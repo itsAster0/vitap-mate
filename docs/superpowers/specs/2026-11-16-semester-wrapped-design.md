@@ -316,3 +316,43 @@ the usual "Unexpected" problem instead of closing the app.
   1080×1920.
 - Whether `wrapped.rs` reads the cached records directly or through the existing `cached_*`.
 - The `WrappedReport` record shape, with one optional field or sub-record per screen.
+
+## New slides (2026-11-18)
+
+Mockups: `wrapped-mockups/new-slides.html`. The existing slides don't change. Each new slide is
+skipped when its facts are missing, and adds one tile to the summary card in slide order.
+
+| After | Slide | Facts | Source |
+|---|---|---|---|
+| Courses | Close call | The course and day attendance came closest to 75%: classes to spare then (or the % it dipped to), its lowest %, its final % | attendance detail |
+| Exams | Exam crunch | The 7-day window with the most papers sat and its dates, the most in one day and that day, days with an exam | exam schedule |
+| Campus | Hostel life | Hours out of the hostel on an average class day, the out/in bar of a class day, trips back to the hostel between classes and their top weekday | biometric |
+| Hostel life | On the move | Floors climbed between classes (with Burj Khalifas, 163 floors each), rooms punched in, the most block changes in a day and its date, rooms per block (top 3) | biometric |
+
+How each fact is worked out:
+- **Close call:** per course, in class order, from its 10th counted class on: spare = the most
+  further absences that keep `percent()` (rounded up, as VTOP) at 75 or more; below 75 there is
+  no spare. The moment with the least spare (below 75 first, then the lowest %) wins; ties go to
+  the earliest. Units are VTOP's (a lab session is two). Skipped when the least spare is over 3.
+- **Exam crunch:** papers already sat (day before today) across every group. The window is the
+  7 days from a paper's day with the most papers, the earliest on a tie. Skipped under 3 papers
+  in the window.
+- **Biometric punches** (checked against live VTOP, 15 Oct 2026): hostel gates read
+  `MH2-FACE-IN-7` / `MH2-FACE-OUT-5`: a place starting `MH` or `LH` with an IN or OUT. A class
+  punch reads `CB-214-FACE`: block CB, room 214. The floor is the room's hundreds digit (1xx is
+  the first floor), and a room starting `G` (G05) is the ground floor (0). The older fixture form
+  `AB1-GF-(101)` (room in brackets) reads the same way. VTOP may drop a minute's leading zero
+  (`19:1` is 19:01), which `minute()` already handles.
+- **Hostel life:** per complete class day, out = each hostel OUT to the next hostel IN that day.
+  Days with at least one OUT→IN pair are averaged, to tenths of an hour. The bar has 36 half
+  hours from 6 AM to midnight, each "out" when out on at least half of those days. A nap is a
+  hostel IN then OUT with a class punch before the IN and after the OUT on the same day.
+  Hostellers only; skipped under 5 such days.
+- **On the move:** per complete class day, class punches in time order. Floors climbed = the
+  first punch's floor plus every rise after it; punches without a readable floor are skipped.
+  Hops = block changes. Rooms = distinct block and room. Skipped without class punches on 5 days.
+- Both biometric slides carry the note "Worked out from your [hostel and ]class punches on
+  <cached> of <total> days, so it can be off." on screen and on the share image. They reuse the
+  Campus slide's Fetch for missing days.
+- **New titles (optional, ask first):** The Stair Climber (150+ floors), The Homebody (20+ naps),
+  The Survivor (dipped below 75% and finished at 75%+), ranked after The Regular.

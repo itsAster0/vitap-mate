@@ -103,9 +103,10 @@ internal class Slide(
 /** Every slide with facts, in the spec's order, ending with the summary. */
 internal fun slides(r: WrappedReport, hasMissing: Boolean): List<Slide> {
     val story = listOfNotNull(
-        openingSlide(r), attendanceSlide(r), streakSlide(r), neverMissedSlide(r), comebackSlide(r), habitsSlide(r),
-        coursesSlide(r), timeSlide(r), placesSlide(r), marksSlide(r), examsSlide(r), gradesSlide(r), cgpaSlide(r),
-        outingsSlide(r), campusSlide(r, hasMissing), previousSlide(r), titleSlide(r),
+        openingSlide(r), attendanceSlide(r), odSlide(r), streakSlide(r), neverMissedSlide(r), comebackSlide(r), habitsSlide(r),
+        dayHalfSlide(r), coursesSlide(r), closeCallSlide(r), timeSlide(r), placesSlide(r), marksSlide(r), fullMarksSlide(r),
+        assessmentsSlide(r), examsSlide(r), crunchSlide(r), gradesSlide(r), cgpaSlide(r), outingsSlide(r), campusSlide(r, hasMissing), hostelSlide(r), movesSlide(r),
+        previousSlide(r), titleSlide(r),
     )
     return story + summarySlide(story)
 }

@@ -13,13 +13,13 @@ use vtop_core::types::{
     WeekendOutingData,
 };
 
-use crate::biometric::{BiometricDay, PunchKind};
+use crate::biometric::{BiometricDay, Punch, PunchKind};
 use crate::calendar::{SemesterCalendar, exam_name};
 use crate::exams::Exams;
 use crate::grades::{
     GradeCount, GradeHistory, GradeSession, Grades, counts, grade_points, semester_summary,
 };
-use crate::marks::Marks;
+use crate::marks::{Assessment, Marks};
 use crate::outing::{self, OutingStanding};
 use crate::records::{
     self, Attendance, AttendanceCourse, AttendedClass, ClassKind, ClassSlot, ClassStatus, Timetable,
@@ -43,19 +43,27 @@ pub struct WrappedReport {
     pub class_day_count: i32,
     pub holidays: i32,
     pub attendance: Option<WrappedAttendance>,
+    pub on_duty: Option<WrappedOnDuty>,
     pub streak: Option<WrappedStreak>,
     /// Course names; empty skips the slide.
     pub never_missed: Vec<String>,
     pub comeback: Option<WrappedComeback>,
+    pub close_call: Option<WrappedCloseCall>,
     pub habits: Option<WrappedHabits>,
+    pub day_half: Option<WrappedDayHalf>,
     pub time: Option<WrappedTime>,
     pub places: Option<WrappedPlaces>,
     pub marks: Option<WrappedMarks>,
+    pub full_marks: Option<WrappedFullMarks>,
+    pub assessments: Option<WrappedAssessments>,
     pub exams: Option<WrappedExams>,
+    pub crunch: Option<WrappedCrunch>,
     pub grades: Option<WrappedGrades>,
     pub cgpa: Option<WrappedCgpa>,
     pub outings: Option<WrappedOutings>,
     pub campus: Option<WrappedCampus>,
+    pub hostel: Option<WrappedHostel>,
+    pub moves: Option<WrappedMoves>,
     pub previous: Option<WrappedPrevious>,
     pub title: WrappedTitle,
     /// The title when Hide grades is on.
@@ -86,6 +94,18 @@ pub struct WrappedCourse {
     pub percent: i32,
 }
 
+/// Classes in VTOP's units (a lab session is two).
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedOnDuty {
+    pub classes: i32,
+    /// Days with a class on duty.
+    pub days: i32,
+    pub present: i32,
+    pub absent: i32,
+    /// The course with the most classes on duty, and one that ties it; `percent` is the count.
+    pub top: Vec<WrappedCourse>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
 pub struct WrappedStreak {
     pub length: i32,
@@ -105,6 +125,19 @@ pub struct WrappedComeback {
     pub final_percent: i32,
 }
 
+/// The moment a course came closest to 75%, in VTOP's units (a lab session is two).
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedCloseCall {
+    pub course: String,
+    /// The class that set the moment.
+    pub day: i32,
+    /// Further absences that keep the course at 75% or more; none when under 75.
+    pub spare: Option<i32>,
+    pub percent: i32,
+    /// After the course's last counted class.
+    pub final_percent: i32,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
 pub struct WrappedHabits {
     /// 0 = Monday; none without an absence.
@@ -118,6 +151,19 @@ pub struct WrappedHabits {
     pub last_slot_days: i32,
     /// Absences by weekday, Monday first; 7 long.
     pub misses_by_weekday: Vec<i32>,
+}
+
+/// Attended classes with a start time, a lab session once: before noon or from 2 PM.
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedDayHalf {
+    /// Before noon is the side with [`DAY_HALF_PERCENT`]; false: from 2 PM.
+    pub morning: bool,
+    /// That side's share, rounded down.
+    pub percent: i32,
+    pub classes: i32,
+    pub total: i32,
+    /// Classes starting in each hour from 8 to 18; 11 long.
+    pub by_hour: Vec<i32>,
 }
 
 /// Attended classes; a lab session is one class of 100 minutes.
@@ -159,11 +205,55 @@ pub struct WrappedCat {
     pub percent: i32,
 }
 
+/// Posted assessments scored at their max marks, re-evaluations left out.
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedFullMarks {
+    pub count: i32,
+    /// Posted assessments.
+    pub of: i32,
+    /// Most first.
+    pub by_kind: Vec<WrappedKindCount>,
+    /// The course with the most; none when that is one.
+    pub top_course: Option<String>,
+    pub top_count: i32,
+}
+
+/// Posted assessments, re-evaluations left out.
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedAssessments {
+    pub total: i32,
+    /// Most first, ties in [`KINDS`] order.
+    pub by_kind: Vec<WrappedKindCount>,
+}
+
+/// Assessments of a kind of [`KINDS`] ("quizzes").
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedKindCount {
+    pub kind: String,
+    pub count: i32,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
 pub struct WrappedExams {
     pub cats: i32,
     pub fats: i32,
     pub top_venue: Option<String>,
+}
+
+/// The 7 days from a paper's day with the most papers sat.
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedCrunch {
+    pub papers: i32,
+    pub first_day: i32,
+    /// `first_day` + 6.
+    pub last_day: i32,
+    /// Papers on each day of the window, `first_day` first; 7 long.
+    pub by_day: Vec<i32>,
+    /// The most papers sat on one day, and the earliest such day.
+    pub most_in_a_day: i32,
+    pub most_day: i32,
+    /// Days with a paper sat.
+    pub exam_days: i32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
@@ -203,6 +293,42 @@ pub struct WrappedCampus {
     pub earliest_entry: Option<String>,
     pub latest_return: Option<String>,
     pub days_on_campus: i32,
+}
+
+/// A hosteller's class days, from hostel gate punches (`MH2-FACE-OUT-3`): out is each OUT to the
+/// next IN that day.
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedHostel {
+    /// Class days with an OUT and an IN after it.
+    pub days: i32,
+    /// Hours out on an average one of those days, in tenths (94 is 9.4 hours).
+    pub out_tenths: i32,
+    /// Half hours from 6:00 to 24:00, each out on at least half of `days`; 36 long.
+    pub out_by_half_hour: Vec<bool>,
+    /// Trips back to the hostel between two class punches.
+    pub naps: i32,
+    /// 0 = Monday, with the most naps; none without a nap.
+    pub nap_weekday: Option<i32>,
+}
+
+/// From class punches (`CB-214-FACE`), in time order each class day.
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedMoves {
+    /// Each day's first floor and every rise after it.
+    pub floors: i32,
+    /// Distinct block and room.
+    pub rooms: i32,
+    /// The most block changes in a day, and the earliest such day.
+    pub most_hops: i32,
+    pub most_hops_day: i32,
+    /// Up to 3, most rooms first, then by name.
+    pub blocks: Vec<WrappedBlock>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
+pub struct WrappedBlock {
+    pub block: String,
+    pub rooms: i32,
 }
 
 /// Against the next older semester; only the halves that improved.
@@ -297,6 +423,12 @@ const PERIOD_MINUTES: i32 = 50;
 /// The comeback counts from this posted class on, and needs this many points.
 const COMEBACK_FROM: usize = 20;
 const COMEBACK_POINTS: i32 = 5;
+/// The close call counts from a course's 10th counted class (in VTOP's units) on, and is
+/// skipped with more than this many classes to spare.
+const CLOSE_CALL_FROM: i32 = 10;
+const CLOSE_CALL_SPARE: i32 = 3;
+/// VTOP's attendance floor, in percent.
+const ATTENDANCE_FLOOR: i32 = 75;
 /// "8 AM" classes start before this minute.
 const EARLY_BEFORE: i32 = 9 * 60;
 /// A return counts as late after this minute.
@@ -306,6 +438,33 @@ const IRON_STREAK_PERCENT: i32 = 15;
 const IRON_STREAK_MIN: i32 = 15;
 /// Courses on the Courses slide's podium.
 const TOP_COURSES: usize = 3;
+/// The On Duty slide needs this many classes on duty.
+const ON_DUTY_MIN: i32 = 10;
+/// Before noon, and from 2 PM; a side needs this share (percent) of the classes.
+const NOON: i32 = 12 * 60;
+const AFTERNOON: i32 = 14 * 60;
+const DAY_HALF_PERCENT: i32 = 60;
+/// The day half's bars: hours from 8.
+const FIRST_HOUR: i32 = 8;
+const HOURS: usize = 11;
+/// Assessment kinds, in the order [`assessment_kind`] tries them.
+const KINDS: [&str; 8] = [
+    "quizzes",
+    "CATs",
+    "FATs",
+    "lab experiments",
+    "digital assessments",
+    "reviews and reports",
+    "assignments",
+    "other",
+];
+/// Papers the exam crunch's week needs.
+const CRUNCH_MIN: i32 = 3;
+/// The biometric slides need this many class days with their punches.
+const BIOMETRIC_MIN_DAYS: i32 = 5;
+/// The hostel bar's half hours, from this minute.
+const HALF_HOURS: usize = 36;
+const DAY_START: i32 = 6 * 60;
 
 impl Core {
     fn wrapped(&self, flow: &str, today: i32) -> Option<WrappedReport> {
@@ -391,6 +550,8 @@ impl Core {
                     .filter(|day| day.complete)
             })
             .collect();
+        let schedule = self.cached_exams(flow.to_string());
+        let marks_page = self.cached_marks(flow.to_string());
         let mut report = WrappedReport {
             semester_name: list
                 .semesters
@@ -406,16 +567,20 @@ impl Core {
             class_day_count: class_days.len() as i32,
             holidays: calendar.holidays().len() as i32,
             attendance: attendance(&courses, &classes),
+            on_duty: on_duty(&classes),
             streak: streak(&classes),
             never_missed: never_missed(&courses),
             comeback: comeback(&classes),
+            close_call: close_call(&classes),
             habits: habits(&classes, slots),
+            day_half: day_half(&classes),
             time: time(&classes),
             places: places(&classes, slots),
-            marks: self.cached_marks(flow.to_string()).and_then(|m| marks(&m)),
-            exams: self
-                .cached_exams(flow.to_string())
-                .and_then(|e| exams(&e, today)),
+            marks: marks_page.as_ref().and_then(marks),
+            full_marks: marks_page.as_ref().and_then(full_marks),
+            assessments: marks_page.as_ref().and_then(assessments),
+            exams: schedule.as_ref().and_then(|e| exams(e, today)),
+            crunch: schedule.as_ref().and_then(|e| crunch(e, today)),
             grades,
             cgpa,
             outings: outings(
@@ -433,6 +598,8 @@ impl Core {
                 },
             ),
             campus: campus(&biometric, class_days.len() as i32),
+            hostel: hostel(&biometric),
+            moves: moves(&biometric),
             previous,
             title: WrappedTitle::FreeSpirit,
             title_without_grades: WrappedTitle::FreeSpirit,
@@ -445,16 +612,24 @@ impl Core {
             classes = classes.len(),
             biometric_days = biometric.len(),
             attendance = report.attendance.is_some(),
+            on_duty = report.on_duty.is_some(),
             streak = report.streak.is_some(),
             comeback = report.comeback.is_some(),
+            close_call = report.close_call.is_some(),
             habits = report.habits.is_some(),
+            day_half = report.day_half.is_some(),
             time = report.time.is_some(),
             places = report.places.is_some(),
             marks = report.marks.is_some(),
+            full_marks = report.full_marks.is_some(),
+            assessments = report.assessments.is_some(),
             exams = report.exams.is_some(),
+            crunch = report.crunch.is_some(),
             grades = report.grades.is_some(),
             cgpa = report.cgpa.is_some(),
             outings = report.outings.is_some(),
+            hostel = report.hostel.is_some(),
+            moves = report.moves.is_some(),
             previous = report.previous.is_some(),
             "wrapped"
         );
@@ -492,8 +667,8 @@ fn pooled(courses: &[AttendanceCourse]) -> Option<(i32, i32, i32)> {
     Some((percent(attended, counted)?, attended, counted))
 }
 
-/// The key with the largest sum, keys compared ignoring case; the first seen wins a tie.
-fn most(items: impl IntoIterator<Item = (String, i32)>) -> Option<(String, i32)> {
+/// Each key's sum, keys compared ignoring case, in the order first seen.
+fn sums(items: impl IntoIterator<Item = (String, i32)>) -> Vec<(String, i32)> {
     let mut sums: Vec<(String, i32)> = Vec::new();
     for (key, n) in items {
         match sums.iter_mut().find(|(k, _)| k.eq_ignore_ascii_case(&key)) {
@@ -501,10 +676,17 @@ fn most(items: impl IntoIterator<Item = (String, i32)>) -> Option<(String, i32)>
             None => sums.push((key, n)),
         }
     }
-    sums.into_iter().fold(None, |best, (key, n)| match best {
-        Some((_, top)) if top >= n => best,
-        _ => Some((key, n)),
-    })
+    sums
+}
+
+/// The key with the largest sum, as [`sums`]; the first seen wins a tie.
+fn most(items: impl IntoIterator<Item = (String, i32)>) -> Option<(String, i32)> {
+    sums(items)
+        .into_iter()
+        .fold(None, |best, (key, n)| match best {
+            Some((_, top)) if top >= n => best,
+            _ => Some((key, n)),
+        })
 }
 
 fn attendance(courses: &[AttendanceCourse], classes: &[Taken]) -> Option<WrappedAttendance> {
@@ -549,6 +731,40 @@ fn attendance(courses: &[AttendanceCourse], classes: &[Taken]) -> Option<Wrapped
         least: least.name.clone(),
         least_percent: least.percent.ceil() as i32,
         top,
+    })
+}
+
+/// None under [`ON_DUTY_MIN`] classes on duty.
+fn on_duty(classes: &[Taken]) -> Option<WrappedOnDuty> {
+    let with = |status: ClassStatus| {
+        classes
+            .iter()
+            .filter(move |(_, class)| class.status == Some(status))
+    };
+    let units = |status| with(status).map(|(course, _)| periods(course)).sum::<i32>();
+    let od = units(ClassStatus::OnDuty);
+    if od < ON_DUTY_MIN {
+        return None;
+    }
+    // By course name, so a course's theory and lab count together; the first seen wins a tie.
+    let mut courses =
+        sums(with(ClassStatus::OnDuty).map(|(course, _)| (course.name.clone(), periods(course))));
+    courses.sort_by_key(|&(_, n)| std::cmp::Reverse(n));
+    let most = courses.first()?.1;
+    Some(WrappedOnDuty {
+        classes: od,
+        days: with(ClassStatus::OnDuty)
+            .map(|(_, class)| class.day)
+            .collect::<HashSet<_>>()
+            .len() as i32,
+        present: units(ClassStatus::Present),
+        absent: units(ClassStatus::Absent),
+        top: courses
+            .into_iter()
+            .take(2)
+            .take_while(|&(_, n)| n == most)
+            .map(|(name, percent)| WrappedCourse { name, percent })
+            .collect(),
     })
 }
 
@@ -641,6 +857,61 @@ fn comeback(classes: &[Taken]) -> Option<WrappedComeback> {
     })
 }
 
+/// Per course in class order, from its [`CLOSE_CALL_FROM`]th counted class and first absence on:
+/// the moment with the least to spare (under 75% first, the lowest of those first), the earliest of equals.
+fn close_call(classes: &[Taken]) -> Option<WrappedCloseCall> {
+    let mut posted: Vec<&Taken> = classes
+        .iter()
+        .filter(|(_, class)| is_counted(class))
+        .collect();
+    posted.sort_by_key(|(course, class)| (course.key.as_str(), class.day, class.start));
+    let mut best: Option<((bool, i32, i32), WrappedCloseCall)> = None;
+    for group in posted.chunk_by(|a, b| a.0.key == b.0.key) {
+        let (mut attended, mut counted) = (0, 0);
+        let mut low: Option<((bool, i32, i32), WrappedCloseCall)> = None;
+        for (course, class) in group {
+            let unit = periods(course);
+            counted += unit;
+            if is_attended(class) {
+                attended += unit;
+            }
+            // Before a course's first absence there's no close call: a full course is always
+            // 3 to spare at its 10th class.
+            let Some(now) = percent(attended, counted)
+                .filter(|_| counted >= CLOSE_CALL_FROM && attended < counted)
+            else {
+                continue;
+            };
+            let spare = (now >= ATTENDANCE_FLOOR).then(|| {
+                (1..)
+                    .take_while(|k| {
+                        percent(attended, counted + k * unit).is_some_and(|p| p >= ATTENDANCE_FLOOR)
+                    })
+                    .count() as i32
+            });
+            let rank = (spare.is_some(), spare.unwrap_or(now), class.day);
+            if low.as_ref().is_none_or(|(lowest, _)| rank < *lowest) {
+                let call = WrappedCloseCall {
+                    course: course.name.clone(),
+                    day: class.day,
+                    spare,
+                    percent: now,
+                    final_percent: 0,
+                };
+                low = Some((rank, call));
+            }
+        }
+        if let (Some((rank, mut call)), Some(last)) = (low, percent(attended, counted)) {
+            call.final_percent = last;
+            if best.as_ref().is_none_or(|(lowest, _)| rank < *lowest) {
+                best = Some((rank, call));
+            }
+        }
+    }
+    best.map(|(_, call)| call)
+        .filter(|call| call.spare.is_none_or(|spare| spare <= CLOSE_CALL_SPARE))
+}
+
 fn habits(classes: &[Taken], slots: &[ClassSlot]) -> Option<WrappedHabits> {
     let posted: Vec<&AttendedClass> = classes
         .iter()
@@ -691,6 +962,39 @@ fn habits(classes: &[Taken], slots: &[ClassSlot]) -> Option<WrappedHabits> {
         first_slot_days: days_at(slots.iter().map(|s| s.start).min(), |c| c.start),
         last_slot_days: days_at(slots.iter().map(|s| s.end).max(), |c| c.end),
         misses_by_weekday: misses.to_vec(),
+    })
+}
+
+/// None when neither side has [`DAY_HALF_PERCENT`] of the classes.
+fn day_half(classes: &[Taken]) -> Option<WrappedDayHalf> {
+    let starts: Vec<i32> = classes
+        .iter()
+        .filter(|(_, class)| is_attended(class))
+        .filter_map(|(_, class)| class.start)
+        .collect();
+    let side = |on: fn(i32) -> bool| starts.iter().filter(|&&start| on(start)).count() as i32;
+    let (before, after) = (side(|s| s < NOON), side(|s| s >= AFTERNOON));
+    let total = starts.len() as i32;
+    let classes = before.max(after);
+    let percent = (total > 0).then(|| classes * 100 / total)?;
+    if percent < DAY_HALF_PERCENT {
+        return None;
+    }
+    let mut by_hour = vec![0; HOURS];
+    for start in starts {
+        if let Some(n) = usize::try_from(start / 60 - FIRST_HOUR)
+            .ok()
+            .and_then(|hour| by_hour.get_mut(hour))
+        {
+            *n += 1;
+        }
+    }
+    Some(WrappedDayHalf {
+        morning: before > after,
+        percent,
+        classes,
+        total,
+        by_hour,
     })
 }
 
@@ -850,6 +1154,79 @@ fn marks(marks: &Marks) -> Option<WrappedMarks> {
         .then_some(report)
 }
 
+/// A marks title's kind of [`KINDS`], the first that matches ignoring case: "QUIZ1" is
+/// quizzes, "Exp1+2" and "Final LAB Report" lab experiments, "DA-1" a digital assessment.
+fn assessment_kind(title: &str) -> &'static str {
+    let lower = title.to_lowercase();
+    let has = |words: &[&str]| words.iter().any(|word| lower.contains(word));
+    let da = lower
+        .split(|c: char| !c.is_ascii_alphabetic())
+        .any(|word| word == "da");
+    let rules = [
+        has(&["quiz"]),
+        cat_of(title).is_some() || title.trim().starts_with("CAT"),
+        has(&["fat"]),
+        has(&["exp", "lab"]),
+        da || has(&["digital assessment"]),
+        has(&["review", "project", "report"]),
+        has(&["assignment"]),
+    ];
+    rules
+        .iter()
+        .position(|&hit| hit)
+        .map_or(KINDS[KINDS.len() - 1], |at| KINDS[at])
+}
+
+/// Posted assessments, re-evaluations left out, with their course's name.
+fn posted(marks: &Marks) -> impl Iterator<Item = (&str, &Assessment)> {
+    marks.courses.iter().flat_map(|course| {
+        course
+            .assessments
+            .iter()
+            .filter(|a| a.scored.is_some() && !a.reevaluation)
+            .map(move |a| (course.name.as_str(), a))
+    })
+}
+
+/// The kinds of `titles` with one or more, most first, ties in [`KINDS`] order.
+fn by_kind<'a>(titles: impl Iterator<Item = &'a str>) -> Vec<WrappedKindCount> {
+    let kinds: Vec<&str> = titles.map(assessment_kind).collect();
+    let mut counts: Vec<WrappedKindCount> = KINDS
+        .iter()
+        .map(|&kind| WrappedKindCount {
+            kind: kind.to_string(),
+            count: kinds.iter().filter(|&&k| k == kind).count() as i32,
+        })
+        .filter(|kind| kind.count > 0)
+        .collect();
+    counts.sort_by_key(|kind| std::cmp::Reverse(kind.count));
+    counts
+}
+
+/// None without a full mark.
+fn full_marks(marks: &Marks) -> Option<WrappedFullMarks> {
+    let full: Vec<(&str, &Assessment)> = posted(marks)
+        .filter(|(_, a)| a.max > 0.0 && a.scored.is_some_and(|scored| scored >= a.max))
+        .collect();
+    let (course, top_count) = most(full.iter().map(|(name, _)| (name.to_string(), 1)))?;
+    Some(WrappedFullMarks {
+        count: full.len() as i32,
+        of: posted(marks).count() as i32,
+        by_kind: by_kind(full.iter().map(|(_, a)| a.title.as_str())),
+        top_course: (top_count > 1).then_some(course),
+        top_count,
+    })
+}
+
+/// None without a posted assessment.
+fn assessments(marks: &Marks) -> Option<WrappedAssessments> {
+    let total = posted(marks).count() as i32;
+    (total > 0).then(|| WrappedAssessments {
+        total,
+        by_kind: by_kind(posted(marks).map(|(_, a)| a.title.as_str())),
+    })
+}
+
 /// Papers dated before `today`: the ones already sat.
 fn exams(exams: &Exams, today: i32) -> Option<WrappedExams> {
     let sat = |group: &'_ crate::exams::ExamGroup| {
@@ -881,6 +1258,39 @@ fn exams(exams: &Exams, today: i32) -> Option<WrappedExams> {
         cats,
         fats,
         top_venue: most(venues).map(|(venue, _)| venue),
+    })
+}
+
+/// Papers dated before `today`, across every exam: the busiest 7 days from a paper's day, the
+/// earliest of equals; none under [`CRUNCH_MIN`] papers in it.
+fn crunch(exams: &Exams, today: i32) -> Option<WrappedCrunch> {
+    let mut days: Vec<i32> = exams
+        .groups
+        .iter()
+        .flat_map(|group| &group.papers)
+        .filter_map(|paper| paper.day.filter(|&day| day < today))
+        .collect();
+    days.sort_unstable();
+    let on = |day: i32| days.iter().filter(|&&d| d == day).count() as i32;
+    let (papers, first_day) = days
+        .iter()
+        .map(|&from| ((from..from + 7).map(on).sum::<i32>(), from))
+        .max_by_key(|&(n, from)| (n, std::cmp::Reverse(from)))
+        .filter(|&(n, _)| n >= CRUNCH_MIN)?;
+    let (most_in_a_day, most_day) = days
+        .iter()
+        .map(|&day| (on(day), day))
+        .max_by_key(|&(n, day)| (n, std::cmp::Reverse(day)))?;
+    let by_day = (first_day..first_day + 7).map(on).collect();
+    days.dedup();
+    Some(WrappedCrunch {
+        papers,
+        first_day,
+        last_day: first_day + 6,
+        by_day,
+        most_in_a_day,
+        most_day,
+        exam_days: days.len() as i32,
     })
 }
 
@@ -1180,6 +1590,173 @@ fn campus(days: &[BiometricDay], total: i32) -> Option<WrappedCampus> {
         earliest_entry: earliest.map(clock),
         latest_return: latest.map(clock),
         days_on_campus: days.iter().filter(|day| !day.punches.is_empty()).count() as i32,
+    })
+}
+
+/// A class punch's block, room and floor.
+struct ClassPunch {
+    block: String,
+    room: String,
+    floor: i32,
+}
+
+/// "CB-214-FACE" is block CB, room 214, floor 2 (the hundreds); a room starting G ("G05"), or a
+/// "GF" part, is the ground floor, and an "<n>F" part gives the floor too. The older form
+/// "AB1-GF-(101)" has the room in brackets. None for a gate's IN or OUT ("MH2-FACE-IN-7", and
+/// July 2026's "MH2-IN-3-(358)" with the gate's number in brackets) and without a room
+/// ("LIB-FACE").
+fn class_punch(venue: &str) -> Option<ClassPunch> {
+    let mut parts = venue.split('-').map(str::trim);
+    let block = parts.next().filter(|block| !block.is_empty())?.to_string();
+    let rest: Vec<&str> = parts.collect();
+    if rest.iter().any(|part| matches!(*part, "IN" | "OUT")) {
+        return None;
+    }
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let room = rest
+        .iter()
+        .map(|part| part.trim_start_matches('(').trim_end_matches(')'))
+        .find(|part| {
+            (part.len() >= 3 && digits(part)) || part.strip_prefix('G').is_some_and(digits)
+        })?;
+    let floor = rest
+        .iter()
+        .find_map(|part| match *part {
+            "GF" => Some(0),
+            part => part.strip_suffix('F').filter(|n| digits(n))?.parse().ok(),
+        })
+        .unwrap_or_else(|| room.parse::<i32>().map_or(0, |number| number / 100));
+    Some(ClassPunch {
+        block,
+        room: room.to_string(),
+        floor,
+    })
+}
+
+/// A hostel gate's IN or OUT: a place starting MH or LH.
+fn is_hostel(punch: &Punch) -> bool {
+    let place = punch.place.to_uppercase();
+    (place.starts_with("MH") || place.starts_with("LH")) && punch.kind != PunchKind::Other
+}
+
+/// Hostellers only: none under [`BIOMETRIC_MIN_DAYS`] days out of the hostel.
+fn hostel(days: &[BiometricDay]) -> Option<WrappedHostel> {
+    let (mut out_days, mut out_minutes) = (0, 0);
+    let (mut halves, mut naps) = ([0; HALF_HOURS], [0; 7]);
+    for day in days {
+        // In time order, with a time.
+        let punches: Vec<(i32, &Punch)> = day
+            .punches
+            .iter()
+            .rev()
+            .filter_map(|punch| Some((punch.minute?, punch)))
+            .collect();
+        let gates: Vec<(i32, PunchKind)> = punches
+            .iter()
+            .filter(|(_, punch)| is_hostel(punch))
+            .map(|&(minute, punch)| (minute, punch.kind))
+            .collect();
+        let classes: Vec<i32> = punches
+            .iter()
+            .filter(|(_, punch)| class_punch(&punch.venue).is_some())
+            .map(|&(minute, _)| minute)
+            .collect();
+        for pair in gates.windows(2) {
+            if let &[(entry, PunchKind::Entry), (exit, PunchKind::Exit)] = pair
+                && classes.first().is_some_and(|&first| first < entry)
+                && classes.last().is_some_and(|&last| last > exit)
+            {
+                naps[records::weekday(day.day) as usize] += 1;
+            }
+        }
+        let (mut out, mut left): (Vec<(i32, i32)>, Option<i32>) = (Vec::new(), None);
+        for &(minute, kind) in &gates {
+            if kind == PunchKind::Exit {
+                left.get_or_insert(minute);
+            } else if let Some(from) = left.take() {
+                out.push((from, minute));
+            }
+        }
+        if out.is_empty() {
+            continue;
+        }
+        out_days += 1;
+        out_minutes += out.iter().map(|(from, to)| to - from).sum::<i32>();
+        for (at, half) in halves.iter_mut().enumerate() {
+            let middle = DAY_START + 30 * at as i32 + 15;
+            if out.iter().any(|&(from, to)| from <= middle && middle < to) {
+                *half += 1;
+            }
+        }
+    }
+    if out_days < BIOMETRIC_MIN_DAYS {
+        return None;
+    }
+    Some(WrappedHostel {
+        days: out_days,
+        out_tenths: (out_minutes * 10 + 30 * out_days) / (60 * out_days),
+        out_by_half_hour: halves.iter().map(|&n| n * 2 >= out_days).collect(),
+        naps: naps.iter().sum(),
+        nap_weekday: naps
+            .iter()
+            .enumerate()
+            .max_by_key(|&(day, &n)| (n, std::cmp::Reverse(day)))
+            .filter(|&(_, &n)| n > 0)
+            .map(|(day, _)| day as i32),
+    })
+}
+
+/// None with class punches on fewer than [`BIOMETRIC_MIN_DAYS`] days.
+fn moves(days: &[BiometricDay]) -> Option<WrappedMoves> {
+    let (mut floors, mut class_days) = (0, 0);
+    let mut hops: Option<(i32, i32)> = None;
+    let mut rooms: HashSet<(String, String)> = HashSet::new();
+    for day in days {
+        // In time order, as punches are newest first.
+        let punches: Vec<ClassPunch> = day
+            .punches
+            .iter()
+            .rev()
+            .filter_map(|punch| class_punch(&punch.venue))
+            .collect();
+        let Some(first) = punches.first() else {
+            continue;
+        };
+        class_days += 1;
+        floors += first.floor;
+        let mut changes = 0;
+        for pair in punches.windows(2) {
+            floors += (pair[1].floor - pair[0].floor).max(0);
+            changes += i32::from(pair[1].block != pair[0].block);
+        }
+        // Days are in order, so the earliest keeps a tie.
+        if hops.is_none_or(|(most, _)| changes > most) {
+            hops = Some((changes, day.day));
+        }
+        rooms.extend(punches.into_iter().map(|p| (p.block, p.room)));
+    }
+    if class_days < BIOMETRIC_MIN_DAYS {
+        return None;
+    }
+    let (most_hops, most_hops_day) = hops?;
+    let mut blocks: Vec<WrappedBlock> = Vec::new();
+    for (block, _) in &rooms {
+        match blocks.iter_mut().find(|b| b.block == *block) {
+            Some(b) => b.rooms += 1,
+            None => blocks.push(WrappedBlock {
+                block: block.clone(),
+                rooms: 1,
+            }),
+        }
+    }
+    blocks.sort_by(|a, b| b.rooms.cmp(&a.rooms).then_with(|| a.block.cmp(&b.block)));
+    blocks.truncate(3);
+    Some(WrappedMoves {
+        floors,
+        rooms: rooms.len() as i32,
+        most_hops,
+        most_hops_day,
+        blocks,
     })
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,6 +31,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Info
+import com.composables.icons.lucide.Lucide
+import java.util.Locale
+import vitapmate.core.WrappedCampus
 import vitapmate.core.WrappedReport
 
 // Outings and campus times.
@@ -97,6 +102,93 @@ internal fun campusSlide(r: WrappedReport, hasMissing: Boolean): Slide? {
         }
         if (c.daysCached != c.daysTotal) Txt(378) { Chip("from ${c.daysCached} of ${c.daysTotal} days") }
         if (!ctx.share && (days > 0 || fetch.running)) FetchRow(432, fetch, days, offer = false)
+    }
+}
+
+/** Out of the hostel on a class day: hours, the day's out and in runs, and naps. */
+internal fun hostelSlide(r: WrappedReport): Slide? {
+    val h = r.hostel ?: return null
+    val hours = "${h.outTenths / 10}.${h.outTenths % 10}"
+    val naps = h.naps.takeIf { it > 0 }
+    return Slide("hostel", Ink.Success, tiles = listOf(Tile(Ink.Success, "$hours h", "out of the hostel a day" + (naps?.let { ", ${count(it, "nap")}" } ?: ""), span = 3))) {
+        val ink = LocalInks.current
+        Txt(58) { Label("Hostel life") }
+        Txt(84) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Big(hours, 112f)
+                H("h", modifier = Modifier.padding(bottom = 12.dp))
+            }
+        }
+        Txt(206) { H("out of the hostel on a class day", 26f) }
+        // 6 AM to midnight in half hours: runs out in the tone, runs in faint.
+        val runs = mutableListOf<Pair<Boolean, Int>>()
+        h.outByHalfHour.forEach { out -> if (runs.lastOrNull()?.first == out) runs[runs.lastIndex] = out to runs.last().second + 1 else runs += out to 1 }
+        SplitBar(290, 44, runs.map { (out, n) -> Triple("", n.toFloat(), (if (out) ink.shape else ink.text.copy(alpha = 0.16f)) to ink.text) })
+        Txt(342) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("6 AM", "noon", "6 PM", "midnight").forEach { Text(it, color = ink.text.copy(alpha = 0.8f), style = type(12f, 600, 0f, 1.2f)) }
+            }
+        }
+        if (naps != null) Panel(378) {
+            Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Big("$naps", 44f)
+                Text(
+                    (if (naps == 1) "trip" else "trips") + " back to your room between classes" + (h.napWeekday?.let { ", most on ${WEEKDAYS[it]}" } ?: ""),
+                    color = ink.text,
+                    style = type(15f, 600, -0.01f, 1.3f),
+                )
+            }
+        }
+        BiometricNote(478, hostel = true, r.campus)
+    }
+}
+
+/** Floors climbed between classes, rooms punched in, hops between blocks. */
+internal fun movesSlide(r: WrappedReport): Slide? {
+    val m = r.moves ?: return null
+    return Slide("moves", Ink.Lab, tiles = listOf(Tile(Ink.Lab, "${m.floors}", "floors climbed, ${count(m.rooms, "room")}", span = 3))) {
+        val ink = LocalInks.current
+        // A staircase at the top right.
+        Shaped(RoundedCornerShape(14.dp), 262, 196, 84, 44, color = lerp(ink.bg, ink.shape, 0.35f))
+        Shaped(RoundedCornerShape(14.dp), 290, 152, 56, 44, color = lerp(ink.bg, ink.shape, 0.6f))
+        Shaped(RoundedCornerShape(14.dp), 318, 108, 28, 44)
+        Txt(58) { Label("On the move") }
+        Txt(86) { Big("${m.floors}", if (m.floors >= 1000) 96f else 120f) }
+        Txt(212) {
+            H(if (m.floors == 1) "floor climbed" else "floors climbed")
+            val burj = m.floors / 163f
+            P("Between classes" + if (burj >= 0.1f) ", about ${String.format(Locale.US, "%.1f", burj)} Burj Khalifas" else "")
+        }
+        Minis(
+            316,
+            listOfNotNull(
+                count(m.rooms, "room") to "you punched in",
+                m.mostHops.takeIf { it > 0 }?.let { count(it, "hop") to "between blocks on ${day(m.mostHopsDay)}" },
+            ),
+        )
+        Txt(414) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                m.blocks.forEachIndexed { i, b -> Chip("${b.block} · " + if (i == 0) count(b.rooms, "room") else "${b.rooms}") }
+            }
+        }
+        BiometricNote(478, hostel = false, r.campus)
+    }
+}
+
+/** The biometric slides' note, on screen and on the share image. */
+@Composable
+private fun BiometricNote(y: Int, hostel: Boolean, campus: WrappedCampus?) {
+    val color = LocalInks.current.text.copy(alpha = 0.78f)
+    Txt(y) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Lucide.Info, null, Modifier.padding(top = 1.dp).size(16.dp), tint = color)
+            Text(
+                "Worked out from your ${if (hostel) "hostel and " else ""}class punches" +
+                    (campus?.let { " on ${it.daysCached} of ${it.daysTotal} days" } ?: "") + ", so it can be off.",
+                color = color,
+                style = type(12f, 500, 0f, 1.35f),
+            )
+        }
     }
 }
 

@@ -1592,3 +1592,477 @@ fn previous_gpa_change_needs_a_hundredth() {
         .unwrap();
     assert!((change - 0.25).abs() < 1e-9, "{change}");
 }
+
+/// One class a day from [`d0`], as (count, status) runs in order.
+fn runs(
+    runs: &[(i32, &'static str)],
+    slot: &'static str,
+) -> Vec<(i32, &'static str, &'static str, &'static str)> {
+    runs.iter()
+        .flat_map(|&(n, status)| (0..n).map(move |_| status))
+        .enumerate()
+        .map(|(i, status)| (d0() + i as i32, "08:00-08:50", status, slot))
+        .collect()
+}
+
+#[test]
+fn close_call_finds_the_tightest_moment() {
+    let fixture = Fixture::new("close-call");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 20, 24)]),
+    );
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(12, "Present"), (4, "Absent"), (8, "Present")], "A1"),
+    );
+    let call = fixture.report().close_call.unwrap();
+    // 12 of 16 is 75% with none to spare; 20 of 24 is 83.3%, 84 rounded up.
+    assert_eq!(
+        (
+            call.course.as_str(),
+            call.day,
+            call.spare,
+            call.percent,
+            call.final_percent
+        ),
+        ("CSE1001 name", d0() + 15, Some(0), 75, 84)
+    );
+}
+
+#[test]
+fn close_call_skipped_with_room_to_spare() {
+    let fixture = Fixture::new("close-call-room");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 30, 30)]),
+    );
+    fixture.history("CSE1001.theory", &runs(&[(30, "Present")], "A1"));
+    assert_eq!(fixture.report().close_call, None);
+}
+
+#[test]
+fn close_call_below_75_has_no_spare() {
+    let fixture = Fixture::new("close-call-below");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 8, 14)]),
+    );
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(6, "Present"), (6, "Absent"), (2, "Present")], "A1"),
+    );
+    let call = fixture.report().close_call.unwrap();
+    // Under 75% from the 10th class on and never back: the lowest, 6 of 12.
+    assert_eq!(
+        (call.day, call.spare, call.percent, call.final_percent),
+        (d0() + 11, None, 50, 58)
+    );
+}
+
+#[test]
+fn close_call_counts_a_lab_as_two() {
+    let fixture = Fixture::new("close-call-lab");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ELA", 22, 24)]),
+    );
+    fixture.history(
+        "CSE1001.lab",
+        &runs(&[(5, "Present"), (1, "Absent"), (6, "Present")], "L1+L2"),
+    );
+    let call = fixture.report().close_call.unwrap();
+    // 10 of 12 at the 6th session; one more missed session is 10 of 14, 72%.
+    assert_eq!(
+        (call.day, call.spare, call.percent, call.final_percent),
+        (d0() + 5, Some(0), 84, 92)
+    );
+}
+
+/// An exam schedule of one CAT with a paper on each of `days` (none: not dated yet).
+fn exam_days(days: &[Option<i32>]) -> Value {
+    let records: Vec<Value> = days
+        .iter()
+        .enumerate()
+        .map(|(i, day)| {
+            json!({"serial": "1", "slot": "A1", "course_name": format!("C{i}"), "course_code": format!("C{i}"),
+                "course_type": "ETH", "course_id": "", "exam_date": day.map(dmy).unwrap_or_default(),
+                "exam_session": "FN", "reporting_time": "", "exam_time": "09:30 AM - 11:00 AM",
+                "venue": "AB1-101", "seat_location": "", "seat_no": ""})
+        })
+        .collect();
+    json!({"exams": [{"exam_type": "CAT1", "records": records}], "semester_id": "AP2", "update_time": 1})
+}
+
+#[test]
+fn crunch_finds_the_busiest_week() {
+    let fixture = Fixture::new("crunch");
+    let d = calendar_ending_after_today(&fixture) - 30;
+    fixture.page(
+        "exam_schedule.json",
+        &exam_days(&[Some(d), Some(d + 2), Some(d + 2), Some(d + 5), Some(d + 20)]),
+    );
+    let c = fixture.report().crunch.unwrap();
+    assert_eq!(
+        (
+            c.papers,
+            c.first_day,
+            c.last_day,
+            c.most_in_a_day,
+            c.most_day,
+            c.exam_days
+        ),
+        (4, d, d + 6, 2, d + 2, 4)
+    );
+    assert_eq!(c.by_day, [1, 0, 2, 0, 0, 1, 0]);
+}
+
+#[test]
+fn crunch_needs_three_papers() {
+    let fixture = Fixture::new("crunch-few");
+    let d = calendar_ending_after_today(&fixture) - 30;
+    fixture.page("exam_schedule.json", &exam_days(&[Some(d), Some(d + 1)]));
+    assert_eq!(fixture.report().crunch, None);
+}
+
+#[test]
+fn crunch_skips_undated_and_future_papers() {
+    let fixture = Fixture::new("crunch-ahead");
+    let today = calendar_ending_after_today(&fixture);
+    fixture.page(
+        "exam_schedule.json",
+        &exam_days(&[Some(today - 3), Some(today - 2), None, Some(today)]),
+    );
+    assert_eq!(fixture.report().crunch, None);
+}
+
+/// A complete cached biometric copy of `day` with `punches` as (time, venue), in any order.
+fn punches(fixture: &Fixture, day: i32, punches: &[(&str, &str)]) {
+    let records: Vec<Value> = punches
+        .iter()
+        .map(|&(time, venue)| json!({"serial": "1", "punch_date": "", "punch_time": time, "venue": venue}))
+        .collect();
+    fixture.shared(
+        &format!("biometric/{day}.json"),
+        &json!({"records": records, "requested_date": "", "update_time": i64::from(day + 1) * 86_400}),
+    );
+}
+
+/// A hosteller's class day, as live VTOP sent it on 15 Oct 2026.
+const HOSTEL_DAY: [(&str, &str); 9] = [
+    ("06:27:00", "MH2-FACE-OUT-3"),
+    ("07:27:00", "MH2-FACE-IN-4"),
+    ("09:55:00", "MH2-FACE-OUT-3"),
+    ("10:48:00", "CB-214-FACE"),
+    ("10:58:00", "MH2-FACE-IN-4"),
+    ("13:37:00", "MH2-FACE-OUT-3"),
+    ("14:14:00", "MH2-FACE-IN-4"),
+    ("17:37:00", "MH2-FACE-OUT-3"),
+    ("19:1", "MH2-FACE-IN-4"),
+];
+
+#[test]
+fn class_punch_reads_block_room_floor() {
+    let read = |venue: &str| class_punch(venue).map(|p| (p.block, p.room, p.floor));
+    assert_eq!(read("CB-214-FACE"), Some(("CB".into(), "214".into(), 2)));
+    assert_eq!(read("AB1-G05-FACE"), Some(("AB1".into(), "G05".into(), 0)));
+    assert_eq!(read("AB1-GF-(101)"), Some(("AB1".into(), "101".into(), 0)));
+    assert_eq!(read("AB2-105-FACE").map(|p| p.2), Some(1));
+    // Gates, also in July 2026's form with the gate's number in brackets.
+    for venue in [
+        "MH2-FACE-IN-7",
+        "MH2-IN-3-(358)",
+        "MH2-OUT-2-(342)",
+        "AB1-FACE-OUT-1",
+        "LIB-FACE",
+        "Enrollment-Device-1",
+        "",
+    ] {
+        assert_eq!(read(venue), None, "{venue}");
+    }
+}
+
+#[test]
+fn hostel_out_time_and_naps() {
+    let fixture = Fixture::new("hostel");
+    let d = d0();
+    // Mon to Thu, and the next Tuesday.
+    for day in [d, d + 1, d + 2, d + 3, d + 8] {
+        let mut day_punches = HOSTEL_DAY.to_vec();
+        // A class after the 13:37 OUT: the IN at 10:58 and that OUT were a nap.
+        if day == d + 1 || day == d + 8 {
+            day_punches.push(("14:30:00", "CB-214-FACE"));
+        }
+        punches(&fixture, day, &day_punches);
+    }
+    let h = fixture.report().hostel.unwrap();
+    // 1:00 + 1:03 + 0:37 + 1:24 = 4:04 a day.
+    assert_eq!(
+        (h.days, h.out_tenths, h.naps, h.nap_weekday),
+        (5, 41, 2, Some(1))
+    );
+    assert_eq!(h.out_by_half_hour.len(), 36);
+    assert!(h.out_by_half_hour[8] && h.out_by_half_hour[1]);
+    assert!(!h.out_by_half_hour[0] && !h.out_by_half_hour[30]);
+}
+
+#[test]
+fn hostel_none_for_a_day_scholar() {
+    let fixture = Fixture::new("hostel-day-scholar");
+    for day in d0()..d0() + 5 {
+        punches(
+            &fixture,
+            day,
+            &[("09:00:00", "CB-214-FACE"), ("11:00:00", "AB1-G05-FACE")],
+        );
+    }
+    let report = fixture.report();
+    assert_eq!(report.hostel, None);
+    assert!(report.moves.is_some());
+}
+
+#[test]
+fn hostel_ignores_an_in_before_any_out() {
+    let fixture = Fixture::new("hostel-in-first");
+    for day in d0()..d0() + 5 {
+        punches(
+            &fixture,
+            day,
+            &[
+                ("07:00:00", "MH2-FACE-IN-4"),
+                ("08:00:00", "MH2-FACE-OUT-3"),
+                ("09:00:00", "MH2-FACE-IN-4"),
+                ("09:30:00", "LIB-FACE"),
+            ],
+        );
+    }
+    let h = fixture.report().hostel.unwrap();
+    assert_eq!((h.days, h.out_tenths, h.naps), (5, 10, 0));
+}
+
+#[test]
+fn moves_counts_floors_rooms_hops() {
+    let fixture = Fixture::new("moves");
+    let d = d0();
+    // Out of time order, as VTOP may list them.
+    punches(
+        &fixture,
+        d,
+        &[
+            ("12:00:00", "AB1-G05-FACE"),
+            ("09:00:00", "CB-214-FACE"),
+            ("08:00:00", "MH2-FACE-OUT-3"),
+            ("14:00:00", "AB1-301-FACE"),
+            ("10:00:00", "CB-105-FACE"),
+        ],
+    );
+    for day in d + 1..d + 5 {
+        punches(&fixture, day, &[("09:00:00", "CB-214-FACE")]);
+    }
+    let m = fixture.report().moves.unwrap();
+    // 2 + 0 + 0 + 3 on the first day, 2 on each of the others; one hop, CB to AB1.
+    assert_eq!(
+        (m.floors, m.rooms, m.most_hops, m.most_hops_day),
+        (13, 4, 1, d)
+    );
+    let blocks: Vec<(&str, i32)> = m
+        .blocks
+        .iter()
+        .map(|b| (b.block.as_str(), b.rooms))
+        .collect();
+    assert_eq!(blocks, [("AB1", 2), ("CB", 2)]);
+}
+
+#[test]
+fn moves_none_under_five_days() {
+    let fixture = Fixture::new("moves-few");
+    for day in d0()..d0() + 4 {
+        punches(&fixture, day, &[("09:00:00", "CB-214-FACE")]);
+    }
+    punches(&fixture, d0() + 4, &[("09:00:00", "MH2-FACE-IN-4")]);
+    assert_eq!(fixture.report().moves, None);
+}
+
+#[test]
+fn on_duty_counts_classes_days_and_top_course() {
+    let fixture = Fixture::new("on-duty");
+    fixture.page(
+        ATTENDANCE,
+        &attendance(
+            "AP2",
+            vec![
+                course("CSE1001", "ETH", 13, 15),
+                course("MAT1001", "ETH", 7, 8),
+            ],
+        ),
+    );
+    let classes = |od: i32, from: i32, present: i32, absent: i32| {
+        let mut classes = Vec::new();
+        for (n, status) in [(od, "On Duty"), (present, "Present"), (absent, "Absent")] {
+            for _ in 0..n {
+                let day = d0() + from + classes.len() as i32;
+                classes.push((day, "08:00-08:50", status, "A1"));
+            }
+        }
+        classes
+    };
+    // CSE1001 on duty on days 0 to 7, MAT1001 on days 5 to 8: 9 days.
+    fixture.history("CSE1001.theory", &classes(8, 0, 5, 2));
+    fixture.history("MAT1001.theory", &classes(4, 5, 3, 1));
+    let od = fixture.report().on_duty.unwrap();
+    assert_eq!((od.classes, od.days, od.present, od.absent), (12, 9, 8, 3));
+    assert_eq!(
+        od.top,
+        [WrappedCourse {
+            name: "CSE1001 name".into(),
+            percent: 8
+        }]
+    );
+    // A tie names both.
+    fixture.history("MAT1001.theory", &classes(8, 5, 0, 0));
+    let names: Vec<(String, i32)> = fixture
+        .report()
+        .on_duty
+        .unwrap()
+        .top
+        .into_iter()
+        .map(|c| (c.name, c.percent))
+        .collect();
+    assert_eq!(
+        names,
+        [("CSE1001 name".into(), 8), ("MAT1001 name".into(), 8)]
+    );
+}
+
+#[test]
+fn on_duty_needs_ten() {
+    let fixture = Fixture::new("on-duty-few");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 12, 12)]),
+    );
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(9, "On Duty"), (3, "Present")], "A1"),
+    );
+    assert_eq!(fixture.report().on_duty, None);
+}
+
+/// Present classes of one course, as (count, "08:00-08:50") runs.
+fn day_half_fixture(name: &str, runs: &[(i32, &'static str)]) -> Fixture {
+    let fixture = Fixture::new(name);
+    let total = runs.iter().map(|r| r.0).sum();
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", total, total)]),
+    );
+    let classes: Vec<_> = runs
+        .iter()
+        .flat_map(|&(n, time)| (0..n).map(move |_| time))
+        .enumerate()
+        .map(|(i, time)| (d0() + i as i32, time, "Present", "A1"))
+        .collect();
+    fixture.history("CSE1001.theory", &classes);
+    fixture
+}
+
+#[test]
+fn day_half_afternoon() {
+    let fixture = day_half_fixture("day-half", &[(3, "08:00-08:50"), (7, "14:00-14:50")]);
+    let half = fixture.report().day_half.unwrap();
+    assert_eq!(
+        (half.morning, half.percent, half.classes, half.total),
+        (false, 70, 7, 10)
+    );
+    assert_eq!(
+        (half.by_hour.len(), half.by_hour[0], half.by_hour[6]),
+        (11, 3, 7)
+    );
+}
+
+#[test]
+fn day_half_skipped_when_mixed() {
+    let fixture = day_half_fixture("day-half-mixed", &[(5, "08:00-08:50"), (5, "14:00-14:50")]);
+    assert_eq!(fixture.report().day_half, None);
+}
+
+#[test]
+fn assessment_kinds_read_vtop_titles() {
+    for (title, kind) in [
+        ("QUIZ1", "quizzes"),
+        ("CAT1", "CATs"),
+        ("CAT2", "CATs"),
+        ("FAT", "FATs"),
+        ("Experiment-3", "lab experiments"),
+        ("Exp1+2", "lab experiments"),
+        ("Exp1+10", "lab experiments"),
+        ("Final LAB Report", "lab experiments"),
+        ("Digital Assessment-2", "digital assessments"),
+        ("DA-1", "digital assessments"),
+        ("First Review", "reviews and reports"),
+        ("Final Review", "reviews and reports"),
+        ("Project Report", "reviews and reports"),
+        ("ASSIGNMENT", "assignments"),
+        ("Assignment", "assignments"),
+        ("Viva", "other"),
+    ] {
+        assert_eq!(assessment_kind(title), kind, "{title}");
+    }
+}
+
+/// Two courses: CSE1001 with 2 of 3 posted at full marks (and a re-evaluation, left out),
+/// MAT1001 with 1 of 1 and one not posted.
+fn full_marks_fixture(name: &str) -> Fixture {
+    let fixture = Fixture::new(name);
+    fixture.page(
+        "marks.json",
+        &marks_page(&[
+            (
+                "CSE1001",
+                &[
+                    ("QUIZ1", "50"),
+                    ("CAT1", "50"),
+                    ("CAT1 Re-evaluation", "50"),
+                    ("Assignment", "30"),
+                ],
+            ),
+            ("MAT1001", &[("QUIZ1", "50"), ("CAT2", "")]),
+        ]),
+    );
+    fixture
+}
+
+fn kinds(by_kind: &[WrappedKindCount]) -> Vec<(&str, i32)> {
+    by_kind.iter().map(|k| (k.kind.as_str(), k.count)).collect()
+}
+
+#[test]
+fn full_marks_counts_max_scores() {
+    let fixture = full_marks_fixture("full-marks");
+    let full = fixture.report().full_marks.unwrap();
+    assert_eq!((full.count, full.of), (3, 4));
+    assert_eq!(kinds(&full.by_kind), [("quizzes", 2), ("CATs", 1)]);
+    assert_eq!(
+        (full.top_course.as_deref(), full.top_count),
+        (Some("CSE1001 name"), 2)
+    );
+    // None at full marks.
+    fixture.page(
+        "marks.json",
+        &marks_page(&[("CSE1001", &[("QUIZ1", "20")])]),
+    );
+    assert_eq!(fixture.report().full_marks, None);
+}
+
+#[test]
+fn assessments_group_by_kind() {
+    let fixture = full_marks_fixture("assessments");
+    let a = fixture.report().assessments.unwrap();
+    // Ties in the kinds' order.
+    assert_eq!(
+        (a.total, kinds(&a.by_kind)),
+        (4, vec![("quizzes", 2), ("CATs", 1), ("assignments", 1)])
+    );
+    fixture.page("marks.json", &marks_page(&[("CSE1001", &[("QUIZ1", "")])]));
+    assert_eq!(fixture.report().assessments, None);
+}

@@ -14402,6 +14402,50 @@ public object FfiConverterTypeWeekendOutingRules: FfiConverterRustBuffer<Weekend
 
 
 /**
+ * Posted assessments, re-evaluations left out.
+ */
+data class WrappedAssessments (
+    var `total`: kotlin.Int
+    , 
+    /**
+     * Most first, ties in [`KINDS`] order.
+     */
+    var `byKind`: List<WrappedKindCount>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedAssessments: FfiConverterRustBuffer<WrappedAssessments> {
+    override fun read(buf: ByteBuffer): WrappedAssessments {
+        return WrappedAssessments(
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceTypeWrappedKindCount.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedAssessments) = (
+            FfiConverterInt.allocationSize(value.`total`) +
+            FfiConverterSequenceTypeWrappedKindCount.allocationSize(value.`byKind`)
+    )
+
+    override fun write(value: WrappedAssessments, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`total`, buf)
+            FfiConverterSequenceTypeWrappedKindCount.write(value.`byKind`, buf)
+    }
+}
+
+
+
+/**
  * Classes in VTOP's units: a lab session is two.
  */
 data class WrappedAttendance (
@@ -14478,6 +14522,44 @@ public object FfiConverterTypeWrappedAttendance: FfiConverterRustBuffer<WrappedA
             FfiConverterString.write(value.`least`, buf)
             FfiConverterInt.write(value.`leastPercent`, buf)
             FfiConverterSequenceTypeWrappedCourse.write(value.`top`, buf)
+    }
+}
+
+
+
+data class WrappedBlock (
+    var `block`: kotlin.String
+    , 
+    var `rooms`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedBlock: FfiConverterRustBuffer<WrappedBlock> {
+    override fun read(buf: ByteBuffer): WrappedBlock {
+        return WrappedBlock(
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedBlock) = (
+            FfiConverterString.allocationSize(value.`block`) +
+            FfiConverterInt.allocationSize(value.`rooms`)
+    )
+
+    override fun write(value: WrappedBlock, buf: ByteBuffer) {
+            FfiConverterString.write(value.`block`, buf)
+            FfiConverterInt.write(value.`rooms`, buf)
     }
 }
 
@@ -14636,6 +14718,71 @@ public object FfiConverterTypeWrappedCgpa: FfiConverterRustBuffer<WrappedCgpa> {
 
 
 
+/**
+ * The moment a course came closest to 75%, in VTOP's units (a lab session is two).
+ */
+data class WrappedCloseCall (
+    var `course`: kotlin.String
+    , 
+    /**
+     * The class that set the moment.
+     */
+    var `day`: kotlin.Int
+    , 
+    /**
+     * Further absences that keep the course at 75% or more; none when under 75.
+     */
+    var `spare`: kotlin.Int?
+    , 
+    var `percent`: kotlin.Int
+    , 
+    /**
+     * After the course's last counted class.
+     */
+    var `finalPercent`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedCloseCall: FfiConverterRustBuffer<WrappedCloseCall> {
+    override fun read(buf: ByteBuffer): WrappedCloseCall {
+        return WrappedCloseCall(
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedCloseCall) = (
+            FfiConverterString.allocationSize(value.`course`) +
+            FfiConverterInt.allocationSize(value.`day`) +
+            FfiConverterOptionalInt.allocationSize(value.`spare`) +
+            FfiConverterInt.allocationSize(value.`percent`) +
+            FfiConverterInt.allocationSize(value.`finalPercent`)
+    )
+
+    override fun write(value: WrappedCloseCall, buf: ByteBuffer) {
+            FfiConverterString.write(value.`course`, buf)
+            FfiConverterInt.write(value.`day`, buf)
+            FfiConverterOptionalInt.write(value.`spare`, buf)
+            FfiConverterInt.write(value.`percent`, buf)
+            FfiConverterInt.write(value.`finalPercent`, buf)
+    }
+}
+
+
+
 data class WrappedComeback (
     var `lowPercent`: kotlin.Int
     , 
@@ -14717,6 +14864,149 @@ public object FfiConverterTypeWrappedCourse: FfiConverterRustBuffer<WrappedCours
 
 
 
+/**
+ * The 7 days from a paper's day with the most papers sat.
+ */
+data class WrappedCrunch (
+    var `papers`: kotlin.Int
+    , 
+    var `firstDay`: kotlin.Int
+    , 
+    /**
+     * `first_day` + 6.
+     */
+    var `lastDay`: kotlin.Int
+    , 
+    /**
+     * Papers on each day of the window, `first_day` first; 7 long.
+     */
+    var `byDay`: List<kotlin.Int>
+    , 
+    /**
+     * The most papers sat on one day, and the earliest such day.
+     */
+    var `mostInADay`: kotlin.Int
+    , 
+    var `mostDay`: kotlin.Int
+    , 
+    /**
+     * Days with a paper sat.
+     */
+    var `examDays`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedCrunch: FfiConverterRustBuffer<WrappedCrunch> {
+    override fun read(buf: ByteBuffer): WrappedCrunch {
+        return WrappedCrunch(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedCrunch) = (
+            FfiConverterInt.allocationSize(value.`papers`) +
+            FfiConverterInt.allocationSize(value.`firstDay`) +
+            FfiConverterInt.allocationSize(value.`lastDay`) +
+            FfiConverterSequenceInt.allocationSize(value.`byDay`) +
+            FfiConverterInt.allocationSize(value.`mostInADay`) +
+            FfiConverterInt.allocationSize(value.`mostDay`) +
+            FfiConverterInt.allocationSize(value.`examDays`)
+    )
+
+    override fun write(value: WrappedCrunch, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`papers`, buf)
+            FfiConverterInt.write(value.`firstDay`, buf)
+            FfiConverterInt.write(value.`lastDay`, buf)
+            FfiConverterSequenceInt.write(value.`byDay`, buf)
+            FfiConverterInt.write(value.`mostInADay`, buf)
+            FfiConverterInt.write(value.`mostDay`, buf)
+            FfiConverterInt.write(value.`examDays`, buf)
+    }
+}
+
+
+
+/**
+ * Attended classes with a start time, a lab session once: before noon or from 2 PM.
+ */
+data class WrappedDayHalf (
+    /**
+     * Before noon is the side with [`DAY_HALF_PERCENT`]; false: from 2 PM.
+     */
+    var `morning`: kotlin.Boolean
+    , 
+    /**
+     * That side's share, rounded down.
+     */
+    var `percent`: kotlin.Int
+    , 
+    var `classes`: kotlin.Int
+    , 
+    var `total`: kotlin.Int
+    , 
+    /**
+     * Classes starting in each hour from 8 to 18; 11 long.
+     */
+    var `byHour`: List<kotlin.Int>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedDayHalf: FfiConverterRustBuffer<WrappedDayHalf> {
+    override fun read(buf: ByteBuffer): WrappedDayHalf {
+        return WrappedDayHalf(
+            FfiConverterBoolean.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedDayHalf) = (
+            FfiConverterBoolean.allocationSize(value.`morning`) +
+            FfiConverterInt.allocationSize(value.`percent`) +
+            FfiConverterInt.allocationSize(value.`classes`) +
+            FfiConverterInt.allocationSize(value.`total`) +
+            FfiConverterSequenceInt.allocationSize(value.`byHour`)
+    )
+
+    override fun write(value: WrappedDayHalf, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`morning`, buf)
+            FfiConverterInt.write(value.`percent`, buf)
+            FfiConverterInt.write(value.`classes`, buf)
+            FfiConverterInt.write(value.`total`, buf)
+            FfiConverterSequenceInt.write(value.`byHour`, buf)
+    }
+}
+
+
+
 data class WrappedExams (
     var `cats`: kotlin.Int
     , 
@@ -14755,6 +15045,71 @@ public object FfiConverterTypeWrappedExams: FfiConverterRustBuffer<WrappedExams>
             FfiConverterInt.write(value.`cats`, buf)
             FfiConverterInt.write(value.`fats`, buf)
             FfiConverterOptionalString.write(value.`topVenue`, buf)
+    }
+}
+
+
+
+/**
+ * Posted assessments scored at their max marks, re-evaluations left out.
+ */
+data class WrappedFullMarks (
+    var `count`: kotlin.Int
+    , 
+    /**
+     * Posted assessments.
+     */
+    var `of`: kotlin.Int
+    , 
+    /**
+     * Most first.
+     */
+    var `byKind`: List<WrappedKindCount>
+    , 
+    /**
+     * The course with the most; none when that is one.
+     */
+    var `topCourse`: kotlin.String?
+    , 
+    var `topCount`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedFullMarks: FfiConverterRustBuffer<WrappedFullMarks> {
+    override fun read(buf: ByteBuffer): WrappedFullMarks {
+        return WrappedFullMarks(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceTypeWrappedKindCount.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedFullMarks) = (
+            FfiConverterInt.allocationSize(value.`count`) +
+            FfiConverterInt.allocationSize(value.`of`) +
+            FfiConverterSequenceTypeWrappedKindCount.allocationSize(value.`byKind`) +
+            FfiConverterOptionalString.allocationSize(value.`topCourse`) +
+            FfiConverterInt.allocationSize(value.`topCount`)
+    )
+
+    override fun write(value: WrappedFullMarks, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`count`, buf)
+            FfiConverterInt.write(value.`of`, buf)
+            FfiConverterSequenceTypeWrappedKindCount.write(value.`byKind`, buf)
+            FfiConverterOptionalString.write(value.`topCourse`, buf)
+            FfiConverterInt.write(value.`topCount`, buf)
     }
 }
 
@@ -14888,6 +15243,119 @@ public object FfiConverterTypeWrappedHabits: FfiConverterRustBuffer<WrappedHabit
 
 
 
+/**
+ * A hosteller's class days, from hostel gate punches (`MH2-FACE-OUT-3`): out is each OUT to the
+ * next IN that day.
+ */
+data class WrappedHostel (
+    /**
+     * Class days with an OUT and an IN after it.
+     */
+    var `days`: kotlin.Int
+    , 
+    /**
+     * Hours out on an average one of those days, in tenths (94 is 9.4 hours).
+     */
+    var `outTenths`: kotlin.Int
+    , 
+    /**
+     * Half hours from 6:00 to 24:00, each out on at least half of `days`; 36 long.
+     */
+    var `outByHalfHour`: List<kotlin.Boolean>
+    , 
+    /**
+     * Trips back to the hostel between two class punches.
+     */
+    var `naps`: kotlin.Int
+    , 
+    /**
+     * 0 = Monday, with the most naps; none without a nap.
+     */
+    var `napWeekday`: kotlin.Int?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedHostel: FfiConverterRustBuffer<WrappedHostel> {
+    override fun read(buf: ByteBuffer): WrappedHostel {
+        return WrappedHostel(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceBoolean.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedHostel) = (
+            FfiConverterInt.allocationSize(value.`days`) +
+            FfiConverterInt.allocationSize(value.`outTenths`) +
+            FfiConverterSequenceBoolean.allocationSize(value.`outByHalfHour`) +
+            FfiConverterInt.allocationSize(value.`naps`) +
+            FfiConverterOptionalInt.allocationSize(value.`napWeekday`)
+    )
+
+    override fun write(value: WrappedHostel, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`days`, buf)
+            FfiConverterInt.write(value.`outTenths`, buf)
+            FfiConverterSequenceBoolean.write(value.`outByHalfHour`, buf)
+            FfiConverterInt.write(value.`naps`, buf)
+            FfiConverterOptionalInt.write(value.`napWeekday`, buf)
+    }
+}
+
+
+
+/**
+ * Assessments of a kind of [`KINDS`] ("quizzes").
+ */
+data class WrappedKindCount (
+    var `kind`: kotlin.String
+    , 
+    var `count`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedKindCount: FfiConverterRustBuffer<WrappedKindCount> {
+    override fun read(buf: ByteBuffer): WrappedKindCount {
+        return WrappedKindCount(
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedKindCount) = (
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterInt.allocationSize(value.`count`)
+    )
+
+    override fun write(value: WrappedKindCount, buf: ByteBuffer) {
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterInt.write(value.`count`, buf)
+    }
+}
+
+
+
 data class WrappedMarks (
     var `bestCat`: WrappedCat?
     , 
@@ -14939,6 +15407,136 @@ public object FfiConverterTypeWrappedMarks: FfiConverterRustBuffer<WrappedMarks>
             FfiConverterInt.write(value.`bestCoursePercent`, buf)
             FfiConverterOptionalInt.write(value.`catChange`, buf)
             FfiConverterOptionalString.write(value.`mostImproved`, buf)
+    }
+}
+
+
+
+/**
+ * From class punches (`CB-214-FACE`), in time order each class day.
+ */
+data class WrappedMoves (
+    /**
+     * Each day's first floor and every rise after it.
+     */
+    var `floors`: kotlin.Int
+    , 
+    /**
+     * Distinct block and room.
+     */
+    var `rooms`: kotlin.Int
+    , 
+    /**
+     * The most block changes in a day, and the earliest such day.
+     */
+    var `mostHops`: kotlin.Int
+    , 
+    var `mostHopsDay`: kotlin.Int
+    , 
+    /**
+     * Up to 3, most rooms first, then by name.
+     */
+    var `blocks`: List<WrappedBlock>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedMoves: FfiConverterRustBuffer<WrappedMoves> {
+    override fun read(buf: ByteBuffer): WrappedMoves {
+        return WrappedMoves(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceTypeWrappedBlock.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedMoves) = (
+            FfiConverterInt.allocationSize(value.`floors`) +
+            FfiConverterInt.allocationSize(value.`rooms`) +
+            FfiConverterInt.allocationSize(value.`mostHops`) +
+            FfiConverterInt.allocationSize(value.`mostHopsDay`) +
+            FfiConverterSequenceTypeWrappedBlock.allocationSize(value.`blocks`)
+    )
+
+    override fun write(value: WrappedMoves, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`floors`, buf)
+            FfiConverterInt.write(value.`rooms`, buf)
+            FfiConverterInt.write(value.`mostHops`, buf)
+            FfiConverterInt.write(value.`mostHopsDay`, buf)
+            FfiConverterSequenceTypeWrappedBlock.write(value.`blocks`, buf)
+    }
+}
+
+
+
+/**
+ * Classes in VTOP's units (a lab session is two).
+ */
+data class WrappedOnDuty (
+    var `classes`: kotlin.Int
+    , 
+    /**
+     * Days with a class on duty.
+     */
+    var `days`: kotlin.Int
+    , 
+    var `present`: kotlin.Int
+    , 
+    var `absent`: kotlin.Int
+    , 
+    /**
+     * The course with the most classes on duty, and one that ties it; `percent` is the count.
+     */
+    var `top`: List<WrappedCourse>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedOnDuty: FfiConverterRustBuffer<WrappedOnDuty> {
+    override fun read(buf: ByteBuffer): WrappedOnDuty {
+        return WrappedOnDuty(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceTypeWrappedCourse.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedOnDuty) = (
+            FfiConverterInt.allocationSize(value.`classes`) +
+            FfiConverterInt.allocationSize(value.`days`) +
+            FfiConverterInt.allocationSize(value.`present`) +
+            FfiConverterInt.allocationSize(value.`absent`) +
+            FfiConverterSequenceTypeWrappedCourse.allocationSize(value.`top`)
+    )
+
+    override fun write(value: WrappedOnDuty, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`classes`, buf)
+            FfiConverterInt.write(value.`days`, buf)
+            FfiConverterInt.write(value.`present`, buf)
+            FfiConverterInt.write(value.`absent`, buf)
+            FfiConverterSequenceTypeWrappedCourse.write(value.`top`, buf)
     }
 }
 
@@ -15130,6 +15728,8 @@ data class WrappedReport (
     , 
     var `attendance`: WrappedAttendance?
     , 
+    var `onDuty`: WrappedOnDuty?
+    , 
     var `streak`: WrappedStreak?
     , 
     /**
@@ -15139,7 +15739,11 @@ data class WrappedReport (
     , 
     var `comeback`: WrappedComeback?
     , 
+    var `closeCall`: WrappedCloseCall?
+    , 
     var `habits`: WrappedHabits?
+    , 
+    var `dayHalf`: WrappedDayHalf?
     , 
     var `time`: WrappedTime?
     , 
@@ -15147,7 +15751,13 @@ data class WrappedReport (
     , 
     var `marks`: WrappedMarks?
     , 
+    var `fullMarks`: WrappedFullMarks?
+    , 
+    var `assessments`: WrappedAssessments?
+    , 
     var `exams`: WrappedExams?
+    , 
+    var `crunch`: WrappedCrunch?
     , 
     var `grades`: WrappedGrades?
     , 
@@ -15156,6 +15766,10 @@ data class WrappedReport (
     var `outings`: WrappedOutings?
     , 
     var `campus`: WrappedCampus?
+    , 
+    var `hostel`: WrappedHostel?
+    , 
+    var `moves`: WrappedMoves?
     , 
     var `previous`: WrappedPrevious?
     , 
@@ -15195,18 +15809,26 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterOptionalTypeWrappedAttendance.read(buf),
+            FfiConverterOptionalTypeWrappedOnDuty.read(buf),
             FfiConverterOptionalTypeWrappedStreak.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterOptionalTypeWrappedComeback.read(buf),
+            FfiConverterOptionalTypeWrappedCloseCall.read(buf),
             FfiConverterOptionalTypeWrappedHabits.read(buf),
+            FfiConverterOptionalTypeWrappedDayHalf.read(buf),
             FfiConverterOptionalTypeWrappedTime.read(buf),
             FfiConverterOptionalTypeWrappedPlaces.read(buf),
             FfiConverterOptionalTypeWrappedMarks.read(buf),
+            FfiConverterOptionalTypeWrappedFullMarks.read(buf),
+            FfiConverterOptionalTypeWrappedAssessments.read(buf),
             FfiConverterOptionalTypeWrappedExams.read(buf),
+            FfiConverterOptionalTypeWrappedCrunch.read(buf),
             FfiConverterOptionalTypeWrappedGrades.read(buf),
             FfiConverterOptionalTypeWrappedCgpa.read(buf),
             FfiConverterOptionalTypeWrappedOutings.read(buf),
             FfiConverterOptionalTypeWrappedCampus.read(buf),
+            FfiConverterOptionalTypeWrappedHostel.read(buf),
+            FfiConverterOptionalTypeWrappedMoves.read(buf),
             FfiConverterOptionalTypeWrappedPrevious.read(buf),
             FfiConverterTypeWrappedTitle.read(buf),
             FfiConverterTypeWrappedTitle.read(buf),
@@ -15224,18 +15846,26 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterInt.allocationSize(value.`classDayCount`) +
             FfiConverterInt.allocationSize(value.`holidays`) +
             FfiConverterOptionalTypeWrappedAttendance.allocationSize(value.`attendance`) +
+            FfiConverterOptionalTypeWrappedOnDuty.allocationSize(value.`onDuty`) +
             FfiConverterOptionalTypeWrappedStreak.allocationSize(value.`streak`) +
             FfiConverterSequenceString.allocationSize(value.`neverMissed`) +
             FfiConverterOptionalTypeWrappedComeback.allocationSize(value.`comeback`) +
+            FfiConverterOptionalTypeWrappedCloseCall.allocationSize(value.`closeCall`) +
             FfiConverterOptionalTypeWrappedHabits.allocationSize(value.`habits`) +
+            FfiConverterOptionalTypeWrappedDayHalf.allocationSize(value.`dayHalf`) +
             FfiConverterOptionalTypeWrappedTime.allocationSize(value.`time`) +
             FfiConverterOptionalTypeWrappedPlaces.allocationSize(value.`places`) +
             FfiConverterOptionalTypeWrappedMarks.allocationSize(value.`marks`) +
+            FfiConverterOptionalTypeWrappedFullMarks.allocationSize(value.`fullMarks`) +
+            FfiConverterOptionalTypeWrappedAssessments.allocationSize(value.`assessments`) +
             FfiConverterOptionalTypeWrappedExams.allocationSize(value.`exams`) +
+            FfiConverterOptionalTypeWrappedCrunch.allocationSize(value.`crunch`) +
             FfiConverterOptionalTypeWrappedGrades.allocationSize(value.`grades`) +
             FfiConverterOptionalTypeWrappedCgpa.allocationSize(value.`cgpa`) +
             FfiConverterOptionalTypeWrappedOutings.allocationSize(value.`outings`) +
             FfiConverterOptionalTypeWrappedCampus.allocationSize(value.`campus`) +
+            FfiConverterOptionalTypeWrappedHostel.allocationSize(value.`hostel`) +
+            FfiConverterOptionalTypeWrappedMoves.allocationSize(value.`moves`) +
             FfiConverterOptionalTypeWrappedPrevious.allocationSize(value.`previous`) +
             FfiConverterTypeWrappedTitle.allocationSize(value.`title`) +
             FfiConverterTypeWrappedTitle.allocationSize(value.`titleWithoutGrades`) +
@@ -15252,18 +15882,26 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterInt.write(value.`classDayCount`, buf)
             FfiConverterInt.write(value.`holidays`, buf)
             FfiConverterOptionalTypeWrappedAttendance.write(value.`attendance`, buf)
+            FfiConverterOptionalTypeWrappedOnDuty.write(value.`onDuty`, buf)
             FfiConverterOptionalTypeWrappedStreak.write(value.`streak`, buf)
             FfiConverterSequenceString.write(value.`neverMissed`, buf)
             FfiConverterOptionalTypeWrappedComeback.write(value.`comeback`, buf)
+            FfiConverterOptionalTypeWrappedCloseCall.write(value.`closeCall`, buf)
             FfiConverterOptionalTypeWrappedHabits.write(value.`habits`, buf)
+            FfiConverterOptionalTypeWrappedDayHalf.write(value.`dayHalf`, buf)
             FfiConverterOptionalTypeWrappedTime.write(value.`time`, buf)
             FfiConverterOptionalTypeWrappedPlaces.write(value.`places`, buf)
             FfiConverterOptionalTypeWrappedMarks.write(value.`marks`, buf)
+            FfiConverterOptionalTypeWrappedFullMarks.write(value.`fullMarks`, buf)
+            FfiConverterOptionalTypeWrappedAssessments.write(value.`assessments`, buf)
             FfiConverterOptionalTypeWrappedExams.write(value.`exams`, buf)
+            FfiConverterOptionalTypeWrappedCrunch.write(value.`crunch`, buf)
             FfiConverterOptionalTypeWrappedGrades.write(value.`grades`, buf)
             FfiConverterOptionalTypeWrappedCgpa.write(value.`cgpa`, buf)
             FfiConverterOptionalTypeWrappedOutings.write(value.`outings`, buf)
             FfiConverterOptionalTypeWrappedCampus.write(value.`campus`, buf)
+            FfiConverterOptionalTypeWrappedHostel.write(value.`hostel`, buf)
+            FfiConverterOptionalTypeWrappedMoves.write(value.`moves`, buf)
             FfiConverterOptionalTypeWrappedPrevious.write(value.`previous`, buf)
             FfiConverterTypeWrappedTitle.write(value.`title`, buf)
             FfiConverterTypeWrappedTitle.write(value.`titleWithoutGrades`, buf)
@@ -17734,6 +18372,38 @@ public object FfiConverterOptionalTypeWeekendOuting: FfiConverterRustBuffer<Week
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedAssessments: FfiConverterRustBuffer<WrappedAssessments?> {
+    override fun read(buf: ByteBuffer): WrappedAssessments? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedAssessments.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedAssessments?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedAssessments.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedAssessments?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedAssessments.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedAttendance: FfiConverterRustBuffer<WrappedAttendance?> {
     override fun read(buf: ByteBuffer): WrappedAttendance? {
         if (buf.get().toInt() == 0) {
@@ -17862,6 +18532,38 @@ public object FfiConverterOptionalTypeWrappedCgpa: FfiConverterRustBuffer<Wrappe
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedCloseCall: FfiConverterRustBuffer<WrappedCloseCall?> {
+    override fun read(buf: ByteBuffer): WrappedCloseCall? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedCloseCall.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedCloseCall?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedCloseCall.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedCloseCall?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedCloseCall.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedComeback: FfiConverterRustBuffer<WrappedComeback?> {
     override fun read(buf: ByteBuffer): WrappedComeback? {
         if (buf.get().toInt() == 0) {
@@ -17894,6 +18596,70 @@ public object FfiConverterOptionalTypeWrappedComeback: FfiConverterRustBuffer<Wr
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedCrunch: FfiConverterRustBuffer<WrappedCrunch?> {
+    override fun read(buf: ByteBuffer): WrappedCrunch? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedCrunch.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedCrunch?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedCrunch.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedCrunch?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedCrunch.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedDayHalf: FfiConverterRustBuffer<WrappedDayHalf?> {
+    override fun read(buf: ByteBuffer): WrappedDayHalf? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedDayHalf.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedDayHalf?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedDayHalf.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedDayHalf?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedDayHalf.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedExams: FfiConverterRustBuffer<WrappedExams?> {
     override fun read(buf: ByteBuffer): WrappedExams? {
         if (buf.get().toInt() == 0) {
@@ -17916,6 +18682,38 @@ public object FfiConverterOptionalTypeWrappedExams: FfiConverterRustBuffer<Wrapp
         } else {
             buf.put(1)
             FfiConverterTypeWrappedExams.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedFullMarks: FfiConverterRustBuffer<WrappedFullMarks?> {
+    override fun read(buf: ByteBuffer): WrappedFullMarks? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedFullMarks.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedFullMarks?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedFullMarks.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedFullMarks?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedFullMarks.write(value, buf)
         }
     }
 }
@@ -17990,6 +18788,38 @@ public object FfiConverterOptionalTypeWrappedHabits: FfiConverterRustBuffer<Wrap
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedHostel: FfiConverterRustBuffer<WrappedHostel?> {
+    override fun read(buf: ByteBuffer): WrappedHostel? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedHostel.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedHostel?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedHostel.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedHostel?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedHostel.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedMarks: FfiConverterRustBuffer<WrappedMarks?> {
     override fun read(buf: ByteBuffer): WrappedMarks? {
         if (buf.get().toInt() == 0) {
@@ -18012,6 +18842,70 @@ public object FfiConverterOptionalTypeWrappedMarks: FfiConverterRustBuffer<Wrapp
         } else {
             buf.put(1)
             FfiConverterTypeWrappedMarks.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedMoves: FfiConverterRustBuffer<WrappedMoves?> {
+    override fun read(buf: ByteBuffer): WrappedMoves? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedMoves.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedMoves?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedMoves.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedMoves?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedMoves.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedOnDuty: FfiConverterRustBuffer<WrappedOnDuty?> {
+    override fun read(buf: ByteBuffer): WrappedOnDuty? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedOnDuty.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedOnDuty?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedOnDuty.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedOnDuty?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedOnDuty.write(value, buf)
         }
     }
 }
@@ -18392,6 +19286,34 @@ public object FfiConverterSequenceInt: FfiConverterRustBuffer<List<kotlin.Int>> 
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterInt.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceBoolean: FfiConverterRustBuffer<List<kotlin.Boolean>> {
+    override fun read(buf: ByteBuffer): List<kotlin.Boolean> {
+        val len = buf.getInt()
+        return List<kotlin.Boolean>(len) {
+            FfiConverterBoolean.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.Boolean>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterBoolean.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.Boolean>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterBoolean.write(it, buf)
         }
     }
 }
@@ -20026,6 +20948,34 @@ public object FfiConverterSequenceTypeTimetableDay: FfiConverterRustBuffer<List<
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeWrappedBlock: FfiConverterRustBuffer<List<WrappedBlock>> {
+    override fun read(buf: ByteBuffer): List<WrappedBlock> {
+        val len = buf.getInt()
+        return List<WrappedBlock>(len) {
+            FfiConverterTypeWrappedBlock.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedBlock>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedBlock.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedBlock>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedBlock.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeWrappedCourse: FfiConverterRustBuffer<List<WrappedCourse>> {
     override fun read(buf: ByteBuffer): List<WrappedCourse> {
         val len = buf.getInt()
@@ -20044,6 +20994,34 @@ public object FfiConverterSequenceTypeWrappedCourse: FfiConverterRustBuffer<List
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeWrappedCourse.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedKindCount: FfiConverterRustBuffer<List<WrappedKindCount>> {
+    override fun read(buf: ByteBuffer): List<WrappedKindCount> {
+        val len = buf.getInt()
+        return List<WrappedKindCount>(len) {
+            FfiConverterTypeWrappedKindCount.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedKindCount>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedKindCount.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedKindCount>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedKindCount.write(it, buf)
         }
     }
 }

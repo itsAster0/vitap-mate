@@ -80,6 +80,50 @@ internal fun attendanceSlide(r: WrappedReport): Slide? {
     }
 }
 
+/** Classes on OD: their share of every counted class, and the course with the most. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+internal fun odSlide(r: WrappedReport): Slide? {
+    val o = r.onDuty ?: return null
+    val counted = o.present + o.classes + o.absent
+    val share = when (val p = (o.classes * 100f / counted.coerceAtLeast(1)).roundToInt()) {
+        in 30..36 -> "A third"
+        in 23..27 -> "A quarter"
+        in 47..53 -> "Half"
+        else -> "$p%"
+    }
+    return Slide("on_duty", Ink.Warning, tiles = listOf(Tile(Ink.Warning, "${o.classes}", "on OD, ${count(o.days, "day")}"))) {
+        val ink = LocalInks.current
+        Txt(56) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Big("${o.classes}", 136f)
+                H("on\nOD", modifier = Modifier.padding(bottom = 16.dp))
+            }
+        }
+        Txt(206) { P("$share of your classes, across ${count(o.days, "day")}", top = 0) }
+        // Every counted class: present, OD, absent.
+        SplitBar(
+            256, 48,
+            listOf(
+                Triple("Present ${o.present}", o.present, ink.text.copy(alpha = 0.16f) to ink.text),
+                Triple("OD ${o.classes}", o.classes, ink.shape to ink.onShape),
+                Triple("", o.absent, ink.mid to ink.text),
+            ).filter { it.second > 0 }.map { (text, n, colors) -> Triple(text, n.toFloat(), colors) },
+        )
+        if (o.absent > 0) Txt(310) {
+            Text("Absent ${o.absent}", Modifier.align(Alignment.End), color = ink.text.copy(alpha = 0.8f), style = type(12f, 600, 0f, 1.2f))
+        }
+        val (top, second) = o.top.getOrNull(0) to o.top.getOrNull(1)
+        if (top != null) {
+            Txt(356) { Label("Most OD in") }
+            Shaped(MaterialShapes.Cookie9Sided.toShape(), 24, 382, 96, text = "${top.percent}", size = 34f)
+            Column(Modifier.offset(136.dp, 394.dp).width(200.dp)) {
+                H(titled(top.name), 24f)
+                if (second != null) P("and ${second.percent} in ${titled(second.name)}", 13f, top = 4)
+            }
+        }
+    }
+}
+
 internal fun streakSlide(r: WrappedReport): Slide? {
     val s = r.streak?.takeIf { it.length > 1 } ?: return null
     val weeks = s.perfectWeeks.takeIf { it > 0 }
@@ -221,6 +265,39 @@ internal fun habitsSlide(r: WrappedReport): Slide? {
     }
 }
 
+/** Before noon or from 2 PM: the side with most attended classes, and classes by start hour. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+internal fun dayHalfSlide(r: WrappedReport): Slide? {
+    val d = r.dayHalf ?: return null
+    val side = if (d.morning) "before noon" else "after 2 PM"
+    return Slide("day_half", Ink.Accent, tiles = listOf(Tile(Ink.Accent, "${d.percent}%", "classes $side"))) {
+        val ink = LocalInks.current
+        // A sun either way.
+        Shaped(MaterialShapes.Cookie12Sided.toShape(), 244, 56, 96, color = Ink.Warning.tone().base)
+        Txt(60) { Big("${d.percent}%", 100f) }
+        Txt(180) {
+            H(if (d.morning) "A morning person" else "An afternoon person")
+            P("${d.classes} of ${count(d.total, "class", "classes")} started " + if (d.morning) "before noon" else "at 2 PM or later")
+        }
+        // Classes by start hour, 8 AM to 6 PM; the winning side in the tone.
+        Txt(320) {
+            Row(Modifier.fillMaxWidth().height(150.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
+                val most = d.byHour.maxOrNull()?.coerceAtLeast(1) ?: 1
+                d.byHour.forEachIndexed { i, n ->
+                    val on = if (d.morning) i < 4 else i >= 6
+                    Box(
+                        Modifier.weight(1f).height((150f * n / most).coerceAtLeast(6f).dp)
+                            .background(if (on) ink.shape else ink.text.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("8 AM", "noon", "2 PM", "6 PM").forEach { Text(it, color = ink.text.copy(alpha = 0.8f), style = type(12f, 600, 0f, 1.2f)) }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal fun coursesSlide(r: WrappedReport): Slide? {
     val a = r.attendance?.takeIf { it.best.isNotBlank() && it.least.isNotBlank() && it.best != it.least } ?: return null
@@ -265,6 +342,57 @@ internal fun coursesSlide(r: WrappedReport): Slide? {
             Text("Least attended", color = lab.text.copy(alpha = 0.8f), style = type(14f, 600, -0.01f, 1.3f))
             Text(titled(a.least), Modifier.padding(top = 8.dp), color = lab.text, style = type(32f))
         }
+    }
+}
+
+/** The tightest any course got to 75%: classes to spare then, or how far under it dipped. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+internal fun closeCallSlide(r: WrappedReport): Slide? {
+    val c = r.closeCall ?: return null
+    val course = titled(c.course)
+    val spare = c.spare
+    val tile = if (spare != null) Tile(Ink.Danger, count(spare, "class", "classes"), "to spare in $course", span = 3)
+    else Tile(Ink.Danger, "${c.percent}%", "low in $course", span = 3)
+    return Slide("close_call", Ink.Danger, tiles = listOf(tile)) {
+        val ink = LocalInks.current
+        Txt(58) { Label("Close call") }
+        Txt(84) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (spare != null) {
+                    Big("$spare", 150f)
+                    H(if (spare == 1) "class\nto spare" else "classes\nto spare", modifier = Modifier.padding(bottom = 20.dp))
+                } else {
+                    Big("${c.percent}%", 120f)
+                    H("your\nlowest", modifier = Modifier.padding(bottom = 16.dp))
+                }
+            }
+        }
+        Txt(252) {
+            P(
+                when (spare) {
+                    null -> "You dipped to ${c.percent}% in $course on ${day(c.day)}. You finished at ${c.finalPercent}%."
+                    0 -> "$course on ${day(c.day)}: any miss and it was under 75%."
+                    else -> "$course on ${day(c.day)}: you could miss just ${count(spare, "more class", "more classes")} and stay at 75%."
+                },
+                top = 0,
+            )
+        }
+        // 50% to 100%, the 75% line, the moment's percent.
+        Txt(332) {
+            val at = ((c.percent - 50) / 50f).coerceIn(0f, 1f)
+            BoxWithConstraints(Modifier.fillMaxWidth().height(44.dp).background(ink.text.copy(alpha = 0.14f), RoundedCornerShape(22.dp))) {
+                Box(Modifier.width(maxWidth * at).fillMaxHeight().background(ink.shape, RoundedCornerShape(22.dp)))
+                Box(Modifier.offset(maxWidth / 2 - 3.dp, (-10).dp).size(6.dp, 64.dp).background(ink.text, RoundedCornerShape(3.dp)))
+                Box(Modifier.offset(x = (maxWidth * at - 22.dp).coerceIn(0.dp, maxWidth - 44.dp)).size(44.dp).background(ink.onShape, MaterialShapes.Cookie9Sided.toShape()))
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("50%", "75%", "100%").forEach {
+                    val line = it == "75%"
+                    Text(it, color = ink.text.copy(alpha = if (line) 1f else 0.8f), style = type(12f, if (line) 800 else 600, 0f, 1.2f))
+                }
+            }
+        }
+        Minis(420, listOf("${c.percent}%" to "its lowest point", "${c.finalPercent}%" to "where it finished"))
     }
 }
 

@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.time.LocalDate
 import vitapmate.core.WrappedReport
 
 // Slides 10 to 13 and 17: marks, exams, grades, CGPA and the last semester.
@@ -61,6 +62,57 @@ internal fun marksSlide(r: WrappedReport): Slide? {
         )
         Txt(if (best != null) 332 else 120) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { rows.forEach { (value, line, name) -> Wide(value, line, name) } }
+        }
+    }
+}
+
+/** Assessments scored at their max marks, by kind, and the course with the most. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+internal fun fullMarksSlide(r: WrappedReport): Slide? {
+    val f = r.fullMarks ?: return null
+    val words = if (f.count == 1) "full mark" else "full marks"
+    return Slide("full_marks", Ink.Lab, grades = true, tiles = listOf(Tile(Ink.Lab, "${f.count}", words, key = true, grades = true)), shareable = { !it }) {
+        Shaped(MaterialShapes.SoftBurst.toShape(), -36, 58, 250, text = "${f.count}", size = 96f)
+        Column(Modifier.offset(216.dp, 126.dp).width(124.dp)) {
+            H(words.replace(' ', '\n'), 28f)
+            P("${f.count} of ${count(f.of, "assessment")}, top score", 13f, top = 6)
+        }
+        // Short kinds, so three fit across.
+        val short = { kind: String -> kind.replace("lab experiments", "lab exps").replace("digital assessments", "DAs").replace(" and reports", "") }
+        Minis(330, f.byKind.take(3).map { "${it.count}" to short(it.kind) }, columns = 3)
+        f.topCourse?.takeIf { it.isNotBlank() }?.let { course ->
+            Txt(420) { Wide("${f.topCount}", "full marks, the most in one course", titled(course)) }
+        }
+    }
+}
+
+/** Posted assessments by kind, a pill per kind sized by its count. */
+internal fun assessmentsSlide(r: WrappedReport): Slide? {
+    val a = r.assessments ?: return null
+    return Slide("assessments", Ink.Danger, tiles = listOf(Tile(Ink.Danger, "${a.total}", if (a.total == 1) "assessment" else "assessments"))) {
+        val ink = LocalInks.current
+        Txt(52) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Big("${a.total}", 140f)
+                H(if (a.total == 1) "test\ntaken" else "tests\ntaken", modifier = Modifier.padding(bottom = 18.dp))
+            }
+        }
+        val most = a.byKind.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+        Txt(218) {
+            a.byKind.take(6).forEachIndexed { i, k ->
+                val (bg, fg) = when (i) {
+                    0 -> ink.shape to ink.onShape
+                    1, 2 -> ink.mid to ink.text
+                    else -> ink.text.copy(alpha = 0.16f) to ink.text
+                }
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Up to 180 of the 312 across, so the kind fits beside.
+                    Box(Modifier.width((180f * k.count / most).coerceAtLeast(50f).dp).height(40.dp).background(bg, RoundedCornerShape(20.dp)).padding(horizontal = 14.dp), Alignment.CenterStart) {
+                        Text("${k.count}", color = fg, style = type(15f, 800, -0.02f, 1f), maxLines = 1)
+                    }
+                    Text(k.kind, color = ink.text.copy(alpha = 0.85f), style = type(13f, 600, -0.01f, 1.2f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }
@@ -102,6 +154,53 @@ internal fun examsSlide(r: WrappedReport): Slide? {
                 H(venue, 30f, Modifier.padding(top = 4.dp))
             }
         }
+    }
+}
+
+/** The 7 days with the most papers sat: a column per day, a shape per paper. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+internal fun crunchSlide(r: WrappedReport): Slide? {
+    val c = r.crunch ?: return null
+    val weekday = { d: Int -> LocalDate.ofEpochDay(d.toLong()).dayOfWeek.value - 1 }
+    return Slide("crunch", Ink.Accent, tiles = listOf(Tile(Ink.Accent, "${c.papers}", "exams in one week"))) {
+        val ink = LocalInks.current
+        Txt(52) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Big("${c.papers}", 140f)
+                H("exams in\none week", modifier = Modifier.padding(bottom = 18.dp))
+            }
+        }
+        Txt(212) { P("Your busiest week, ${day(c.firstDay)} to ${day(c.lastDay)}", top = 0) }
+        val most = c.byDay.maxOrNull()?.coerceAtLeast(1) ?: 1
+        // The busiest day on a pill, only when it had more than one.
+        val busiest = if (most > 1) c.byDay.indexOf(most) else -1
+        val dot = (120 / most).coerceAtMost(36)
+        Txt(262) {
+            Row(Modifier.fillMaxWidth().height(168.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+                c.byDay.forEachIndexed { i, n ->
+                    val on = i == busiest
+                    Column(
+                        Modifier.weight(1f).then(if (on) Modifier.background(ink.shape.copy(alpha = 0.22f), RoundedCornerShape(24.dp)).padding(vertical = 8.dp) else Modifier),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        repeat(n) { Box(Modifier.size(dot.dp).background(ink.shape, MaterialShapes.Cookie9Sided.toShape())) }
+                        Text(
+                            WEEKDAYS[weekday(c.firstDay + i)].take(1),
+                            color = if (on) ink.shape else ink.text.copy(alpha = if (n > 0) 1f else 0.5f),
+                            style = type(13f, 700, 0f, 1.2f),
+                        )
+                    }
+                }
+            }
+        }
+        Minis(
+            446,
+            listOfNotNull(
+                c.mostInADay.takeIf { it > 1 }?.let { "$it in a day" to "${WEEKDAYS[weekday(c.mostDay)].take(3)} ${day(c.mostDay)}" },
+                count(c.examDays, "day") to "with an exam",
+            ),
+        )
     }
 }
 
