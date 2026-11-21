@@ -14,6 +14,10 @@ dependencies:
   - com.composables:icons-lucide-cmp:2.2.1: exported
   # The Photo Picker for the avatar (already the app's; no storage permission).
   - androidx.activity:activity-compose:1.13.0
+  # Jetpack PDF (SystemPdf.kt): vector zoom, text selection and links where SDK extension 13+ has
+  # the platform's sandboxed renderer; Docs and the outing pass keep their PdfRenderer views elsewhere.
+  - androidx.pdf:pdf-compose:1.0.0-beta01
+  - androidx.pdf:pdf-document-service:1.0.0-beta01
 
 test-dependencies:
   # ColorTablesTest works out ColorTables.kt with it; the app doesn't ship it.

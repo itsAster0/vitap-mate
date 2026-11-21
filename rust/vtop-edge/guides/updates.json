@@ -30,6 +30,10 @@
       "title": "Tools",
       "items": [
         "Docs lists the files in your download folder and the mess menu, with the mess timings you set.",
+        {
+          "text": "PDFs in Docs and the outing pass stay sharp when you zoom, and you can select and copy their text and tap their links, on most phones with Android 12 and later.",
+          "since": 3001010
+        },
         "Profile shows your VTOP profile and your mentor.",
         "VTOP opens the full site, already signed in, for pages the app doesn't cover."
       ]
@@ -45,9 +49,29 @@
         },
         "OTP auto-fill reads VTOP's code from your Gmail with your own Google key, or from a forwarding address.",
         "The home-screen widget shows the next class and today's timetable. Long-press the app icon for Timetable, Attendance and Outing.",
+        {
+          "text": "Widgets for attendance (the courses closest to 75% first), the next exam and the mess menu join the timetable widget. All four also work on the lock screen.",
+          "since": 3001010
+        },
         "Live updates put the class that's on now and your outing requests on the lock screen, on Android 16 and later.",
+        {
+          "text": "On exam days a live update counts down to your paper with the venue and seat. A class you can't skip shows in red, on Android 17.",
+          "since": 3001010
+        },
         "In class mode turns on Do Not Disturb while a class is on.",
+        {
+          "text": "Calendar sync puts your classes for the next two weeks, your exams and the academic calendar's holidays in your phone's calendar. Turn it on in Settings.",
+          "since": 3001010
+        },
+        {
+          "text": "A Quick Settings tile turns In class on or off and shows your next class.",
+          "since": 3001010
+        },
         "Assistants that support Android's app functions can read your timetable and attendance, on Android 16 and later.",
+        {
+          "text": "Assistants can also read your exams, marks, grades, outings, the academic calendar, today's mess menu and how many classes you can miss.",
+          "since": 3001010
+        },
         "Connected apps pairs the browser extension and makes keys for Claude and other AI apps (MCP).",
         "Share or print the timetable and grade history as a PDF. Long-press the round button with your initial on either page.",
         {
@@ -65,11 +89,17 @@
     {
       "version": "3.1.0",
       "code": 3001010,
-      "summary": "3.1 adds Semester Wrapped, asks before your VTOP cookie leaves the phone, gives clearer change alerts with outings, course files and the calendar, loads VTOP pages faster and is smaller.",
+      "summary": "3.1 adds Semester Wrapped, calendar sync, new widgets on the home and lock screen, exam live updates and a Quick Settings tile, asks before your VTOP cookie leaves the phone, gives clearer change alerts and loads VTOP pages faster.",
       "sections": [
         {
           "title": "New",
           "items": [
+            "Calendar sync, in Settings: your classes for the next two weeks, your exams with venue and seat, and the academic calendar's holidays and exam days go into a Vitap Mate calendar on your phone, so they show in Google Calendar, on your watch and in At a Glance. Turning it off removes that calendar.",
+            "New widgets: Attendance lists the courses closest to 75% with how many classes you can miss, Exams counts down to your next paper, and Mess menu shows the meal on now or next. They and the timetable widget also work on the lock screen.",
+            "Exam live update: on an exam day, from an hour before, the lock screen counts down to your paper with the venue, seat and reporting time, then to its end.",
+            "On Android 17, a class live update turns red when you can't skip it and amber when you can miss only one or two more.",
+            "A Quick Settings tile turns In class on or off and shows the class on now or next.",
+            "Assistants like Gemini can now read your exams, marks, grades, outing requests, the academic calendar, the mess menu and how many classes you can miss before the next exam, as well as your classes and attendance.",
             "Semester Wrapped: once a semester's classes are over, the top of More opens a story of that semester. Tap through attendance, your longest streak, the courses you never missed, your room and faculty, marks, GPA and CGPA, outings and campus times, then share any slide or the summary card as an image.",
             "Close call: the course that came nearest to 75%, with how many classes you had to spare.",
             "On Duty: how many of your classes were on OD, on how many days, and the course with the most.",
@@ -89,6 +119,9 @@
         {
           "title": "Improved",
           "items": [
+            "PDFs in Docs and the outing pass open in Android's PDF viewer where your phone has it: sharp at any zoom, with text you can select and copy, links you can tap and a scroll thumb for long files.",
+            "The timetable widget is rebuilt and follows your wallpaper's colours as before.",
+            "In class uses Android 15's Modes, with its own icon and a description of when it turns on.",
             "The forwarding guide and these notes now load when you open them and stay saved on your phone, so they can be corrected without an app update.",
             "OTP auto-fill through a forwarding address matches codes by VTOP's clock and keeps waiting while a code is on its way.",
             "Outing no longer limits the longest trip to 15 days. VTOP decides what it allows.",

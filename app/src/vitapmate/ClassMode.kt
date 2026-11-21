@@ -92,13 +92,26 @@ object ClassMode {
             val current = todays.filter { it.start <= now && now < it.end }.maxByOrNull { it.end }
             // Minutes from today's midnight to the next flip.
             val wake = current?.end ?: quiet.firstOrNull { it.day > today || it.start > now }?.let { (it.day - today) * 1440 + it.start }
-            val rule = id ?: manager.addAutomaticZenRule(
-                AutomaticZenRule("In class", null, ComponentName(app, MainActivity::class.java), CONDITION, null, NotificationManager.INTERRUPTION_FILTER_PRIORITY, true),
-            )
+            // A rule made before Android 15's typed rules is updated once, in place.
+            val rule = id?.also { if (Build.VERSION.SDK_INT >= 35 && manager.getAutomaticZenRule(it).type != AutomaticZenRule.TYPE_SCHEDULE_TIME) manager.updateAutomaticZenRule(it, inClass(app)) }
+                ?: manager.addAutomaticZenRule(inClass(app))
             manager.setAutomaticZenRuleState(rule, Condition(CONDITION, current?.name ?: "No class now", if (current != null) Condition.STATE_TRUE else Condition.STATE_FALSE))
             if (wake != null) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, ms + (wake * 60L - istSecond(ms)) * 1000, alarm)
             Log.info("classmode", "rule", f, mapOf("on" to "${current != null}", "today" to "${todays.size}", "wake_in_min" to "${wake?.minus(now)}"))
         }
+    }
+
+    /** The "In class" rule: on Android 15+ a time-schedule mode with its icon and what turns it on. */
+    private fun inClass(app: Context): AutomaticZenRule {
+        val settings = ComponentName(app, MainActivity::class.java)
+        if (Build.VERSION.SDK_INT < 35) return AutomaticZenRule("In class", null, settings, CONDITION, null, NotificationManager.INTERRUPTION_FILTER_PRIORITY, true)
+        return AutomaticZenRule.Builder("In class", CONDITION)
+            .setConfigurationActivity(settings)
+            .setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+            .setType(AutomaticZenRule.TYPE_SCHEDULE_TIME)
+            .setIconResId(R.drawable.tile_class)
+            .setTriggerDescription("During your classes, and exams from reporting time")
+            .build()
     }
 }
 

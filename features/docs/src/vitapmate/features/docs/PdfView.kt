@@ -43,6 +43,8 @@ import vitapmate.data.Doc
 import vitapmate.data.Docs
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
+import vitapmate.ui.SystemPdf
+import vitapmate.ui.systemPdfSupported
 
 /** An open PDF: page sizes up front, pages rendered one at a time on its own thread (PdfRenderer allows one). */
 private class Pdf(fd: ParcelFileDescriptor) : AutoCloseable {
@@ -72,10 +74,17 @@ private class Pdf(fd: ParcelFileDescriptor) : AutoCloseable {
     }
 }
 
-/** Every page down a list, pinch to zoom; reopens on the page it was left at. */
+/**
+ * Every page down a list, pinch to zoom; reopens on the page it was left at. Opened full screen
+ * where the platform has it, Jetpack PDF's viewer ([SystemPdf]) instead, for sharp zoom and text
+ * selection.
+ */
 @OptIn(FlowPreview::class)
 @Composable
 internal fun PdfView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
+    if (!embedded && doc.uri.isNotEmpty() && systemPdfSupported()) {
+        return SystemPdf(doc.uri, Modifier.fillMaxSize().testTag("docs.viewer.pdf"), doc.page, PaddingValues(Space.sm), { Docs.saveView(doc.id, it, doc.zoom) }, onFailed)
+    }
     val pdf by produceState<Pdf?>(null, doc.uri) {
         value = runCatching { withContext(Dispatchers.IO) { Pdf(Docs.open(doc)) } }.onFailure(onFailed).getOrNull()
     }

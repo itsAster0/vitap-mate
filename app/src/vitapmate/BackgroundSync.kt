@@ -208,7 +208,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 Settings.syncPaused = null
                 prefs.edit().remove(MISSES).apply()
             }
-            TimetableWidget.refresh(app)
+            Widgets.refresh(app)
+            CalendarSync.sync(app, unattended = true)
             // New changes since the last notification, of the kinds switched on.
             val since = prefs.getLong("notified_ms", System.currentTimeMillis() - 86_400_000L)
             val fresh = withContext(Dispatchers.IO) { AppCore.await().changes(f) }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MessWidget's message badge icon (Lucide utensils); tinted by Widgets.kt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:pathData="M3,2v7c0,1.1 0.9,2 2,2h4a2,2 0,0 0,2 -2V2M7,2v20M21,15V2a5,5 0,0 0,-5 5v6c0,1.1 0.9,2 2,2h3zM21,15v7"
+      android:strokeColor="#FF000000"
+      android:strokeWidth="2"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round" />
+</vector>

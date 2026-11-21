@@ -133,6 +133,9 @@ object Settings {
     /** Assistant (Android 16+): the saved timetable and attendance for Android's app functions; off by default. */
     var assistant by flag("settings_assistant", false)
 
+    /** Calendar: classes, exams and the academic calendar in a calendar on the phone (app's CalendarSync); off by default. */
+    var calendarSync by flag("settings_calendar_sync", false)
+
     /** Semester ids whose Wrapped was opened. */
     var wrappedSeen by ids("settings_wrapped_seen")
 
@@ -182,7 +185,7 @@ object Settings {
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
+            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 

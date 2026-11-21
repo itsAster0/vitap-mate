@@ -44,10 +44,10 @@ fun LiveUpdatesSetting() {
     val promotable = remember(Foreground.resumes) { LiveUpdates.promotable(context) }
     ListGroup("Live updates", footer = "On the lock screen and in the status bar, from what the app has saved.") {
         GroupItem(
-            "Class and outing",
+            "Class, exam and outing",
             "settings.live_updates",
             Lucide.Radio,
-            "The class on now and the next one; an outing request until VTOP decides",
+            "The class on now and the next one; an exam paper on its day; an outing request until VTOP decides",
             onClick = { set(!Settings.liveUpdates) },
             trailing = { ItemSwitch(Settings.liveUpdates, { set(it) }) },
             on = Settings.liveUpdates,

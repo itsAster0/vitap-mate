@@ -4,6 +4,11 @@
   <string name="shortcut_timetable">Timetable</string>
   <string name="shortcut_attendance">Attendance</string>
   <string name="shortcut_outing">Outing</string>
-  <!-- Home-screen widget (res/xml/timetable_widget.xml). -->
+  <!-- Home-screen widgets (res/xml/*_widget.xml); the timetable and attendance ones take the shortcut labels. -->
   <string name="widget_timetable_description">Your next class and today\'s timetable</string>
+  <string name="widget_attendance_description">The courses closest to 75%, with how many classes to attend or skip</string>
+  <string name="widget_exams">Exams</string>
+  <string name="widget_exams_description">A countdown to your next exam, with its venue and seat</string>
+  <string name="widget_mess">Mess menu</string>
+  <string name="widget_mess_description">Today\'s meals from your mess menu, with the one on now or next</string>
 </resources>

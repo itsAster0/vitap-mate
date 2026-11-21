@@ -118,7 +118,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
         ("Live updates" to 7).takeIf { LiveUpdates.supported() },
         ("In class" to 8).takeIf { ClassMode.supported() },
         ("Assistant" to 9).takeIf { android.os.Build.VERSION.SDK_INT >= 36 },
-        "Appearance" to 10, "Files and mess" to 11, "Diagnostics" to 12,
+        "Calendar" to 10, "Appearance" to 11, "Files and mess" to 12, "Diagnostics" to 13,
     )
     var confirmSignOut by remember { mutableStateOf(false) }
     var messTimings by remember { mutableStateOf(false) }
@@ -234,6 +234,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             item { LiveUpdatesSetting() }
             item { ClassModeSetting() }
             item { AssistantSetting() }
+            item { CalendarSync.Setting() }
             item { AppearanceGroup() }
             item {
                 ListGroup("Files and mess") {

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TimetableWidget's room pin (Lucide map-pin); tinted by its layout. -->
+<!-- The widgets' room pin (Lucide map-pin); tinted by Widgets.kt. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="13dp"
     android:height="13dp"

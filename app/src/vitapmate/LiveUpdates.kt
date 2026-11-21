@@ -17,9 +17,13 @@ import android.text.format.DateFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vitapmate.core.AttendanceCourse
+import vitapmate.core.ClassKind
 import vitapmate.core.ClassSlot
+import vitapmate.core.Core
 import vitapmate.core.OutingRequest
 import vitapmate.core.OutingStanding
+import vitapmate.core.ScheduledPaper
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Settings
@@ -36,15 +40,25 @@ import vitapmate.ui.clock
  * `ProgressStyle` on their own channel. The class on now (or next) from the cached timetable, with
  * its room and a bar until it ends, then the next one, gone after the day's last class; and an
  * outing request while VTOP has it pending, then approved or rejected once a fetched outing page
- * says so. The class one is redrawn by an inexact alarm ([LiveUpdateReceiver]) at each class
- * boundary and every [TICK_MIN] minutes during the day. Flows `live.*`.
+ * says so. The class one carries the course's attendance advice, in Android 17's caution or
+ * danger colour when it is close to 75%. On an exam day, an exam paper from [EXAM_LEAD_MIN]
+ * minutes before its start until its end, in place of the class one. Both are redrawn by an
+ * inexact alarm ([LiveUpdateReceiver]) at each class or paper boundary and every [TICK_MIN]
+ * minutes during the day. Flows `live.*`.
  */
 object LiveUpdates {
     private const val CHANNEL = "live"
     private const val CLASS_ID = 300
+    private const val EXAM_ID = 301
 
     /** The next class shows from this many minutes before the day's first one. */
     private const val LEAD_MIN = 30
+
+    /** The exam update shows from this many minutes before a paper starts. */
+    private const val EXAM_LEAD_MIN = 60
+
+    /** A paper's length when VTOP gives no end and no other paper of its exam has one. */
+    private const val EXAM_MIN = 90
 
     /** How often the bar moves on (the countdown runs on its own). */
     private const val TICK_MIN = 5
@@ -72,12 +86,23 @@ object LiveUpdates {
         val today = istDay(ms)
         val now = istMinute(ms)
         // Days from today with their classes, start order; null without a cached timetable.
-        val days = runCatching {
-            withContext(Dispatchers.IO) {
-                val c = AppCore.await()
-                c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).map { d -> d.day to meeting(d).map { it.slot }.sortedBy { it.start } } }
-            }
-        }.onFailure { Log.warn("live", "timetable unavailable: ${it::class.simpleName}", f) }.getOrNull()
+        val days = cached(f, "timetable") { c ->
+            c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).map { d -> d.day to meeting(d).map { it.slot }.sortedBy { it.start } } }
+        }
+        val attendance = cached(f, "attendance") { c -> c.cachedAttendance(f)?.courses?.associateBy { it.key } }
+        // Dated papers from today on, start order, in minutes from today's midnight.
+        val papers = cached(f, "exams") { c ->
+            c.cachedExams(f)?.groups.orEmpty().flatMap { g ->
+                val length = g.papers.firstNotNullOfOrNull { p -> p.end?.let { e -> p.start?.let { e - it } } } ?: EXAM_MIN
+                g.papers.mapNotNull { p ->
+                    val d = p.day ?: return@mapNotNull null
+                    val start = p.start ?: return@mapNotNull null
+                    if (d < today) null else Paper(g.name, p, (d - today) * 1440 + start, (d - today) * 1440 + (p.end ?: (start + length)))
+                }
+            }.sortedBy { it.start }
+        }.orEmpty()
+        val exam = papers.firstOrNull { it.start - EXAM_LEAD_MIN <= now && now < it.end }
+        if (exam != null) postExam(app, manager, exam, ms, now) else manager.cancel(EXAM_ID)
         val todays = days?.firstOrNull { it.first == today }?.second.orEmpty()
         val current = todays.firstOrNull { it.start <= now && now < it.end }
         val next = todays.firstOrNull { it.start > now }
@@ -85,13 +110,18 @@ object LiveUpdates {
         val showing: String
         // Minutes from today's midnight to the next redraw.
         val wake: Int?
-        if (current != null) {
+        fun course(slot: ClassSlot) = attendance?.get("${slot.code}.${if (slot.kind == ClassKind.LAB) "lab" else "theory"}")
+        if (exam != null) {
+            showing = "exam"
+            manager.cancel(CLASS_ID)
+            wake = minOf(if (now < exam.start) exam.start else exam.end, now + TICK_MIN)
+        } else if (current != null) {
             showing = "now"
-            post(app, manager, current, true, current.start, current.end, todays.firstOrNull { it.start >= current.end }, ms, now)
+            post(app, manager, current, true, current.start, current.end, todays.firstOrNull { it.start >= current.end }, course(current), ms, now)
             wake = minOf(current.end, now + TICK_MIN)
         } else if (next != null && (before != null || next.start - now <= LEAD_MIN)) {
             showing = "next"
-            post(app, manager, next, false, before?.end ?: (next.start - LEAD_MIN), next.start, null, ms, now)
+            post(app, manager, next, false, before?.end ?: (next.start - LEAD_MIN), next.start, null, course(next), ms, now)
             wake = minOf(next.start, now + TICK_MIN)
         } else {
             showing = "none"
@@ -99,8 +129,12 @@ object LiveUpdates {
             wake = next?.let { it.start - LEAD_MIN }
                 ?: days?.firstOrNull { it.first > today && it.second.isNotEmpty() }?.let { (it.first - today) * 1440 + it.second.first().start - LEAD_MIN }
         }
-        if (wake != null) app.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMinute(ms, wake), alarm(app))
-        Log.info("live", "class", f, mapOf("today" to "${todays.size}", "showing" to showing, "wake_in_min" to "${wake?.minus(now)}"))
+        val wakeAt = listOfNotNull(wake, papers.firstOrNull { it.start - EXAM_LEAD_MIN > now }?.let { it.start - EXAM_LEAD_MIN }).minOrNull()
+        if (wakeAt != null) app.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMinute(ms, wakeAt), alarm(app))
+        Log.info(
+            "live", "class", f,
+            mapOf("today" to "${todays.size}", "exams_today" to "${papers.count { it.start < 1440 }}", "showing" to showing, "wake_in_min" to "${wakeAt?.minus(now)}"),
+        )
     }
 
     /**
@@ -111,12 +145,7 @@ object LiveUpdates {
     suspend fun outings(context: Context, flowName: String) = flow(flowName) { f ->
         val app = context.applicationContext
         if (!allowed(app)) return@flow
-        val requests = runCatching {
-            withContext(Dispatchers.IO) {
-                val c = AppCore.await()
-                c.cachedGeneralOuting(f)?.requests.orEmpty() + c.cachedWeekendOuting(f)?.requests.orEmpty()
-            }
-        }.onFailure { Log.warn("live", "outings unavailable: ${it::class.simpleName}", f) }.getOrNull() ?: return@flow
+        val requests = cached(f, "outings") { c -> c.cachedGeneralOuting(f)?.requests.orEmpty() + c.cachedWeekendOuting(f)?.requests.orEmpty() } ?: return@flow
         val prefs = app.getSharedPreferences("live", Context.MODE_PRIVATE)
         val seen = prefs.getStringSet("outings", null)?.associate { it.substringBefore('=') to it.substringAfter('=') }
         val manager = app.getSystemService(NotificationManager::class.java)
@@ -138,7 +167,14 @@ object LiveUpdates {
         Log.info("live", "outings", f, mapOf("requests" to "${requests.size}", "posted" to "$posted", "first" to "${seen == null}"))
     }
 
-    /** Developer → Preview: a class on now (half way) and an approved outing, from made-up data. */
+    /** [read] on the cache, off the main thread; null (logged) when it fails. */
+    private suspend fun <T> cached(f: String, what: String, read: (Core) -> T): T? =
+        runCatching { withContext(Dispatchers.IO) { read(AppCore.await()) } }.onFailure { Log.warn("live", "$what unavailable: ${it::class.simpleName}", f) }.getOrNull()
+
+    /** An exam [paper] of [exam], from [start] to [end] in minutes from today's midnight in India. */
+    private class Paper(val exam: String, val paper: ScheduledPaper, val start: Int, val end: Int)
+
+    /** Developer → Preview: a class on now (half way, attendance at risk), a paper soon and an approved outing, from made-up data. */
     fun preview(context: Context) {
         val app = context.applicationContext
         if (!allowed(app)) return
@@ -146,33 +182,49 @@ object LiveUpdates {
         channel(manager)
         val ms = System.currentTimeMillis()
         val now = istMinute(ms)
-        fun slot(start: Int, name: String, block: String, room: String, code: String) = ClassSlot(0, start, start + 50, "", name, vitapmate.core.ClassKind.THEORY, room, block, code, "", null)
-        post(app, manager, slot(now - 25, "Data Structures", "AB1", "204", "A1"), true, now - 25, now + 25, slot(now + 35, "Operating Systems", "CB", "312", "B1"), ms, now)
+        fun slot(start: Int, name: String, block: String, room: String, code: String) = ClassSlot(0, start, start + 50, "", name, ClassKind.THEORY, room, block, code, "", null)
+        val risky = AttendanceCourse("A1.theory", "", "", "A1", "Data Structures", ClassKind.THEORY, "", "", 30, 41, 41, 73.2, false, 0, 3, "Attend 3", false, null, null)
+        post(app, manager, slot(now - 25, "Data Structures", "AB1", "204", "A1"), true, now - 25, now + 25, slot(now + 35, "Operating Systems", "CB", "312", "B1"), risky, ms, now)
+        val paper = ScheduledPaper("B1.theory", "B1", "Operating Systems", ClassKind.THEORY, "ETH", "B1", null, now + 20, now + 110, now + 5, "FN", "AB1-204", "R6 · C6", "36")
+        postExam(app, manager, Paper("CAT-II", paper, now + 20, now + 110), ms, now)
         postOuting(app, manager, "preview", OutingRequest("preview", vitapmate.core.OutingKind.GENERAL, "Vijayawada", "Shopping", "Approved", OutingStanding.APPROVED, "APPROVED", listOf(vitapmate.core.OutingWhen("Out", "Sat 14 Nov, 9:00 AM")), "IN 4 DAYS", null, null))
     }
 
     private fun channel(manager: NotificationManager) {
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "Live updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "The class on now and outing requests"
+                description = "The class on now, exam papers and outing requests"
                 setSound(null, null)
                 enableVibration(false)
             },
         )
     }
 
-    /** The class [slot], on now ([live]) or next: the bar runs from [from] to [to] (minutes), [then] after it. */
-    private fun post(context: Context, manager: NotificationManager, slot: ClassSlot, live: Boolean, from: Int, to: Int, then: ClassSlot?, ms: Long, now: Int) {
+    /**
+     * The class [slot], on now ([live]) or next: the bar runs from [from] to [to] (minutes), [then]
+     * after it. With [course]'s attendance close to 75%, its advice leads the text, the bar and the
+     * advice in Android 17's danger (no class to spare) or caution (one or two) colour.
+     */
+    private fun post(context: Context, manager: NotificationManager, slot: ClassSlot, live: Boolean, from: Int, to: Int, then: ClassSlot?, course: AttendanceCourse?, ms: Long, now: Int) {
         if (Build.VERSION.SDK_INT < 36) return
         val h24 = DateFormat.is24HourFormat(context)
-        val text = listOfNotNull(
+        val danger = course != null && course.total > 0 && (!course.safe || course.debarred || course.canSkip == 0)
+        val advice = course?.advice?.ifEmpty { null }?.takeIf { danger || course.canSkip in 1..2 }
+        val semantic = if (advice == null || Build.VERSION.SDK_INT < 37) null else if (danger) Notification.SEMANTIC_STYLE_DANGER else Notification.SEMANTIC_STYLE_CAUTION
+        val text = SpannableString(listOfNotNull(
+            advice,
             place(slot),
             slot.slot.ifEmpty { null },
             "${clock(slot.start, h24)} – ${clock(slot.end, h24)}",
             then?.let { "then ${it.name} at ${clock(it.start, h24)}" + (place(it)?.let { p -> " in $p" } ?: "") },
-        ).joinToString(" · ")
+        ).joinToString(" · "))
+        val bar = Notification.ProgressStyle.Segment((to - from).coerceAtLeast(1))
+        if (semantic != null && Build.VERSION.SDK_INT >= 37) {
+            text.setSpan(Notification.createSemanticStyleAnnotation(semantic), 0, advice!!.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            bar.setSemanticStyle(semantic)
+        }
         val style = Notification.ProgressStyle()
-            .setProgressSegments(listOf(Notification.ProgressStyle.Segment((to - from).coerceAtLeast(1))))
+            .setProgressSegments(listOf(bar))
             .setProgress((now - from).coerceIn(0, (to - from).coerceAtLeast(1)))
             .setStyledByProgress(true)
         val n = Notification.Builder(context, CHANNEL)
@@ -195,6 +247,56 @@ object LiveUpdates {
             .setContentIntent(open(context, "timetable", CLASS_ID))
             .build()
         manager.notify(CLASS_ID, n)
+    }
+
+    /**
+     * An exam [p]: the bar runs from [EXAM_LEAD_MIN] before its start to its end, with points at
+     * both, the countdown to the start, then to the end; in Android 17's info colour.
+     */
+    private fun postExam(context: Context, manager: NotificationManager, p: Paper, ms: Long, now: Int) {
+        if (Build.VERSION.SDK_INT < 36) return
+        val h24 = DateFormat.is24HourFormat(context)
+        val started = now >= p.start
+        val title = SpannableString("${p.exam}: ${p.paper.name}")
+        val length = (p.end - p.start).coerceAtLeast(1)
+        val wait = Notification.ProgressStyle.Segment(EXAM_LEAD_MIN)
+        val sitting = Notification.ProgressStyle.Segment(length)
+        val points = listOf(Notification.ProgressStyle.Point(EXAM_LEAD_MIN), Notification.ProgressStyle.Point(EXAM_LEAD_MIN + length))
+        if (Build.VERSION.SDK_INT >= 37) {
+            title.setSpan(Notification.createSemanticStyleAnnotation(Notification.SEMANTIC_STYLE_INFO), 0, p.exam.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sitting.setSemanticStyle(Notification.SEMANTIC_STYLE_INFO)
+            points.forEach { it.setSemanticStyle(Notification.SEMANTIC_STYLE_INFO) }
+        }
+        val style = Notification.ProgressStyle()
+            .setProgressSegments(listOf(wait, sitting))
+            .setProgressPoints(points)
+            .setProgress((now - p.start + EXAM_LEAD_MIN).coerceIn(0, EXAM_LEAD_MIN + length))
+            .setStyledByProgress(true)
+        val text = listOfNotNull(
+            p.paper.venue.ifEmpty { null },
+            p.paper.seat.ifEmpty { null }?.let { "Seat $it" },
+            "${clock(p.start % 1440, h24)} – ${clock(p.end % 1440, h24)}",
+            p.paper.reporting?.takeIf { !started }?.let { "report by ${clock(it, h24)}" },
+        ).joinToString(" · ")
+        val n = Notification.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSubText(if (started) "Exam on now" else "Exam soon")
+            .setStyle(style)
+            .setShortCriticalText(p.paper.venue.ifEmpty { clock(p.start % 1440, h24) })
+            .setWhen(atMinute(ms, if (started) p.end else p.start))
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            .setChronometerCountDown(true)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setRequestPromotedOngoing(true)
+            .setCategory(Notification.CATEGORY_EVENT)
+            .setTimeoutAfter(atMinute(ms, p.end) - ms + 10 * 60_000L)
+            .setContentIntent(open(context, "exams", EXAM_ID))
+            .build()
+        manager.notify(EXAM_ID, n)
     }
 
     /** "CB 312": the block, then the room; null when VTOP lists neither. */

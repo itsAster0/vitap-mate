@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TimetableWidget's message badge icon (Lucide calendar); tinted by its layout. -->
+<!-- The timetable and exams widgets' message badge icon (Lucide calendar); tinted by Widgets.kt. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="22dp"
     android:height="22dp"

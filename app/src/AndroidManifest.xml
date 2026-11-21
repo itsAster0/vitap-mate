@@ -14,6 +14,9 @@
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <!-- In class (ClassMode.kt): the app's own Do Not Disturb rule, once the student allows it. -->
   <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+  <!-- Settings → Calendar (CalendarSync.kt): classes and exams in the app's own calendar, asked for when it is turned on. -->
+  <uses-permission android:name="android.permission.READ_CALENDAR" />
+  <uses-permission android:name="android.permission.WRITE_CALENDAR" />
   <!-- Gmail sign-in keeps the app awake while the student is in the browser (SignInService.kt). -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <!-- Play Services' QR scanner (QrScanner.kt) visibility on Android 11+. -->
@@ -134,13 +137,46 @@
         <action android:name="android.app.appfunctions.AppFunctionService" />
       </intent-filter>
     </service>
-    <!-- Home-screen widget: next class and today's timetable (TimetableWidget.kt). -->
+    <!-- Home-screen widgets (Glance; Widgets.kt): next class and today's timetable (TimetableWidget.kt). -->
     <receiver android:name="vitapmate.TimetableWidgetReceiver" android:exported="true" android:label="@string/shortcut_timetable">
       <intent-filter>
         <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
       </intent-filter>
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/timetable_widget" />
     </receiver>
+    <!-- Home-screen widget: the courses most at risk of falling below 75% (AttendanceWidget.kt). -->
+    <receiver android:name="vitapmate.AttendanceWidgetReceiver" android:exported="true" android:label="@string/shortcut_attendance">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/attendance_widget" />
+    </receiver>
+    <!-- Home-screen widget: a countdown to the next exam paper (ExamsWidget.kt). -->
+    <receiver android:name="vitapmate.ExamsWidgetReceiver" android:exported="true" android:label="@string/widget_exams">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/exams_widget" />
+    </receiver>
+    <!-- Home-screen widget: today's mess menu, the meal on now or next (MessWidget.kt). -->
+    <receiver android:name="vitapmate.MessWidgetReceiver" android:exported="true" android:label="@string/widget_mess">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/mess_widget" />
+    </receiver>
+    <!-- Quick Settings tile that switches In class (ClassTile.kt). -->
+    <service
+        android:name="vitapmate.ClassTile"
+        android:exported="true"
+        android:label="In class"
+        android:icon="@drawable/tile_class"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE" />
+      </intent-filter>
+      <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+    </service>
     <!-- Shares the log file from the Inspector (share sheet). -->
     <provider
         android:name="androidx.core.content.FileProvider"

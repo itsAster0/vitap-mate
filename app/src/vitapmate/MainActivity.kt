@@ -116,6 +116,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Foreground.started()
+        // The calendar from the cache, if it is on.
+        AppScope.launch { CalendarSync.sync(applicationContext) }
     }
 
     override fun onResume() {
@@ -126,8 +128,8 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         Foreground.stopped()
-        // Picks up a timetable refreshed in the app.
-        AppScope.launch { TimetableWidget.refresh(applicationContext) }
+        // Picks up a timetable, attendance or exams refreshed in the app.
+        AppScope.launch { Widgets.refresh(applicationContext) }
         // And outing pages fetched in it; the class update follows a changed timetable.
         AppScope.launch { LiveUpdates.refresh(applicationContext, "live.leave"); LiveUpdates.outings(applicationContext, "live.leave") }
         AppScope.launch { ClassMode.refresh(applicationContext, "classmode.leave") }

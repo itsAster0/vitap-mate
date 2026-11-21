@@ -1,9 +1,9 @@
-• Semester Wrapped: your semester as a story you can share, with Hide grades
+• Semester Wrapped: your semester as a story to share
+• Classes, exams and holidays in your phone's calendar
+• Attendance, exam and mess menu widgets, also on the lock screen
+• Live updates for exams; classes you can't skip show in red
+• Quick Settings tile for In class
+• Gemini can read exams, marks, grades, outings and the mess menu
+• Sharper PDFs with text you can copy
 • The app asks before your VTOP cookie leaves the phone
-• Change alerts name the course first, and cover outings, course files and the calendar
-• VTOP pages load faster; pull to refresh keeps your page
-• More reliable OTP auto-fill
-• Exams in date order; In class also silences exams
-• Tap a class for its attendance
-• Fixes for Android 9, sheets, QR scanning and slow connections
-• Smaller app, fewer crashes
+• Clearer change alerts, faster VTOP, better OTP auto-fill

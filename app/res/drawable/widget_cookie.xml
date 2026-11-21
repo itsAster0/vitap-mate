@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TimetableWidget's badge: a 9-lobed scallop, r = R(1 + 0.045 cos 9θ) / 1.045; tinted by its layout. -->
+<!-- The widgets' badge: a 9-lobed scallop, r = R(1 + 0.045 cos 9θ) / 1.045; tinted by Widgets.kt. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="54dp"
     android:height="54dp"
