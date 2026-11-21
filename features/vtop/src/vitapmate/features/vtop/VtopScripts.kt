@@ -73,7 +73,7 @@ internal object VtopScripts {
 })();
 """
 
-    /** `vtopActivityScript`: observes activity only. Request arguments, results and errors are preserved. */
+    /** `vtopActivityScript`: observes activity only (and requests that land on the login page). Request arguments, results and errors are preserved. */
     const val ACTIVITY = """
 (function() {
   if (location.origin !== 'https://vtop.vitap.ac.in' || window.__mateActivity) return;
@@ -121,12 +121,29 @@ internal object VtopScripts {
       notify('activity');
     };
   }
+  // Not in the Flutter app: VTOP's in-place pages are requests, so a session that ran out while
+  // browsing shows up only in them: redirected to the login page, or refused (VTOP answers 404
+  // when the session behind the page's CSRF token is gone). A refusal is checked by loading
+  // /vtop/content, as Rust's session check does: it lands on the login page when signed out.
+  let probing = 0;
+  function landed(url, status) {
+    // The login page's own requests (its CAPTCHA) don't count: Kotlin already saw that page.
+    if (location.pathname.startsWith('/vtop/login')) return;
+    try {
+      if (url && new URL(url).pathname.startsWith('/vtop/login')) return notify('login');
+    } catch (_) { return; }
+    if (originalFetch && (status === 401 || status === 403 || status === 404) && Date.now() - probing > 10000) {
+      probing = Date.now();
+      originalFetch.call(window, '/vtop/content', {credentials: 'same-origin'})
+        .then(function(response) { landed(response.url, 0); }, function() {});
+    }
+  }
   const originalFetch = window.fetch;
   if (originalFetch) window.fetch = function() {
     const done = sameOrigin(arguments[0]) ? begin() : function() {};
     try {
       const result = originalFetch.apply(this, arguments);
-      result.then(done, done);
+      result.then(function(response) { done(); landed(response.url, response.status); }, done);
       return result;
     } catch (error) { done(); throw error; }
   };
@@ -142,6 +159,7 @@ internal object VtopScripts {
     if (!tracked.get(this)) return send.apply(this, arguments);
     const done = begin();
     this.addEventListener('loadend', done, {once: true});
+    this.addEventListener('loadend', function() { landed(this.responseURL, this.status); }, {once: true});
     try { return send.apply(this, arguments); }
     catch (error) { this.removeEventListener('loadend', done); done(); throw error; }
   };

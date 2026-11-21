@@ -37,8 +37,8 @@ import com.composables.icons.lucide.House
 import com.composables.icons.lucide.LockKeyhole
 import com.composables.icons.lucide.LogIn
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.Search
+import com.composables.icons.lucide.Trash2
 import vitapmate.ui.Space
 
 /** One of the view preferences in the menu: label, checked, toggle. */
@@ -46,7 +46,7 @@ internal data class VtopToggle(val tag: String, val label: String, val on: Boole
 
 /**
  * The screen's own slim bar (the Flutter app's nested header): close, the page shown (VTOP's own
- * title) over the host, Search, Home, and the Flutter menu (Reload, view preferences). Pull down at the top of the page reloads too.
+ * title) over the host, Search, Home, and the menu (clear the saved VTOP files, view preferences). Pull down at the top of the page reloads.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -56,7 +56,10 @@ internal fun VtopToolbar(
     onClose: () -> Unit,
     onSearch: () -> Unit,
     onHome: () -> Unit,
-    onReload: () -> Unit,
+    /** The saved files' size, read when the menu opens ("2.1 MB"); null until read. */
+    saved: String?,
+    onMenu: () -> Unit,
+    onClearSaved: () -> Unit,
     toggles: List<VtopToggle>,
 ) {
     var menu by remember { mutableStateOf(false) }
@@ -81,14 +84,15 @@ internal fun VtopToolbar(
             M3IconButton(onClick = onSearch, modifier = Modifier.testTag("vtop.search.open"), enabled = enabled, shapes = IconButtonDefaults.shapes()) { Icon(Lucide.Search, "Search VTOP pages", Modifier.size(20.dp)) }
             M3IconButton(onClick = onHome, modifier = Modifier.testTag("vtop.home"), enabled = enabled, shapes = IconButtonDefaults.shapes()) { Icon(Lucide.House, "VTOP Home", Modifier.size(20.dp)) }
             Box {
-                M3IconButton(onClick = { menu = true }, modifier = Modifier.testTag("vtop.menu"), enabled = enabled, shapes = IconButtonDefaults.shapes()) { Icon(Lucide.EllipsisVertical, "More", Modifier.size(20.dp)) }
+                M3IconButton(onClick = { menu = true; onMenu() }, modifier = Modifier.testTag("vtop.menu"), enabled = enabled, shapes = IconButtonDefaults.shapes()) { Icon(Lucide.EllipsisVertical, "More", Modifier.size(20.dp)) }
                 // A popup window: its tags need their own resource-id switch.
                 DropdownMenu(menu, { menu = false }, Modifier.semantics { testTagsAsResourceId = true }, shape = MaterialTheme.shapes.large) {
                     DropdownMenuItem(
-                        { Text("Reload") },
-                        { menu = false; onReload() },
-                        leadingIcon = { Icon(Lucide.RotateCw, null, Modifier.size(20.dp)) },
-                        modifier = Modifier.testTag("vtop.reload"),
+                        { Text("Clear saved files") },
+                        { menu = false; onClearSaved() },
+                        leadingIcon = { Icon(Lucide.Trash2, null, Modifier.size(20.dp)) },
+                        trailingIcon = saved?.let { { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+                        modifier = Modifier.testTag("vtop.clear_saved"),
                     )
                     HorizontalDivider(Modifier.padding(vertical = Space.xs))
                     val haptics = rememberHaptics()

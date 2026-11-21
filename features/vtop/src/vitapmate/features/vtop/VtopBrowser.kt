@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlin.math.abs
 import org.json.JSONArray
 import vitapmate.core.WebSession
 import vitapmate.data.Docs
@@ -97,6 +99,10 @@ internal class VtopBrowser(
     private var menuSequence = 0
     private var startUrl: String? = null
     private var pageStart = 0L
+    /** The page to open again once the next document is signed in (after a reload or a sign-in again). */
+    private var reopen: VtopPage? = null
+    private var assets: VtopAssets? = null
+    private var userAgent = ""
 
     val busy get() = pageLoading || requests > 0
 
@@ -126,6 +132,8 @@ internal class VtopBrowser(
             displayZoomControls = false
             setSupportMultipleWindows(false)
         }
+        userAgent = settings.userAgentString
+        assets = VtopAssets(context.cacheDir)
         addJavascriptInterface(Bridge(), "vitapmate")
         webViewClient = Client()
         webChromeClient = object : WebChromeClient() {
@@ -136,18 +144,31 @@ internal class VtopBrowser(
             override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams) =
                 onChooseFile(callback, params)
         }
+        var startX = 0f
         var startY = 0f
         var pulling = false
-        // Taps and scrolls still reach the page; only a downward drag that starts at the very top pulls.
+        val slop = ViewConfiguration.get(context).scaledTouchSlop
+        fun stopPull() {
+            if (pulling) onPullEnd(0f)
+            pulling = false
+        }
+        // Taps and scrolls still reach the page; only a downward drag that starts at the very top
+        // pulls. A second finger (pinch zoom) or a sideways drag (a wide table) is the page's.
         setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    startX = event.x
                     startY = event.y
                     pulling = !canScrollVertically(-1) && innerAtTop && !reloading
                 }
-                MotionEvent.ACTION_MOVE -> if (pulling) onPull((event.y - startY).coerceAtLeast(0f))
-                MotionEvent.ACTION_UP -> if (pulling) onPullEnd(event.y - startY).also { pulling = false }
-                MotionEvent.ACTION_CANCEL -> if (pulling) onPullEnd(0f).also { pulling = false }
+                MotionEvent.ACTION_POINTER_DOWN -> stopPull()
+                MotionEvent.ACTION_MOVE -> if (pulling) {
+                    val dx = abs(event.x - startX)
+                    val dy = event.y - startY
+                    if (dx > slop && dx > dy) stopPull() else onPull((dy - slop).coerceAtLeast(0f))
+                }
+                MotionEvent.ACTION_UP -> if (pulling) onPullEnd(event.y - startY - slop).also { pulling = false }
+                MotionEvent.ACTION_CANCEL -> stopPull()
             }
             false
         }
@@ -164,6 +185,8 @@ internal class VtopBrowser(
     /** Loads [session]'s start page from scratch (after fresh cookies were set). */
     fun open(session: WebSession) {
         startUrl = session.startUrl
+        // Signed in again: back to the page shown, not Home.
+        reopen = page
         home(reload = true)
     }
 
@@ -186,10 +209,20 @@ internal class VtopBrowser(
         view.loadUrl(start)
     }
 
+    /**
+     * Loads the document again. VTOP shows its pages in place, so that is Home: the page shown
+     * opens again once it is back, and the title stays meanwhile.
+     */
     fun reload() {
+        val view = view ?: return
         error = null
-        reloading = view != null
-        view?.reload()
+        reloading = true
+        reopen = page
+        history.clear()
+        history += VtopPage("", "")
+        sidebar = null
+        stepBack()
+        view.reload()
     }
 
     /** Applies the view preferences to the page shown now (new pages get them on load). */
@@ -353,6 +386,11 @@ internal class VtopBrowser(
                 when (event.optString("type")) {
                     "activity" -> requests = event.optInt("active")
                     "ready" -> view?.evaluateJavascript(VtopScripts.AUTHENTICATED) { if (it == "true") onAuthenticated() }
+                    // A request inside the page landed on the login page: the session ran out while browsing.
+                    "login" -> {
+                        Log.info(SRC, "login page in request", flow)
+                        onLoginPage()
+                    }
                     // Aggregate numbers only, never URLs, resource names or response bodies.
                     "timing" -> Log.info(SRC, "resource timing", flow, listOf("duration", "resources", "transferBytes", "zeroTransfer").associateWith { event.optLong(it).toString() })
                 }
@@ -405,14 +443,26 @@ internal class VtopBrowser(
             val uri = Uri.parse(url)
             if (!isVtop(uri)) return
             val path = uri.path.orEmpty()
+            val files = assets?.summary().orEmpty()
             if (path.startsWith("/vtop/login")) {
                 Log.info(SRC, "login page", flow, mapOf("path" to path))
                 return onLoginPage()
             }
-            Log.info(SRC, "page loaded", flow, mapOf("path" to path, "ms" to (SystemClock.elapsedRealtime() - pageStart).toString()))
+            Log.info(SRC, "page loaded", flow, mapOf("path" to path, "ms" to (SystemClock.elapsedRealtime() - pageStart).toString()) + files)
             inject(view)
-            view.evaluateJavascript(VtopScripts.AUTHENTICATED) { signedIn -> if (signedIn == "true") onAuthenticated() }
+            view.evaluateJavascript(VtopScripts.AUTHENTICATED) { signedIn ->
+                if (signedIn != "true") return@evaluateJavascript
+                onAuthenticated()
+                reopen?.takeIf { it.url.isNotEmpty() }?.let {
+                    Log.info(SRC, "reopen page", flow, mapOf("menu" to pathOf(it.url)))
+                    openMenu(it.url)
+                }
+                reopen = null
+            }
         }
+
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+            assets?.serve(request, userAgent)
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             Log.warn(SRC, "load failed", flow, mapOf("path" to pathOf(request.url), "code" to error.errorCode.toString(), "main" to request.isForMainFrame.toString()))

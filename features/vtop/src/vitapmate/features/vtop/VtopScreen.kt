@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.drop
 import androidx.compose.runtime.snapshotFlow
 import vitapmate.ui.rememberHaptics
 import android.content.Context
+import android.text.format.Formatter
 import android.net.Uri
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -67,6 +68,7 @@ import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
+import vitapmate.ui.showToast
 
 private const val SRC = VtopBrowser.SRC
 private const val PREFS = "settings"
@@ -107,6 +109,8 @@ internal fun VtopScreen() {
     var recent by remember { mutableStateOf(emptyList<VtopPage>()) }
     var searching by remember { mutableStateOf(false) }
     var sidebar by remember { mutableStateOf<List<VtopPage>?>(null) }
+    var saved by remember { mutableStateOf<String?>(null) }
+    val assets = remember { VtopAssets(context.cacheDir) }
     val pull = rememberPullToRefreshState()
     val pullPx = with(LocalDensity.current) { PullToRefreshDefaults.PositionalThreshold.toPx() }
     val haptics = rememberHaptics()
@@ -250,7 +254,18 @@ internal fun VtopScreen() {
             enabled = ready,
             onClose = callback::close,
             onHome = { browser.home() },
-            onReload = { reload("menu") },
+            saved = saved,
+            onMenu = { scope.launch { saved = withContext(Dispatchers.IO) { Formatter.formatShortFileSize(context, assets.bytes()) } } },
+            onClearSaved = {
+                scope.launch {
+                    flow("vtop.clear_saved") { id ->
+                        withContext(Dispatchers.IO) { assets.clear() }
+                        Log.info(SRC, "saved files cleared", id)
+                    }
+                    showToast("Saved files cleared", "VTOP's files download again as the page reloads.")
+                    reload("clear_saved")
+                }
+            },
             onSearch = {
                 sidebar = null
                 searching = true
