@@ -38,6 +38,9 @@ class ColorTablesTest {
 
     private fun hex(c: Color) = "%06X".format(c.toArgb() and 0xFFFFFF)
 
+    /** Ten decimals: the last bits of pow/atan2 differ between CPUs (arm64 laptop, x86 CI). */
+    private fun dec(d: Double) = "%.10f".format(java.util.Locale.ROOT, d)
+
     private fun scheme(s: ColorScheme): String {
         val roles = ColorScheme::class.java.methods
             .filter { it.name.startsWith("get") && it.parameterCount == 0 && it.returnType == Long::class.javaPrimitiveType }
@@ -90,7 +93,7 @@ class ColorTablesTest {
         out.appendLine(")")
         out.appendLine()
         out.appendLine("/** The status seeds' CAM16 hues: success, warning, danger, lab. */")
-        out.appendLine("internal val SEED_HUES = doubleArrayOf(${seeds.joinToString(", ") { Hct.fromInt(it.toArgb()).hue.toString() }})")
+        out.appendLine("internal val SEED_HUES = doubleArrayOf(${seeds.joinToString(", ") { dec(Hct.fromInt(it.toArgb()).hue) }})")
         out.appendLine()
         out.appendLine("/**")
         out.appendLine(" * Each status seed's tones (base, subtle, onSubtle as RRGGBB) with its hue turned -15° to +15° in")
@@ -105,8 +108,8 @@ class ColorTablesTest {
         }
         out.appendLine()
         out.appendLine("/** CAM16's default viewing conditions (materialkolor's ViewingConditions.DEFAULT). */")
-        out.appendLine("internal val CAM16_RGB_D = doubleArrayOf(${vc.rgbD.joinToString(", ")})")
-        out.appendLine("internal const val CAM16_FL = ${vc.fl}")
+        out.appendLine("internal val CAM16_RGB_D = doubleArrayOf(${vc.rgbD.joinToString(", ") { dec(it) }})")
+        out.appendLine("internal const val CAM16_FL = ${dec(vc.fl)}")
         val file = File("").absoluteFile.let { if (it.name == "design") it else it.resolve("design") }.resolve("src/vitapmate/ui/ColorTables.kt")
         if (System.getenv("REGEN_COLORS") == "1") file.writeText(out.toString())
         assertEquals(out.toString(), file.readText(), "ColorTables.kt is stale: REGEN_COLORS=1 ./kotlin test -m design")
