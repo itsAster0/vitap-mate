@@ -52,9 +52,13 @@ pub fn encode(body: &[u8]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
             d
         })
         .collect();
-    let repair = reed_solomon_simd::encode(k, repair_pool(k), &padded).expect("valid shard shape");
+    // `shape` keeps the shards valid; without repair the data symbols still go.
+    let repair = reed_solomon_simd::encode(k, repair_pool(k), &padded).unwrap_or_else(|e| {
+        log::error!("no repair symbols for {} bytes: {e}", body.len());
+        Vec::new()
+    });
     if k == 1 {
-        data[0] = padded[0].clone();
+        data.clone_from(&padded);
     }
     (data, repair)
 }
@@ -85,7 +89,9 @@ pub fn decode(total: usize, symbols: &std::collections::BTreeMap<u8, Vec<u8>>) -
             .collect();
         let restored = reed_solomon_simd::decode(k, repair_pool(k), originals, recovery).ok()?;
         for (i, d) in restored {
-            data[i] = Some(d);
+            if let Some(slot) = data.get_mut(i) {
+                *slot = Some(d);
+            }
         }
     }
     let mut body: Vec<u8> = data.into_iter().collect::<Option<Vec<_>>>()?.concat();

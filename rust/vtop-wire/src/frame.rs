@@ -8,7 +8,7 @@
 //!
 //! Handshake packets have their own layout (see [`crate::msg`]).
 
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+use chacha20poly1305::aead::{Aead, AeadInOut, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Nonce};
 
 /// Client → gateway: a request, a request for more symbols, or a pure ack.
@@ -67,32 +67,26 @@ impl Keys {
         packet.push(ptype);
         packet.extend_from_slice(&sid.to_be_bytes());
         packet.extend_from_slice(&ctr.to_be_bytes());
-        let sealed = self
-            .send
-            .encrypt(
-                &nonce(ctr),
-                Payload {
-                    msg: plain,
-                    aad: &packet,
-                },
-            )
-            .expect("ChaCha20-Poly1305 encryption cannot fail for in-range sizes");
-        packet.extend_from_slice(&sealed);
+        let sealed = self.send.encrypt(
+            &nonce(ctr),
+            Payload {
+                msg: plain,
+                aad: &packet,
+            },
+        );
+        // Fails only past 256 GiB. A bare header is too short to open, so the
+        // peer drops it.
+        match sealed {
+            Ok(sealed) => packet.extend_from_slice(&sealed),
+            Err(_) => log::error!("{} bytes do not seal", plain.len()),
+        }
         packet
     }
 
     pub fn open(&self, packet: &[u8]) -> Option<Opened> {
         let (ptype, sid, ctr) = header(packet)?;
-        let plain = self
-            .recv
-            .decrypt(
-                &nonce(ctr),
-                Payload {
-                    msg: &packet[HEADER..],
-                    aad: &packet[..HEADER],
-                },
-            )
-            .ok()?;
+        let (aad, msg) = packet.split_at_checked(HEADER)?;
+        let plain = self.recv.decrypt(&nonce(ctr), Payload { msg, aad }).ok()?;
         Some(Opened {
             ptype,
             sid,
@@ -107,17 +101,33 @@ impl Keys {
 /// nobody else can produce it (QUIC's stateless reset, RFC 9000 §10.3).
 pub fn reset_token(gateway_key: &[u8; 32], sid: u32) -> [u8; RESET_TOKEN] {
     // Derive a separate key first, so the static key itself never keys the MAC.
-    let derived = ChaCha20Poly1305::new(gateway_key.into())
-        .encrypt(&Nonce::from(*b"vtop-reset-1"), [0u8; 32].as_slice())
-        .expect("ChaCha20-Poly1305 encryption cannot fail for in-range sizes");
+    let mut derived = [0u8; 32];
     let mut n = [0u8; 12];
-    n[..4].copy_from_slice(&sid.to_be_bytes());
-    n[4..].copy_from_slice(b"reset-id");
-    let derived: [u8; 32] = derived[..32].try_into().expect("32 bytes");
-    let tag = ChaCha20Poly1305::new(&derived.into())
-        .encrypt(&n.into(), [].as_slice())
-        .expect("ChaCha20-Poly1305 encryption cannot fail for in-range sizes");
-    tag.try_into().expect("a 16-byte tag")
+    let (n_sid, n_label) = n.split_at_mut(4);
+    n_sid.copy_from_slice(&sid.to_be_bytes());
+    n_label.copy_from_slice(b"reset-id");
+    let token = ChaCha20Poly1305::new(gateway_key.into())
+        .encrypt_inout_detached(
+            &Nonce::from(*b"vtop-reset-1"),
+            &[],
+            derived.as_mut_slice().into(),
+        )
+        .and_then(|_| {
+            ChaCha20Poly1305::new(&derived.into()).encrypt_inout_detached(
+                &n.into(),
+                &[],
+                [].as_mut_slice().into(),
+            )
+        });
+    match token {
+        Ok(tag) => tag.into(),
+        // Unreachable for these sizes; still a MAC under the gateway's key.
+        Err(_) => {
+            let mac = crate::noise::hmac(gateway_key, &[b"vtop-reset-1", &n]);
+            let (token, _) = mac.split_first_chunk().unwrap_or((&[0; RESET_TOKEN], &[]));
+            *token
+        }
+    }
 }
 
 /// Compares in constant time.
@@ -130,17 +140,17 @@ pub fn header(packet: &[u8]) -> Option<(u8, u32, u32)> {
     if packet.len() < HEADER + TAG {
         return None;
     }
+    let (&[ptype, s0, s1, s2, s3, c0, c1, c2, c3], _) = packet.split_first_chunk::<HEADER>()?;
     Some((
-        packet[0],
-        u32::from_be_bytes(packet[1..5].try_into().ok()?),
-        u32::from_be_bytes(packet[5..9].try_into().ok()?),
+        ptype,
+        u32::from_be_bytes([s0, s1, s2, s3]),
+        u32::from_be_bytes([c0, c1, c2, c3]),
     ))
 }
 
 fn nonce(ctr: u32) -> Nonce {
-    let mut n = [0u8; 12];
-    n[4..8].copy_from_slice(&ctr.to_le_bytes());
-    n.into()
+    let [c0, c1, c2, c3] = ctr.to_le_bytes();
+    [0, 0, 0, 0, c0, c1, c2, c3, 0, 0, 0, 0].into()
 }
 
 /// WireGuard-style sliding window over the last 64 counters.

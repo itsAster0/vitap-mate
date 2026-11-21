@@ -32,7 +32,8 @@ use crate::frame::{
 };
 use crate::link::Link;
 use crate::msg::{now_ms, now_us, Data, Req, MAX_REQUEST};
-use crate::{hex, unhex, NOISE};
+use crate::noise::{random_key, Initiator};
+use crate::{hex, unhex};
 
 pub const COUNTER_BLOCK: u32 = 1024;
 pub const REKEY: Duration = Duration::from_secs(24 * 3600);
@@ -208,9 +209,10 @@ pub async fn fetch_over<N: Net>(
     let device = device_key(&cfg.state_dir)?;
     let ip = resolve(net, cfg, deadline).await?;
     let mut slot = Slot::claim(&cfg.state_dir);
-    let profile = cfg
-        .state_dir
-        .join(format!("link-{}", network_key(ip, cfg.ports[0])));
+    let profile = cfg.state_dir.join(format!(
+        "link-{}",
+        network_key(ip, cfg.ports.first().copied().unwrap_or_default())
+    ));
     let link = fs::read_to_string(&profile)
         .ok()
         .and_then(|t| Link::parse(&t))
@@ -386,7 +388,13 @@ struct Run<'a, N: Net> {
 
 impl<N: Net> Run<'_, N> {
     async fn send(&mut self, port: usize, packet: &[u8], duplicate: bool) {
-        let to = SocketAddr::new(self.ip, self.ports[port % self.ports.len()]);
+        let Some(&to) = port
+            .checked_rem(self.ports.len())
+            .and_then(|i| self.ports.get(i))
+        else {
+            return;
+        };
+        let to = SocketAddr::new(self.ip, to);
         for copy in 0..if duplicate { 2 } else { 1 } {
             if copy > 0 {
                 self.net.sleep(DUPLICATE_GAP).await;
@@ -514,15 +522,15 @@ impl<N: Net> Run<'_, N> {
                 let until = self.timer(&rounds, last, working, first_wire, backoff);
                 self.recv(until, &mut buf)
                     .await
-                    .map(|n| (Instant::now(), buf[..n].to_vec()))
+                    .and_then(|n| Some((Instant::now(), buf.get(..n)?.to_vec())))
             };
             if let Some((t, packet)) = item {
                 // A reset counts only with this session's token; anything
                 // else unencrypted is ignored.
                 if packet.first() == Some(&T_RESET)
                     && packet.len() == 5 + RESET_TOKEN
-                    && packet[1..5] == sid.to_be_bytes()
-                    && same_token(&packet[5..], &saved.reset)
+                    && packet.get(1..5) == Some(&sid.to_be_bytes()[..])
+                    && same_token(packet.get(5..).unwrap_or_default(), &saved.reset)
                     && !new_session
                 {
                     return Err(Outcome::Reset);
@@ -734,20 +742,18 @@ impl<N: Net> Run<'_, N> {
         lost_events: &mut usize,
         sent_events: &mut usize,
     ) -> Result<(Keys, Saved), Outcome> {
-        let fail = |e: snow::Error| Outcome::Failed(WireError::Io(e.to_string()));
-        let mut hs = snow::Builder::new(NOISE.parse().map_err(fail)?)
-            .local_private_key(&self.device)
-            .map_err(fail)?
-            .remote_public_key(&self.server_key)
-            .map_err(fail)?
-            .build_initiator()
-            .map_err(fail)?;
+        let fail = |what: &str| Outcome::Failed(WireError::Io(format!("noise: {what}")));
         let mut payload = now_us().to_be_bytes().to_vec();
         payload.extend_from_slice(&request(&self.link, req_id, 0, 0, Some(body), 0).encode());
-        let mut msg1 = [0u8; 1200];
-        let len = hs.write_message(&payload, &mut msg1).map_err(fail)?;
+        let ephemeral = random_key().ok_or_else(|| fail("no random source"))?;
+        let (hs, msg1) = Initiator::start(&self.device, &self.server_key, ephemeral, &payload)
+            .ok_or_else(|| fail("message 1"))?;
+        // snow wrote message 1 into a 1200-byte buffer; keep its limit.
+        if msg1.len() > 1200 {
+            return Err(fail("message 1 too long"));
+        }
         let mut hs1 = vec![T_HS1];
-        hs1.extend_from_slice(&msg1[..len]);
+        hs1.extend_from_slice(&msg1);
         let duplicate = self.link.duplicate();
         let copies = if duplicate { 2.0 } else { 1.0 };
         let base = 1.5
@@ -759,7 +765,7 @@ impl<N: Net> Run<'_, N> {
             if Instant::now() >= self.give_up_at() {
                 return Err(self.failure());
             }
-            let port = (self.link.port + attempt) % self.ports.len();
+            let port = (self.link.port + attempt) % self.ports.len().max(1);
             if attempt > 0 {
                 self.retries += 1;
                 *lost_events += 1;
@@ -770,53 +776,60 @@ impl<N: Net> Run<'_, N> {
             let until = Instant::now() + Duration::from_secs_f64(wait);
             while let Some(n) = self.recv(until, &mut buf).await {
                 match buf[0] {
-                    T_HS2 if n > 5 && buf[1..5] == hs1[1..5] => {
-                        let mut p = [0u8; 64];
-                        if let Ok(len) = hs.read_message(&buf[5..n], &mut p) {
-                            if len != 4 + RESET_TOKEN {
-                                continue;
-                            }
-                            let now = Instant::now();
-                            *hs2_at = Some(now);
-                            // Only with a measured rate: subtracting send times
-                            // at a guessed rate can drive the sample to zero,
-                            // and the minimum filter would keep it.
-                            if attempt == 0 && self.link.measured {
-                                // If the first copy was lost HS2 answers the second, sent one
-                                // transmit time later: subtract both copies' send time.
-                                let s = now.duration_since(t0).as_secs_f64()
-                                    - (copies * (hs1.len() + IP_UDP) as f64 + (n + IP_UDP) as f64)
-                                        / self.link.rate;
-                                self.link.sample_rtt(s);
-                            }
-                            self.link.port = port;
-                            let (send, recv) = hs.dangerously_get_raw_split();
-                            let sid = u32::from_be_bytes(p[..4].try_into().expect("4 bytes"));
-                            return Ok((
-                                Keys::new(&send, &recv),
-                                Saved {
-                                    sid,
-                                    send,
-                                    recv,
-                                    next_ctr: 0,
-                                    port,
-                                    created_ms: now_ms(),
-                                    reset: p[4..4 + RESET_TOKEN].try_into().expect("16 bytes"),
-                                    gateway: self.server_key,
-                                },
-                            ));
+                    T_HS2 if n > 5 && buf.get(1..5) == hs1.get(1..5) => {
+                        let Some((p, (send, recv))) = buf.get(5..n).and_then(|m| hs.finish(m))
+                        else {
+                            continue;
+                        };
+                        let Some((sid, reset)) = p.split_first_chunk::<4>().and_then(|(sid, r)| {
+                            Some((
+                                u32::from_be_bytes(*sid),
+                                <[u8; RESET_TOKEN]>::try_from(r).ok()?,
+                            ))
+                        }) else {
+                            continue;
+                        };
+                        let now = Instant::now();
+                        *hs2_at = Some(now);
+                        // Only with a measured rate: subtracting send times
+                        // at a guessed rate can drive the sample to zero,
+                        // and the minimum filter would keep it.
+                        if attempt == 0 && self.link.measured {
+                            // If the first copy was lost HS2 answers the second, sent one
+                            // transmit time later: subtract both copies' send time.
+                            let s = now.duration_since(t0).as_secs_f64()
+                                - (copies * (hs1.len() + IP_UDP) as f64 + (n + IP_UDP) as f64)
+                                    / self.link.rate;
+                            self.link.sample_rtt(s);
                         }
+                        self.link.port = port;
+                        return Ok((
+                            Keys::new(&send, &recv),
+                            Saved {
+                                sid,
+                                send,
+                                recv,
+                                next_ctr: 0,
+                                port,
+                                created_ms: now_ms(),
+                                reset,
+                                gateway: self.server_key,
+                            },
+                        ));
                     }
-                    T_WRONG_KEY if n == 5 && buf[1..5] == hs1[1..5] => {
+                    T_WRONG_KEY if n == 5 && buf.get(1..5) == hs1.get(1..5) => {
                         return Err(Outcome::Failed(WireError::WrongKey));
                     }
-                    T_DATA | T_WORKING => early.push((Instant::now(), buf[..n].to_vec())),
+                    T_DATA | T_WORKING => {
+                        early.extend(buf.get(..n).map(|p| (Instant::now(), p.to_vec())))
+                    }
                     _ => {}
                 }
             }
             wait = (wait * 1.5).min(base + 32.0);
         }
-        unreachable!("the loop returns")
+        // `0..` never ends; the deadline above returns.
+        Err(self.failure())
     }
 
     /// When to give up waiting and ask again.
@@ -937,7 +950,8 @@ fn device_key(dir: &Path) -> Result<[u8; 32], WireError> {
     {
         return Ok(key);
     }
-    let (private, _) = crate::generate_keypair();
+    let (private, _) = crate::try_generate_keypair()
+        .ok_or_else(|| WireError::Io("no random source for the device key".into()))?;
     write_atomic(&path, hex(&private).as_bytes()).map_err(io)?;
     Ok(private)
 }
@@ -967,7 +981,13 @@ async fn resolve(
             return Ok(ip);
         }
     }
-    let all = net.resolve(&cfg.host, cfg.ports[0], deadline).await;
+    let all = net
+        .resolve(
+            &cfg.host,
+            cfg.ports.first().copied().unwrap_or_default(),
+            deadline,
+        )
+        .await;
     let found = all.iter().find(|a| a.is_ipv4()).or(all.first()).copied();
     match (found, cached) {
         (Some(ip), _) => {

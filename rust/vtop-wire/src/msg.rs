@@ -44,18 +44,17 @@ impl Req {
     }
 
     pub fn decode(b: &[u8]) -> Option<Self> {
-        if b.len() < 13 {
-            return None;
-        }
+        let (&[r0, r1, round, want, loss_pct, a0, a1, t0, t1, c0, c1, c2, c3], body) =
+            b.split_first_chunk::<13>()?;
         Some(Self {
-            req_id: u16::from_be_bytes([b[0], b[1]]),
-            round: b[2],
-            want: b[3],
-            loss_pct: b[4],
-            rate: u16::from_be_bytes([b[5], b[6]]),
-            rtt_ms: u16::from_be_bytes([b[7], b[8]]),
-            last_ctr: u32::from_be_bytes(b[9..13].try_into().ok()?),
-            body: b[13..].to_vec(),
+            req_id: u16::from_be_bytes([r0, r1]),
+            round,
+            want,
+            loss_pct,
+            rate: u16::from_be_bytes([a0, a1]),
+            rtt_ms: u16::from_be_bytes([t0, t1]),
+            last_ctr: u32::from_be_bytes([c0, c1, c2, c3]),
+            body: body.to_vec(),
         })
     }
 }
@@ -88,18 +87,17 @@ impl<'a> Data<'a> {
     }
 
     pub fn decode(b: &'a [u8]) -> Option<Self> {
-        if b.len() < DATA_HEADER {
-            return None;
-        }
+        let (&[r0, r1, sym, k, t0, t1, round, pos, len], bytes) =
+            b.split_first_chunk::<DATA_HEADER>()?;
         Some(Self {
-            req_id: u16::from_be_bytes([b[0], b[1]]),
-            sym: b[2],
-            k: b[3],
-            total: u16::from_be_bytes([b[4], b[5]]),
-            round: b[6],
-            pos: b[7],
-            len: b[8],
-            bytes: &b[DATA_HEADER..],
+            req_id: u16::from_be_bytes([r0, r1]),
+            sym,
+            k,
+            total: u16::from_be_bytes([t0, t1]),
+            round,
+            pos,
+            len,
+            bytes,
         })
     }
 }

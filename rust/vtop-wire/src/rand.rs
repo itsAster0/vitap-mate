@@ -1,6 +1,6 @@
 //! Identifiers that only need to be unpredictable enough not to collide:
 //! session ids, request ids, handshake tags. None of them is a secret (they
-//! travel in clear headers); keys come from snow's own random source.
+//! travel in clear headers); keys come from the OS (`noise::random_key`).
 
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};

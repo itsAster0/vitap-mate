@@ -20,12 +20,24 @@
 //!   silence timer; rate, round trip and loss are learned per network and
 //!   kept between runs.
 
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::string_slice,
+        clippy::panic
+    )
+)]
+
 pub mod client;
 pub mod fec;
 pub mod frame;
 pub mod gateway;
 pub mod link;
 pub mod msg;
+mod noise;
 mod rand;
 #[cfg(test)]
 mod tests;
@@ -39,15 +51,25 @@ pub const NOISE: &str = "Noise_IK_25519_ChaChaPoly_BLAKE2s";
 /// only block the others. Some networks drop UDP 443 to force QUIC back to TCP.
 pub const PORTS: [u16; 3] = [3478, 51820, 443];
 
-/// Generates a Noise static key pair: (private, public).
+/// Generates a Noise static key pair: (private, public), or `None` if the OS
+/// random source fails.
+pub fn try_generate_keypair() -> Option<([u8; 32], [u8; 32])> {
+    let private = noise::random_key()?;
+    Some((private, noise::public_key(&private)))
+}
+
+/// [`try_generate_keypair`], for the gateway's key rotation. A key must never
+/// come from a weak source, so if the OS random source keeps failing after a
+/// few tries the process aborts rather than return one.
 pub fn generate_keypair() -> ([u8; 32], [u8; 32]) {
-    let kp = snow::Builder::new(NOISE.parse().expect("valid Noise pattern"))
-        .generate_keypair()
-        .expect("key generation");
-    (
-        kp.private.try_into().expect("32-byte key"),
-        kp.public.try_into().expect("32-byte key"),
-    )
+    for _ in 0..8 {
+        if let Some(pair) = try_generate_keypair() {
+            return pair;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    log::error!("the OS random source fails: no key can be made");
+    std::process::abort()
 }
 
 pub fn hex(bytes: &[u8]) -> String {

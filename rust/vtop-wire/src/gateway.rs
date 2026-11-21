@@ -27,7 +27,7 @@ use crate::frame::{
 };
 use crate::link::RATE_FLOOR;
 use crate::msg::{now_us, Data, Req, LOSS_UNKNOWN};
-use crate::NOISE;
+use crate::noise::{random_key, Responder};
 
 pub const FRESH_MS: u64 = 120_000;
 /// The client's own duplicate of a packet arrives within this; a later copy
@@ -300,7 +300,7 @@ impl Gateway {
         from: SocketAddr,
         now: Instant,
     ) -> Option<NewRequest> {
-        let msg1 = &packet[1..];
+        let msg1 = packet.get(1..)?;
         let ephemeral: [u8; 32] = msg1.get(..32)?.try_into().ok()?;
         if let Some((at, sid, hs2)) = self.handshakes.get(&ephemeral).cloned() {
             if let Some(sess) = self.sessions.get_mut(&sid) {
@@ -315,24 +315,18 @@ impl Gateway {
             }
             return None;
         }
-        let mut payload = [0u8; 1500];
         // Under the first key that opens it: the phone's copy may be a week old.
         let opened = self.keys.iter().find_map(|key| {
-            let mut hs = snow::Builder::new(NOISE.parse().ok()?)
-                .local_private_key(key)
-                .ok()?
-                .build_responder()
-                .ok()?;
-            let len = hs.read_message(msg1, &mut payload).ok()?;
-            Some((hs, len, *key))
+            let (hs, payload) = Responder::read(key, msg1)?;
+            Some((hs, payload, *key))
         });
-        let (mut hs, len, key) = match opened {
+        let (hs, payload, key) = match opened {
             Some(opened) => opened,
             None => {
                 log::debug!("message 1 from {from} opens under no key");
                 // Far smaller than message 1, so nothing is amplified.
                 let mut wrong_key = vec![T_WRONG_KEY];
-                wrong_key.extend_from_slice(&ephemeral[..4]);
+                wrong_key.extend_from_slice(ephemeral.get(..4)?);
                 self.direct.push_back(Outgoing {
                     socket,
                     to: from,
@@ -341,9 +335,10 @@ impl Gateway {
                 return None;
             }
         };
-        let ts = u64::from_be_bytes(payload.get(..8)?.try_into().ok()?);
-        let req = Req::decode(&payload[8..len])?;
-        let device: [u8; 32] = hs.get_remote_static()?.try_into().ok()?;
+        let (ts, req) = payload.split_first_chunk::<8>()?;
+        let ts = u64::from_be_bytes(*ts);
+        let req = Req::decode(req)?;
+        let device = hs.remote_static();
         let seen = self.seen_ts.entry(device).or_default();
         if now_us().abs_diff(ts) > FRESH_MS * 1000 || seen.contains(&ts) {
             log::debug!("message 1 from {from}: stale or replayed timestamp");
@@ -354,14 +349,12 @@ impl Gateway {
         }
         seen.push(ts);
         let sid = crate::rand::u32();
-        let mut msg2 = [0u8; 128];
         let mut hs2_payload = sid.to_be_bytes().to_vec();
         hs2_payload.extend_from_slice(&reset_token(&key, sid));
-        let m2 = hs.write_message(&hs2_payload, &mut msg2).ok()?;
-        let (k_ir, k_ri) = hs.dangerously_get_raw_split();
+        let (msg2, (k_ir, k_ri)) = hs.finish(random_key()?, &hs2_payload)?;
         let mut hs2 = vec![T_HS2];
-        hs2.extend_from_slice(&ephemeral[..4]);
-        hs2.extend_from_slice(&msg2[..m2]);
+        hs2.extend_from_slice(ephemeral.get(..4)?);
+        hs2.extend_from_slice(&msg2);
         // Losing HS2 stalls everything, so it goes twice on lossy links.
         let lossy = req.loss_pct != LOSS_UNKNOWN && req.loss_pct >= 10;
         let copies = if lossy { 2 } else { 1 };
@@ -570,11 +563,11 @@ impl Gateway {
             );
             syms.extend(data.iter().enumerate().map(|(i, d)| (i as u8, d.clone())));
             for _ in 0..spare {
-                syms.push(next(*k, repair, next_repair));
+                syms.extend(next(*k, repair, next_repair));
             }
         } else {
             for _ in 0..req.want {
-                syms.push(next(*k, repair, next_repair));
+                syms.extend(next(*k, repair, next_repair));
             }
         }
         let (k, total) = (*k as u8, *total as u16);
@@ -632,10 +625,10 @@ impl Gateway {
     }
 }
 
-fn next(k: usize, repair: &[Vec<u8>], next_repair: &mut usize) -> (u8, Vec<u8>) {
-    let i = *next_repair % repair.len();
+fn next(k: usize, repair: &[Vec<u8>], next_repair: &mut usize) -> Option<(u8, Vec<u8>)> {
+    let i = next_repair.checked_rem(repair.len())?;
     *next_repair += 1;
-    ((k + i) as u8, repair[i].clone())
+    Some(((k + i) as u8, repair.get(i)?.clone()))
 }
 
 /// Spacing at 2x the client's rate (4 kbit/s before it is known). Faster
