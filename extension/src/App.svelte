@@ -469,7 +469,7 @@
               <span
                 class={i === login.log.length - 1 && running
                   ? "text-indigo-200"
-                  : entry.text === "Failed" || entry.text === "Cancelled"
+                  : entry.text === "Failed" || entry.text === "Cancelled" || entry.text === "Interrupted"
                     ? "text-rose-300"
                     : "text-slate-400"}
               >

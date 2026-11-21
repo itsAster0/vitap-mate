@@ -28,7 +28,13 @@ function createOverlay() {
   return overlay;
 }
 
+let hideOverlayTimer: number | undefined;
+
 function showOverlay(text: string) {
+  if (hideOverlayTimer !== undefined) {
+    window.clearTimeout(hideOverlayTimer);
+    hideOverlayTimer = undefined;
+  }
   const overlay = createOverlay();
 
   overlay.textContent = text;
@@ -40,7 +46,11 @@ function hideOverlay(delay = 1200) {
 
   if (!overlay) return;
 
-  window.setTimeout(() => {
+  if (hideOverlayTimer !== undefined) {
+    window.clearTimeout(hideOverlayTimer);
+  }
+  hideOverlayTimer = window.setTimeout(() => {
+    hideOverlayTimer = undefined;
     overlay.style.display = "none";
   }, delay);
 }
@@ -96,11 +106,16 @@ function isVtopPageOutsideContent() {
 async function maybeAutoLogin() {
   if (!isVtopRootPage() || !extensionAlive()) return;
 
-  const result = await chrome.storage.local.get([
-    "token",
-    "autoLogin",
-    "lastAutoLoginAt",
-  ]);
+  let result: Record<string, unknown>;
+  try {
+    result = await chrome.storage.local.get([
+      "token",
+      "autoLogin",
+      "lastAutoLoginAt",
+    ]);
+  } catch {
+    return;
+  }
 
   const token = String(result.token ?? "").trim();
   const autoLogin = Boolean(result.autoLogin);
@@ -115,7 +130,11 @@ async function maybeAutoLogin() {
     return;
   }
 
-  await chrome.storage.local.set({ lastAutoLoginAt: now });
+  try {
+    await chrome.storage.local.set({ lastAutoLoginAt: now });
+  } catch {
+    return;
+  }
   showOverlay("Auto login running...");
 
   sendToBackground({ type: "LOGIN_WITH_TOKEN", source: "content" }, (response) => {
@@ -174,7 +193,14 @@ function addStudentCardButton() {
       sendToBackground({});
       return;
     }
-    const stored = await chrome.storage.local.get("token");
+    let stored: Record<string, unknown>;
+    try {
+      stored = await chrome.storage.local.get("token");
+    } catch {
+      showOverlay("VITAP Mate was updated. Refresh this page to use it.");
+      hideOverlay(4000);
+      return;
+    }
     if (!String(stored.token ?? "").trim()) {
       sendToBackground({ type: "OPEN_EXTENSION_PANEL" });
       return;
@@ -185,7 +211,12 @@ function addStudentCardButton() {
     sendToBackground({ type: "LOGIN_WITH_TOKEN", source: "content" }, (response) => {
       button.disabled = false;
       button.style.opacity = "";
-      if (!response?.ok) hideOverlay(3500);
+      if (!response) {
+        showOverlay("Sign-in was interrupted. Please try again.");
+        hideOverlay(3500);
+      } else if (!response.ok) {
+        hideOverlay(3500);
+      }
     });
   });
 
@@ -246,7 +277,14 @@ createPanelLauncher();
 maybeAutoLogin();
 
 if (isVtopPageOutsideContent()) {
-  new MutationObserver(() => addStudentCardButton()).observe(document.documentElement, {
+  const observer = new MutationObserver(() => {
+    if (!extensionAlive()) {
+      observer.disconnect();
+      return;
+    }
+    addStudentCardButton();
+  });
+  observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
   });

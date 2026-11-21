@@ -11,6 +11,15 @@ import {
   type SessionSource,
 } from "./bridge";
 import { VTOP_DOMAIN, installCookies } from "./cookies";
+import {
+  createIdleState,
+  loadLoginState,
+  saveLoginState,
+  type LoginPhase,
+  type LoginState,
+} from "./state";
+
+export type { LoginPhase, LoginState };
 
 const VTOP_CONTENT_URL = "https://vtop.vitap.ac.in/vtop/content";
 
@@ -42,39 +51,6 @@ type BackgroundMessage =
   | StateRequest
   | CheckRequest;
 
-/** Where a sign-in is. `phone` and `server` are the two ways a session is made. */
-export type LoginPhase =
-  | "idle"
-  | "check"
-  | "request"
-  | "phone"
-  | "server"
-  | "cookies"
-  | "open"
-  | "done"
-  | "error";
-
-export type LoginState = {
-  phase: LoginPhase;
-  /** The step's text, as shown on the VTOP page too. */
-  text: string;
-  /** Which way the session came, once known. */
-  via?: "browser" | "phone" | "server";
-  /** Where the session the server handed out came from. */
-  source?: SessionSource;
-  startedAt?: number;
-  finishedAt?: number;
-  /** When the wait for a session gives up (ms). */
-  deadline?: number;
-  /** When the server takes over from a phone that hasn't answered (ms). */
-  serverDueAt?: number;
-  error?: string;
-  /** The step that failed, so the popup can mark it. */
-  failedPhase?: LoginPhase;
-  /** What happened, with times, for the popup's activity list. */
-  log: { at: number; text: string }[];
-};
-
 /** Sent to the popup on every change. */
 export type StateMessage = { type: "VTOP_MATE_STATE"; state: LoginState };
 
@@ -87,16 +63,21 @@ const STATUS_TIMEOUT_MS = 10000;
 const CANCELLED = "Sign-in cancelled.";
 let loginInFlight: Promise<void> | null = null;
 let cancel: AbortController | null = null;
-let state: LoginState = { phase: "idle", text: "", log: [] };
+let state: LoginState = createIdleState();
 
 /** Waits, but stops early when the sign-in is cancelled. */
 function sleep(milliseconds: number, signal: AbortSignal) {
+  if (signal.aborted) return Promise.resolve();
   return new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, milliseconds);
-    signal.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timer);
       resolve();
-    });
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -105,12 +86,16 @@ function throwIfCancelled(signal: AbortSignal) {
 }
 
 async function getActiveTabId() {
-  const tabs = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
+  try {
+    const tabs = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
 
-  return tabs[0]?.id;
+    return tabs[0]?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 async function sendToTab(tabId: number | undefined, message: unknown) {
@@ -146,20 +131,25 @@ async function report(
   if (newStep || state.log.length === 0) {
     state.log = [...state.log, { at: Date.now(), text }];
   }
+  await saveLoginState(state);
   await sendToTab(tabId, { type: "VTOP_MATE_LOADING", text });
   await broadcast();
 }
 
 async function goToVtopContent(tabId?: number) {
   if (tabId) {
-    await chrome.tabs.update(tabId, {
-      url: VTOP_CONTENT_URL,
-    });
-  } else {
-    await chrome.tabs.create({
-      url: VTOP_CONTENT_URL,
-    });
+    try {
+      await chrome.tabs.update(tabId, {
+        url: VTOP_CONTENT_URL,
+      });
+      return;
+    } catch {
+      // Tab may have been closed while signing in; open a new one instead.
+    }
   }
+  await chrome.tabs.create({
+    url: VTOP_CONTENT_URL,
+  });
 }
 
 async function readSessionOutcome(response: Response) {
@@ -270,10 +260,11 @@ async function browserSignedIn() {
 
 async function sessionBounced() {
   try {
-    const check = await fetch(VTOP_CONTENT_URL, {
-      credentials: "include",
-      redirect: "follow",
-    });
+    const check = await fetchWithTimeout(
+      VTOP_CONTENT_URL,
+      { credentials: "include", redirect: "follow" },
+      STATUS_TIMEOUT_MS,
+    );
     return isLoginRedirect(check.url);
   } catch {
     return false;
@@ -292,8 +283,8 @@ async function expireSession(base: string, key: string) {
   }
 }
 
-async function performLogin(signal: AbortSignal) {
-  const tabId = await getActiveTabId();
+async function performLogin(signal: AbortSignal, preferredTabId?: number) {
+  const tabId = preferredTabId ?? (await getActiveTabId());
 
   const stored = await chrome.storage.local.get(["token", "bridgeUrl"]);
   const key = String(stored.token ?? "").trim();
@@ -314,11 +305,14 @@ async function performLogin(signal: AbortSignal) {
   throwIfCancelled(signal);
 
   let cookies = await getSession(base, key, tabId, signal);
+  throwIfCancelled(signal);
   await install(cookies, tabId);
 
   if (await sessionBounced()) {
+    throwIfCancelled(signal);
     await expireSession(base, key);
     cookies = await getSession(base, key, tabId, signal);
+    throwIfCancelled(signal);
     await install(cookies, tabId);
 
     if (await sessionBounced()) {
@@ -332,42 +326,58 @@ async function performLogin(signal: AbortSignal) {
   await goToVtopContent(tabId);
 }
 
-async function runLogin() {
+function runLogin(preferredTabId?: number) {
   if (loginInFlight) return loginInFlight;
   cancel = new AbortController();
+  const signal = cancel.signal;
   const startedAt = Date.now();
   state = { phase: "check", text: "Starting…", startedAt, log: [] };
-  loginInFlight = performLogin(cancel.signal);
-  try {
-    await loginInFlight;
-    const finishedAt = Date.now();
-    state = { ...state, phase: "done", finishedAt, deadline: undefined };
-    state.log = [...state.log, { at: finishedAt, text: "Signed in" }];
-    const last: LastLogin = {
-      at: finishedAt,
-      via: state.via ?? "phone",
-      ms: finishedAt - startedAt,
-      source: state.source,
-    };
-    await chrome.storage.local.set({ lastLogin: last });
-  } catch (err) {
-    const text = err instanceof Error ? err.message : "Unknown login error";
-    const finishedAt = Date.now();
-    state = {
-      ...state,
-      phase: "error",
-      failedPhase: state.phase,
-      error: text,
-      finishedAt,
-      deadline: undefined,
-    };
-    state.log = [...state.log, { at: finishedAt, text: text === CANCELLED ? "Cancelled" : "Failed" }];
-    throw err;
-  } finally {
-    loginInFlight = null;
-    cancel = null;
+
+  const task = (async () => {
+    await saveLoginState(state);
     await broadcast();
-  }
+    try {
+      await performLogin(signal, preferredTabId);
+      const finishedAt = Date.now();
+      state = {
+        ...state,
+        phase: "done",
+        finishedAt,
+        deadline: undefined,
+        serverDueAt: undefined,
+      };
+      state.log = [...state.log, { at: finishedAt, text: "Signed in" }];
+      const last: LastLogin = {
+        at: finishedAt,
+        via: state.via ?? "phone",
+        ms: finishedAt - startedAt,
+        source: state.source,
+      };
+      await chrome.storage.local.set({ lastLogin: last }).catch(() => {});
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Unknown login error";
+      const finishedAt = Date.now();
+      state = {
+        ...state,
+        phase: "error",
+        failedPhase: state.phase,
+        error: text,
+        finishedAt,
+        deadline: undefined,
+        serverDueAt: undefined,
+      };
+      state.log = [...state.log, { at: finishedAt, text: text === CANCELLED ? "Cancelled" : "Failed" }];
+      throw err;
+    } finally {
+      loginInFlight = null;
+      cancel = null;
+      await saveLoginState(state);
+      await broadcast();
+    }
+  })();
+
+  loginInFlight = task;
+  return task;
 }
 
 
@@ -387,26 +397,42 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === "GET_LOGIN_STATE") {
+      if (state.phase === "idle") {
+        loadLoginState(loginInFlight !== null)
+          .then((restored) => {
+            if (state.phase === "idle" && restored) {
+              state = restored;
+            }
+            sendResponse(state);
+          })
+          .catch(() => sendResponse(state));
+        return true;
+      }
       sendResponse(state);
       return;
     }
 
     if (message.type === "CHECK_VTOP_SESSION") {
-      browserSignedIn().then((signedIn) => sendResponse({ signedIn }));
+      browserSignedIn()
+        .then((signedIn) => sendResponse({ signedIn }))
+        .catch(() => sendResponse({ signedIn: false }));
       return true;
     }
 
     if (message.type !== "LOGIN_WITH_TOKEN") return;
 
-    runLogin()
+    runLogin(sender.tab?.id)
       .then(() => {
         sendResponse({ ok: true });
       })
       .catch(async (err) => {
-        const tabId = await getActiveTabId();
         const text = err instanceof Error ? err.message : "Unknown login error";
-
-        await sendToTab(tabId, { type: "VTOP_MATE_ERROR", text });
+        try {
+          const tabId = sender.tab?.id ?? (await getActiveTabId());
+          await sendToTab(tabId, { type: "VTOP_MATE_ERROR", text });
+        } catch {
+          // Best-effort error overlay on the active tab.
+        }
 
         if (text !== CANCELLED) console.error(err);
 
