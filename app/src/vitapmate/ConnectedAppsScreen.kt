@@ -74,9 +74,6 @@ import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.TriangleAlert
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -341,33 +338,28 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
         }
     }
 
-    fun scan() {
-        val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
-        val unavailable = { why: String ->
+    val scan = rememberQrScanner(
+        onResult = { raw ->
+            val scanned = pairCode(raw)
+            Log.info("ui.connected_apps", "scanned", fields = mapOf("pair_code" to "${scanned != null}"))
+            if (scanned == null) {
+                showToast("Not a pairing code", "Scan the QR code the extension or the AI app's sign-in page shows.")
+            } else {
+                text = shown(scanned)
+                pair(scanned)
+            }
+        },
+        onUnavailable = { why ->
             Log.info("ui.connected_apps", "scanner unavailable", fields = mapOf("why" to why))
             showToast("Scanner not ready", "Type the code the extension shows instead.")
             runCatching { typing.requestFocus() }
-        }
-        runCatching {
-            GmsBarcodeScanning.getClient(context, options).startScan()
-                .addOnSuccessListener { barcode ->
-                    val scanned = pairCode(barcode.rawValue.orEmpty())
-                    Log.info("ui.connected_apps", "scanned", fields = mapOf("pair_code" to "${scanned != null}"))
-                    if (scanned == null) {
-                        showToast("Not a pairing code", "Scan the QR code the extension or the AI app's sign-in page shows.")
-                    } else {
-                        text = shown(scanned)
-                        pair(scanned)
-                    }
-                }
-                .addOnFailureListener { unavailable(it::class.simpleName ?: "error") }
-        }.onFailure { unavailable(it::class.simpleName ?: "error") }
-    }
+        },
+    )
 
     Sheet("connected_apps.pair_sheet", onDismiss) {
         Text("Pair a browser", style = MaterialTheme.typography.titleLarge)
         Note("Open the vitapmate extension in Chrome or Firefox, or connect an AI app such as Claude to $MCP_URL. It shows a QR code and a 10-character code.")
-        Button(if (busy) null else ::scan, Modifier.fillMaxWidth().height(60.dp).testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
+        Button(if (busy) null else scan, Modifier.fillMaxWidth().height(60.dp).testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
         OutlinedTextField(
             text,
             { text = it.take(16) },
