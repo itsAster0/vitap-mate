@@ -248,7 +248,7 @@ private fun groupOf(run: Run, now: Long): String {
     // A time ahead of the clock (it was set back since) counts as now.
     val end = minOf(run.endT ?: run.startT, now)
     val day = epochDayOf(end)
-    return when (val days = epochDayOf(now) - day) {
+    return when (epochDayOf(now) - day) {
         0 -> if (now - end < 15 * 60_000) "Just now" else "Earlier today"
         1 -> "Yesterday"
         in 2..6 -> formatDay(day, "EEEE")

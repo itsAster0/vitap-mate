@@ -329,7 +329,7 @@ internal fun VtopScreen() {
             }
             when {
                 problem != null -> Box(Modifier.fillMaxSize().background(background), Alignment.Center) {
-                    ProblemView(problem!!, onRetry = { scope.launch { prepare("vtop.open", force = false) } })
+                    problem?.let { ProblemView(it, onRetry = { scope.launch { prepare("vtop.open", force = false) } }) }
                 }
                 session == null -> VtopLoading(reconnecting)
             }

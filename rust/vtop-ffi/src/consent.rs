@@ -1,6 +1,8 @@
 //! Consent before the VTOP session (cookies, and the password where a path sends it) goes to
 //! our servers. Every send asks [`allowed`] first, which fails closed: no gate, no flow, a flow
-//! nobody watches (the app not shown, a background run) or a gate error all count as no. A
+//! nobody watches (the app not shown, a background run) or a gate error all count as no, except
+//! that a background run follows the chosen route once the student ticked "don't ask again" for
+//! [`CookieKind::Route`] (they chose that route and said not to ask). A
 //! "don't ask again" tick is kept per [`CookieKind`] in [`FILE`]; an answer also covers the rest
 //! of its flow for [`FLOW_GRANT_S`] (a proxied sign-in's hops ask once). Kotlin implements [`CookieGate`] (`CookieConsent.kt`).
 
@@ -168,11 +170,17 @@ async fn decide(
             _ => return "denied_no_gate",
         }
     };
-    if !gate.attended(flow.to_string()) {
-        return "denied_unattended";
-    }
+    let attended = gate.attended(flow.to_string());
     {
         let state = state();
+        if !attended {
+            // Only the route: account checks and handovers always have the student watching.
+            return if kind == CookieKind::Route && state.remembered.contains(&kind) {
+                "sent_remembered_unattended"
+            } else {
+                "denied_unattended"
+            };
+        }
         if state.remembered.contains(&kind) {
             return "sent_remembered";
         }
@@ -400,10 +408,15 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn unattended_denies_even_when_remembered() {
+    fn unattended_denies_unless_route_remembered() {
         let gate = install(false, false);
-        remember(CookieKind::Route);
         assert!(!check("f", CookieKind::Route, true));
+        remember(CookieKind::Account);
+        remember(CookieKind::Handover);
+        assert!(!check("f", CookieKind::Account, true));
+        assert!(!check("f", CookieKind::Handover, true));
+        remember(CookieKind::Route);
+        assert!(check("f", CookieKind::Route, true));
         assert_eq!(gate.asks(), 0);
     }
 

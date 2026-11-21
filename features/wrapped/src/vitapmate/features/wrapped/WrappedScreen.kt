@@ -175,7 +175,7 @@ internal fun WrappedScreen() {
             LaunchedEffect(work, running) {
                 val p = work?.progress
                 val total = p?.getInt(BiometricFetchWorker.TOTAL, 0) ?: 0
-                if (!running) shown = 0 to 0 else if (total > 0) shown = p!!.getInt(BiometricFetchWorker.DONE, 0) to total
+                if (!running) shown = 0 to 0 else if (p != null && total > 0) shown = p.getInt(BiometricFetchWorker.DONE, 0) to total
             }
             val campus = CampusFetch(
                 missing,

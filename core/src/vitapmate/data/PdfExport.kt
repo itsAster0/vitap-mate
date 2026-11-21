@@ -51,7 +51,7 @@ object PdfExport {
             text.textSize = size
             text.typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             text.color = color
-            page!!.canvas.drawText(TextUtils.ellipsize(s, text, w, TextUtils.TruncateAt.END).toString(), x, y, text)
+            page?.canvas?.drawText(TextUtils.ellipsize(s, text, w, TextUtils.TruncateAt.END).toString(), x, y, text)
         }
         fun row(cells: List<String>, weights: List<Float>, header: Boolean) {
             room(ROW)
@@ -62,7 +62,7 @@ object PdfExport {
                 draw(cell, if (header) 8.5f else 9.5f, header, if (header) 0xFF6A6A75.toInt() else 0xFF1C1C1F.toInt(), x, w - 8)
                 x += w
             }
-            page!!.canvas.drawLine(MARGIN, y + 6, W - MARGIN, y + 6, rule)
+            page?.canvas?.drawLine(MARGIN, y + 6, W - MARGIN, y + 6, rule)
         }
         room(0f)
         y += 22

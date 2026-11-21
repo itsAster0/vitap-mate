@@ -166,7 +166,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: CoreException.InvalidCredentials) {
+            } catch (_: CoreException.InvalidCredentials) {
                 rejected = true
                 passwordError = "VTOP didn't accept this username and password"
             } catch (e: CoreException.OtpRequired) {

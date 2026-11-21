@@ -448,8 +448,11 @@ internal fun placesSlide(r: WrappedReport): Slide? {
     val faculty = p.faculty?.takeIf { it.isNotBlank() && p.facultyClasses > 0 }?.let(::titled)
     if (room == null && faculty == null) return null
     val roomHours = (p.roomMinutes + 30) / 60
-    val tile = if (room != null) Tile(Ink.Warning, room, "your room, ${count(roomHours, "hour")}", small = true)
-    else Tile(Ink.Warning, faculty!!, "${count(p.facultyClasses, "class", "classes")} together", small = true)
+    val tile = when {
+        room != null -> Tile(Ink.Warning, room, "your room, ${count(roomHours, "hour")}", small = true)
+        faculty != null -> Tile(Ink.Warning, faculty, "${count(p.facultyClasses, "class", "classes")} together", small = true)
+        else -> return null
+    }
     return Slide("places", Ink.Warning, tiles = listOf(tile)) {
         val ink = LocalInks.current
         val facultyY = if (room != null) 340 else 62

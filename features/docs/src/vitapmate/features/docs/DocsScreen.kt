@@ -190,7 +190,7 @@ internal fun DocsScreen() {
         }
     }
 
-    val recent = remember(shown) { shown.filter { it.kind != DocKind.File && it.lastOpenedAt != null }.maxByOrNull { it.lastOpenedAt!! } }
+    val recent = remember(shown) { shown.filter { it.kind != DocKind.File && it.lastOpenedAt != null }.maxByOrNull { it.lastOpenedAt ?: 0L } }
     val grid = rememberLazyGridState()
     val bottom = LocalContentPadding.current.calculateBottomPadding()
     LazyVerticalGrid(
@@ -231,7 +231,7 @@ internal fun DocsScreen() {
                 EmptyView(Lucide.Search, "No documents found", action = { TextButton({ query = "" }) { Text("Clear search") } })
             }
         }
-        itemsIndexed(shown, key = { _, it -> it.id }) { i, doc ->
+        itemsIndexed(shown, key = { _, d -> d.id }) { i, doc ->
             DocCard(doc, i, Modifier.animateItem(), onOpen = { open(doc) }, onLongPress = { actions = doc.id })
         }
     }

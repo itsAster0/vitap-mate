@@ -78,7 +78,8 @@ import vitapmate.ui.showToast
  * when the public Downloads wasn't writable) goes through the app's FileProvider instead.
  */
 private fun uriOf(context: Context, doc: Doc): Uri = Docs.uriOf(doc).let { uri ->
-    if (uri.scheme == "file") FileProvider.getUriForFile(context, "${context.packageName}.logs", java.io.File(uri.path!!)) else uri
+    val path = uri.path
+    if (uri.scheme == "file" && path != null) FileProvider.getUriForFile(context, "${context.packageName}.logs", java.io.File(path)) else uri
 }
 
 private fun mimeOf(doc: Doc): String =
@@ -156,7 +157,10 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
                         Action(if (doc.asMessMenu) Lucide.Sheet else Lucide.Utensils, if (doc.asMessMenu) "Show as spreadsheet" else "Show as mess menu", "docs.action.menu") {
                             close {
                                 onDismiss()
-                                act("menu") { if (!doc.asMessMenu) loadMessMenu(doc); Docs.setMessMenu(doc.id, !doc.asMessMenu) }
+                                act("menu") {
+                                    if (!doc.asMessMenu) loadMessMenu(doc)
+                                    Docs.setMessMenu(doc.id, !doc.asMessMenu)
+                                }
                             }
                         }
                     }

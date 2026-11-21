@@ -99,7 +99,7 @@ internal fun VtopSearch(pages: List<VtopPage>?, recent: List<VtopPage>, onSelect
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    itemsIndexed(list, key = { _, it -> "$tag:${it.url}" }) { i, p ->
+                    itemsIndexed(list, key = { _, page -> "$tag:${page.url}" }) { i, p ->
                         // Segmented: one rounded group, small corners between rows.
                         val big = 20.dp
                         val small = 4.dp

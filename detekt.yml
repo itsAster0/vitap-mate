@@ -1,0 +1,40 @@
+# detekt on top of its defaults (`mise run detekt`, and CI). Off: rules that fight Compose and this
+# codebase's style (magic numbers in layouts, long lines, PascalCase composables, long parameter
+# lists and methods for screens). Kept: the rules that find bugs and dead code.
+complexity:
+  CyclomaticComplexMethod:
+    active: false
+  ComplexCondition:
+    active: false
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  NestedBlockDepth:
+    active: false
+  TooManyFunctions:
+    active: false
+exceptions:
+  # The app catches Throwable on purpose around Rust calls, rethrowing CancellationException.
+  TooGenericExceptionCaught:
+    active: false
+  InstanceOfCheckForException:
+    active: false
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  MatchingDeclarationName:
+    active: false
+style:
+  ThrowsCount:
+    active: false
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  ForbiddenComment:
+    active: false

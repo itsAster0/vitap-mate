@@ -1165,7 +1165,7 @@ fn ymd(day: i32) -> (i32, usize, i32) {
 }
 
 /// `day` as "EEE d MMM" ("Sat 10 Oct"), "d MMM" or "EEE d MMM yyyy".
-fn format_day(day: i32, pattern: &str) -> String {
+pub(crate) fn format_day(day: i32, pattern: &str) -> String {
     let (year, month, date) = ymd(day);
     let weekday = DAY_NAMES
         .get(usize::from(sunday_weekday(day)))

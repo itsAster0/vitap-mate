@@ -89,8 +89,9 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
             IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
         }
         // Waiting in the warning tone, ready in the neutral one, working in success.
+        val lastOtpAt = status.lastOtpAt
         val (label, tone) = when {
-            status.lastOtpAt != null -> "Working · last OTP ${ago(status.lastOtpAt!!)}" to tones.success
+            lastOtpAt != null -> "Working · last OTP ${ago(lastOtpAt)}" to tones.success
             on -> "Ready · no OTP forwarded yet" to neutralTone
             else -> "Waiting for Gmail's confirmation mail…" to tones.warning
         }

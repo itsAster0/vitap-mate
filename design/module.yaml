@@ -6,8 +6,8 @@ product:
 dependencies:
   - //core: exported
   - $compose.foundation: exported
-  - $compose.material3: exported
-  # Material3 1.5.0 stable, ahead of the 1.5.0-rc01 that Compose 1.13.0-rc01 brings.
+  # Material3 by its Maven coordinates (Android only): the toolchain can't tell which
+  # `$compose.material3` goes with Compose 1.13.0-rc01, and 1.5.0 stable is what the app uses.
   - androidx.compose.material3:material3-android:1.5.0: exported
   - $compose.components.resources
   - androidx.core:core-ktx:1.19.1: exported

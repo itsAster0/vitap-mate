@@ -261,7 +261,7 @@ internal class VtopBrowser(
         view.evaluateJavascript(VtopScripts.PAGES) { json ->
             val list = runCatching { JSONArray(json) }.getOrNull()
             val pages = (0 until (list?.length() ?: 0)).mapNotNull { i ->
-                val o = list!!.optJSONObject(i) ?: return@mapNotNull null
+                val o = list?.optJSONObject(i) ?: return@mapNotNull null
                 VtopPage(o.optString("url"), o.optString("title"), o.optString("section")).takeIf { it.url.isNotEmpty() && it.title.isNotEmpty() }
             }
             if (pages.isNotEmpty()) sidebar = pages

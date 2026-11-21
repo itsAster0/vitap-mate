@@ -128,9 +128,13 @@ object Docs {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var dir: File? = null
     private var app: Context? = null
+
+    /** The app, once [init] ran; every use is after it. */
+    private val ctx: Context get() = checkNotNull(app) { "Docs.init not called" }
     private var counter = 0
 
     /** Every document, in saved order; Compose state. */
+    @Suppress("MemberNameEqualsClassName") // Docs.docs reads as the list it is.
     val docs: List<Doc> get() = state.value
 
     /** The library's sort, kept in the index. */
@@ -183,16 +187,15 @@ object Docs {
 
     /** [doc]'s file for reading in place (PdfRenderer). */
     fun open(doc: Doc): ParcelFileDescriptor =
-        app!!.contentResolver.openFileDescriptor(uriOf(doc), "r") ?: error("can't open the file")
+        ctx.contentResolver.openFileDescriptor(uriOf(doc), "r") ?: error("can't open the file")
 
-    fun readBytes(doc: Doc): ByteArray = (app!!.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { it.readBytes() }
+    fun readBytes(doc: Doc): ByteArray = (ctx.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { it.readBytes() }
 
     /**
      * Runs [block] on a temporary copy of [doc] in the cache, for APIs that need a [File] (a zip
      * reader); the copy is deleted after.
      */
     fun <T> withFile(doc: Doc, block: (File) -> T): T {
-        val ctx = app!!
         val tmp = File(File(ctx.cacheDir, "docs").apply { mkdirs() }, "${System.nanoTime()}-${doc.file.substringAfterLast('/')}")
         try {
             (ctx.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { input -> tmp.outputStream().use(input::copyTo) }

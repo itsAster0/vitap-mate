@@ -293,8 +293,11 @@ internal fun previousSlide(r: WrappedReport): Slide? {
     val attendance = p.attendanceChange?.let { change -> r.attendance?.let { it.percent to change } }
     val gpaPair = p.gpaChange?.let { change -> r.grades?.let { it.gpa to change } }
     if (attendance == null && gpaPair == null) return null
-    val tile = if (attendance != null) Tile(Ink.Success, "+${attendance.second}%", "attendance on last semester")
-    else Tile(Ink.Success, "+${gpa(gpaPair!!.second)}", "GPA on last semester", grades = true)
+    val tile = when {
+        attendance != null -> Tile(Ink.Success, "+${attendance.second}%", "attendance on last semester")
+        gpaPair != null -> Tile(Ink.Success, "+${gpa(gpaPair.second)}", "GPA on last semester", grades = true)
+        else -> return null
+    }
     val then = shortName(p.semesterName)
     val now = shortName(r.semesterName)
     return Slide("last_semester", Ink.Success, grades = gpaPair != null, tiles = listOf(tile), shareable = { hide -> !hide || attendance != null }) { c ->

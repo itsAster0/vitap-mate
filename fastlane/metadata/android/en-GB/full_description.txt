@@ -1,15 +1,33 @@
-Consolidate your academic information in one secure app. View your schedule, attendance, and marks, even offline. Utilize online features for Wi-Fi management and course material downloads.
+Vitap Mate puts your VTOP in one fast app. Your timetable, attendance, marks, grades, exams and outings are saved on your phone, so they open straight away, even without a connection.
 
-🔸 This app is not affiliated with VIT-AP University — it’s an independent project made by a student  for students.
+This is an unofficial app made by a student for students. It isn't affiliated with or endorsed by VIT-AP University.
 
-Comprehensive Features:
+CLASSES
+• Timetable shows today's classes with the room, your attendance and how long until each one starts. Swipe through the week or open the weekly grid.
+• Attendance shows each course's percentage, classes VTOP hasn't posted yet and a calendar with every class marked.
+• The attendance calculator tells you how many classes you can miss, or must attend, to stay at 75%, counting OD that's still pending. Plan days lets you pick days to skip and see where each course ends up.
+• Course pages list each course's classes, files and course plan. Files download into a folder you choose.
 
-Automated Timetable & Attendance: Real-time schedule and attendance updates.
-Instant Marks & Grade Access: Easy access to your academic performance.
-Offline Data Access: View schedules, attendance, and marks without internet.
- Wi-Fi Management: Securely login/logout from VITAP Wi-Fi (requires internet).
-Course Material Downloads: Download course files for study (requires internet).
-Enhanced Data Security: On-device processing ensures privacy.
-User-Friendly Interface: Intuitive navigation for a seamless experience.
-Optimized Performance: Lightweight and efficient.
-Simplify your VITAP experience. Download VITAP-PAL today!
+EXAMS AND RESULTS
+• Exams lists the date, time, venue and seat of each exam, in the order they happen.
+• Marks shows every assessment and the total for each course.
+• Grades shows your grade history and CGPA, and the planner works out the grades you need for a target CGPA.
+
+CAMPUS
+• Calendar shows holidays, exam days and changed working days.
+• Outing applies for general and weekend outings, cancels them and opens the pass. A request shows as done only after VTOP confirms it.
+• Biometric shows when you went in and out on any day.
+
+AROUND THE APP
+• The bell lists what changed on VTOP. Background sync checks every few hours and notifies you when something changes.
+• OTP auto-fill reads VTOP's sign-in code from your Gmail or a forwarding address.
+• A home-screen widget with your next class and today's timetable.
+• On Android 16 and later, the current class and your outing requests show on the lock screen.
+• In class mode turns on Do Not Disturb while a class or exam is on.
+• Share or print your timetable and grade history as a PDF.
+• Semester Wrapped turns a finished semester into a story you can share, with an option to hide your grades.
+• VTOP opens the full site, already signed in, for pages the app doesn't cover.
+• Works with the Vitap Mate browser extension, and with Claude and other AI assistants through MCP keys you control.
+
+YOUR DATA
+By default everything runs on your phone: the app signs in to VTOP directly, reads the pages on the device and stores your data there. It asks you before your VTOP session is sent to any server, and tells you where it goes. Logs stay on your phone unless you share them.

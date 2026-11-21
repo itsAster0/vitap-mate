@@ -124,6 +124,15 @@ jarsigner -verify "$aab" | grep -q '^jar verified' || { echo "$aab is not signed
 echo "$aab (Play: bundle exec fastlane android deploy_internal)"
 '''
 
+[tasks.notes]
+description = "Draft the release notes from the commits since the last release (or [since]): prints them and stubs this versionCode's Play changelog and updates.json entry"
+usage = 'arg "[since]" help="The revision to start from (default: the last v* tag, else chore(release) commit)"'
+run = 'bun fastlane/notes.ts "${usage_since:-}"'
+
+[tasks.detekt]
+description = "Lint the Kotlin with detekt (brew install detekt): detekt.yml on top of the defaults, as CI runs it"
+run = "detekt --input app/src,core/src,design/src,features --excludes '**/vtop_ffi.kt' --config detekt.yml --build-upon-default-config"
+
 [tasks.logs]
 description = "Follow the app's log (Kotlin and Rust) in logcat"
 run = "$HOME/Library/Android/sdk/platform-tools/adb logcat -v time -s vitapmate"

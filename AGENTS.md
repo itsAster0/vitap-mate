@@ -78,7 +78,8 @@ keystore/             release keystore (gitignored; never read or print it)
   it.
 - A send of the VTOP session to our servers goes through `consent::allowed`
   (`rust/vtop-ffi/src/consent.rs`); background flows are
-  `flow(name, unattended = true)` and never send it.
+  `flow(name, unattended = true)` and send it only over the chosen route
+  with its "Don't ask again" ticked (else they fetch Direct).
 - Rust follows the Google Rust style guide. New crates use edition 2024.
 
 ## Setup
@@ -106,6 +107,8 @@ mise run rust-android        # after changing rust/vtop-ffi: builds the .so into
 ./kotlin run -d emulator-5554
 mise run release             # signed 64-bit APK at build/vitapmate-release.apk (--both: also -32bit.apk)
 mise run logs                # also logs-pull, state, ui-dump and trace for the running app over adb
+mise run detekt              # Kotlin lint (brew install detekt); CI runs the same
+mise run notes [since]       # draft the release notes from the commits since the last release
 
 cd rust && cargo fmt && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 cd rust/vtop-edge && bun run test && bun run check
@@ -131,7 +134,7 @@ Google Play has the app as `com.vitap_pal.app`, the Flutter app's id, and takes
 the AAB. To release:
 
 1. Raise `versionCode` and `versionName` in `app/module.yaml`. Codes follow
-   `M m pp bbb` from 3000000 (3.0.0); Play refuses a code it has seen.
+   `M mmm p bb` from 3000000 (3.0.0 is 3000000, 3.0.4 is 3000410, 3.1.0 is 3001000); Play refuses a code it has seen.
 2. Write `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt` (at most
    500 characters) and add the version with its `code` to `releases` (newest
    first) in `rust/vtop-edge/guides/updates.json`; give features it adds

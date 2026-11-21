@@ -76,7 +76,10 @@ fun WeekStrip(dates: List<Int>, today: Int, selectedDay: Int, onSelect: (Int) ->
                     .clip(shape)
                     .background(fill)
                     .then(if (isToday && !selected) Modifier.border(1.5.dp, scheme.primary, shape) else Modifier)
-                    .selectable(selected, role = Role.Tab, onClick = { if (day != selectedDay) haptics.tick(); onSelect(day) })
+                    .selectable(selected, role = Role.Tab, onClick = {
+                        if (day != selectedDay) haptics.tick()
+                        onSelect(day)
+                    })
                     .semantics { contentDescription = "${formatDay(date, "EEEE, d MMMM")}, ${if (count == 0) "no classes" else "$count classes"}" }
                     .testTag("timetable.day.$day")
                     .padding(vertical = 8.dp),

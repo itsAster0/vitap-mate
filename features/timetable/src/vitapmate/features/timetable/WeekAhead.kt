@@ -61,7 +61,7 @@ fun WeekAhead(from: Int, days: (Int) -> TimetableDay?, onOpen: (Int) -> (() -> U
                 listOfNotNull(
                     "${clock(slots.minOf { it.slot.start }, h24)} – ${clock(slots.maxOf { it.slot.end }, h24)}",
                     if (fats.isEmpty()) null else "Lab FAT ${fats.joinToString(", ")}",
-                    if (day!!.lastClassDay) "Last class day" else null,
+                    if (day?.lastClassDay == true) "Last class day" else null,
                 ).joinToString("  ·  "),
                 null, slots.map { it.slot },
             )

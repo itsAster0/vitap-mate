@@ -38,7 +38,7 @@ class PushService : FirebaseMessagingService() {
     // back the token on later starts; these still work.
     @Deprecated("FCM 26")
     @Suppress("DEPRECATION")
-    override fun onNewToken(token: String) = Push.send(applicationContext, token)
+    override fun onNewToken(token: String) = Push.send(token)
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
@@ -60,8 +60,8 @@ class PushService : FirebaseMessagingService() {
 object Push {
     /** Sends the current token once the app has started (FCM may not call [PushService.onNewToken] again). */
     @Suppress("DEPRECATION")
-    fun start(context: Context) {
-        runCatching { FirebaseMessaging.getInstance().token.addOnSuccessListener { send(context, it) } }
+    fun start() {
+        runCatching { FirebaseMessaging.getInstance().token.addOnSuccessListener { send(it) } }
             .onFailure { Log.warn("push", "no firebase: ${it::class.simpleName}") }
     }
 
@@ -112,7 +112,7 @@ object Push {
         NotificationManagerCompat.from(context).notify(ASKED.hashCode(), n)
     }
 
-    internal fun send(context: Context, token: String) {
+    internal fun send(token: String) {
         AppScope.launch {
             flow("push.token") { f ->
                 val result = runCatching { withContext(Dispatchers.IO) { AppCore.await().setPushToken(f, token) } }

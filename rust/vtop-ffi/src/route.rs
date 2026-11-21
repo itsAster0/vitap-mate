@@ -9,8 +9,9 @@
 //!
 //! A route that fails is skipped for [`SKIP_S`] and the request goes on to the next, finally
 //! Direct; the student never has to change the setting to get their data. Proxy, Server and UDP
-//! send the VTOP session, so each asks first ([`consent::allowed`]); a no (and every background
-//! run) goes Direct and is not skipped, so the next fetch the student watches asks again.
+//! send the VTOP session, so each asks first ([`consent::allowed`]); a no goes Direct and is not
+//! skipped, so the next fetch the student watches asks again. A background run uses the chosen
+//! route only when the student ticked "don't ask again", else Direct.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};

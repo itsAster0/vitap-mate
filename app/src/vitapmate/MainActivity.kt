@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
         BackgroundSync.apply(applicationContext)
         if (savedInstanceState == null) {
             BackgroundSync.registerDebugTrigger(applicationContext)
-            Push.start(applicationContext)
+            Push.start()
             PlayUpdate.check(this)
         }
         // The splash leaves as soon as the first frame is drawn (nothing holds it): a quick fade

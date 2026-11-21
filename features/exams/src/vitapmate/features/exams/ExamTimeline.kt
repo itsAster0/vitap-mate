@@ -78,7 +78,7 @@ internal fun ExamTimeline(
     ) {
         // Written papers that stay folded, by line: consecutive ones join into one block.
         val folded = lines.map { it is Line.Paper && it.paper.done(today, minute) && "${group.name}/${it.paper.key}" !in expanded }
-        itemsIndexed(lines, key = { _, it -> it.key }) { i, line ->
+        itemsIndexed(lines, key = { _, l -> l.key }) { i, line ->
             val joinedAbove = folded[i] && folded.getOrElse(i - 1) { false }
             val joinedBelow = folded[i] && folded.getOrElse(i + 1) { false }
             val item = Modifier.animateItem().padding(top = if (i == 0) 0.dp else if (joinedAbove) 2.dp else Space.sm)

@@ -52,7 +52,7 @@ fun compactMinutes(minutes: Int): String {
 }
 
 /** "Tomorrow", a weekday name within the coming week, else "Tue 6 Oct". */
-fun dayLabel(day: Int, today: Int): String = when (val days = day - today) {
+fun dayLabel(day: Int, today: Int): String = when (day - today) {
     1 -> "Tomorrow"
     in 2..6 -> formatDay(day, "EEEE")
     else -> formatDay(day, "EEE d MMM")

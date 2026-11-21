@@ -39,6 +39,10 @@
       "items": [
         "Everything stays saved on your phone, so pages open without a connection.",
         "The bell next to the round button with your initial lists what changed on VTOP. Background sync checks every few hours and sends a notification when something changes.",
+        {
+          "text": "The bell also tells you when an outing is decided, a course gets new files or the academic calendar changes.",
+          "since": 3001010
+        },
         "OTP auto-fill reads VTOP's code from your Gmail with your own Google key, or from a forwarding address.",
         "The home-screen widget shows the next class and today's timetable. Long-press the app icon for Timetable, Attendance and Outing.",
         "Live updates put the class that's on now and your outing requests on the lock screen, on Android 16 and later.",
@@ -60,59 +64,21 @@
   "releases": [
     {
       "version": "3.1.0",
-      "code": 3001004,
-      "summary": "3.1.0 adds eight slides to Semester Wrapped.",
-      "sections": [
-        {
-          "title": "New",
-          "items": [
-            "Close call: the course that came nearest to 75%, with how many classes you had to spare.",
-            "On Duty: how many of your classes were on OD, on how many days, and the course with the most.",
-            "Morning or afternoon person, from when your classes started.",
-            "Full marks and Assessments: the tests you scored full marks in, and every test you took, by kind. Hide grades leaves full marks out of the shared image.",
-            "Exam crunch: your busiest exam week and the most exams in one day.",
-            "Hostel life and On the move, from your biometric punches: time out of the hostel, trips back between classes, floors climbed and rooms. These are worked out from punches, so they can be a little off."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "3.0.4",
-      "code": 3000410,
-      "summary": "3.0.4 adds Semester Wrapped, a shareable story of your semester, and lists exams in the order they happen.",
+      "code": 3001010,
+      "summary": "3.1 adds Semester Wrapped, asks before your VTOP cookie leaves the phone, gives clearer change alerts with outings, course files and the calendar, loads VTOP pages faster and is smaller.",
       "sections": [
         {
           "title": "New",
           "items": [
             "Semester Wrapped: once a semester's classes are over, the top of More opens a story of that semester. Tap through attendance, your longest streak, the courses you never missed, your room and faculty, marks, GPA and CGPA, outings and campus times, then share any slide or the summary card as an image.",
+            "Close call: the course that came nearest to 75%, with how many classes you had to spare.",
+            "On Duty: how many of your classes were on OD, on how many days, and the course with the most.",
+            "Morning or afternoon person, from when your classes started.",
+            "Full marks and Assessments: the tests you scored full marks in, and every test you took, by kind. Hide grades leaves full marks out of the shared image.",
+            "Exam crunch: your busiest exam week and the most exams in one day.",
+            "Hostel life and On the move, from your biometric punches: time out of the hostel, trips back between classes, floors climbed and rooms. These are worked out from punches, so they can be a little off.",
             "Hide grades leaves your marks and grades out of the shared image. The story on your phone still shows them.",
-            "Campus times for Wrapped come from VTOP only when you tap Fetch. They load in the background with a notification you can stop."
-          ]
-        },
-        {
-          "title": "Improved",
-          "items": [
-            "Exams are listed in the order they happen, so a CAT shows before the FAT.",
-            "Background sync also saves the last few days of biometric entries.",
-            "Silence during classes (Settings → In class) also covers exams, from reporting time until each one ends."
-          ]
-        },
-        {
-          "title": "Fixed",
-          "items": [
-            "The app could close by itself right after opening."
-          ]
-        }
-      ]
-    },
-    {
-      "version": "3.0.3",
-      "code": 3000300,
-      "summary": "3.0.3 asks before your VTOP cookie leaves the phone, is about 1.9 MB smaller, and makes OTP auto-fill through a forwarding address more reliable.",
-      "sections": [
-        {
-          "title": "New",
-          "items": [
+            "Campus times for Wrapped come from VTOP only when you tap Fetch. They load in the background with a notification you can stop.",
             "Before your VTOP cookie goes to the vitapmate server, the app asks first and says where it goes and what it is used for. Tick Don't ask again for each kind, or turn it back on in Settings.",
             "Checking your server account no longer sends your VTOP cookie every time. Once VTOP confirms it, this phone stays confirmed for two weeks.",
             "Connected apps has a button to copy the MCP link, and Make a key by hand for AI apps that take a key instead of signing in.",
@@ -123,11 +89,33 @@
         {
           "title": "Improved",
           "items": [
-            "The app is about 1.9 MB smaller and starts with less to load.",
             "The forwarding guide and these notes now load when you open them and stay saved on your phone, so they can be corrected without an app update.",
             "OTP auto-fill through a forwarding address matches codes by VTOP's clock and keeps waiting while a code is on its way.",
             "Outing no longer limits the longest trip to 15 days. VTOP decides what it allows.",
-            "The source code link in About opens the right GitHub page."
+            "The source code link in About opens the right GitHub page.",
+            "Exams are listed in the order they happen, so a CAT shows before the FAT.",
+            "Background sync also saves the last few days of biometric entries.",
+            "Silence during classes (Settings → In class) also covers exams, from reporting time until each one ends.",
+            "VTOP saves the site's own files on your phone, so pages open faster. Clear saved files is in the VTOP menu.",
+            "Pull to refresh in VTOP reopens the page you're on instead of going back to the start. If your session ran out, the app signs in again and reopens it.",
+            "With OTP auto-fill on, the app asks VTOP for a new code once if the first one expires before it arrives.",
+            "Changes in the bell name the course first and say what happened under it. It also lists outing decisions, new course files and academic calendar changes, and opening a page clears its changes.",
+            "Background sync also checks a pending outing, so you hear when it's decided.",
+            "Tap a class in Timetable to open that course's attendance.",
+            "Course files that Docs can show open in its own viewer.",
+            "The app is smaller and starts with less to load."
+          ]
+        },
+        {
+          "title": "Fixed",
+          "items": [
+            "The app could close by itself right after opening.",
+            "The semester sheet and other sheets sometimes ignored every tap.",
+            "Signing in with your device lock works on Android 9.",
+            "Scanning the QR code in Connected apps uses Google's scanner directly.",
+            "The slow-connection (UDP) mode handles a phone clock that's off and retries when needed.",
+            "Downloads, links into the app and OTP resend are more reliable.",
+            "An error inside the app fails only that action instead of closing the app."
           ]
         }
       ]

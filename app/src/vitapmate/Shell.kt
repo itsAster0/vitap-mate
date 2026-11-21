@@ -70,6 +70,8 @@ fun Shell(nav: Nav, onSignedOut: () -> Unit) {
         Log.info("ui.shell", "route ${nav.top.key}", fields = mapOf("tab" to nav.tab.orEmpty(), "stack" to keys.joinToString(">")))
         StateRegistry.report("route", mapOf("route" to nav.top.key, "tab" to nav.tab, "stack" to keys, "tabs" to tabs))
     }
+    // Opening a page sees its changes in the inbox.
+    LaunchedEffect(nav.top.key) { pageOpened(nav.top.key) }
     // The bar's top above the window's bottom, before the scroll offset; NavBarSpace adds it.
     val barTop = remember { mutableIntStateOf(0) }
     LaunchedEffect(scroll) { snapshotFlow { (barTop.intValue + scroll.state.offset).roundToInt().coerceAtLeast(0) }.collect { NavBarSpace.px = it } }

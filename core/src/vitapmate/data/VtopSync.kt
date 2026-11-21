@@ -24,8 +24,8 @@ import vitapmate.observability.flow
  * OTP, [otp] must get it accepted (background: auto-fill alone; Fetch all: the prompt), asked once
  * however many pages need it, and returns false to stop the whole run. [everything] adds the pages background sync
  * leaves out (profile, course page, outings). Rust records what changed on each fetch (the
- * change inbox). Flow [flowName] ([unattended] for background sync: no VTOP session leaves the
- * phone, so a Server or Proxy route fetches Direct), log src `sync`.
+ * change inbox). Flow [flowName] ([unattended] for background sync: it uses the chosen route when
+ * its "Don't ask again" is ticked, else Direct), log src `sync`.
  */
 object VtopSync {
     /** How a run ended. */
@@ -120,9 +120,12 @@ object VtopSync {
                 if (everything) {
                     add("profile" to { it.fetchProfile(f) })
                     add("course_page" to { it.fetchCoursePage(f) })
+                } else {
+                    // One course's lecture plan a run, in turn, so new files reach the inbox.
+                    withContext(Dispatchers.IO) { nextCourse(core, f) }?.let { id -> add("course_files" to { it.fetchCourseView(f, id, null) }) }
                 }
-                // With Live updates on, outings are checked while a trip ahead is pending (Android 16+).
-                if (everything || Settings.liveUpdates && android.os.Build.VERSION.SDK_INT >= 36 && withContext(Dispatchers.IO) { pendingOuting(core, f) }) {
+                // Outings are checked while a trip ahead is pending, so a decision shows in the inbox (and Live updates).
+                if (everything || withContext(Dispatchers.IO) { pendingOuting(core, f) }) {
                     add("general_outing" to { it.fetchGeneralOuting(f) })
                     add("weekend_outing" to { it.fetchWeekendOuting(f) })
                 }
@@ -140,6 +143,16 @@ object VtopSync {
     /** The newest [n] of the 14 days to [today] not in [complete], newest first; today always counts. */
     internal fun biometricDays(today: Int, complete: Set<Int>, n: Int): List<Int> =
         (today downTo today - 13).filter { it == today || it !in complete }.take(n)
+
+    /** The course part after the one checked last ([Settings.syncCourse]), from the saved course list; null without one. */
+    internal fun nextCourse(core: Core, f: String): String? {
+        val ids = core.cachedCoursePage(f)?.groups.orEmpty().flatMap { g -> g.parts.map { it.id } }
+        return nextAfter(ids, Settings.syncCourse)?.also { Settings.syncCourse = it }
+    }
+
+    /** The id after [last] in [ids], wrapping round; the first when [last] is gone. */
+    internal fun nextAfter(ids: List<String>, last: String?): String? =
+        if (ids.isEmpty()) null else ids[(ids.indexOf(last) + 1) % ids.size]
 
     private fun pendingOuting(core: Core, f: String) =
         (core.cachedGeneralOuting(f)?.requests.orEmpty() + core.cachedWeekendOuting(f)?.requests.orEmpty()).any { it.standing == OutingStanding.PENDING && it.highlight != null }

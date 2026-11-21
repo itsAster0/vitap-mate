@@ -94,7 +94,7 @@ internal fun SemesterView(
                 item("summary") {
                     SemesterSummaryCard(grades.courses, summary, onCourse = { i -> scope.launch { list.animateScrollToItem(i + 1) } }, Modifier.animateItem().padding(bottom = Space.sm))
                 }
-                itemsIndexed(grades.courses, key = { _, it -> it.courseId.ifEmpty { it.code } }) { i, course ->
+                itemsIndexed(grades.courses, key = { _, c -> c.courseId.ifEmpty { c.code } }) { i, course ->
                     val key = "${grades.semesterId}/${course.courseId}"
                     val open = key in expanded
                     LaunchedEffect(open) { if (open) details.open(grades.semesterId, course.courseId) }
@@ -132,7 +132,7 @@ private fun SemesterChips(selected: String, onSelect: (String) -> Unit) {
         contentPadding = PaddingValues(horizontal = Space.sm, vertical = Space.xs),
         horizontalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
-        itemsIndexed(semesters, key = { _, it -> it.id }) { _, semester ->
+        itemsIndexed(semesters, key = { _, s -> s.id }) { _, semester ->
             val haptics = rememberHaptics()
             FilterChip(
                 selected = semester.id == selected,

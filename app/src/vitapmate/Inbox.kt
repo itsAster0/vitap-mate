@@ -43,7 +43,10 @@ import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.BookOpenCheck
 import com.composables.icons.lucide.CalendarCheck
 import com.composables.icons.lucide.CalendarClock
+import com.composables.icons.lucide.CalendarDays
 import com.composables.icons.lucide.ClipboardList
+import com.composables.icons.lucide.DoorOpen
+import com.composables.icons.lucide.FileText
 import com.composables.icons.lucide.GraduationCap
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.Dispatchers
@@ -90,6 +93,15 @@ private object Unseen {
     }
 }
 
+/** A page was opened: its kind's changes count as seen, and the bell's count follows. */
+suspend fun pageOpened(page: String) {
+    if (page !in CHANGE_PAGES) return
+    orNull { coreFlow("inbox.page_seen") { c, id -> c.markPageSeen(id, page) } } ?: return
+    Unseen.read()
+}
+
+private val CHANGE_PAGES = ChangeKind.entries.map(::pageOf).toSet()
+
 /** The unread count, read again after each VTOP run finishes (More's card and Changes row). */
 @Composable
 fun rememberUnseenChanges(): Int {
@@ -131,17 +143,17 @@ fun InboxScreen() {
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
     var changes by remember { mutableStateOf<List<Change>?>(null) }
-    var fresh by remember { mutableIntStateOf(0) }
+    var fresh by remember { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(Unit) {
         flow("inbox.open") { id ->
             withContext(Dispatchers.IO) {
                 val core = AppCore.await()
-                fresh = core.unseenChanges(id).toInt()
+                fresh = core.unseenChangeIds(id).toSet()
                 changes = core.changes(id)
                 core.markChangesSeen(id)
             }
             Unseen.count = 0
-            Log.info("ui.inbox", "open", id, mapOf("changes" to "${changes?.size}", "new" to "$fresh"))
+            Log.info("ui.inbox", "open", id, mapOf("changes" to "${changes?.size}", "new" to "${fresh.size}"))
         }
     }
     Page("Changes", INBOX, actions = {
@@ -159,7 +171,7 @@ fun InboxScreen() {
             Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) { EmptyView(Lucide.Bell, "No changes yet", Modifier.testTag("inbox.empty")) }
             return@Page
         }
-        val newIds = list.take(fresh).map { it.id }.toSet()
+        val newIds = fresh
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp),
             verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
@@ -178,7 +190,7 @@ fun InboxScreen() {
                     Text(day, Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 }
                 // A day's rows join into one block.
-                itemsIndexed(items, key = { _, it -> it.id }) { i, change ->
+                itemsIndexed(items, key = { _, c -> c.id }) { i, change ->
                     ChangeRow(change, change.id in newIds, ListItemDefaults.segmentedShapes(i, items.size).shape) {
                         scope.logAction("inbox.open_change", "ui.inbox", "open ${change.kind.name.lowercase()}")
                         val target = pageOf(change.kind)
@@ -200,7 +212,7 @@ private fun ChangeRow(change: Change, new: Boolean, shape: Shape, onClick: () ->
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val tone = when {
-        change.title.contains("below 75") -> tones.danger
+        change.urgent || change.title.contains("below 75") -> tones.danger
         new -> tones.accentTone
         else -> null
     }
@@ -237,6 +249,9 @@ private fun shapeOf(kind: ChangeKind): RoundedPolygon = when (kind) {
     ChangeKind.TIMETABLE -> MaterialShapes.Clover4Leaf
     ChangeKind.EXAMS -> MaterialShapes.Cookie7Sided
     ChangeKind.GRADES -> MaterialShapes.SoftBurst
+    ChangeKind.OUTING -> MaterialShapes.Pentagon
+    ChangeKind.FILES -> MaterialShapes.Gem
+    ChangeKind.CALENDAR -> MaterialShapes.Flower
 }
 
 private fun iconOf(kind: ChangeKind): ImageVector = when (kind) {
@@ -245,6 +260,9 @@ private fun iconOf(kind: ChangeKind): ImageVector = when (kind) {
     ChangeKind.TIMETABLE -> Lucide.CalendarClock
     ChangeKind.EXAMS -> Lucide.BookOpenCheck
     ChangeKind.GRADES -> Lucide.GraduationCap
+    ChangeKind.OUTING -> Lucide.DoorOpen
+    ChangeKind.FILES -> Lucide.FileText
+    ChangeKind.CALENDAR -> Lucide.CalendarDays
 }
 
 /** The feature a change belongs to. */
@@ -254,4 +272,7 @@ internal fun pageOf(kind: ChangeKind): String = when (kind) {
     ChangeKind.TIMETABLE -> "timetable"
     ChangeKind.EXAMS -> "exams"
     ChangeKind.GRADES -> "grades"
+    ChangeKind.OUTING -> "outing"
+    ChangeKind.FILES -> "coursepage"
+    ChangeKind.CALENDAR -> "calendar"
 }

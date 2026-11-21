@@ -66,7 +66,7 @@ object TimetableWidget {
         val h24 = DateFormat.is24HourFormat(context)
         if (ids.isNotEmpty()) {
             val agenda = load(context)
-            ids.forEach { manager.updateAppWidget(it, sized(context, manager.getAppWidgetOptions(it)) { w, h -> draw(context, agenda, h24, w, h) }) }
+            ids.forEach { manager.updateAppWidget(it, sized(manager.getAppWidgetOptions(it)) { w, h -> draw(context, agenda, h24, w, h) }) }
         }
         val prefs = context.getSharedPreferences("widget", Context.MODE_PRIVATE)
         if (Build.VERSION.SDK_INT < 35 || prefs.getBoolean(PREVIEW_SET, false)) return
@@ -78,7 +78,7 @@ object TimetableWidget {
     }
 
     /** One drawing per size the launcher gives (Android 12+), else landscape and portrait from the min and max sizes. */
-    private fun sized(context: Context, options: Bundle, draw: (Float, Float) -> RemoteViews): RemoteViews {
+    private fun sized(options: Bundle, draw: (Float, Float) -> RemoteViews): RemoteViews {
         if (Build.VERSION.SDK_INT >= 31) {
             @Suppress("DEPRECATION") // The typed overload is Android 13+.
             val sizes = options.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)

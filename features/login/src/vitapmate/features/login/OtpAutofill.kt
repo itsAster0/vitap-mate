@@ -144,7 +144,7 @@ object OtpAutofill {
                             return@withTimeoutOrNull
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: CoreException.OtpRejected) {
+                        } catch (_: CoreException.OtpRejected) {
                             Log.info("sync", "otp turned down", flow)
                         } catch (e: Throwable) {
                             why = "VTOP didn't take the code"

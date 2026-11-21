@@ -88,7 +88,8 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   account, handover; kept in `consent.json`, dropped on
   sign-out or another student). It fails closed: no gate, an empty flow, the
   app not shown or a background flow (`flow(name, unattended = true)`: the
-  open-app sweep and background sync) is a no, even with the tick. A no on a
+  open-app sweep and background sync) is a no, except a route send with the
+  route's tick, so background runs follow the chosen route. A no on a
   route fetches Direct without the 5-minute skip; elsewhere it is
   `ConsentDenied`. Calls nobody started (the semester push)
   never ask and send only with the tick. A session request while the

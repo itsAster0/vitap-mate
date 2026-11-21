@@ -110,7 +110,7 @@ internal fun HistoryView(
                         }
                     })
                 }
-                itemsIndexed(courses, key = { _, it -> it.key }) { i, course ->
+                itemsIndexed(courses, key = { _, c -> c.key }) { i, course ->
                     HistoryCourseCard(course, course.key in expanded, { onToggle(course.key) }, Modifier.animateItem(), segment(i, courses.size))
                 }
             }

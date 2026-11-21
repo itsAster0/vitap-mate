@@ -42,7 +42,8 @@ fun DayLine(day: CalendarDay, today: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (tone != null) Dot(size = 8.dp, color = if (hollow(day.mark!!)) Color.Transparent else tone.base, ring = if (hollow(day.mark!!)) tone.base else null)
+        val hollow = day.mark?.let(::hollow) == true
+        if (tone != null) Dot(size = 8.dp, color = if (hollow) Color.Transparent else tone.base, ring = if (hollow) tone.base else null)
         Column(Modifier.weight(1f)) {
             Text(formatDay(day.day, "EEE d MMM"), style = MaterialTheme.typography.labelLarge.nums(color = scheme.onSurface))
             Text(day.label.ifBlank { "Not on the calendar" }, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)

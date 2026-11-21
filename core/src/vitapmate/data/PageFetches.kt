@@ -116,8 +116,8 @@ open class SingleFlight internal constructor(
 
     /** A screen showing page [id] came ([on]) or went; its waiting runs move up or down. */
     internal fun shown(id: String, on: Boolean) = synchronized(runs) {
-        onScreen[id] = (onScreen[id] ?: 0) + if (on) 1 else -1
-        if (onScreen[id]!! <= 0) onScreen.remove(id)
+        val n = (onScreen[id] ?: 0) + if (on) 1 else -1
+        if (n <= 0) onScreen.remove(id) else onScreen[id] = n
     }
 
     /** Whether a screen shows page [id]. */

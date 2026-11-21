@@ -185,7 +185,9 @@ fun decodeMealWindows(raw: String?): Map<Meal, MealWindow> {
     val parts = raw?.split(',').orEmpty()
     return Meal.entries.associateWith { meal ->
         val p = parts.getOrNull(meal.ordinal)?.split('-')?.map { it.toIntOrNull() }
-        if (p != null && p.size == 2 && p[0] != null && p[1] != null) MealWindow(p[0]!!, p[1]!!) else defaultMealWindows.getValue(meal)
+        val from = p?.getOrNull(0)
+        val to = p?.getOrNull(1)
+        if (p?.size == 2 && from != null && to != null) MealWindow(from, to) else defaultMealWindows.getValue(meal)
     }
 }
 

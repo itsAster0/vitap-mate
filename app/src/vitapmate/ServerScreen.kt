@@ -352,7 +352,7 @@ fun ServerScreen() {
                         }
                     }
                 }
-                problem != null -> item { ProblemView(problem!!, onRetry = ::load, Modifier.fillMaxWidth(), busy = loading) }
+                problem != null -> item { problem?.let { ProblemView(it, onRetry = ::load, Modifier.fillMaxWidth(), busy = loading) } }
                 else -> item { Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator(Modifier.testTag("server.loading")) } }
             }
         }

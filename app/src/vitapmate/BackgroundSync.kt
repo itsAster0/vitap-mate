@@ -113,7 +113,7 @@ object BackgroundSync {
     /** A sample change through [notify] (Developer → Show a test notification). */
     fun notifyTest(context: Context) = notify(
         context,
-        listOf(Change("test", ChangeKind.ATTENDANCE, System.currentTimeMillis(), "Attendance posted", "Sample course (Theory): 1 class present, now 92%", null, "")),
+        listOf(Change("test", ChangeKind.ATTENDANCE, System.currentTimeMillis(), "Sample course (Theory)", "Attendance posted · 1 class present, now 92%", null, "", false)),
     )
 
     /**
@@ -140,10 +140,10 @@ object BackgroundSync {
         val open = openPage(MainActivity.OPEN_INBOX, 0)
         val seen = PendingIntent.getBroadcast(context, 0, Intent(context, SeenReceiver::class.java), PendingIntent.FLAG_IMMUTABLE)
         for ((kind, list) in changes.groupBy { it.kind }) {
-            val title = if (list.size == 1) list[0].title else "${list[0].title} and ${list.size - 1} more"
+            val title = if (list.size == 1) list[0].title else "${list.size} ${kind.name.lowercase()} changes"
             // One change: its text in full; several: a line each.
             val style = if (list.size == 1) NotificationCompat.BigTextStyle().bigText(list[0].body)
-            else NotificationCompat.InboxStyle().also { s -> list.take(6).forEach { s.addLine("${it.title}: ${it.body}") } }
+            else NotificationCompat.InboxStyle().also { s -> list.take(6).forEach { s.addLine("${it.title} · ${it.body}") } }
             val page = pageOf(kind)
             val n = NotificationCompat.Builder(context, channelOf(kind))
                 .setSmallIcon(R.drawable.ic_notification)

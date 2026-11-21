@@ -149,6 +149,9 @@ object Settings {
      */
     var syncPaused by text("settings_sync_paused")
 
+    /** The course part background sync last checked for new files ([VtopSync]). */
+    var syncCourse by text("settings_sync_course")
+
     /** Whether background sync notifies about changes of [kind] ("attendance", "marks", "timetable", "exams", "grades"). */
     fun notifies(kind: String): Boolean = notifyOff[kind] != true
 
@@ -214,7 +217,7 @@ val SYNC_HOURS = listOf(3, 6, 12, 24)
 const val SYNC_HOURS_DEFAULT = 3
 
 /** The kinds of change the inbox records and background sync can notify about. */
-val NOTIFY_KINDS = listOf("attendance", "marks", "timetable", "exams", "grades")
+val NOTIFY_KINDS = listOf("attendance", "marks", "timetable", "exams", "grades", "outing", "files", "calendar")
 
 enum class ThemeMode { System, Light, Dark }
 

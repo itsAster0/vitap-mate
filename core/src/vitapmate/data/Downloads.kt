@@ -41,7 +41,9 @@ object Downloads {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private var app: Context? = null
-    private val prefs get() = app!!.getSharedPreferences("downloads", Context.MODE_PRIVATE)
+    /** The app, once [init] ran; every use is after it. */
+    private val ctx: Context get() = checkNotNull(app) { "Downloads.init not called" }
+    private val prefs get() = ctx.getSharedPreferences("downloads", Context.MODE_PRIVATE)
 
     /** The chosen folder (a tree URI), or null for Downloads/vitapmate. */
     var folder by mutableStateOf<Uri?>(null)
@@ -76,15 +78,15 @@ object Downloads {
     suspend fun adopt(name: String, mime: String, fallback: Uri?): Uri = lock.withLock {
         fun find(): Uri? = runCatching {
             val where = "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
-            app!!.contentResolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.MediaColumns._ID), where, arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$SUBDIR/", name), null)
+            ctx.contentResolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.MediaColumns._ID), where, arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$SUBDIR/", name), null)
                 ?.use { c -> if (c.moveToFirst()) android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)) else null }
         }.getOrNull()
         // DownloadManager publishes the entry a moment after it reports the download done.
         var found: Uri? = null
-        for (attempt in 0 until 10) {
+        var tries = 0
+        while (found == null && tries++ < 10) {
             found = withContext(Dispatchers.IO) { find() }
-            if (found != null) break
-            delay(300)
+            if (found == null) delay(300)
         }
         val uri = found ?: fallback ?: error("can't find the file")
         record(uri, name, mime)
@@ -125,7 +127,7 @@ object Downloads {
     }
 
     /** Whether [uri] still opens (the student may have deleted the file in their file manager). */
-    fun exists(uri: Uri): Boolean = runCatching { app!!.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
+    fun exists(uri: Uri): Boolean = runCatching { ctx.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
 
     /** A file in the folder: where it is, its name and size. */
     class Entry(val uri: String, val name: String, val size: Long)
@@ -136,7 +138,7 @@ object Downloads {
      * main thread.
      */
     fun list(): List<Entry>? = runCatching {
-        val resolver = app!!.contentResolver
+        val resolver = ctx.contentResolver
         val tree = folder
         if (tree != null) {
             val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
@@ -224,12 +226,12 @@ object Downloads {
     }
 
     private fun write(tree: Uri?, name: String, mime: String, open: () -> InputStream): Uri {
-        val context = app!!
+        val context = ctx
         val resolver = context.contentResolver
         if (tree != null) {
             val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
             val doc = DocumentsContract.createDocument(resolver, parent, mime, name) ?: error("can't create the file")
-            open().use { input -> resolver.openOutputStream(doc)!!.use { input.copyTo(it) } }
+            open().use { input -> (resolver.openOutputStream(doc) ?: error("can't write the file")).use { input.copyTo(it) } }
             return doc
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -240,7 +242,7 @@ object Downloads {
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("can't create the file")
-            open().use { input -> resolver.openOutputStream(uri)!!.use { input.copyTo(it) } }
+            open().use { input -> (resolver.openOutputStream(uri) ?: error("can't write the file")).use { input.copyTo(it) } }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             return uri
         }
@@ -260,7 +262,7 @@ object Downloads {
     private fun delete(context: Context, uri: Uri) {
         runCatching {
             when {
-                uri.scheme == "file" -> File(uri.path!!).delete()
+                uri.scheme == "file" -> uri.path?.let { File(it).delete() }
                 DocumentsContract.isDocumentUri(context, uri) && uri.authority != MediaStore.AUTHORITY -> DocumentsContract.deleteDocument(context.contentResolver, uri)
                 else -> context.contentResolver.delete(uri, null, null)
             }

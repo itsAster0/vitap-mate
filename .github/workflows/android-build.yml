@@ -43,6 +43,25 @@ env:
   # Kotlin compiler for local use.
   MISE_AUTO_INSTALL: "false"
 jobs:
+  detekt:
+    name: Kotlin lint (detekt)
+    runs-on: ubuntu-latest
+    env:
+      DETEKT: "1.23.8"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+        with:
+          install_args: java
+          cache: true
+      # The same rules as `mise run detekt` (detekt.yml on top of the defaults).
+      - name: Run detekt
+        run: |
+          curl -fLo detekt.jar "https://github.com/detekt/detekt/releases/download/v$DETEKT/detekt-cli-$DETEKT-all.jar"
+          java -jar detekt.jar --input app/src,core/src,design/src,features \
+            --excludes '**/vtop_ffi.kt' --config detekt.yml --build-upon-default-config
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest

@@ -39,9 +39,10 @@ object SemesterChoice {
             Log.info("ui.semesters", "fresh", f, mapOf("trigger" to trigger, "count" to "${semesters?.items?.size}"))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            problem = problemOf(e, f)
+            val failed = problemOf(e, f)
+            problem = failed
             askedOtp(e)
-            Log.warn("ui.semesters", "refresh failed", f, mapOf("trigger" to trigger, "kind" to problem!!.kind.name))
+            Log.warn("ui.semesters", "refresh failed", f, mapOf("trigger" to trigger, "kind" to failed.kind.name))
         } finally {
             loading = false
         }
