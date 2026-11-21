@@ -188,7 +188,7 @@ impl Core {
             let at_ms = now_ms();
             let added = add(store, drafts, semester, at_ms);
             let mut kinds: BTreeMap<&str, usize> = BTreeMap::new();
-            for change in &store.changes[..added] {
+            for change in store.changes.iter().take(added) {
                 *kinds.entry(kind_name(change.kind)).or_default() += 1;
             }
             for (kind, n) in kinds {

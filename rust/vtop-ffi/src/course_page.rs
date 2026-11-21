@@ -484,7 +484,9 @@ fn is_lab(kind: &str) -> bool {
 fn material_label(label: &str) -> String {
     let label = label.trim();
     match label.get(..10) {
-        Some(head) if head.eq_ignore_ascii_case("reference ") => label[10..].trim().to_string(),
+        Some(head) if head.eq_ignore_ascii_case("reference ") => {
+            label.get(10..).unwrap_or_default().trim().to_string()
+        }
         _ => label.to_string(),
     }
 }

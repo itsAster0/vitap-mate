@@ -394,16 +394,23 @@ impl Core {
         };
         let seal_secret = &self.device().seal_secret;
         // Kept by the edge since setup, for a phone that joined after Gmail sent it.
-        if let Some(sealed) = inbox["confirmation"].as_str().filter(|s| !s.is_empty())
+        if let Some(sealed) = inbox
+            .get("confirmation")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
             && let Some(confirmation) = open(seal_secret, &saved.id, sealed)
         {
             debug!("gmail confirmation kept on the edge");
             self.record(&saved.id, &confirmation);
         }
-        if let Some(at) = inbox["lastOtpAt"].as_i64() {
+        if let Some(at) = inbox.get("lastOtpAt").and_then(Value::as_i64) {
             self.record_otp_at(&saved.id, at);
         }
-        let Some(sealed) = inbox["sealed"].as_str().filter(|s| !s.is_empty()) else {
+        let Some(sealed) = inbox
+            .get("sealed")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+        else {
             debug!("inbox empty");
             return Ok(None);
         };

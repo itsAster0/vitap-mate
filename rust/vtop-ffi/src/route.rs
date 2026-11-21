@@ -431,7 +431,11 @@ impl Core {
         match answer.packed {
             Some(packed) => unpacked(&request.name, &packed)
                 .ok_or_else(|| ServerError::Failed(format!("unreadable packed {}", request.name))),
-            None => Ok(answer.body["data"].take()),
+            None => Ok(answer
+                .body
+                .get_mut("data")
+                .map(Value::take)
+                .unwrap_or_default()),
         }
     }
 
@@ -467,15 +471,20 @@ impl Core {
             }
             answer => answer?,
         };
-        let state: SessionState = serde_json::from_value(answer["session"].clone())
-            .map_err(|_| ServerError::Failed("unexpected sign-in answer".into()))?;
+        let state: SessionState =
+            serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
+                .map_err(|_| ServerError::Failed("unexpected sign-in answer".into()))?;
         session
             .client
             .resume_session(&state)
             .map_err(|error| ServerError::Failed(error.to_string()))?;
-        if answer["status"] == "otp_required" {
-            let message = answer["message"]
-                .as_str()
+        if answer
+            .get("status")
+            .is_some_and(|status| status == "otp_required")
+        {
+            let message = answer
+                .get("message")
+                .and_then(Value::as_str)
                 .unwrap_or("Enter the OTP VTOP emailed you.");
             session.otp = Some(message.to_string());
             session.server_otp = true;
@@ -502,7 +511,7 @@ impl Core {
         let mut body = json!({ "session": session.client.session_state() });
         let path = match code {
             Some(code) => {
-                body["otp"] = json!(code);
+                crate::json_set(&mut body, "otp", json!(code));
                 "/v1/vtop/login/otp"
             }
             None => "/v1/vtop/login/resend",
@@ -517,10 +526,11 @@ impl Core {
                     }
                     error => error.into(),
                 })?;
-        let state: SessionState = serde_json::from_value(answer["session"].clone())
-            .map_err(|_| CoreError::from(VtopError::InvalidResponse))?;
+        let state: SessionState =
+            serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
+                .map_err(|_| CoreError::from(VtopError::InvalidResponse))?;
         session.client.resume_session(&state)?;
-        if code.is_some() && answer["status"] == "ok" {
+        if code.is_some() && answer.get("status").is_some_and(|status| status == "ok") {
             session.otp = None;
             session.server_otp = false;
             session.logins += 1;

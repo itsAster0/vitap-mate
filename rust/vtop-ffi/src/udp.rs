@@ -109,7 +109,9 @@ impl wire::Socket for Opened {
     async fn recv_from(&self, buf: &mut [u8], until: Instant) -> Option<(usize, SocketAddr)> {
         let datagram = self.0.receive(millis_until(until)).await.ok()??;
         let n = datagram.data.len().min(buf.len());
-        buf[..n].copy_from_slice(&datagram.data[..n]);
+        if let (Some(to), Some(from)) = (buf.get_mut(..n), datagram.data.get(..n)) {
+            to.copy_from_slice(from);
+        }
         Some((n, SocketAddr::new(datagram.ip.parse().ok()?, datagram.port)))
     }
 }
@@ -221,10 +223,13 @@ impl Core {
             }
             let mut body: Value = serde_json::from_slice(&answer.body).map_err(|_| unreadable())?;
             if answer.status != 200 {
-                let code = body["code"].as_str().unwrap_or("unknown");
+                let code = body
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown");
                 return Err(format!("the UDP gateway answered {} {code}", answer.status));
             }
-            return Ok(body["data"].take());
+            return Ok(body.get_mut("data").map(Value::take).unwrap_or_default());
         }
     }
 

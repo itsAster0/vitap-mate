@@ -73,7 +73,7 @@ pub(crate) struct Answer {
 
 impl Answer {
     fn text(&self, key: &str) -> Option<String> {
-        self.body[key].as_str().map(str::to_string)
+        self.body.get(key)?.as_str().map(str::to_string)
     }
 
     fn error(&self) -> EdgeError {
@@ -237,7 +237,7 @@ impl Core {
             "platform": "android",
         });
         if let Some(token) = &device.push_token {
-            body["fcmToken"] = json!(token);
+            crate::json_set(&mut body, "fcmToken", json!(token));
         }
         let bytes = serde_json::to_vec(&body).unwrap_or_default();
         let req = Request {
@@ -359,7 +359,7 @@ impl Core {
                 code = code.as_str(),
                 "edge refused"
             );
-            match answer.body["serverTime"].as_i64() {
+            match answer.body.get("serverTime").and_then(Value::as_i64) {
                 Some(server_time) if code == "stale_time" && !retried => {
                     self.update_device(|d| {
                         d.clock_offset = server_time.saturating_sub(unix_now());

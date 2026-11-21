@@ -305,7 +305,7 @@ impl Core {
                 Err(CoreError::ConsentDenied) => return Ok(false),
                 account => account?.map_err(refused)?,
             };
-            if account["savedCredentials"] != json!(true) {
+            if account.get("savedCredentials") != Some(&json!(true)) {
                 return Ok(false);
             }
             match self
@@ -433,14 +433,14 @@ impl Core {
                 .saved_account(flow.clone())
                 .and_then(|account| account.registration_number)
             {
-                body["registrationNumber"] = json!(regno);
+                crate::json_set(&mut body, "registrationNumber", json!(regno));
             }
             let mailbox = self
                 .saved_mailbox()
                 .filter(|(on, ..)| *on == server)
                 .map(|(_, id, _)| id);
             if let Some(id) = &mailbox {
-                body["mailbox"] = json!(id);
+                crate::json_set(&mut body, "mailbox", json!(id));
             }
             let path = "/v1/devices/delete";
             if !supported(self.edge_post(&server, path, &flow, &body).await, path)? {
@@ -499,8 +499,10 @@ impl Core {
                     .await
                 {
                     Ok(list) => {
-                        let phones: Vec<MailPhoneView> =
-                            serde_json::from_value(list["devices"].clone()).map_err(unexpected)?;
+                        let phones: Vec<MailPhoneView> = serde_json::from_value(
+                            list.get("devices").cloned().unwrap_or_default(),
+                        )
+                        .map_err(unexpected)?;
                         let phones = phones
                             .into_iter()
                             .map(|p| MailPhone {
@@ -622,19 +624,23 @@ impl Core {
         let mut credentials =
             json!({ "username": account.username, "password": account.password, "otp": otp });
         if let Some(grant) = gmail {
-            credentials["gmail"] = json!({
-                "refreshToken": grant.refresh_token,
-                "clientId": grant.client_id,
-                "clientSecret": grant.client_secret,
-                "deleteAfterReading": grant.delete_after_reading,
-            });
+            crate::json_set(
+                &mut credentials,
+                "gmail",
+                json!({
+                    "refreshToken": grant.refresh_token,
+                    "clientId": grant.client_id,
+                    "clientSecret": grant.client_secret,
+                    "deleteAfterReading": grant.delete_after_reading,
+                }),
+            );
         }
         let body = json!({ "label": label(), "credentials": credentials });
         let answer = self
             .account_post(server, "/v1/link", flow, action, ask, body)
             .await?
             .map_err(refused)?;
-        if answer["savedCredentials"] != json!(true) {
+        if answer.get("savedCredentials") != Some(&json!(true)) {
             return Err(CoreError::Other {
                 reason: "The server keeps a password only with a forwarding address or \
                              Gmail OTP auto-fill set up."

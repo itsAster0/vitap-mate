@@ -1,6 +1,17 @@
 //! The Compose prototype's core: one signed-in VTOP client, its session and
 //! a JSON cache in the app's data directory, and ready-to-draw records.
 
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::string_slice,
+        clippy::panic
+    )
+)]
+
 mod calendar;
 mod changes;
 mod consent;
@@ -1382,6 +1393,16 @@ fn traced_sync<T>(
     let result = span.in_scope(work);
     close(&span, &result);
     result
+}
+
+/// `value[key] = item`, without the panic `IndexMut` has when `value` is not an object.
+pub(crate) fn json_set(value: &mut serde_json::Value, key: &str, item: serde_json::Value) {
+    if value.is_null() {
+        *value = serde_json::Value::Object(serde_json::Map::new());
+    }
+    if let Some(map) = value.as_object_mut() {
+        map.insert(key.to_owned(), item);
+    }
 }
 
 #[cfg(test)]

@@ -878,12 +878,12 @@ fn clock_times(text: &str) -> Vec<i32> {
     let mut times = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        if !bytes[i].is_ascii_digit() {
+        if !bytes.get(i).is_some_and(u8::is_ascii_digit) {
             i += 1;
             continue;
         }
         let mut j = i;
-        while j < bytes.len() && bytes[j].is_ascii_digit() {
+        while bytes.get(j).is_some_and(u8::is_ascii_digit) {
             j += 1;
         }
         let colon = j - i <= 2
@@ -897,7 +897,7 @@ fn clock_times(text: &str) -> Vec<i32> {
             }
             let suffix = text.get(k..k + 2).map(str::to_ascii_uppercase);
             if matches!(suffix.as_deref(), Some("AM" | "PM"))
-                && let Some(minutes) = records::minutes(&text[i..k + 2])
+                && let Some(minutes) = text.get(i..k + 2).and_then(records::minutes)
             {
                 times.push(minutes);
                 i = k + 2;
@@ -1137,7 +1137,13 @@ fn list_days(days: &[u8], and: &str, short: bool) -> String {
     let names: Vec<&str> = days
         .iter()
         .filter_map(|d| DAY_NAMES.get(usize::from(*d)))
-        .map(|name| if short { &name[..3] } else { name })
+        .map(|name| {
+            if short {
+                name.get(..3).unwrap_or(name)
+            } else {
+                name
+            }
+        })
         .collect();
     match names.split_last() {
         None => String::new(),
@@ -1161,8 +1167,13 @@ fn ymd(day: i32) -> (i32, usize, i32) {
 /// `day` as "EEE d MMM" ("Sat 10 Oct"), "d MMM" or "EEE d MMM yyyy".
 fn format_day(day: i32, pattern: &str) -> String {
     let (year, month, date) = ymd(day);
-    let weekday = &DAY_NAMES[usize::from(sunday_weekday(day))][..3];
-    let month = MONTHS[month - 1];
+    let weekday = DAY_NAMES
+        .get(usize::from(sunday_weekday(day)))
+        .map_or("", |name| name.get(..3).unwrap_or(name));
+    let month = MONTHS
+        .get(month.saturating_sub(1))
+        .copied()
+        .unwrap_or_default();
     match pattern {
         "d MMM" => format!("{date} {month}"),
         "EEE d MMM yyyy" => format!("{weekday} {date} {month} {year}"),
@@ -1200,7 +1211,11 @@ fn short_clock(minutes: i32) -> String {
 /// `11-Oct-2026`, what the outing date fields post.
 fn outing_date(day: i32) -> VtopResult<OutingDate> {
     let (year, month, date) = ymd(day);
-    OutingDate::parse(&format!("{date:02}-{}-{year:04}", MONTHS[month - 1]))
+    let month = MONTHS
+        .get(month.saturating_sub(1))
+        .copied()
+        .unwrap_or_default();
+    OutingDate::parse(&format!("{date:02}-{month}-{year:04}"))
 }
 
 fn outing_time(minute: i32) -> VtopResult<OutingTime> {

@@ -599,13 +599,12 @@ impl From<GradeDetailsData> for GradeDetails {
         let mut sections: Vec<(String, Vec<GradeDetailMark>)> = Vec::new();
         for mark in &data.marks {
             let parts: Vec<&str> = mark.mark_title.split('•').collect();
-            let (section, title) = if parts.len() >= 2 {
-                (
-                    parts[0].trim().to_string(),
-                    parts[1..].join("•").trim().to_string(),
-                )
-            } else {
-                (data.class_course_type.clone(), mark.mark_title.clone())
+            let (section, title) = match parts.split_first() {
+                Some((section, rest)) if !rest.is_empty() => (
+                    section.trim().to_string(),
+                    rest.join("•").trim().to_string(),
+                ),
+                _ => (data.class_course_type.clone(), mark.mark_title.clone()),
             };
             let mark = GradeDetailMark {
                 mark_title: title,
@@ -863,42 +862,43 @@ pub(crate) fn counts<'a>(grades: impl Iterator<Item = &'a str>) -> Vec<GradeCoun
 fn parse_credits(raw: &str) -> Option<f64> {
     let text = raw.trim().replace(',', ".");
     let start = text.find(|c: char| c.is_ascii_digit())?;
-    let rest = &text[start..];
+    let rest = text.get(start..)?;
     let mut end = rest
         .find(|c: char| !c.is_ascii_digit())
         .unwrap_or(rest.len());
-    if rest[end..].starts_with('.') {
-        let fraction = rest[end + 1..]
+    if let Some(after) = rest.get(end..).and_then(|after| after.strip_prefix('.')) {
+        let fraction = after
             .find(|c: char| !c.is_ascii_digit())
-            .unwrap_or(rest.len() - end - 1);
+            .unwrap_or(after.len());
         if fraction > 0 {
             end += 1 + fraction;
         }
     }
-    rest[..end].parse().ok().filter(|value| *value > 0.0)
+    rest.get(..end)?.parse().ok().filter(|value| *value > 0.0)
 }
 
 /// Every number in `raw`, as written.
 fn numbers(raw: &str) -> Vec<&str> {
     let mut found = Vec::new();
     let bytes = raw.as_bytes();
+    let digit = |at: usize| bytes.get(at).is_some_and(u8::is_ascii_digit);
     let mut at = 0;
     while at < bytes.len() {
-        if !bytes[at].is_ascii_digit() {
+        if !digit(at) {
             at += 1;
             continue;
         }
         let start = at;
-        while at < bytes.len() && bytes[at].is_ascii_digit() {
+        while digit(at) {
             at += 1;
         }
-        if at + 1 < bytes.len() && bytes[at] == b'.' && bytes[at + 1].is_ascii_digit() {
+        if bytes.get(at) == Some(&b'.') && digit(at + 1) {
             at += 1;
-            while at < bytes.len() && bytes[at].is_ascii_digit() {
+            while digit(at) {
                 at += 1;
             }
         }
-        found.push(&raw[start..at]);
+        found.extend(raw.get(start..at));
     }
     found
 }
@@ -918,7 +918,7 @@ fn short_range(raw: &str) -> String {
 /// "Jan-2025" → "Jan '25".
 fn short_session(month: &str) -> String {
     match month.trim().split('-').collect::<Vec<_>>()[..] {
-        [name, year] if year.len() == 4 => format!("{name} '{}", &year[2..]),
+        [name, year] if year.len() == 4 => format!("{name} '{}", year.get(2..).unwrap_or_default()),
         _ => month.to_string(),
     }
 }

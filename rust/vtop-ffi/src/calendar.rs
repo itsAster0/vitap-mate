@@ -454,7 +454,7 @@ impl SemesterCalendar {
             while start <= last {
                 let next = month_start(start + 31);
                 months.push(CalendarMonth {
-                    month: civil_date(i64::from(start))[..7].to_string(),
+                    month: civil_date(i64::from(start)).chars().take(7).collect(),
                     days: (start..next).map(|day| self.day(day)).collect(),
                     events: events
                         .iter()
@@ -558,10 +558,12 @@ impl SemesterCalendar {
                 let previous = rows.iter().rposition(|row| {
                     row.entry.mark == entry.mark && row.entry.title == entry.title
                 });
-                match previous {
-                    Some(index) if !self.class_day_between(rows[index].last, day) => {
-                        rows[index].last = day;
-                        rows[index].parts[0].1 = day;
+                match previous.and_then(|index| rows.get_mut(index)) {
+                    Some(row) if !self.class_day_between(row.last, day) => {
+                        row.last = day;
+                        if let Some(part) = row.parts.first_mut() {
+                            part.1 = day;
+                        }
                     }
                     _ => rows.push(Row {
                         first: day,
@@ -619,7 +621,9 @@ impl SemesterCalendar {
 /// The 1st of `day`'s month.
 fn month_start(day: i32) -> i32 {
     let date = civil_date(i64::from(day));
-    epoch_day(&format!("{}-01", &date[..7])).unwrap_or(day)
+    date.get(..7)
+        .and_then(|month| epoch_day(&format!("{month}-01")))
+        .unwrap_or(day)
 }
 
 #[cfg(test)]

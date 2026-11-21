@@ -42,19 +42,20 @@ pub struct Semester {
 impl Semester {
     pub(crate) fn new(id: String, name: String) -> Self {
         let words: Vec<&str> = name.split_whitespace().collect();
-        let shaped = words.len() >= 3
-            && words[1].eq_ignore_ascii_case("semester")
-            && words[2].len() >= 7
-            && words[2].chars().take(4).all(|c| c.is_ascii_digit())
-            && words[2].as_bytes()[4] == b'-';
-        let (season, year, note) = if shaped {
-            let mut season = words[0].to_lowercase();
-            if let Some(first) = season.get_mut(0..1) {
-                first.make_ascii_uppercase();
+        let (season, year, note) = match words.as_slice() {
+            [season, kind, year, note @ ..]
+                if kind.eq_ignore_ascii_case("semester")
+                    && year.len() >= 7
+                    && year.chars().take(4).all(|c| c.is_ascii_digit())
+                    && year.as_bytes().get(4) == Some(&b'-') =>
+            {
+                let mut season = season.to_lowercase();
+                if let Some(first) = season.get_mut(0..1) {
+                    first.make_ascii_uppercase();
+                }
+                (season, year.to_string(), note.join(" "))
             }
-            (season, words[2].to_string(), words[3..].join(" "))
-        } else {
-            (name.trim().to_string(), String::new(), String::new())
+            _ => (name.trim().to_string(), String::new(), String::new()),
         };
         Self {
             id,
@@ -848,14 +849,18 @@ fn person_name(raw: &str) -> String {
     let name = raw
         .rfind('-')
         .filter(|&i| i > 0)
-        .map_or(raw, |i| &raw[..i])
+        .and_then(|i| raw.get(..i))
+        .unwrap_or(raw)
         .trim();
     if name != name.to_uppercase() {
         return name.to_string();
     }
     let word = |w: &str| match w.chars().next() {
         Some(first) if w.chars().count() > 1 && !w.contains('.') => {
-            format!("{first}{}", w[first.len_utf8()..].to_lowercase())
+            format!(
+                "{first}{}",
+                w.get(first.len_utf8()..).unwrap_or_default().to_lowercase()
+            )
         }
         _ => w.to_string(),
     };

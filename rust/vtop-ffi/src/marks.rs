@@ -309,10 +309,10 @@ fn totals(assessments: &[Assessment]) -> (f64, f64) {
 fn reevaluation_at(lower: &str) -> Option<(usize, usize)> {
     let boundary = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric());
     lower.match_indices("re").find_map(|(start, _)| {
-        let rest = lower[start + 2..].trim_start_matches([' ', '-']);
+        let rest = lower.get(start + 2..)?.trim_start_matches([' ', '-']);
         let after = rest.strip_prefix("evaluation")?;
         let end = lower.len() - after.len();
-        (boundary(lower[..start].chars().next_back()) && boundary(after.chars().next()))
+        (boundary(lower.get(..start)?.chars().next_back()) && boundary(after.chars().next()))
             .then_some((start, end))
     })
 }
@@ -326,7 +326,10 @@ pub(crate) fn strip_reevaluation(title: &str) -> String {
     let lower = title.to_lowercase();
     reevaluation_at(&lower).map_or_else(
         || lower.clone(),
-        |(start, end)| format!("{}{}", &lower[..start], &lower[end..]),
+        |(start, end)| match (lower.get(..start), lower.get(end..)) {
+            (Some(head), Some(tail)) => format!("{head}{tail}"),
+            _ => lower.clone(),
+        },
     )
 }
 
@@ -361,7 +364,12 @@ fn title_case(raw: &str) -> String {
     name.split_whitespace()
         .map(|word| match word.chars().next() {
             Some(first) if word.chars().count() > 1 && !word.contains('.') => {
-                format!("{first}{}", word[first.len_utf8()..].to_lowercase())
+                format!(
+                    "{first}{}",
+                    word.get(first.len_utf8()..)
+                        .unwrap_or_default()
+                        .to_lowercase()
+                )
             }
             _ => word.to_string(),
         })

@@ -54,7 +54,7 @@ impl Core {
             .filter(|saved| saved.server == server);
         if let Some(saved) = saved {
             let mut sent = body.clone();
-            sent["accountToken"] = json!(saved.token);
+            crate::json_set(&mut sent, "accountToken", json!(saved.token));
             match self.edge_answer(server, path, flow, &sent).await {
                 Err(error) if matches!(error.code(), "token_invalid" | "token_expired") => {
                     info!(path, code = error.code(), "account token refused");
@@ -71,7 +71,7 @@ impl Core {
             .session_cookies(flow, CookieKind::Account, action, ask)
             .await?
             .ok_or(CoreError::NotSignedIn)?;
-        body["session"] = json!({ "cookies": cookies });
+        crate::json_set(&mut body, "session", json!({ "cookies": cookies }));
         let answer = self.edge_answer(server, path, flow, &body).await;
         self.keep_answer_token(server, path, regno, &answer);
         Ok(answer.map(|answer| answer.body))

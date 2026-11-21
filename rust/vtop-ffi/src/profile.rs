@@ -287,7 +287,8 @@ impl Hostel {
             let lower = trimmed.to_lowercase();
             lower
                 .strip_suffix("fee")
-                .map_or(trimmed, |_| &trimmed[..trimmed.len() - 3])
+                .and_then(|_| trimmed.get(..trimmed.len().saturating_sub(3)))
+                .unwrap_or(trimmed)
                 .trim()
                 .to_string()
         });
@@ -483,7 +484,10 @@ fn address(group: &ProfileGroup) -> String {
 fn strip_suffix<'a>(title: &'a str, suffix: &str) -> &'a str {
     let trimmed = title.trim();
     if trimmed.to_uppercase().ends_with(suffix) {
-        trimmed[..trimmed.len() - suffix.len()].trim()
+        trimmed
+            .get(..trimmed.len().saturating_sub(suffix.len()))
+            .unwrap_or(trimmed)
+            .trim()
     } else {
         trimmed
     }
@@ -526,7 +530,8 @@ fn details_title(title: &str) -> String {
     let base = trimmed
         .to_uppercase()
         .strip_suffix("INFORMATION")
-        .map_or(trimmed, |_| &trimmed[..trimmed.len() - "INFORMATION".len()]);
+        .and_then(|_| trimmed.get(..trimmed.len().saturating_sub("INFORMATION".len())))
+        .unwrap_or(trimmed);
     let name = nice_label(base);
     if name == "Educational" {
         "Education".to_string()
@@ -608,14 +613,12 @@ fn word(w: &str, first: bool, all_caps: bool) -> String {
     {
         return w.to_uppercase();
     }
-    match lower.find(|c: char| c.is_ascii_lowercase()) {
-        Some(i) if !lower[..i].chars().any(|c| c.is_ascii_digit()) => {
-            format!(
-                "{}{}{}",
-                &lower[..i],
-                lower[i..=i].to_uppercase(),
-                &lower[i + 1..]
-            )
+    let found = lower
+        .find(|c: char| c.is_ascii_lowercase())
+        .and_then(|i| Some((lower.get(..i)?, lower.get(i..=i)?, lower.get(i + 1..)?)));
+    match found {
+        Some((head, letter, tail)) if !head.chars().any(|c| c.is_ascii_digit()) => {
+            format!("{head}{}{tail}", letter.to_uppercase())
         }
         _ => lower,
     }

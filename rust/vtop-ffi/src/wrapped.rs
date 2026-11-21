@@ -1174,7 +1174,10 @@ fn assessment_kind(title: &str) -> &'static str {
     rules
         .iter()
         .position(|&hit| hit)
-        .map_or(KINDS[KINDS.len() - 1], |at| KINDS[at])
+        .and_then(|at| KINDS.get(at))
+        .or(KINDS.last())
+        .copied()
+        .unwrap_or_default()
 }
 
 /// Posted assessments, re-evaluations left out, with their course's name.
@@ -1665,8 +1668,9 @@ fn hostel(days: &[BiometricDay]) -> Option<WrappedHostel> {
             if let &[(entry, PunchKind::Entry), (exit, PunchKind::Exit)] = pair
                 && classes.first().is_some_and(|&first| first < entry)
                 && classes.last().is_some_and(|&last| last > exit)
+                && let Some(naps) = naps.get_mut(records::weekday(day.day) as usize)
             {
-                naps[records::weekday(day.day) as usize] += 1;
+                *naps += 1;
             }
         }
         let (mut out, mut left): (Vec<(i32, i32)>, Option<i32>) = (Vec::new(), None);
@@ -1726,8 +1730,10 @@ fn moves(days: &[BiometricDay]) -> Option<WrappedMoves> {
         floors += first.floor;
         let mut changes = 0;
         for pair in punches.windows(2) {
-            floors += (pair[1].floor - pair[0].floor).max(0);
-            changes += i32::from(pair[1].block != pair[0].block);
+            if let [from, to] = pair {
+                floors += (to.floor - from.floor).max(0);
+                changes += i32::from(to.block != from.block);
+            }
         }
         // Days are in order, so the earliest keeps a tie.
         if hops.is_none_or(|(most, _)| changes > most) {

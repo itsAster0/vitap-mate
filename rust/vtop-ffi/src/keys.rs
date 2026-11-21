@@ -239,12 +239,17 @@ impl Core {
                 )
                 .await?
                 .map_err(refused)?;
-            let keys: Vec<AccessKey> = serde_json::from_value::<Vec<KeyView>>(view["keys"].clone())
-                .unwrap_or_default()
-                .into_iter()
-                .map(AccessKey::from)
-                .collect();
-            let linked = view["thisPhone"].as_bool().unwrap_or(false);
+            let keys: Vec<AccessKey> = serde_json::from_value::<Vec<KeyView>>(
+                view.get("keys").cloned().unwrap_or_default(),
+            )
+            .unwrap_or_default()
+            .into_iter()
+            .map(AccessKey::from)
+            .collect();
+            let linked = view
+                .get("thisPhone")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
             let elsewhere = if linked { elsewhere(&view) } else { vec![] };
             info!(
                 linked,
@@ -322,13 +327,13 @@ impl Core {
             let (path, action) = ("/v1/keys/move", "Move keys to this phone");
             let mut body = json!({});
             if let Some(from) = from {
-                body["from"] = json!(from);
+                crate::json_set(&mut body, "from", json!(from));
             }
             let answer = self
                 .account_post(&self.forwarding_server(), path, &flow, action, true, body)
                 .await?
                 .map_err(refused)?;
-            let moved = answer["moved"].as_u64().unwrap_or(0) as u32;
+            let moved = answer.get("moved").and_then(Value::as_u64).unwrap_or(0) as u32;
             info!(moved, "keys moved");
             Ok(moved)
         })
@@ -394,8 +399,12 @@ impl Core {
             .edge_post(server, "/v1/pair/info", flow, &json!({ "code": code }))
             .await
             .map_err(refused)?;
-        let text = |key: &str| answer[key].as_str().map(str::to_string);
-        let app = match (answer["kind"].as_str(), text("name"), text("host")) {
+        let text = |key: &str| answer.get(key)?.as_str().map(str::to_string);
+        let app = match (
+            answer.get("kind").and_then(Value::as_str),
+            text("name"),
+            text("host"),
+        ) {
             (Some("mcp"), Some(name), Some(host)) => Some(PairApp { name, host }),
             _ => None,
         };
@@ -407,7 +416,7 @@ impl Core {
     async fn link_with(&self, server: &str, flow: &str, action: &str) -> Result<(), CoreError> {
         let mut link = json!({ "label": crate::server::label() });
         if let Some(semester) = self.read::<String>(crate::SELECTED) {
-            link["semesterId"] = json!(semester);
+            crate::json_set(&mut link, "semesterId", json!(semester));
         }
         self.account_post(server, "/v1/link", flow, action, true, link)
             .await?
@@ -430,7 +439,7 @@ impl Core {
             "outings": outings,
         });
         if let Some(code) = pair_code {
-            body["pairCode"] = json!(code);
+            crate::json_set(&mut body, "pairCode", json!(code));
         }
         let mut linked_now = false;
         let answer = loop {
@@ -444,8 +453,9 @@ impl Core {
             }
         };
         let text = |key: &str| {
-            answer[key]
-                .as_str()
+            answer
+                .get(key)
+                .and_then(Value::as_str)
                 .map(str::to_string)
                 .ok_or_else(|| CoreError::Other {
                     reason: "The server sent an unexpected answer.".into(),
