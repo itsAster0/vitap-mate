@@ -11,14 +11,13 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::info;
-use vtop_core::client::Hop;
 use vtop_shared::engine::PageFetch;
+use vtop_shared::mail_seal;
 use vtop_shared::wire_page::{NEED_SESSION, WirePageRequest, WirePageResponse, session_hash};
-use vtop_shared::{device_sig, mail_seal};
 use vtop_wire::client::{self as wire, ClientConfig, WireError};
 
 use crate::route::unpacked;
-use crate::transport::{self, TransportError};
+use crate::transport::TransportError;
 use crate::{Core, unix_now};
 
 const GATEWAY: &str = "udp-gateway.json";
@@ -156,8 +155,11 @@ impl Core {
         let net = Foreign(network.ok_or("no UDP network set")?);
         let server = self.forwarding_server();
         let now = unix_now();
+        let server_now = now.saturating_add(self.device().clock_offset);
         let cached = self.read::<Gateway>(GATEWAY).filter(|g| {
-            g.server == server && now - g.fetched < GATEWAY_KEEP_SECS && g.key(now).is_some()
+            g.server == server
+                && (0..GATEWAY_KEEP_SECS).contains(&now.saturating_sub(g.fetched))
+                && g.key(server_now).is_some()
         });
         let mut asked = cached.is_none();
         let mut gateway = match cached {
@@ -177,7 +179,7 @@ impl Core {
         };
         loop {
             let key = gateway
-                .key(unix_now())
+                .key(self.server_now())
                 .ok_or("the UDP gateway has no current key")?;
             let config = ClientConfig {
                 host: gateway.host.clone(),
@@ -228,38 +230,13 @@ impl Core {
 
     /// Asks the edge where the gateway listens and for its keys, and keeps the answer.
     async fn udp_gateway(&self, server: &str, flow: &str) -> Result<Gateway, String> {
-        let id = self.device_id(server, flow).await;
-        let id = id.map_err(|error| format!("no device id: {}", error.code()))?;
-        let device = self.device();
         let path = "/v1/udp";
-        let time = unix_now() + device.clock_offset;
-        let sig = device_sig::sign(&device.seed, "GET", path, time, b"").unwrap_or_default();
-        let hop = Hop {
-            method: "GET".into(),
-            url: format!("{}{path}", server.trim_end_matches('/')),
-            headers: vec![
-                ("x-request-id".into(), flow.into()),
-                (device_sig::DEVICE.into(), id),
-                (device_sig::TIME.into(), time.to_string()),
-                (device_sig::SIG.into(), sig),
-            ],
-            body: Vec::new(),
-            timeout: EDGE_TIMEOUT,
-            connect_timeout: EDGE_TIMEOUT,
-            download_to: None,
-        };
-        let transport = transport::current().map_err(|error| error.to_string())?;
-        let response = transport
-            .send(hop)
+        let body = self
+            .edge_get(server, path, flow, EDGE_TIMEOUT)
             .await
-            .map_err(|error| error.to_string())?;
-        let status = response.status;
-        let bytes = response.bytes().await.map_err(|error| error.to_string())?;
-        if status != 200 {
-            return Err(format!("{path} answered HTTP {status}"));
-        }
+            .map_err(|error| format!("{path}: {}", error.code()))?;
         let mut gateway: Gateway =
-            serde_json::from_slice(&bytes).map_err(|_| format!("{path}: unexpected answer"))?;
+            serde_json::from_value(body).map_err(|_| format!("{path}: unexpected answer"))?;
         gateway.server = server.to_string();
         gateway.fetched = unix_now();
         self.write_plain(GATEWAY, &gateway);
@@ -373,7 +350,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let core = Core {
             cache: dir.clone(),
-            dir,
+            dir: dir.clone(),
             slot: Mutex::new(None),
         };
         let (port, public) = spawn_gateway();
@@ -400,6 +377,256 @@ mod tests {
         assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
         let page = core.udp_page("0f10d00e", &request).await;
         assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn gateway_key_uses_server_adjusted_time_when_clock_is_skewed() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-skew-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let core = Core {
+            cache: dir.clone(),
+            dir: dir.clone(),
+            slot: Mutex::new(None),
+        };
+        // Unreachable edge: proves udp_page stays on the cache using local `fetched` age.
+        core.dev_set_forwarding_server("f".into(), Some("http://127.0.0.1:1".into()))
+            .unwrap();
+        let (port, active_pub) = spawn_gateway();
+        let (_, local_pub) = mail_seal::generate_keypair();
+        let active_key = mail_seal::key32(&active_pub).unwrap();
+        let local_key = mail_seal::key32(&local_pub).unwrap();
+
+        let local_now = unix_now();
+        let skew = 7 * 86_400;
+
+        // Phone clock 7 days slow (clock_offset = +7 days).
+        core.set_clock_offset(skew);
+        let server_now = core.server_now();
+        let gateway = Gateway {
+            host: "127.0.0.1".into(),
+            ports: vec![port],
+            keys: vec![
+                GatewayKey {
+                    public_key: local_pub.clone(),
+                    from: local_now - 60,
+                    until: local_now + 60,
+                },
+                GatewayKey {
+                    public_key: active_pub.clone(),
+                    from: server_now - 60,
+                    until: server_now + 60,
+                },
+            ],
+            server: core.forwarding_server(),
+            fetched: local_now,
+        };
+        assert_eq!(gateway.key(local_now), Some(local_key));
+        assert_eq!(gateway.key(core.server_now()), Some(active_key));
+
+        core.write_plain(GATEWAY, &gateway);
+        let request = PageFetch {
+            session: json!({ "cookies": "JSESSIONID=x" }),
+            name: "attendance".into(),
+            semester: Some("AP1".into()),
+            args: Default::default(),
+            dictionary: Some("d1c7".into()),
+        };
+        set_udp_network(Arc::new(StdNetwork));
+        let page = core.udp_page("skew-slow", &request).await;
+        assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
+
+        // Phone clock 7 days fast (clock_offset = -7 days).
+        core.set_clock_offset(-skew);
+        let behind_now = core.server_now();
+        let fast_gateway = Gateway {
+            host: "127.0.0.1".into(),
+            ports: vec![port],
+            keys: vec![GatewayKey {
+                public_key: active_pub,
+                from: behind_now - 60,
+                until: behind_now + 60,
+            }],
+            server: core.forwarding_server(),
+            fetched: local_now,
+        };
+        assert_eq!(fast_gateway.key(local_now), None);
+        assert_eq!(fast_gateway.key(core.server_now()), Some(active_key));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    async fn mock_udp_edge(
+        seed: String,
+        server_time: i64,
+        udp_port: u16,
+        public: String,
+        always_stale: bool,
+    ) -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use vtop_shared::device_sig;
+
+        let hits = Arc::new(AtomicUsize::new(0));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let count = hits.clone();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let (count, seed, public) = (count.clone(), seed.clone(), public.clone());
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 8192];
+                    let mut total = 0;
+                    loop {
+                        let Ok(n) = socket.read(&mut buf[total..]).await else {
+                            return;
+                        };
+                        if n == 0 {
+                            break;
+                        }
+                        total += n;
+                        if buf[..total].windows(4).any(|w| w == b"\r\n\r\n") || total == buf.len() {
+                            break;
+                        }
+                    }
+                    let req = String::from_utf8_lossy(&buf[..total]);
+                    let mut lines = req.lines();
+                    let first = lines.next().unwrap_or("");
+                    let mut parts = first.split_whitespace();
+                    let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+                    let header = |name: &str| {
+                        req.lines().skip(1).find_map(|line| {
+                            let (k, v) = line.split_once(':')?;
+                            k.trim().eq_ignore_ascii_case(name).then(|| v.trim())
+                        })
+                    };
+                    let (status, body) = match (method, path) {
+                        ("POST", "/v1/devices/register") => (
+                            "201 Created",
+                            json!({ "deviceId": "0123456789abcdef0123456789abcdef" }).to_string(),
+                        ),
+                        ("GET", "/v1/udp") => {
+                            count.fetch_add(1, Ordering::SeqCst);
+                            let dev = header(device_sig::DEVICE).unwrap_or("");
+                            let time: i64 = header(device_sig::TIME)
+                                .and_then(|v| v.parse().ok())
+                                .unwrap_or(0);
+                            let sig = header(device_sig::SIG).unwrap_or("");
+                            let expected_sig =
+                                device_sig::sign(&seed, "GET", "/v1/udp", time, b"").unwrap();
+                            if dev != "0123456789abcdef0123456789abcdef" || sig != expected_sig {
+                                (
+                                    "401 Unauthorized",
+                                    json!({ "code": "bad_signature", "error": "bad sig" })
+                                        .to_string(),
+                                )
+                            } else if always_stale || (time - server_time).abs() > 120 {
+                                (
+                                    "401 Unauthorized",
+                                    json!({
+                                        "code": "stale_time",
+                                        "error": "clock skewed",
+                                        "serverTime": server_time,
+                                    })
+                                    .to_string(),
+                                )
+                            } else {
+                                (
+                                    "200 OK",
+                                    json!({
+                                        "host": "127.0.0.1",
+                                        "ports": [udp_port],
+                                        "keys": [{
+                                            "id": "k1",
+                                            "publicKey": public,
+                                            "from": server_time - 60,
+                                            "until": server_time + 60,
+                                        }],
+                                    })
+                                    .to_string(),
+                                )
+                            }
+                        }
+                        _ => ("404 Not Found", "{}".to_string()),
+                    };
+                    let response = format!(
+                        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = socket.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+        (base, hits)
+    }
+
+    #[tokio::test]
+    async fn udp_gateway_handles_stale_time_and_fetches_page() {
+        use std::sync::atomic::Ordering;
+
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-stale-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let core = Core {
+            cache: dir.clone(),
+            dir: dir.clone(),
+            slot: Mutex::new(None),
+        };
+        let seed = core.device().seed;
+        let (udp_port, public) = spawn_gateway();
+        let skew = 3600;
+        let server_time = unix_now() + skew;
+        let (edge, hits) = mock_udp_edge(seed, server_time, udp_port, public, false).await;
+        core.dev_set_forwarding_server("f".into(), Some(edge))
+            .unwrap();
+
+        let request = PageFetch {
+            session: json!({ "cookies": "JSESSIONID=x" }),
+            name: "attendance".into(),
+            semester: Some("AP1".into()),
+            args: Default::default(),
+            dictionary: Some("d1c7".into()),
+        };
+        set_udp_network(Arc::new(StdNetwork));
+        let page = core.udp_page("stale-flow", &request).await;
+        assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+        assert!(
+            (core.device().clock_offset - skew).abs() <= 5,
+            "clock_offset was {}",
+            core.device().clock_offset
+        );
+        let saved = core.read::<Gateway>(GATEWAY).unwrap();
+        assert!((saved.fetched - unix_now()).abs() <= 5);
+        assert!(saved.key(unix_now()).is_none());
+        assert!(saved.key(core.server_now()).is_some());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn udp_gateway_stops_after_one_stale_time_retry() {
+        use std::sync::atomic::Ordering;
+
+        let dir =
+            std::env::temp_dir().join(format!("vtop-ffi-udp-stale-stop-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let core = Core {
+            cache: dir.clone(),
+            dir: dir.clone(),
+            slot: Mutex::new(None),
+        };
+        let seed = core.device().seed;
+        let (_, public) = mail_seal::generate_keypair();
+        let (edge, hits) = mock_udp_edge(seed, unix_now() + 3600, 3478, public, true).await;
+
+        let err = core.udp_gateway(&edge, "stale-loop").await.err().unwrap();
+        assert_eq!(err, "/v1/udp: stale_time");
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Against the deployed edge and gateway: `cargo test -p vtop-ffi live_udp -- --ignored`.
@@ -413,7 +640,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let core = Core {
             cache: dir.clone(),
-            dir,
+            dir: dir.clone(),
             slot: Mutex::new(None),
         };
         set_udp_network(Arc::new(StdNetwork));

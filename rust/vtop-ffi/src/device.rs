@@ -1,7 +1,7 @@
 //! This install as the edge knows it: an Ed25519 seed that signs every request
 //! (`vtop_shared::device_sig`), the X25519 key forwarded OTPs are sealed to, the id each server
 //! gave it, and the FCM token. All in `device.json`; nothing of it is ever logged. Every call to
-//! the edge goes through [`Core::edge_post`].
+//! the edge goes through [`Core::edge_post`] or [`Core::edge_get`].
 
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
@@ -89,37 +89,34 @@ impl Answer {
     }
 }
 
-/// POSTs JSON through the app's transport, with the flow as `x-request-id` and `headers`.
-async fn send(
-    server: &str,
-    path: &str,
-    flow: &str,
-    body: &[u8],
-    headers: Vec<(String, String)>,
-) -> Result<Answer, EdgeError> {
+struct Request<'a> {
+    method: &'a str,
+    server: &'a str,
+    path: &'a str,
+    flow: &'a str,
+    body: &'a [u8],
+    timeout: Duration,
+}
+
+/// Sends `req` through the app's transport, with the flow as `x-request-id` and `headers`.
+async fn send(req: &Request<'_>, headers: Vec<(String, String)>) -> Result<Answer, EdgeError> {
     let offline = |error: &dyn std::fmt::Display| {
-        warn!(path, error = %error, "edge unreachable");
+        warn!(path = req.path, error = %error, "edge unreachable");
         EdgeError::Offline
     };
     let transport = transport::current().map_err(|error| offline(&error))?;
-    let mut all = vec![
-        ("content-type".into(), "application/json".into()),
-        ("x-request-id".into(), flow.into()),
-    ];
+    let mut all = vec![("x-request-id".into(), req.flow.into())];
+    if req.method == "POST" {
+        all.push(("content-type".into(), "application/json".into()));
+    }
     all.extend(headers);
-    // The engine signs in or fetches from VTOP behind `/v1/vtop/` (the edge gives up at 32 s).
-    let timeout = if path.starts_with("/v1/vtop/") {
-        VTOP_TIMEOUT
-    } else {
-        TIMEOUT
-    };
     let hop = Hop {
-        method: "POST".into(),
-        url: format!("{}{path}", server.trim_end_matches('/')),
+        method: req.method.into(),
+        url: format!("{}{}", req.server.trim_end_matches('/'), req.path),
         headers: all,
-        body: body.to_vec(),
-        timeout,
-        connect_timeout: TIMEOUT,
+        body: req.body.to_vec(),
+        timeout: req.timeout,
+        connect_timeout: req.timeout.min(TIMEOUT),
         download_to: None,
     };
     let response = transport.send(hop).await.map_err(|error| offline(&error))?;
@@ -154,11 +151,12 @@ async fn send(
 fn signed(
     seed: &str,
     id: Option<&str>,
+    method: &str,
     path: &str,
     time: i64,
     body: &[u8],
 ) -> Vec<(String, String)> {
-    let sig = device_sig::sign(seed, "POST", path, time, body).unwrap_or_default();
+    let sig = device_sig::sign(seed, method, path, time, body).unwrap_or_default();
     let mut headers = vec![
         (device_sig::TIME.into(), time.to_string()),
         (device_sig::SIG.into(), sig),
@@ -213,6 +211,17 @@ impl Core {
         });
     }
 
+    /// Current unix time in seconds adjusted for the edge's clock (`unix_now() + clock_offset`).
+    pub(crate) fn server_now(&self) -> i64 {
+        unix_now().saturating_add(self.device().clock_offset)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_clock_offset(&self, offset: i64) {
+        self.device();
+        self.update_device(|d| d.clock_offset = offset);
+    }
+
     /// This install's id on `server`, registering it there first if needed.
     pub(crate) async fn device_id(&self, server: &str, flow: &str) -> Result<String, EdgeError> {
         let device = self.device();
@@ -231,7 +240,15 @@ impl Core {
             body["fcmToken"] = json!(token);
         }
         let bytes = serde_json::to_vec(&body).unwrap_or_default();
-        let answer = self.signed_post(server, path, flow, &bytes, None).await?;
+        let req = Request {
+            method: "POST",
+            server,
+            path,
+            flow,
+            body: &bytes,
+            timeout: TIMEOUT,
+        };
+        let answer = self.signed_send(&req, None).await?;
         if !(200..300).contains(&answer.status) {
             return Err(answer.error());
         }
@@ -258,6 +275,26 @@ impl Core {
         Ok(self.edge_answer(server, path, flow, body).await?.body)
     }
 
+    /// A signed GET to the edge as this install. A `stale_time` answer corrects the clock offset
+    /// and retries once; `unknown_device` registers again and retries once.
+    pub(crate) async fn edge_get(
+        &self,
+        server: &str,
+        path: &str,
+        flow: &str,
+        timeout: Duration,
+    ) -> Result<Value, EdgeError> {
+        let req = Request {
+            method: "GET",
+            server,
+            path,
+            flow,
+            body: b"",
+            timeout,
+        };
+        Ok(self.edge_send(&req).await?.body)
+    }
+
     /// As [`Self::edge_post`], with a packed page kept as it came.
     pub(crate) async fn edge_answer(
         &self,
@@ -267,18 +304,34 @@ impl Core {
         body: &Value,
     ) -> Result<Answer, EdgeError> {
         let bytes = serde_json::to_vec(body).unwrap_or_default();
+        // The engine signs in or fetches from VTOP behind `/v1/vtop/` (the edge gives up at 32 s).
+        let timeout = if path.starts_with("/v1/vtop/") {
+            VTOP_TIMEOUT
+        } else {
+            TIMEOUT
+        };
+        let req = Request {
+            method: "POST",
+            server,
+            path,
+            flow,
+            body: &bytes,
+            timeout,
+        };
+        self.edge_send(&req).await
+    }
+
+    async fn edge_send(&self, req: &Request<'_>) -> Result<Answer, EdgeError> {
         for attempt in 0..2 {
-            let id = self.device_id(server, flow).await?;
-            let answer = self
-                .signed_post(server, path, flow, &bytes, Some(&id))
-                .await?;
+            let id = self.device_id(req.server, req.flow).await?;
+            let answer = self.signed_send(req, Some(&id)).await?;
             if (200..300).contains(&answer.status) {
                 return Ok(answer);
             }
             let error = answer.error();
             if error.code() == "unknown_device" && attempt == 0 {
                 self.update_device(|d| {
-                    d.ids.remove(server);
+                    d.ids.remove(req.server);
                 });
                 continue;
             }
@@ -287,35 +340,30 @@ impl Core {
         Err(EdgeError::Offline)
     }
 
-    /// Sends `bytes` signed with this install's seed, as `id` (None: registering). A
+    /// Sends `req` signed with this install's seed, as `id` (None: registering). A
     /// `stale_time` answer sets the clock offset from the edge's `serverTime` and retries once.
-    async fn signed_post(
-        &self,
-        server: &str,
-        path: &str,
-        flow: &str,
-        bytes: &[u8],
-        id: Option<&str>,
-    ) -> Result<Answer, EdgeError> {
+    async fn signed_send(&self, req: &Request<'_>, id: Option<&str>) -> Result<Answer, EdgeError> {
         let mut retried = false;
         loop {
             let device = self.device();
-            let time = unix_now() + device.clock_offset;
-            let headers = signed(&device.seed, id, path, time, bytes);
-            let answer = send(server, path, flow, bytes, headers).await?;
+            let time = unix_now().saturating_add(device.clock_offset);
+            let headers = signed(&device.seed, id, req.method, req.path, time, req.body);
+            let answer = send(req, headers).await?;
             if (200..300).contains(&answer.status) {
                 return Ok(answer);
             }
             let code = answer.text("code").unwrap_or_default();
             info!(
-                path,
+                path = req.path,
                 status = answer.status,
                 code = code.as_str(),
                 "edge refused"
             );
             match answer.body["serverTime"].as_i64() {
                 Some(server_time) if code == "stale_time" && !retried => {
-                    self.update_device(|d| d.clock_offset = server_time - unix_now());
+                    self.update_device(|d| {
+                        d.clock_offset = server_time.saturating_sub(unix_now());
+                    });
                     retried = true;
                 }
                 _ => return Ok(answer),
@@ -385,22 +433,27 @@ mod tests {
         assert_eq!(inbox.unwrap_err().code(), "mailbox_not_found");
         // Unsigned, and signed with the wrong device id.
         let bytes = label.to_string().into_bytes();
-        let unsigned = send(server, "/v1/devices/update", "live", &bytes, vec![])
-            .await
-            .unwrap();
+        let req = Request {
+            method: "POST",
+            server,
+            path: "/v1/devices/update",
+            flow: "live",
+            body: &bytes,
+            timeout: TIMEOUT,
+        };
+        let unsigned = send(&req, vec![]).await.unwrap();
         assert_eq!(unsigned.status, 401);
         assert_eq!(unsigned.text("code").as_deref(), Some("bad_signature"));
         let seed = core.device().seed;
         let headers = signed(
             &seed,
             Some(&"0".repeat(32)),
+            "POST",
             "/v1/devices/update",
             unix_now(),
             &bytes,
         );
-        let stranger = send(server, "/v1/devices/update", "live", &bytes, headers)
-            .await
-            .unwrap();
+        let stranger = send(&req, headers).await.unwrap();
         assert_eq!(stranger.status, 404);
         // A phone clock 15 minutes slow: corrected from `serverTime`, then accepted.
         core.update_device(|d| d.clock_offset = -900);
