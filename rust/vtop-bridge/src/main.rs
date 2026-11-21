@@ -28,7 +28,7 @@ async fn main() {
     };
     let listen = config.listen;
     let edge = Arc::new(HttpEdge {
-        http: reqwest::Client::new(),
+        http: https(),
         base_url: config.edge_url.clone(),
         token: config.internal_token.clone(),
     });
@@ -38,7 +38,7 @@ async fn main() {
     // (and VTOP, to check it) once.
     let sessions = vtop_mcp::bridge::CachedSessions::new(
         Arc::new(vtop_mcp::bridge::BridgeClient::new(
-            reqwest::Client::new(),
+            https(),
             config.edge_url.clone(),
         )),
         Duration::from_secs(300),
@@ -54,10 +54,7 @@ async fn main() {
                 config: vtop_core::VtopConfig::default(),
             }),
             edge,
-            gmail: Arc::new(GoogleOAuthRefresher::new(
-                reqwest::Client::new(),
-                DEFAULT_TOKEN_URL.into(),
-            )),
+            gmail: Arc::new(GoogleOAuthRefresher::new(https(), DEFAULT_TOKEN_URL.into())),
         },
     ));
     tracing::info!("starting vtop-engine on {listen}");
@@ -107,4 +104,10 @@ async fn shutdown_signal() {
         () = ctrl_c => {},
         () = terminate => {},
     }
+}
+
+fn https() -> reqwest::Client {
+    vtop_core::client::https_client(&[])
+        .build()
+        .expect("HTTP client")
 }

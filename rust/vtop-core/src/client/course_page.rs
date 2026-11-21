@@ -306,7 +306,9 @@ mod tests {
         let x =
             httpdate::fmt_http_date(std::time::UNIX_EPOCH + std::time::Duration::from_secs(now));
         let old = |url: &str, query: &[(&str, &str)]| {
-            reqwest::Client::new()
+            crate::client::https_client(&[])
+                .build()
+                .unwrap()
                 .get(url)
                 .query(query)
                 .build()
@@ -352,7 +354,9 @@ mod tests {
         };
         let semester = SemesterId::parse("AP2026272").unwrap();
         let old = |form: &[(&str, &str)]| {
-            reqwest::Client::new()
+            crate::client::https_client(&[])
+                .build()
+                .unwrap()
                 .post("https://vtop.example/")
                 .form(form)
                 .build()

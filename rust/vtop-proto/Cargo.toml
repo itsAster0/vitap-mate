@@ -6,7 +6,8 @@ description = "VTOP without I/O: parsers, types, inputs and the request/response
 
 [dependencies]
 serde = { workspace = true }
-scraper = "0.23.1"
+# No "errors" (the parse errors nothing reads) or "main" (the CLI binary).
+scraper = { version = "0.29.0", default-features = false }
 thiserror = "2"
 
 [dev-dependencies]

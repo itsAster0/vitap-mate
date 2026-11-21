@@ -16,12 +16,12 @@ serde_json = { workspace = true }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 async-trait = "0.1"
-base64 = "0.22.1"
-brotli = "8"
-aes-gcm = "0.10"
-sha2 = "0.10"
+base64 = "0.23.1"
+brotli = "9"
+aes-gcm = "0.11"
+sha2 = "0.11"
 futures = "0.3"
-tower-http = { version = "0.6", default-features = false, features = ["compression-br", "compression-gzip"] }
+tower-http = { version = "0.7", default-features = false, features = ["compression-br", "compression-gzip"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

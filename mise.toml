@@ -13,7 +13,7 @@ run = [
   # API 28 = the app's minSdk (ATrace needs 23+). armeabi-v7a: budget phones with a 64-bit
   # chip on 32-bit Android (Redmi 9A/9i/9C, Galaxy A13/A03), which Play hides 64-bit-only apps from.
   # The .so builds std from source on a pinned nightly (needs rust-src), smaller by
-  # building std for size and dropping derived Debug fields (`shallow` keeps the variant
+  # building std for size (optimize_for_size, keeping `backtrace`) and dropping derived Debug fields (`shallow` keeps the variant
   # names; `none` would blank the logs, since obs.rs formats every tracing field, the
   # message too, with {:?}). Panics unwind, so a panic fails one call, not the app, and
   # obs.rs logs its message and file:line.
@@ -24,7 +24,7 @@ run = [
   f="-Zfmt-debug=shallow"
   CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="$f" CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_RUSTFLAGS="$f" \
     cargo +nightly-2026-11-01 ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs \
-    build --release -p vtop-ffi -Zbuild-std=std,panic_unwind
+    build --release -p vtop-ffi -Zbuild-std=std,panic_unwind -Zbuild-std-features=panic-unwind,backtrace,optimize_for_size
   ''',
   # Bindgen reads the metadata from a host build: the stripped Android .so
   # keeps only dynamic symbols, which bindgen does not read. Same API.
@@ -95,10 +95,11 @@ prop() { sed -n "s/^$1=//p" app/keystore.properties; }
 # The build holds both ABIs (the AAB needs them); each APK keeps one, so neither carries the other's libraries.
 apk() {
   cp "$tmp/en.apk" "$tmp/$1.apk"
-  # The build's own v1 (JAR) signature: minSdk 28 needs only the v2+ signature apksigner adds.
+  # The build's own v1 (JAR) signature: minSdk 28 needs only the v2+ signature apksigner adds
+  # (and it adds no v1 one of its own: --v1-signing-enabled false).
   zip -qd "$tmp/$1.apk" "lib/$2/*" 'META-INF/MANIFEST.MF' 'META-INF/*.SF' 'META-INF/*.RSA'
   "$tools/zipalign" -P 16 -f 4 "$tmp/$1.apk" "$tmp/$1-aligned.apk"
-  STORE_PASS="$(prop storePassword)" KEY_PASS="$(prop keyPassword)" "$tools/apksigner" sign \
+  STORE_PASS="$(prop storePassword)" KEY_PASS="$(prop keyPassword)" "$tools/apksigner" sign --v1-signing-enabled false \
     --ks "$(prop storeFile)" --ks-key-alias "$(prop keyAlias)" \
     --ks-pass env:STORE_PASS --key-pass env:KEY_PASS --out "$3" "$tmp/$1-aligned.apk"
   "$tools/apksigner" verify "$3"

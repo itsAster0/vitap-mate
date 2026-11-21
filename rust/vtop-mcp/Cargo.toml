@@ -13,8 +13,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = "0.1"
 async-trait = "0.1"
-sha2 = "0.10"
-base64 = "0.22.1"
+sha2 = "0.11"
+base64 = "0.23.1"
 rmcp = { version = "3", features = ["server", "macros", "transport-streamable-http-server"] }
 
 [dev-dependencies]

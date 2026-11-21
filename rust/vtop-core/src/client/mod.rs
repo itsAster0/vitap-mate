@@ -39,6 +39,8 @@ pub use hostel::{
     check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
     WeekendOutingApplication,
 };
+#[cfg(feature = "reqwest")]
+pub use http::https_client;
 pub use http::VITAP_INTERMEDIATE_CA_PEM;
 pub use transport::{Hop, HopFuture, HopResponse, Transport, TransportError};
 

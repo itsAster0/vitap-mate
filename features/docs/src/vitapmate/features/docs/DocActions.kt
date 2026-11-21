@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Lucide
@@ -202,10 +204,13 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
 @Composable
 private fun Action(icon: ImageVector, label: String, tag: String, tint: Color = Color.Unspecified, fill: Color = Color.Transparent, onClick: () -> Unit) {
     val pill = if (fill == Color.Transparent) Modifier else Modifier.padding(start = Space.md, top = Space.xs, end = Space.md).clip(RoundedCornerShape(Radii.pill))
+    // The pre-Expressive list item: square, 16/8 dp padding, 16 dp after the icon (12 + 4 here).
     ListItem(
-        headlineContent = { Text(label, color = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurface else tint) },
         modifier = Modifier.testTag(tag).then(pill).clickable(onClick = onClick).padding(horizontal = Space.sm),
-        leadingContent = { Icon(icon, null, tint = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurfaceVariant else tint) },
+        leadingContent = { Icon(icon, null, Modifier.padding(end = 4.dp), tint = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurfaceVariant else tint) },
+        shapes = ListItemDefaults.shapes(RectangleShape),
         colors = ListItemDefaults.colors(containerColor = fill),
-    )
+        elevation = ListItemDefaults.elevation(0.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    ) { Text(label, color = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurface else tint) }
 }

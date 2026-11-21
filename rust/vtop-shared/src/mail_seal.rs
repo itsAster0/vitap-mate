@@ -15,7 +15,6 @@ use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use hkdf::Hkdf;
-use rand::RngCore;
 use sha2::Sha256;
 use x25519_dalek::{PublicKey, StaticSecret};
 
@@ -35,7 +34,7 @@ pub enum SealError {
 /// phone's secure storage; the public key to the bridge.
 pub fn generate_keypair() -> (String, String) {
     let mut secret = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut secret);
+    getrandom::fill(&mut secret).expect("the OS random source");
     let secret = StaticSecret::from(secret);
     let public = PublicKey::from(&secret);
     (
@@ -77,8 +76,8 @@ pub fn seal(
 ) -> Result<String, SealError> {
     let mut ephemeral = [0u8; 32];
     let mut nonce = [0u8; 12];
-    rand::rngs::OsRng.fill_bytes(&mut ephemeral);
-    rand::rngs::OsRng.fill_bytes(&mut nonce);
+    getrandom::fill(&mut ephemeral).expect("the OS random source");
+    getrandom::fill(&mut nonce).expect("the OS random source");
     seal_with(recipient_public, mailbox_id, plaintext, ephemeral, nonce)
 }
 
@@ -97,7 +96,7 @@ pub fn seal_with(
     let shared = ephemeral.diffie_hellman(&PublicKey::from(recipient));
     let ciphertext = cipher(shared.as_bytes(), &ephemeral_public, &recipient)
         .encrypt(
-            Nonce::from_slice(&nonce),
+            &Nonce::from(nonce),
             Payload {
                 msg: plaintext,
                 aad: mailbox_id.as_bytes(),
@@ -123,11 +122,11 @@ pub fn open(secret: &str, mailbox_id: &str, sealed: &str) -> Result<Vec<u8>, Sea
         return Err(SealError::Malformed);
     }
     let ephemeral: [u8; 32] = bytes[1..33].try_into().expect("32 bytes");
-    let nonce = &bytes[33..HEADER_LEN];
+    let nonce: [u8; 12] = bytes[33..HEADER_LEN].try_into().expect("12 bytes");
     let shared = secret.diffie_hellman(&PublicKey::from(ephemeral));
     cipher(shared.as_bytes(), &ephemeral, &recipient)
         .decrypt(
-            Nonce::from_slice(nonce),
+            &Nonce::from(nonce),
             Payload {
                 msg: &bytes[HEADER_LEN..],
                 aad: mailbox_id.as_bytes(),
@@ -205,6 +204,56 @@ mod tests {
         assert_eq!(
             open(&secret, VECTOR_ID, &sealed).unwrap(),
             VECTOR_PLAINTEXT.as_bytes()
+        );
+    }
+
+    /// Known answers pinned before the x25519-dalek 3 / hkdf 0.13 / aes-gcm
+    /// 0.11 bump: RFC 7748 §6.1, RFC 5869 A.1, the vector's shared secret, and
+    /// the edge's box opened as given.
+    #[test]
+    fn known_answers() {
+        let key = |h: &str| <[u8; 32]>::try_from(hex::decode(h).unwrap()).unwrap();
+        let alice = StaticSecret::from(key(
+            "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a",
+        ));
+        let bob = key("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f");
+        assert_eq!(
+            hex::encode(PublicKey::from(&alice).as_bytes()),
+            "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"
+        );
+        assert_eq!(
+            hex::encode(alice.diffie_hellman(&PublicKey::from(bob)).as_bytes()),
+            "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742"
+        );
+        let vector = StaticSecret::from(VECTOR_EPHEMERAL)
+            .diffie_hellman(&PublicKey::from(&StaticSecret::from(VECTOR_SECRET)));
+        assert_eq!(
+            hex::encode(vector.as_bytes()),
+            "2ffe325b2a26611bf1911325d4a62b33749b8f350d0e88ba91e316acaae66554"
+        );
+
+        let mut okm = [0u8; 42];
+        Hkdf::<Sha256>::new(
+            Some(&hex::decode("000102030405060708090a0b0c").unwrap()),
+            &[0x0b; 22],
+        )
+        .expand(&hex::decode("f0f1f2f3f4f5f6f7f8f9").unwrap(), &mut okm)
+        .unwrap();
+        assert_eq!(
+            hex::encode(okm),
+            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865"
+        );
+
+        let secret = URL_SAFE_NO_PAD.encode(VECTOR_SECRET);
+        assert_eq!(
+            open(&secret, VECTOR_ID, VECTOR_BOX).unwrap(),
+            VECTOR_PLAINTEXT.as_bytes()
+        );
+        let (secret, public) = generate_keypair();
+        assert_eq!(
+            URL_SAFE_NO_PAD
+                .encode(PublicKey::from(&StaticSecret::from(key32(&secret).unwrap())).as_bytes()),
+            public
         );
     }
 }

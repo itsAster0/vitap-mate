@@ -311,3 +311,15 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
         .unwrap();
     assert_eq!(WirePageResponse::decode(&got.body).unwrap().status, 200);
 }
+
+/// Pinned before the x25519-dalek 3 bump: the key the app is given for the
+/// gateway's private key, the same one snow derives.
+#[test]
+fn public_key_known_answer() {
+    assert_eq!(
+        vtop_wire::hex(&vtop_gateway::public_key(&[7; 32])),
+        "13be4feaeaf204c7fd3358fc9c00721881d174278128227ec674f37f7fe97b6d"
+    );
+    let (private, public) = vtop_wire::generate_keypair();
+    assert_eq!(vtop_gateway::public_key(&private), public);
+}

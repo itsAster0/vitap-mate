@@ -108,12 +108,13 @@ impl Keys {
 pub fn reset_token(gateway_key: &[u8; 32], sid: u32) -> [u8; RESET_TOKEN] {
     // Derive a separate key first, so the static key itself never keys the MAC.
     let derived = ChaCha20Poly1305::new(gateway_key.into())
-        .encrypt(Nonce::from_slice(b"vtop-reset-1"), [0u8; 32].as_slice())
+        .encrypt(&Nonce::from(*b"vtop-reset-1"), [0u8; 32].as_slice())
         .expect("ChaCha20-Poly1305 encryption cannot fail for in-range sizes");
     let mut n = [0u8; 12];
     n[..4].copy_from_slice(&sid.to_be_bytes());
     n[4..].copy_from_slice(b"reset-id");
-    let tag = ChaCha20Poly1305::new(derived[..32].into())
+    let derived: [u8; 32] = derived[..32].try_into().expect("32 bytes");
+    let tag = ChaCha20Poly1305::new(&derived.into())
         .encrypt(&n.into(), [].as_slice())
         .expect("ChaCha20-Poly1305 encryption cannot fail for in-range sizes");
     tag.try_into().expect("a 16-byte tag")

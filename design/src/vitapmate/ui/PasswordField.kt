@@ -1,10 +1,11 @@
 package vitapmate.ui
 
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
@@ -20,14 +21,12 @@ import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.EyeOff
 import com.composables.icons.lucide.Lucide
 
 /**
- * A password [OutlinedTextField] with a show/hide eye as its trailing icon (toggle tagged
+ * A password [OutlinedSecureTextField] with a show/hide eye as its trailing icon (toggle tagged
  * `[tag].toggle`). Hidden by default, and hidden again whenever the field leaves the screen.
  */
 @Composable
@@ -42,15 +41,14 @@ fun PasswordField(
     leadingIcon: @Composable (() -> Unit)? = null,
     supportingText: @Composable (() -> Unit)? = null,
     imeAction: ImeAction = ImeAction.Done,
-    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    onKeyboardAction: KeyboardActionHandler? = null,
     shape: Shape = OutlinedTextFieldDefaults.shape,
     initiallyShown: Boolean = false,
     colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
 ) {
     var shown by remember(initiallyShown) { mutableStateOf(initiallyShown) }
-    OutlinedTextField(
-        value,
-        onValueChange,
+    OutlinedSecureTextField(
+        rememberSyncedTextFieldState(value, onValueChange),
         modifier.testTag(tag).semantics { contentType = ContentType.Password },
         enabled = enabled,
         label = { androidx.compose.material3.Text(label) },
@@ -62,10 +60,9 @@ fun PasswordField(
         },
         supportingText = supportingText,
         isError = isError,
-        visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+        textObfuscationMode = if (shown) TextObfuscationMode.Visible else TextObfuscationMode.Hidden,
         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password, imeAction = imeAction),
-        keyboardActions = keyboardActions,
-        singleLine = true,
+        onKeyboardAction = onKeyboardAction,
         shape = shape,
         colors = colors,
     )

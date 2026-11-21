@@ -129,7 +129,10 @@ async fn other_errors_are_not_retried() {
 }
 
 fn client(server: &MockServer) -> BridgeClient {
-    BridgeClient::new(reqwest::Client::new(), server.uri())
+    BridgeClient::new(
+        vtop_core::client::https_client(&[]).build().unwrap(),
+        server.uri(),
+    )
 }
 
 #[tokio::test]

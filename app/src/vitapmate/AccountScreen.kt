@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -228,7 +227,7 @@ fun AccountScreen() {
                                 isError = passwordError,
                                 initiallyShown = rejected,
                                 leadingIcon = { circle(Lucide.Lock, passwordError) },
-                                keyboardActions = KeyboardActions(onDone = { save() }),
+                                onKeyboardAction = { save() },
                                 shape = MaterialTheme.shapes.large,
                                 colors = fieldColors,
                             )

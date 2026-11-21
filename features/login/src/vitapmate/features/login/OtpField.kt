@@ -9,14 +9,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.placeCursorAtEnd
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,11 +37,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import vitapmate.ui.Space
 import vitapmate.ui.nums
+import vitapmate.ui.rememberSyncedTextFieldState
 
 /**
  * Six digit cells over one hidden text field (digits only, at most six; SMS/email OTP autofill).
@@ -55,27 +60,39 @@ internal fun OtpField(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val state = rememberSyncedTextFieldState(code, onChange)
+    // The caret always sits at the end.
+    LaunchedEffect(state) {
+        snapshotFlow { state.selection }.collect { if (it != TextRange(state.text.length)) state.edit { placeCursorAtEnd() } }
+    }
     BasicTextField(
-        // The caret always sits at the end.
-        TextFieldValue(code, TextRange(code.length)),
-        { onChange(it.text.filter(Char::isDigit).take(6)) },
+        state,
         modifier.focusRequester(focus).testTag("otp.code").semantics { contentType = ContentType.SmsOtpCode },
+        inputTransformation = DigitsOnly,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Transparent),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onDone() }),
-        singleLine = true,
+        onKeyboardAction = { onDone() },
+        lineLimits = TextFieldLineLimits.SingleLine,
         interactionSource = interaction,
         cursorBrush = SolidColor(Color.Transparent),
-        decorationBox = { input ->
+        decorator = TextFieldDecorator { input ->
             Box {
                 Box(Modifier.matchParentSize().alpha(0f)) { input() }
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                    val current = if (focused) code.length.coerceAtMost(5) else -1
-                    for (i in 0 until 6) Cell(code.getOrNull(i), focused = i == current, isError = isError)
+                    val text = state.text
+                    val current = if (focused) text.length.coerceAtMost(5) else -1
+                    for (i in 0 until 6) Cell(text.getOrNull(i), focused = i == current, isError = isError)
                 }
             }
         },
     )
+}
+
+/** Keeps the digits of an edit (typed, pasted or autofilled), at most six. */
+private val DigitsOnly = InputTransformation {
+    val digits = asCharSequence().filter(Char::isDigit).take(6)
+    if (digits.length != length) replace(0, length, digits)
+    placeCursorAtEnd()
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

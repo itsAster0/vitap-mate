@@ -530,8 +530,23 @@ impl Engine {
     }
 }
 
+/// rustls with ring and the bundled webpki roots: the image has no system
+/// certificates (as `vtop_core::client::https_client`, which this crate does
+/// not depend on).
 fn engine_http() -> reqwest::Client {
+    let roots = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    let mut tls = rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .expect("ring supports TLS 1.2 and 1.3")
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    tls.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     reqwest::Client::builder()
+        .tls_backend_preconfigured(tls)
         .timeout(ENGINE_TIMEOUT)
         .build()
         .expect("HTTP client")

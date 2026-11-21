@@ -19,13 +19,13 @@ dependencies:
   # Typed back stack and predictive back for the shell (Compose Multiplatform build).
   - org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0
   # Push from the edge (session requests, the event log); configured by `mise run firebase`.
-  - com.google.firebase:firebase-messaging:26.0.1
+  - com.google.firebase:firebase-messaging:26.0.2
   # Settings → Connected apps → Pair a browser: Play services' QR scanner (its own UI, no CAMERA permission).
   - com.google.android.gms:play-services-code-scanner:16.1.0
   # Play's flexible in-app updates (PlayUpdate).
   - com.google.android.play:app-update:2.1.0
   # Settings → Assistant: the timetable and attendance as Android app functions (AssistantFunctions, Android 16+).
-  - androidx.appfunctions:appfunctions:1.0.0-rc01
+  - androidx.appfunctions:appfunctions:1.0.0
 settings:
   android:
     signing: enabled
@@ -34,6 +34,9 @@ settings:
     versionName: "3.1.0"
     namespace: vitapmate
     minSdk: 28
+    # Compose 1.13 needs Android 37.1 to compile against.
+    compileSdk:
+      minorApiLevel: 1
     # armeabi-v7a: phones on 32-bit Android (mise run rust-android builds both).
     abiFilters: [arm64-v8a, armeabi-v7a]
     resourcePackaging:
@@ -52,8 +55,10 @@ settings:
     ksp:
       # Generates VitapmateFunctions and its XML from AssistantFunctions.
       processors:
-        - androidx.appfunctions:appfunctions-compiler:1.0.0-rc01
-  compose: enabled
+        - androidx.appfunctions:appfunctions-compiler:1.0.0
+  compose:
+    enabled: true
+    version: 1.13.0-rc01
   jvm:
     jdk:
       version: 26

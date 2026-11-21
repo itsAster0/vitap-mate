@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -118,8 +119,9 @@ internal fun OtpSheet(challenge: OtpChallenge, onSubmit: () -> Unit, onResend: (
                 enabled = !challenge.submitting,
             ) { Icon(Lucide.Minimize2, "Minimise") }
         }
+        // Full height, so the sheet never resizes as it reaches the top (that left it "settling" and eating taps; see SemesterSheet).
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = Space.xl).padding(bottom = Space.xl),
+            Modifier.fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = Space.xl).padding(bottom = Space.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.size(72.dp).background(scheme.primaryContainer, MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {

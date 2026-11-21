@@ -703,3 +703,68 @@ async fn fetches_on_a_runtime_free_net() {
     assert_eq!((second.body, second.handshake), (answer(100), false));
     gw.task.abort();
 }
+
+/// Known answers pinned before the chacha20poly1305 0.11 bump: RFC 8439
+/// §2.8.2, a framed packet, a reset token, and Noise message 1 with fixed
+/// keys. Phones on older builds and the gateway must keep agreeing on these.
+#[test]
+fn known_answers() {
+    use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+    use chacha20poly1305::ChaCha20Poly1305;
+
+    let key: [u8; 32] = std::array::from_fn(|i| 0x80 + i as u8);
+    let nonce: [u8; 12] = crate::unhex("070000004041424344454647")
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let rfc = ChaCha20Poly1305::new(&key.into())
+        .encrypt(
+            &nonce.into(),
+            Payload {
+                msg: b"Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.",
+                aad: &crate::unhex("50515253c0c1c2c3c4c5c6c7").unwrap(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        crate::hex(&rfc),
+        "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b61161ae10b594f09e26a7e902ecbd0600691"
+    );
+
+    let (client, gateway) = (Keys::new(&[1; 32], &[2; 32]), Keys::new(&[2; 32], &[1; 32]));
+    let packet = client.seal(crate::frame::T_REQ, 0x0102_0304, 5, b"hello");
+    assert_eq!(
+        crate::hex(&packet),
+        "110102030400000005761d0e9b8f4f286c489e3dedb406609262a4f9816f"
+    );
+    assert_eq!(gateway.open(&packet).unwrap().plain, b"hello");
+
+    assert_eq!(
+        crate::hex(&crate::frame::reset_token(&[7; 32], 7)),
+        "aab80c06d6bf66e1d20f8627c9175b7a"
+    );
+
+    // X25519 public key of [7; 32], as in vtop-shared's mail_seal vector.
+    let gateway_private = [7u8; 32];
+    let gateway_public =
+        crate::unhex("13be4feaeaf204c7fd3358fc9c00721881d174278128227ec674f37f7fe97b6d").unwrap();
+    let mut initiator = snow::Builder::new(crate::NOISE.parse().unwrap())
+        .local_private_key(&[1; 32])
+        .unwrap()
+        .remote_public_key(&gateway_public)
+        .unwrap()
+        .fixed_ephemeral_key_for_testing_only(&[3; 32])
+        .build_initiator()
+        .unwrap();
+    let mut hs1 = [0u8; 256];
+    let len = initiator.write_message(b"vm1", &mut hs1).unwrap();
+    assert_eq!(crate::hex(&hs1[..len]), "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22ceee0eda7cefc5af950f648062adf3c29edc2a5ac7c1ab4297f72530bb40de0b35a883bc2ba2be8abed7c0881a175cdb40195db3067eb9bc601995f9c74a8e16ea3997");
+    let mut responder = snow::Builder::new(crate::NOISE.parse().unwrap())
+        .local_private_key(&gateway_private)
+        .unwrap()
+        .build_responder()
+        .unwrap();
+    let mut payload = [0u8; 256];
+    let n = responder.read_message(&hs1[..len], &mut payload).unwrap();
+    assert_eq!(&payload[..n], b"vm1");
+}

@@ -9,12 +9,14 @@ vtop-wire = { path = "../vtop-wire" }
 vtop-shared = { path = "../vtop-shared" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 reqwest = { workspace = true }
+rustls = { workspace = true }
+webpki-roots = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-base64 = "0.22.1"
+base64 = "0.23.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-x25519-dalek = { version = "2", features = ["static_secrets"] }
+x25519-dalek = { version = "3", features = ["static_secrets"] }
 
 [dev-dependencies]
 wiremock = "0.6"

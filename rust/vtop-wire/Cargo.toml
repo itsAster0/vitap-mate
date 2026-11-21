@@ -5,7 +5,7 @@ edition = "2021"
 description = "The phone ↔ gateway UDP transport for slow, lossy networks: Noise IK, explicit-counter framing, Reed-Solomon repair. Used by the app and by vtop-gateway."
 
 [dependencies]
-chacha20poly1305 = "0.10"
+chacha20poly1305 = "0.11"
 reed-solomon-simd = "3"
 # Only the crypto of `NOISE` (25519, ChaChaPoly, BLAKE2s): snow's defaults add AES-GCM, SHA-2 and,
 # through its `std` feature, ring, which would all end up in the app's library.

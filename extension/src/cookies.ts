@@ -5,7 +5,7 @@ export const VTOP_DOMAIN = "vtop.vitap.ac.in";
 /** The parts of `chrome.cookies` used here, so tests can pass a fake. */
 export type CookieApi = {
   getAll(details: { domain: string }): Promise<chrome.cookies.Cookie[]>;
-  set(details: chrome.cookies.SetDetails): Promise<chrome.cookies.Cookie | null>;
+  set(details: chrome.cookies.SetDetails): Promise<chrome.cookies.Cookie | null | undefined>;
   remove(details: {
     url: string;
     name: string;

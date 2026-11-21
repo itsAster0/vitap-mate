@@ -84,7 +84,7 @@ internal fun PlanCourseCard(
                     onCheckedChange = { haptics.tick(); onGrade(grade) },
                     modifier = Modifier.weight(weight).height(40.dp).semantics { role = Role.RadioButton }.testTag("grades.plan.row.$index.grade.$grade"),
                     shapes = ToggleButtonShapes(connected(i, PICKER.size, 20.dp, 8.dp), connected(i, PICKER.size, 12.dp, 4.dp), RoundedCornerShape(20.dp)),
-                    colors = ToggleButtonDefaults.toggleButtonColors(
+                    colors = ToggleButtonDefaults.colors(
                         containerColor = scheme.surfaceContainerHigh,
                         contentColor = scheme.onSurfaceVariant,
                         checkedContainerColor = tone.base,

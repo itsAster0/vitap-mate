@@ -48,9 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// One fresh session: the raw CAPTCHA image and the solver's answer.
 async fn sample() -> Result<(Vec<u8>, String), Box<dyn std::error::Error>> {
-    let http = reqwest::Client::builder()
+    let http = vtop_core::client::https_client(&[CA_PEM])
         .cookie_store(true)
-        .add_root_certificate(reqwest::Certificate::from_pem(CA_PEM.as_bytes())?)
         .user_agent("Mozilla/5.0 (X11; Linux x86_64; rv:157.0) Gecko/20100101 Firefox/157.0")
         .timeout(Duration::from_secs(20))
         .build()?;

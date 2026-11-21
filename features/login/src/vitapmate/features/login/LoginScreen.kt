@@ -276,7 +276,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     isError = passwordError != null,
                     leadingIcon = { circle(Lucide.Lock, passwordError != null) },
                     supportingText = passwordError?.let { { Text(it, Modifier.testTag("login.password.error")) } },
-                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    onKeyboardAction = { submit() },
                     shape = MaterialTheme.shapes.large,
                     colors = fieldColors,
                 )

@@ -10,15 +10,17 @@ vtop-proto = { path = "../vtop-proto" }
 # The server's transport and the Gmail OTP reader. The app (vtop-ffi) leaves
 # it off and passes its own transport.
 reqwest = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+webpki-roots = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 # The server's timers (Gmail polling, retry pauses); the app has none (see `sync`).
 tokio = { workspace = true, features = ["time"], optional = true }
 log = { workspace = true }
-base64 = { version = "0.22.1", optional = true }
+base64 = { version = "0.23.1", optional = true }
 
 [features]
-reqwest = ["dep:reqwest", "dep:base64", "dep:serde_json", "dep:tokio"]
+reqwest = ["dep:reqwest", "dep:rustls", "dep:webpki-roots", "dep:base64", "dep:serde_json", "dep:tokio"]
 
 [[example]]
 name = "captcha_samples"

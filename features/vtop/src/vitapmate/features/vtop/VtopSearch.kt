@@ -4,6 +4,7 @@ import vitapmate.ui.OpenHaptic
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -23,21 +26,21 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,7 +60,8 @@ import vitapmate.ui.Space
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun VtopSearch(pages: List<VtopPage>?, recent: List<VtopPage>, onSelect: (VtopPage) -> Unit, onDismiss: () -> Unit) {
-    var query by remember { mutableStateOf("") }
+    val field = rememberTextFieldState()
+    val query = field.text.toString()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val all = pages.orEmpty()
@@ -71,18 +75,17 @@ internal fun VtopSearch(pages: List<VtopPage>?, recent: List<VtopPage>, onSelect
     ModalBottomSheet(onDismiss, Modifier.semantics { testTagsAsResourceId = true }.testTag("vtop.search"), sheet) {
         Column(Modifier.fillMaxHeight(0.88f)) {
             // M3's search field, in the sheet as the Flutter app has it.
+            // No search bar to expand: the results list sits below, always shown.
             SearchBarDefaults.InputField(
-                query = query,
-                onQueryChange = { query = it },
+                textFieldState = field,
+                searchBarState = rememberSearchBarState(SearchBarValue.Expanded),
                 onSearch = {},
-                expanded = false,
-                onExpandedChange = {},
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Space.page).clip(SearchBarDefaults.inputFieldShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh).focusRequester(focus).testTag("vtop.search.field"),
                 placeholder = { Text("Search VTOP pages") },
                 leadingIcon = { Icon(Lucide.Search, null, Modifier.size(20.dp)) },
                 trailingIcon = {
-                    if (query.isNotEmpty()) IconButton({ query = "" }, Modifier.testTag("vtop.search.clear")) { Icon(Lucide.X, "Clear search", Modifier.size(18.dp)) }
+                    if (query.isNotEmpty()) IconButton({ field.clearText() }, Modifier.testTag("vtop.search.clear")) { Icon(Lucide.X, "Clear search", Modifier.size(18.dp)) }
                 },
             )
             LazyColumn(Modifier.fillMaxWidth().testTag("vtop.search.list")) {
@@ -104,15 +107,18 @@ internal fun VtopSearch(pages: List<VtopPage>?, recent: List<VtopPage>, onSelect
                             topStart = if (i == 0) big else small, topEnd = if (i == 0) big else small,
                             bottomStart = if (i == list.lastIndex) big else small, bottomEnd = if (i == list.lastIndex) big else small,
                         )
+                        // The pre-Expressive list item: square, 16/8 dp padding, 16 dp gaps (12 + 4 here).
                         ListItem(
-                            headlineContent = { Text(p.title) },
                             supportingContent = if (showSection && p.section.isNotEmpty()) ({ Text(p.section) }) else null,
-                            leadingContent = if (recentIcon) ({ Icon(Lucide.History, null, Modifier.size(18.dp)) }) else null,
-                            trailingContent = { Icon(Lucide.ChevronRight, null, Modifier.size(18.dp)) },
+                            leadingContent = if (recentIcon) ({ Icon(Lucide.History, null, Modifier.padding(end = 4.dp).size(18.dp)) }) else null,
+                            trailingContent = { Icon(Lucide.ChevronRight, null, Modifier.padding(start = 4.dp).size(18.dp)) },
+                            shapes = ListItemDefaults.shapes(RectangleShape),
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            elevation = ListItemDefaults.elevation(0.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                             modifier = Modifier.padding(horizontal = Space.page, vertical = 1.dp).clip(shape)
                                 .clickable { onSelect(p) }.testTag("vtop.search.page"),
-                        )
+                        ) { Text(p.title) }
                     }
                 }
                 when {

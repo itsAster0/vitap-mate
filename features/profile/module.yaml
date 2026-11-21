@@ -10,7 +10,9 @@ settings:
   android:
     namespace: vitapmate.features.profile
     minSdk: 28
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.13.0-rc01
   jvm:
     jdk:
       version: 26

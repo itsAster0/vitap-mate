@@ -3,6 +3,7 @@ package vitapmate.features.coursepage
 import vitapmate.ui.OpenHaptic
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,8 +39,9 @@ internal fun SectionSheet(sections: List<CourseSection>, selected: String?, onPi
         sheet,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
+        // Full height, so the sheet never resizes as it reaches the top (that left it "settling" and eating taps; see SemesterSheet).
         LazyColumn(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().fillMaxHeight(),
             contentPadding = PaddingValues(start = Space.lg, end = Space.lg, bottom = Space.lg),
             verticalArrangement = Arrangement.spacedBy(Space.sm),
         ) {

@@ -7,8 +7,10 @@ dependencies:
   - //core: exported
   - $compose.foundation: exported
   - $compose.material3: exported
+  # Material3 1.5.0 stable, ahead of the 1.5.0-rc01 that Compose 1.13.0-rc01 brings.
+  - androidx.compose.material3:material3-android:1.5.0: exported
   - $compose.components.resources
-  - androidx.core:core-ktx:1.19.0: exported
+  - androidx.core:core-ktx:1.19.1: exported
   - com.composables:icons-lucide-cmp:2.2.1: exported
   # The Photo Picker for the avatar (already the app's; no storage permission).
   - androidx.activity:activity-compose:1.13.0
@@ -21,7 +23,9 @@ settings:
   android:
     namespace: vitapmate.ui
     minSdk: 28
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.13.0-rc01
   jvm:
     jdk:
       version: 26

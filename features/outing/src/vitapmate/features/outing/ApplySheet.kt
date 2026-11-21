@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -71,13 +72,14 @@ internal fun ApplySheet(
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
         CompositionLocalProvider(LocalContentPadding provides PaddingValues()) {
-            Column(Modifier.fillMaxWidth().imePadding()) {
+            // Full height, so the sheet never resizes as it reaches the top (that left it "settling" and eating taps; see SemesterSheet).
+            Column(Modifier.fillMaxWidth().fillMaxHeight().imePadding()) {
                 Column(Modifier.padding(horizontal = Space.xl)) {
                     Text(title, style = MaterialTheme.typography.headlineSmallEmphasized)
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 Column(
-                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = Space.xl, vertical = Space.lg),
+                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = Space.xl, vertical = Space.lg),
                     content = content,
                 )
                 Column(Modifier.padding(start = Space.xl, end = Space.xl, bottom = Space.lg)) {

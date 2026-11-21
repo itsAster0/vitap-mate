@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -76,7 +77,9 @@ fun SemesterSheet(
         if (semesters.isEmpty() && problem == null && !loading) {
             Text("No semesters yet. Refresh to load them from VTOP.", Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        SemesterList(semesters, selected, onSelect, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp))
+        // Full height, so the sheet's size never changes as it reaches the top: a list just shorter than the
+        // screen left Material3's drag state "settling" after an expand, and it ate every tap on the rows.
+        SemesterList(semesters, selected, onSelect, Modifier.fillMaxHeight(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp))
     }
 }
 

@@ -175,7 +175,10 @@ mod tests {
     }
 
     fn refresher(server: &MockServer) -> GoogleOAuthRefresher {
-        GoogleOAuthRefresher::new(reqwest::Client::new(), format!("{}/token", server.uri()))
+        GoogleOAuthRefresher::new(
+            vtop_core::client::https_client(&[]).build().unwrap(),
+            format!("{}/token", server.uri()),
+        )
     }
 
     fn form(request: &Request) -> Vec<(String, String)> {

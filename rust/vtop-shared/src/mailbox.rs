@@ -29,4 +29,13 @@ mod tests {
             owner_hash(&[8u8; 32], "23ABC4567")
         );
     }
+
+    /// Pinned before the sha2 0.11 bump: stored hashes must keep matching.
+    #[test]
+    fn known_answer() {
+        assert_eq!(
+            owner_hash(&[7u8; 32], "23ABC4567"),
+            "80730afe139ef525333e4662c94a736547475ca21fc3776231d938b004487d19"
+        );
+    }
 }

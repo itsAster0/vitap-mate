@@ -2,6 +2,7 @@ package vitapmate.features.login
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -50,8 +51,9 @@ fun OtpAutofillSheet(onDismiss: () -> Unit) {
         sheet,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
+        // Full height, so the sheet never resizes as it reaches the top (that left it "settling" and eating taps; see SemesterSheet).
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Space.xl).padding(bottom = Space.xl),
+            Modifier.fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = Space.xl).padding(bottom = Space.xl),
             verticalArrangement = Arrangement.spacedBy(Space.lg),
         ) {
             Text("OTP auto-fill", style = MaterialTheme.typography.titleLarge)

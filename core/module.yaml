@@ -9,23 +9,25 @@ dependencies:
   - org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0: exported
   # The generated UniFFI bindings load libvtop_ffi.so through JNA.
   - net.java.dev.jna:jna:5.19.1@aar
-  - androidx.annotation:annotation:1.10.0
+  - androidx.annotation:annotation:1.11.0
   # flow() sections in Perfect, next to the Rust spans.
   - androidx.tracing:tracing:2.0.5
-  - androidx.core:core-ktx:1.19.0
+  - androidx.core:core-ktx:1.19.1
   # The VTOP password in the phone's password manager (SavedPasswords); Play services below Android 14.
   - androidx.credentials:credentials:1.6.0
   - androidx.credentials:credentials-play-services-auth:1.6.0
   # The sign-in kept across reinstalls (AccountBackup).
   - com.google.android.gms:play-services-auth-blockstore:16.4.0
   # Background sync (app's SyncWorker) and Wrapped's campus-times fetch (BiometricFetch).
-  - androidx.work:work-runtime:2.11.2: exported
+  - androidx.work:work-runtime:2.12.0: exported
 
 settings:
   android:
     namespace: vitapmate.core
     minSdk: 28
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.13.0-rc01
   jvm:
     jdk:
       version: 26

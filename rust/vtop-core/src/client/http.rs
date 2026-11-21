@@ -3,12 +3,14 @@
 
 #[cfg(feature = "reqwest")]
 use std::{
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 
 #[cfg(feature = "reqwest")]
-use reqwest::{Certificate, Client};
+use reqwest::{Client, ClientBuilder};
+#[cfg(feature = "reqwest")]
+use rustls::pki_types::{pem::PemObject, CertificateDer};
 
 #[cfg(feature = "reqwest")]
 use crate::config::VtopConfig;
@@ -67,9 +69,35 @@ pub(super) fn shared_client(config: &VtopConfig) -> VtopResult<Client> {
     Ok(client)
 }
 
+/// A client on rustls with ring, trusting the bundled webpki roots and
+/// `extra_roots` (PEM), as reqwest 0.12's `rustls-tls-webpki-roots` did. The
+/// server images carry no system certificates, which reqwest 0.13's own
+/// verifier would read. Every server client starts here.
+#[cfg(feature = "reqwest")]
+pub fn https_client(extra_roots: &[&str]) -> ClientBuilder {
+    let mut roots = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    roots.add_parsable_certificates(
+        extra_roots
+            .iter()
+            .filter_map(|pem| CertificateDer::from_pem_slice(pem.as_bytes()).ok()),
+    );
+    let mut tls = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .expect("ring supports TLS 1.2 and 1.3")
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    // What reqwest offers by itself with `http2` on.
+    tls.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    Client::builder().tls_backend_preconfigured(tls)
+}
+
 #[cfg(feature = "reqwest")]
 fn build_client(config: &VtopConfig) -> VtopResult<Client> {
-    let mut builder = Client::builder()
+    https_client(&[VITAP_INTERMEDIATE_CA_PEM])
         // Redirects are followed by VtopClient so it can collect the
         // Set-Cookie headers of every hop into its own jar.
         .redirect(reqwest::redirect::Policy::none())
@@ -78,13 +106,9 @@ fn build_client(config: &VtopConfig) -> VtopResult<Client> {
         .tcp_keepalive(Duration::from_secs(60))
         .tcp_nodelay(true)
         .connect_timeout(config.connect_timeout)
-        .timeout(config.request_timeout);
-
-    if let Ok(certificate) = Certificate::from_pem(VITAP_INTERMEDIATE_CA_PEM.as_bytes()) {
-        builder = builder.add_root_certificate(certificate);
-    }
-
-    builder.build().map_err(|error| {
-        VtopError::ConfigurationError(format!("HTTP client setup failed: {error}"))
-    })
+        .timeout(config.request_timeout)
+        .build()
+        .map_err(|error| {
+            VtopError::ConfigurationError(format!("HTTP client setup failed: {error}"))
+        })
 }

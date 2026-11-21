@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -284,12 +285,14 @@ private fun copy(context: Context, label: String, text: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Sheet(tag: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+private fun Sheet(tag: String, onDismiss: () -> Unit, full: Boolean = false, content: @Composable () -> Unit) {
     val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     OpenHaptic()
     ModalBottomSheet(onDismiss, Modifier.testTag(tag), sheet, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Space.xl).padding(bottom = Space.xl),
+            // [full]: a list that can come near the screen's height; see SemesterSheet for why it then fills it.
+            Modifier.fillMaxWidth().then(if (full) Modifier.fillMaxHeight() else Modifier).verticalScroll(rememberScrollState())
+                .padding(horizontal = Space.xl).padding(bottom = Space.xl),
             verticalArrangement = Arrangement.spacedBy(Space.lg),
         ) { content() }
     }
@@ -472,7 +475,7 @@ private fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Uni
         }
     }
 
-    Sheet("connected_apps.key_sheet", onDismiss) {
+    Sheet("connected_apps.key_sheet", onDismiss, full = true) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).background(MaterialTheme.colorScheme.secondaryContainer, key.kind.shape), Alignment.Center) {
                 Icon(key.kind.icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)

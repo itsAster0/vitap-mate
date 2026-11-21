@@ -2,8 +2,8 @@
 //! `base64(nonce || ciphertext)`; the associated data names the document it
 //! belongs to, so a blob copied into another document does not open.
 
-use aes_gcm::aead::{Aead, KeyInit, OsRng, Payload};
-use aes_gcm::{AeadCore, Aes256Gcm, Nonce};
+use aes_gcm::aead::{Aead, Generate, KeyInit, Payload};
+use aes_gcm::{Aes256Gcm, Nonce};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -29,7 +29,7 @@ impl Sealer {
     }
 
     pub fn seal(&self, aad: &str, plaintext: &[u8]) -> String {
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let nonce = Nonce::generate();
         let ciphertext = self
             .cipher
             .encrypt(
@@ -51,9 +51,10 @@ impl Sealer {
             return Err(VaultError::Corrupt);
         }
         let (nonce, ciphertext) = bytes.split_at(NONCE_LEN);
+        let nonce = Nonce::try_from(nonce).map_err(|_| VaultError::Corrupt)?;
         self.cipher
             .decrypt(
-                Nonce::from_slice(nonce),
+                &nonce,
                 Payload {
                     msg: ciphertext,
                     aad: aad.as_bytes(),
@@ -132,6 +133,21 @@ mod tests {
         assert_eq!(
             sealer.open_json::<Vec<String>>("x", &sealed).unwrap(),
             vec!["a"]
+        );
+    }
+
+    /// A value sealed before the aes-gcm 0.11 bump (key [7; 32], document
+    /// `accounts/A`): Account objects keep such blobs, so it must still open.
+    #[test]
+    fn known_answer() {
+        const SEALED: &str = "sHmWs9EMGXPskalSCxUM0+Qnr82cVuV4nc2Kjp6TDYeoGHoyKUN+tgcEYShOYpaltPA=";
+        assert_eq!(
+            Sealer::new([7; 32]).open("accounts/A", SEALED).unwrap(),
+            br#"{"password":"hunter2"}"#
+        );
+        assert_eq!(
+            Sealer::new([7; 32]).open("accounts/B", SEALED),
+            Err(VaultError::Corrupt)
         );
     }
 }
