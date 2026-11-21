@@ -14,6 +14,8 @@ on:
       - "extension/**"
       - "fastlane/**"
       - ".github/workflows/extension-build.yml"
+      - ".github/workflows/rust-check.yml"
+      - ".github/workflows/edge-check.yml"
       - "**/*.md"
   pull_request:
     paths-ignore:
@@ -26,6 +28,8 @@ on:
       - "extension/**"
       - "fastlane/**"
       - ".github/workflows/extension-build.yml"
+      - ".github/workflows/rust-check.yml"
+      - ".github/workflows/edge-check.yml"
       - "**/*.md"
   workflow_dispatch:
 permissions:
@@ -51,11 +55,16 @@ jobs:
         with:
           install_args: java kotlin-toolchain
           cache: true
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      # Pinned nightly for Android .so (-Zbuild-std needs rust-src); stable
+      # stays the default for the host uniffi-bindgen build.
+      - name: Set up Rust nightly (Android)
+        uses: dtolnay/rust-toolchain@master
         with:
-          # arm64 and armeabi-v7a for phones, x86_64 for emulators (as `mise run rust-android`).
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          toolchain: nightly-2026-11-01
+          components: rust-src
+          targets: aarch64-linux-android,armv7-linux-androideabi
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-ndk
         uses: taiki-e/install-action@v2
         with:
@@ -138,6 +147,8 @@ jobs:
         run: ./kotlin build
       - name: Test core
         run: ./kotlin test -m core
+      - name: Test design
+        run: ./kotlin test -m design
       - name: Build signed release APK
         if: steps.signing.outputs.signed == 'true'
         run: mise run release --both

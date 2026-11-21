@@ -1,0 +1,55 @@
+name: Rust Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust/**"
+      - "!rust/vtop-edge/**"
+      - "!**/*.md"
+      - ".github/workflows/rust-check.yml"
+  pull_request:
+    paths:
+      - "rust/**"
+      - "!rust/vtop-edge/**"
+      - "!**/*.md"
+      - ".github/workflows/rust-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check Rust workspace
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace

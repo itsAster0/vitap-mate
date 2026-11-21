@@ -7,6 +7,11 @@ on:
       - "extension/**"
       - "!**/*.md"
       - ".github/workflows/extension-build.yml"
+  pull_request:
+    paths:
+      - "extension/**"
+      - "!**/*.md"
+      - ".github/workflows/extension-build.yml"
   workflow_dispatch:
 
 permissions:
@@ -89,7 +94,7 @@ jobs:
 
       # Unlisted: Mozilla signs it automatically and we host the .xpi ourselves.
       - name: Sign for Firefox
-        if: env.AMO_JWT_ISSUER != ''
+        if: env.AMO_JWT_ISSUER != '' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         run: |
           bunx web-ext sign --source-dir dist-firefox --channel unlisted \
             --artifacts-dir web-ext-artifacts \
@@ -97,7 +102,7 @@ jobs:
           mv web-ext-artifacts/*.xpi extension.xpi
 
       - name: Upload Firefox artifact
-        if: env.AMO_JWT_ISSUER != ''
+        if: env.AMO_JWT_ISSUER != '' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v4
         with:
           name: vitapmate-extension-firefox
