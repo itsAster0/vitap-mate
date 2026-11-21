@@ -286,43 +286,32 @@ fn message_text(message: &Value) -> String {
 
 fn decode_quoted_printable(input: &str) -> String {
     let joined = input.replace("=\r\n", "").replace("=\n", "");
-    let bytes = joined.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'=' && index + 2 < bytes.len() {
-            let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok();
-            if let Some(value) = hex.and_then(|hex| u8::from_str_radix(hex, 16).ok()) {
-                out.push(value);
-                index += 3;
-                continue;
-            }
+    let mut rest = joined.as_bytes();
+    let mut out = Vec::with_capacity(rest.len());
+    while let Some((&byte, tail)) = rest.split_first() {
+        let escaped = (byte == b'=')
+            .then(|| tail.split_at_checked(2))
+            .flatten()
+            .and_then(|(hex, after)| {
+                let hex = std::str::from_utf8(hex).ok()?;
+                Some((u8::from_str_radix(hex, 16).ok()?, after))
+            });
+        if let Some((value, after)) = escaped {
+            out.push(value);
+            rest = after;
+            continue;
         }
-        out.push(bytes[index]);
-        index += 1;
+        out.push(byte);
+        rest = tail;
     }
     String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The first run of exactly six ASCII digits.
 fn first_six_digit_code(text: &str) -> Option<String> {
-    let bytes = text.as_bytes();
-    let mut start = 0;
-    while start < bytes.len() {
-        if !bytes[start].is_ascii_digit() {
-            start += 1;
-            continue;
-        }
-        let mut end = start;
-        while end < bytes.len() && bytes[end].is_ascii_digit() {
-            end += 1;
-        }
-        if end - start == 6 {
-            return Some(text[start..end].to_string());
-        }
-        start = end;
-    }
-    None
+    text.split(|c: char| !c.is_ascii_digit())
+        .find(|run| run.len() == 6)
+        .map(str::to_string)
 }
 
 #[cfg(test)]

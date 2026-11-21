@@ -70,19 +70,21 @@ fn solve(image: &jpeg::Image) -> Result<String, String> {
         .iter()
         .map(|bytes| f32::from_le_bytes(*bytes))
         .collect();
-    let (weights, biases) = model.split_at(INPUTS * LABELS.len());
+    let (weights, biases) = model
+        .split_at_checked(INPUTS * LABELS.len())
+        .ok_or_else(|| "Embedded CAPTCHA model is truncated".to_string())?;
 
     let mut output = String::with_capacity(6);
     for block in saturation(&image.rgb) {
         let bits = threshold(&block);
         let scores = dense(&bits, weights, biases);
-        let best_index = scores
+        let best = scores
             .iter()
-            .enumerate()
-            .max_by(|(_, left), (_, right)| left.total_cmp(right))
-            .map(|(index, _)| index)
+            .zip(LABELS)
+            .max_by(|(left, _), (right, _)| left.total_cmp(right))
+            .map(|(_, &label)| label)
             .ok_or_else(|| "Embedded CAPTCHA model produced no result".to_string())?;
-        output.push(LABELS[best_index] as char);
+        output.push(best as char);
     }
     Ok(output)
 }
@@ -112,7 +114,9 @@ fn saturation(rgb: &[u8]) -> Vec<Vec<f32>> {
             let mut block = Vec::with_capacity(INPUTS);
             for row in row_start..row_end {
                 block.extend_from_slice(
-                    &pixels[row * WIDTH + column_start..row * WIDTH + column_end],
+                    pixels
+                        .get(row * WIDTH + column_start..row * WIDTH + column_end)
+                        .unwrap_or_default(),
                 );
             }
             block
@@ -193,11 +197,11 @@ mod jpeg {
                         self.pos += 2;
                         0xFF
                     }
-                    Some([0xFF, _]) | None => 0,
-                    Some(_) => {
+                    Some(&[byte, _]) if byte != 0xFF => {
                         self.pos += 1;
-                        self.data[self.pos - 1]
+                        byte
                     }
+                    _ => 0,
                 };
                 self.acc = u32::from(byte);
                 self.count = 8;
@@ -220,10 +224,14 @@ mod jpeg {
 
         fn decode(&mut self, table: &Huffman) -> Result<u8, &'static str> {
             let mut code = 0;
-            for &(first, end, index) in &table.lengths[1..] {
+            for &(first, end, index) in table.lengths.iter().skip(1) {
                 code = (code << 1) | self.bit();
                 if code < end {
-                    return Ok(table.values[index + (code - first) as usize]);
+                    return table
+                        .values
+                        .get(index + (code - first) as usize)
+                        .copied()
+                        .ok_or("bad Huffman code");
                 }
             }
             Err("bad Huffman code")
@@ -231,9 +239,10 @@ mod jpeg {
     }
 
     fn u16_at(data: &[u8], pos: usize) -> Result<usize, &'static str> {
-        data.get(pos..pos + 2)
-            .map(|b| usize::from(b[0]) << 8 | usize::from(b[1]))
-            .ok_or("truncated")
+        match data.get(pos..pos + 2) {
+            Some(&[high, low]) => Ok(usize::from(high) << 8 | usize::from(low)),
+            _ => Err("truncated"),
+        }
     }
 
     pub(super) fn decode(data: &[u8]) -> Result<Image, &'static str> {
@@ -267,18 +276,19 @@ mod jpeg {
                     if !(count == 1 || count == 3) || width == 0 || height == 0 {
                         return Err("unsupported frame");
                     }
-                    for c in segment.get(6..6 + 3 * count).ok_or("truncated")?.chunks(3) {
-                        let (h, v) = (usize::from(c[1] >> 4), usize::from(c[1] & 15));
-                        if !(1..=4).contains(&h) || !(1..=4).contains(&v) || c[2] > 3 {
+                    let specs = segment.get(6..6 + 3 * count).ok_or("truncated")?;
+                    for &[id, sampling, quant] in specs.as_chunks::<3>().0 {
+                        let (h, v) = (usize::from(sampling >> 4), usize::from(sampling & 15));
+                        if !(1..=4).contains(&h) || !(1..=4).contains(&v) || quant > 3 {
                             return Err("bad component");
                         }
                         // One component: blocks in raster order, factors unused.
                         let (h, v) = if count == 1 { (1, 1) } else { (h, v) };
                         components.push(Component {
-                            id: c[0],
+                            id,
                             h,
                             v,
-                            quant: usize::from(c[2]),
+                            quant: usize::from(quant),
                             dc: 0,
                             ac: 0,
                             pred: 0,
@@ -301,18 +311,20 @@ mod jpeg {
                             ..Huffman::default()
                         };
                         let (mut code, mut index) = (0, 0);
-                        for (bits, &n) in counts.iter().enumerate() {
-                            table.lengths[bits + 1] = (code, code + i32::from(n), index);
+                        for (length, &n) in table.lengths.iter_mut().skip(1).zip(counts) {
+                            *length = (code, code + i32::from(n), index);
                             code = (code + i32::from(n)) << 1;
                             index += usize::from(n);
                         }
-                        let id = usize::from(class_id & 15);
-                        match (class_id >> 4, id) {
-                            (0, 0..=3) => dc_tables[id] = table,
-                            (1, 0..=3) => ac_tables[id] = table,
+                        let tables = match class_id >> 4 {
+                            0 => &mut dc_tables,
+                            1 => &mut ac_tables,
                             _ => return Err("bad Huffman table"),
-                        }
-                        rest = &rest[17 + total..];
+                        };
+                        *tables
+                            .get_mut(usize::from(class_id & 15))
+                            .ok_or("bad Huffman table")? = table;
+                        rest = rest.get(17 + total..).unwrap_or_default();
                     }
                 }
                 0xDB => {
@@ -324,14 +336,22 @@ mod jpeg {
                         let table = quant
                             .get_mut(usize::from(precision_id & 15))
                             .ok_or("bad quantisation table")?;
-                        for (k, &natural) in ZIGZAG.iter().enumerate() {
-                            table[natural] = if wide {
-                                i32::from(values[2 * k]) << 8 | i32::from(values[2 * k + 1])
-                            } else {
-                                i32::from(values[k])
-                            };
+                        let decoded: Vec<i32> = if wide {
+                            values
+                                .as_chunks::<2>()
+                                .0
+                                .iter()
+                                .map(|&[high, low]| i32::from(high) << 8 | i32::from(low))
+                                .collect()
+                        } else {
+                            values.iter().map(|&value| i32::from(value)).collect()
+                        };
+                        for (&natural, value) in ZIGZAG.iter().zip(decoded) {
+                            if let Some(slot) = table.get_mut(natural) {
+                                *slot = value;
+                            }
                         }
-                        rest = &rest[1 + size..];
+                        rest = rest.get(1 + size..).unwrap_or_default();
                     }
                 }
                 0xDD => restart = u16_at(segment, 0)?,
@@ -340,13 +360,14 @@ mod jpeg {
                     if components.is_empty() || count != components.len() {
                         return Err("only single-scan JPEG is supported");
                     }
-                    for s in segment.get(1..1 + 2 * count).ok_or("truncated")?.chunks(2) {
+                    let specs = segment.get(1..1 + 2 * count).ok_or("truncated")?;
+                    for &[id, tables] in specs.as_chunks::<2>().0 {
                         let component = components
                             .iter_mut()
-                            .find(|c| c.id == s[0])
+                            .find(|c| c.id == id)
                             .ok_or("scan names an unknown component")?;
-                        component.dc = usize::from(s[1] >> 4).min(3);
-                        component.ac = usize::from(s[1] & 15).min(3);
+                        component.dc = usize::from(tables >> 4).min(3);
+                        component.ac = usize::from(tables & 15).min(3);
                     }
                     let mut bits = Bits {
                         data,
@@ -413,11 +434,13 @@ mod jpeg {
             }
             let (mx, my) = (mcu % mcu_x, mcu / mcu_x);
             for c in components.iter_mut() {
-                let q = &quant[c.quant];
+                let q = quant.get(c.quant).ok_or("bad quantisation table")?;
+                let dc_table = dc_tables.get(c.dc).ok_or("bad Huffman table")?;
+                let ac_table = ac_tables.get(c.ac).ok_or("bad Huffman table")?;
                 for by in 0..c.v {
                     for bx in 0..c.h {
                         block.fill(0);
-                        let size = bits.decode(&dc_tables[c.dc])?;
+                        let size = bits.decode(dc_table)?;
                         if size > 11 {
                             return Err("bad DC size");
                         }
@@ -425,7 +448,7 @@ mod jpeg {
                         block[0] = c.pred.wrapping_mul(q[0]);
                         let mut k = 1;
                         while k < 64 {
-                            let rs = bits.decode(&ac_tables[c.ac])?;
+                            let rs = bits.decode(ac_table)?;
                             let (run, size) = (usize::from(rs >> 4), rs & 15);
                             if size == 0 {
                                 if run != 15 {
@@ -436,12 +459,21 @@ mod jpeg {
                             }
                             k += run;
                             let natural = *ZIGZAG.get(k).ok_or("bad AC run")?;
-                            block[natural] = bits.receive_extend(size).wrapping_mul(q[natural]);
+                            let value = bits.receive_extend(size);
+                            if let (Some(slot), Some(&step)) =
+                                (block.get_mut(natural), q.get(natural))
+                            {
+                                *slot = value.wrapping_mul(step);
+                            }
                             k += 1;
                         }
                         let x = (mx * c.h + bx) * 8;
                         let y = (my * c.v + by) * 8;
-                        idct(&mut block, &mut c.plane[y * c.stride + x..], c.stride);
+                        let out = c
+                            .plane
+                            .get_mut(y * c.stride + x..)
+                            .ok_or("bad block position")?;
+                        idct(&mut block, out, c.stride);
                     }
                 }
             }
@@ -451,10 +483,12 @@ mod jpeg {
 
     /// zune-jpeg's scalar integer IDCT (stb_image's), output clamped to 0..=255.
     fn idct(v: &mut [i32; 64], out: &mut [i16], stride: usize) {
-        if v[1..].iter().all(|&x| x == 0) {
+        if v.iter().skip(1).all(|&x| x == 0) {
             let dc = (v[0].wrapping_add(4 + 1024) >> 3).clamp(0, 255) as i16;
-            for row in 0..8 {
-                out[row * stride..row * stride + 8].fill(dc);
+            for row in out.chunks_mut(stride).take(8) {
+                if let Some(pixels) = row.get_mut(..8) {
+                    pixels.fill(dc);
+                }
             }
             return;
         }
@@ -466,7 +500,7 @@ mod jpeg {
                 } else {
                     (line * 8, 1, 512 + 65536 + (128 << 17))
                 };
-                let at = |i: usize| v[base + i * step];
+                let at = |i: usize| v.get(base + i * step).copied().unwrap_or(0);
                 let (wa, ws, wm) = (i32::wrapping_add, i32::wrapping_sub, i32::wrapping_mul);
 
                 let p1 = wm(wa(at(2), at(6)), 2217);
@@ -502,11 +536,15 @@ mod jpeg {
                     ws(x1, t2),
                     ws(x0, t3),
                 ];
-                for (i, value) in results.into_iter().enumerate() {
-                    if pass == 0 {
-                        v[base + i * 8] = value >> 10;
-                    } else {
-                        out[line * stride + i] = (value >> 17).clamp(0, 255) as i16;
+                if pass == 0 {
+                    for (i, value) in results.into_iter().enumerate() {
+                        if let Some(slot) = v.get_mut(base + i * 8) {
+                            *slot = value >> 10;
+                        }
+                    }
+                } else if let Some(row) = out.get_mut(line * stride..) {
+                    for (pixel, value) in row.iter_mut().zip(results) {
+                        *pixel = (value >> 17).clamp(0, 255) as i16;
                     }
                 }
             }
@@ -524,10 +562,10 @@ mod jpeg {
                 let mut out = plane;
                 if v == 2 {
                     let rows: Vec<&[i16]> = out.chunks_exact(width).collect();
-                    let last = rows.len() - 1;
                     let mut next = Vec::with_capacity(out.len() * 2);
-                    for (r, row) in rows.iter().enumerate() {
-                        let (up, down) = (rows[r.saturating_sub(1)], rows[(r + 1).min(last)]);
+                    for (r, &row) in rows.iter().enumerate() {
+                        let up = *r.checked_sub(1).and_then(|i| rows.get(i)).unwrap_or(&row);
+                        let down = *rows.get(r + 1).unwrap_or(&row);
                         next.extend(row.iter().zip(up).map(|(&a, &b)| tri(a, b)));
                         next.extend(row.iter().zip(down).map(|(&a, &b)| tri(a, b)));
                     }
@@ -536,9 +574,11 @@ mod jpeg {
                 if h == 2 {
                     let mut next = Vec::with_capacity(out.len() * 2);
                     for row in out.chunks_exact(width) {
-                        for x in 0..width {
-                            next.push(tri(row[x], row[x.saturating_sub(1)]));
-                            next.push(tri(row[x], row[(x + 1).min(width - 1)]));
+                        for (x, &here) in row.iter().enumerate() {
+                            let left = x.checked_sub(1).and_then(|i| row.get(i));
+                            let right = row.get(x + 1);
+                            next.push(tri(here, *left.unwrap_or(&here)));
+                            next.push(tri(here, *right.unwrap_or(&here)));
                         }
                     }
                     out = next;
@@ -575,18 +615,21 @@ mod jpeg {
         for y in 0..height {
             for x in 0..width {
                 let at = y * stride + x;
-                if let [luma] = planes.as_slice() {
-                    rgb.extend_from_slice(&[luma[at] as u8; 3]);
-                    continue;
+                let sample = |plane: &[i16]| plane.get(at).copied().map_or(0, i32::from);
+                match planes.as_slice() {
+                    [luma] => rgb.extend_from_slice(&[sample(luma) as u8; 3]),
+                    [luma, cb, cr, ..] => {
+                        // BT.601 full range, 14-bit fixed point.
+                        let y0 = sample(luma) * 16384 + (1 << 13) - 1;
+                        let cb = sample(cb) - 128;
+                        let cr = sample(cr) - 128;
+                        let r = (y0 + cr * 22970) >> 14;
+                        let g = (y0 + cr * -11700 + cb * -5638) >> 14;
+                        let b = (y0 + cb * 29032) >> 14;
+                        rgb.extend([r, g, b].map(|c| c.clamp(0, 255) as u8));
+                    }
+                    _ => {}
                 }
-                // BT.601 full range, 14-bit fixed point.
-                let y0 = i32::from(planes[0][at]) * 16384 + (1 << 13) - 1;
-                let cb = i32::from(planes[1][at]) - 128;
-                let cr = i32::from(planes[2][at]) - 128;
-                let r = (y0 + cr * 22970) >> 14;
-                let g = (y0 + cr * -11700 + cb * -5638) >> 14;
-                let b = (y0 + cb * 29032) >> 14;
-                rgb.extend([r, g, b].map(|c| c.clamp(0, 255) as u8));
             }
         }
         Image { width, height, rgb }

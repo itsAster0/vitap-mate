@@ -83,13 +83,15 @@ pub fn https_client(extra_roots: &[&str]) -> ClientBuilder {
             .iter()
             .filter_map(|pem| CertificateDer::from_pem_slice(pem.as_bytes()).ok()),
     );
-    let mut tls = rustls::ClientConfig::builder_with_provider(Arc::new(
+    let Ok(tls) = rustls::ClientConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
-    .with_safe_default_protocol_versions()
-    .expect("ring supports TLS 1.2 and 1.3")
-    .with_root_certificates(roots)
-    .with_no_client_auth();
+    .with_safe_default_protocol_versions() else {
+        // ring supports TLS 1.2 and 1.3, so this does not happen; were it
+        // to, reqwest's own TLS setup is the fallback.
+        return Client::builder();
+    };
+    let mut tls = tls.with_root_certificates(roots).with_no_client_auth();
     // What reqwest offers by itself with `http2` on.
     tls.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     Client::builder().tls_backend_preconfigured(tls)

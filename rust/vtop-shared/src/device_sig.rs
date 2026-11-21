@@ -13,6 +13,9 @@ pub const TIME: &str = "x-vm-time";
 pub const SIG: &str = "x-vm-sig";
 
 /// A new seed, base64url. It stays on the phone.
+// No key is better than a weak one: without the OS random source this
+// aborts. Making it fallible changes the callers in vtop-ffi and vtop-bridge.
+#[allow(clippy::expect_used)]
 pub fn generate_seed() -> String {
     let mut seed = [0u8; 32];
     getrandom::fill(&mut seed).expect("the OS random source");

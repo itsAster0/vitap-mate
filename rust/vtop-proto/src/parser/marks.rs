@@ -7,12 +7,12 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, compact_cell, selector};
+use super::{Pick, TD, compact_cell, selector};
 use crate::now_unix;
 use crate::types::{MarksData, MarksRecord, MarksRecordEach};
 
-static CONTENT_ROW: LazyLock<Selector> = LazyLock::new(|| selector("tr.tableContent"));
-static MARK_ROW: LazyLock<Selector> = LazyLock::new(|| selector("tr.tableContent-level1"));
+static CONTENT_ROW: LazyLock<Option<Selector>> = LazyLock::new(|| selector("tr.tableContent"));
+static MARK_ROW: LazyLock<Option<Selector>> = LazyLock::new(|| selector("tr.tableContent-level1"));
 
 fn course_row(cells: &[ElementRef<'_>]) -> MarksRecord {
     let cell = |index: usize| compact_cell(cells.get(index));
@@ -76,9 +76,9 @@ fn mark_rows(container: Option<&ElementRef<'_>>) -> Vec<MarksRecordEach> {
         return Vec::new();
     };
     let rows = container
-        .select(&MARK_ROW)
+        .pick(&MARK_ROW)
         .map(|row| {
-            let cells: Vec<_> = row.select(&TD).collect();
+            let cells: Vec<_> = row.pick(&TD).collect();
             let cell = |index: usize| compact_cell(cells.get(index));
             MarksRecordEach {
                 serial: cell(0),
@@ -100,8 +100,8 @@ pub fn parse_marks(html: &str, sem: &str) -> MarksData {
     let mut records = Vec::new();
     let mut course: Option<MarksRecord> = None;
 
-    for (index, row) in document.select(&CONTENT_ROW).enumerate() {
-        let cells: Vec<_> = row.select(&TD).collect();
+    for (index, row) in document.pick(&CONTENT_ROW).enumerate() {
+        let cells: Vec<_> = row.pick(&TD).collect();
         if index.is_multiple_of(2) {
             course = Some(course_row(&cells));
         } else {

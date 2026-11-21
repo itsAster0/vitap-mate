@@ -205,15 +205,12 @@ struct Reader<'a>(&'a [u8]);
 
 impl<'a> Reader<'a> {
     fn take(&mut self, n: usize) -> Option<&'a [u8]> {
-        if self.0.len() < n {
-            return None;
-        }
-        let (head, tail) = self.0.split_at(n);
+        let (head, tail) = self.0.split_at_checked(n)?;
         self.0 = tail;
         Some(head)
     }
     fn byte(&mut self) -> Option<u8> {
-        Some(self.take(1)?[0])
+        self.take(1)?.first().copied()
     }
     fn long(&mut self) -> Option<String> {
         let n = u16::from_be_bytes(self.take(2)?.try_into().ok()?) as usize;

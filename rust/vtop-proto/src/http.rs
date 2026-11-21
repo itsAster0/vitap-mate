@@ -216,8 +216,11 @@ pub fn http_date(unix: u64) -> String {
     let year = yoe + era * 400 + i64::from(month <= 2);
     format!(
         "{}, {day:02} {} {year} {:02}:{:02}:{:02} GMT",
-        DAYS[(days % 7) as usize],
-        MONTHS[(month - 1) as usize],
+        DAYS.get((days % 7) as usize).copied().unwrap_or_default(),
+        MONTHS
+            .get((month - 1) as usize)
+            .copied()
+            .unwrap_or_default(),
         secs / 3600,
         secs / 60 % 60,
         secs % 60
@@ -252,7 +255,7 @@ pub fn parse_http_date(text: &str) -> Option<u64> {
 pub fn url_parts(url: &str) -> Option<(&str, String, &str)> {
     let (scheme, rest) = url.split_once("://")?;
     let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-    let authority = &rest[..end];
+    let (authority, rest) = rest.split_at_checked(end)?;
     let authority = authority
         .rsplit_once('@')
         .map_or(authority, |(_, host)| host);
@@ -260,8 +263,7 @@ pub fn url_parts(url: &str) -> Option<(&str, String, &str)> {
         Some(v6) => v6.split(']').next().unwrap_or_default(),
         None => authority.split(':').next().unwrap_or_default(),
     };
-    let rest = &rest[end..];
-    let path = &rest[..rest.find(['?', '#']).unwrap_or(rest.len())];
+    let path = rest.split(['?', '#']).next().unwrap_or_default();
     Some((
         scheme,
         host.to_ascii_lowercase(),
@@ -279,9 +281,9 @@ pub fn join_url(base: &str, location: &str) -> Option<String> {
     }
     let (scheme, rest) = base.split_once("://")?;
     let origin_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-    let origin = format!("{scheme}://{}", &rest[..origin_end]);
-    let path = &rest[origin_end..];
-    let path = &path[..path.find(['?', '#']).unwrap_or(path.len())];
+    let (authority, path) = rest.split_at_checked(origin_end)?;
+    let origin = format!("{scheme}://{authority}");
+    let path = path.split(['?', '#']).next().unwrap_or_default();
     Some(if let Some(after) = location.strip_prefix("//") {
         format!("{scheme}://{after}")
     } else if location.starts_with('/') {
@@ -289,7 +291,10 @@ pub fn join_url(base: &str, location: &str) -> Option<String> {
     } else if location.starts_with('?') {
         format!("{origin}{path}{location}")
     } else {
-        let dir = &path[..path.rfind('/').map_or(0, |at| at + 1)];
+        let dir = path
+            .rfind('/')
+            .and_then(|at| path.get(..=at))
+            .unwrap_or_default();
         let dir = if dir.is_empty() { "/" } else { dir };
         format!("{origin}{dir}{location}")
     })

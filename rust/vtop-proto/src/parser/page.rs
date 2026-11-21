@@ -5,14 +5,14 @@ use std::sync::LazyLock;
 
 use scraper::{Html, Selector};
 
-use super::selector;
+use super::{Pick, selector};
 
-static CSRF_INPUT: LazyLock<Selector> = LazyLock::new(|| selector("input[name='_csrf']"));
-static REGISTRATION_INPUT: LazyLock<Selector> =
+static CSRF_INPUT: LazyLock<Option<Selector>> = LazyLock::new(|| selector("input[name='_csrf']"));
+static REGISTRATION_INPUT: LazyLock<Option<Selector>> =
     LazyLock::new(|| selector("input[type=hidden][name=authorizedIDX]"));
-static CAPTCHA_IMAGE: LazyLock<Selector> =
+static CAPTCHA_IMAGE: LazyLock<Option<Selector>> =
     LazyLock::new(|| selector("img.form-control.img-fluid.bg-light.border-0"));
-static LOGIN_ALERT: LazyLock<Selector> =
+static LOGIN_ALERT: LazyLock<Option<Selector>> =
     LazyLock::new(|| selector(r#"span.text-danger.text-center[role="alert"]"#));
 
 /// Reads `var <name> = "<value>"` (either quote style) out of inline script.
@@ -24,7 +24,8 @@ pub fn extract_javascript_var(page: &str, name: &str) -> Option<String> {
     if quote != '"' && quote != '\'' {
         return None;
     }
-    after_equals[quote.len_utf8()..]
+    after_equals
+        .get(quote.len_utf8()..)?
         .split_once(quote)
         .map(|(value, _)| value.to_string())
 }
@@ -32,7 +33,7 @@ pub fn extract_javascript_var(page: &str, name: &str) -> Option<String> {
 pub fn extract_csrf_token(page: &str) -> Option<String> {
     let document = Html::parse_document(page);
     document
-        .select(&CSRF_INPUT)
+        .pick(&CSRF_INPUT)
         .next()
         .and_then(|element| element.value().attr("value"))
         .map(str::to_string)
@@ -42,7 +43,7 @@ pub fn extract_csrf_token(page: &str) -> Option<String> {
 pub fn extract_registration_number(page: &str) -> Option<String> {
     let document = Html::parse_document(page);
     document
-        .select(&REGISTRATION_INPUT)
+        .pick(&REGISTRATION_INPUT)
         .next()
         .and_then(|element| element.value().attr("value"))
         .map(str::to_string)
@@ -53,13 +54,13 @@ pub fn extract_registration_number(page: &str) -> Option<String> {
 pub fn extract_session_fields(page: &str) -> (Option<String>, Option<String>) {
     let document = Html::parse_document(page);
     let csrf = document
-        .select(&CSRF_INPUT)
+        .pick(&CSRF_INPUT)
         .next()
         .and_then(|element| element.value().attr("value"))
         .map(str::to_string)
         .or_else(|| extract_javascript_var(page, "csrfValue"));
     let registration = document
-        .select(&REGISTRATION_INPUT)
+        .pick(&REGISTRATION_INPUT)
         .next()
         .and_then(|element| element.value().attr("value"))
         .map(str::to_string)
@@ -71,7 +72,7 @@ pub fn extract_session_fields(page: &str) -> (Option<String>, Option<String>) {
 pub fn extract_captcha_data(page: &str) -> Option<String> {
     let document = Html::parse_document(page);
     document
-        .select(&CAPTCHA_IMAGE)
+        .pick(&CAPTCHA_IMAGE)
         .next()
         .and_then(|element| element.value().attr("src"))
         .filter(|src| src.contains("base64,"))
@@ -81,7 +82,7 @@ pub fn extract_captcha_data(page: &str) -> Option<String> {
 /// Text of the red alert banner on the login page, whitespace-collapsed.
 pub fn login_alert_message(page: &str) -> Option<String> {
     let document = Html::parse_document(page);
-    document.select(&LOGIN_ALERT).next().map(|element| {
+    document.pick(&LOGIN_ALERT).next().map(|element| {
         element
             .text()
             .flat_map(str::split_whitespace)

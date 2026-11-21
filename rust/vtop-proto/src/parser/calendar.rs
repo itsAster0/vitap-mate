@@ -4,11 +4,11 @@ use std::sync::LazyLock;
 
 use scraper::{Html, Selector};
 
-use super::{TD, selector, word_text};
+use super::{Pick, TD, selector, word_text};
 use crate::types::CalendarEntry;
 
-static MONTH_BUTTON: LazyLock<Selector> = LazyLock::new(|| selector("a[onclick]"));
-static SPAN: LazyLock<Selector> = LazyLock::new(|| selector("span"));
+static MONTH_BUTTON: LazyLock<Option<Selector>> = LazyLock::new(|| selector("a[onclick]"));
+static SPAN: LazyLock<Option<Selector>> = LazyLock::new(|| selector("span"));
 
 const MONTHS: [&str; 12] = [
     "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
@@ -19,7 +19,7 @@ const MONTHS: [&str; 12] = [
 pub fn parse_calendar_months(html: &str) -> Vec<String> {
     let document = Html::parse_fragment(html);
     document
-        .select(&MONTH_BUTTON)
+        .pick(&MONTH_BUTTON)
         .filter_map(|link| {
             let onclick = link.value().attr("onclick")?;
             let (_, rest) = onclick.split_once("processViewCalendar(")?;
@@ -39,8 +39,8 @@ pub fn parse_calendar_month(html: &str, cal_date: &str) -> Vec<CalendarEntry> {
     let document = Html::parse_fragment(html);
     let mut entries = Vec::new();
 
-    for cell in document.select(&TD) {
-        let spans: Vec<String> = cell.select(&SPAN).map(|span| word_text(&span)).collect();
+    for cell in document.pick(&TD) {
+        let spans: Vec<String> = cell.pick(&SPAN).map(|span| word_text(&span)).collect();
         let Some(day) = spans.first().and_then(|day| day.parse::<u32>().ok()) else {
             continue;
         };
@@ -49,8 +49,10 @@ pub fn parse_calendar_month(html: &str, cal_date: &str) -> Vec<CalendarEntry> {
         }
         let date = format!("{year:04}-{month:02}-{day:02}");
         // After the day: "Kind - Group" then "(Note)", once per event.
-        for pair in spans[1..].chunks(2) {
-            let event = pair[0].as_str();
+        for pair in spans.get(1..).unwrap_or_default().chunks(2) {
+            let Some(event) = pair.first().map(String::as_str) else {
+                continue;
+            };
             if event.is_empty() {
                 continue;
             }

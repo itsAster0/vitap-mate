@@ -6,14 +6,14 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, TR, compact_text, selector};
+use super::{Pick, TD, TR, compact_text, selector};
 use crate::now_unix;
 use crate::types::{
     ClassKind, SemesterData, SemesterInfo, TimetableCourse, TimetableData, TimetableSlot,
 };
 
-static TBODY: LazyLock<Selector> = LazyLock::new(|| selector("tbody"));
-static SEMESTER_OPTION: LazyLock<Selector> =
+static TBODY: LazyLock<Option<Selector>> = LazyLock::new(|| selector("tbody"));
+static SEMESTER_OPTION: LazyLock<Option<Selector>> =
     LazyLock::new(|| selector(r#"select[name="semesterSubId"] option"#));
 
 /// What the registration table says about each course.
@@ -29,8 +29,8 @@ struct Registration {
 impl Registration {
     fn parse(table: ElementRef<'_>) -> Self {
         let mut registration = Self::default();
-        for row in table.select(&TR) {
-            let cells: Vec<_> = row.select(&TD).collect();
+        for row in table.pick(&TR) {
+            let cells: Vec<_> = row.pick(&TD).collect();
             if cells.len() > 8 {
                 registration.add_row(&cells);
             }
@@ -41,7 +41,12 @@ impl Registration {
     /// Reads a "CODE - Name (Type)" row with credits in cell 3 ("L T P J C")
     /// and faculty in cell 8.
     fn add_row(&mut self, cells: &[ElementRef<'_>]) {
-        let course = compact_text(&cells[2]);
+        let (Some(course), Some(credits), Some(faculty)) =
+            (cells.get(2), cells.get(3), cells.get(8))
+        else {
+            return;
+        };
+        let course = compact_text(course);
         let parts: Vec<_> = course
             .splitn(2, '-')
             .filter(|part| !part.is_empty())
@@ -54,7 +59,7 @@ impl Registration {
         let name = name.trim().to_string();
         let course_type = course_type.trim().trim_end_matches(')').trim().to_string();
         let is_lab = course_type.to_lowercase().contains("lab");
-        let credits = cells[3]
+        let credits = credits
             .text()
             .flat_map(str::split_whitespace)
             .last()
@@ -75,7 +80,7 @@ impl Registration {
             });
         }
         self.names.entry(code.clone()).or_insert(name);
-        let faculty = compact_text(&cells[8]);
+        let faculty = compact_text(faculty);
         let by_code = if is_lab {
             &mut self.lab_faculty
         } else {
@@ -160,14 +165,17 @@ fn parse_grid(grid: ElementRef<'_>, registration: &Registration) -> Vec<Timetabl
     let mut day = String::new();
     let mut row_index = 0usize;
 
-    for row in grid.select(&TR) {
-        let mut cells: Vec<_> = row.select(&TD).collect();
-        if cells.len() <= 6 {
+    for row in grid.pick(&TR) {
+        let all: Vec<_> = row.pick(&TD).collect();
+        if all.len() <= 6 {
             continue;
         }
-        if row_index.is_multiple_of(2) {
-            day = compact_text(&cells[0]);
-            cells.remove(0);
+        let mut cells = all.as_slice();
+        if row_index.is_multiple_of(2)
+            && let Some((first, rest)) = cells.split_first()
+        {
+            day = compact_text(first);
+            cells = rest;
         }
         for (column, cell) in cells.iter().enumerate() {
             let text = compact_text(cell);
@@ -210,7 +218,7 @@ fn parse_grid(grid: ElementRef<'_>, registration: &Registration) -> Vec<Timetabl
 
 pub fn parse_timetable(html: &str, sem: &str) -> TimetableData {
     let document = Html::parse_document(html);
-    let mut tables = document.select(&TBODY);
+    let mut tables = document.pick(&TBODY);
     let registration = tables.next().map(Registration::parse).unwrap_or_default();
     let slots = tables
         .next()
@@ -230,7 +238,7 @@ pub fn parse_timetable(html: &str, sem: &str) -> TimetableData {
 pub fn parse_semid_timetable(html: &str) -> SemesterData {
     let document = Html::parse_document(html);
     let semesters = document
-        .select(&SEMESTER_OPTION)
+        .pick(&SEMESTER_OPTION)
         .skip(1)
         .filter_map(|option| {
             let id = option.value().attr("value")?;

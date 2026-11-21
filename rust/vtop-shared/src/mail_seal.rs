@@ -32,6 +32,9 @@ pub enum SealError {
 
 /// A new keypair as base64url (secret, public). The secret goes into the
 /// phone's secure storage; the public key to the bridge.
+// No key is better than a weak one: without the OS random source this
+// aborts. Making it fallible changes the callers in vtop-ffi and vtop-bridge.
+#[allow(clippy::expect_used)]
 pub fn generate_keypair() -> (String, String) {
     let mut secret = [0u8; 32];
     getrandom::fill(&mut secret).expect("the OS random source");
@@ -57,15 +60,20 @@ pub fn is_public_key(encoded: &str) -> bool {
     key32(encoded).is_ok()
 }
 
-fn cipher(shared: &[u8; 32], ephemeral: &[u8; 32], recipient: &[u8; 32]) -> Aes256Gcm {
+fn cipher(
+    shared: &[u8; 32],
+    ephemeral: &[u8; 32],
+    recipient: &[u8; 32],
+) -> Result<Aes256Gcm, SealError> {
     let mut salt = [0u8; 64];
-    salt[..32].copy_from_slice(ephemeral);
-    salt[32..].copy_from_slice(recipient);
+    let (head, tail) = salt.split_at_mut(32);
+    head.copy_from_slice(ephemeral);
+    tail.copy_from_slice(recipient);
     let mut key = [0u8; 32];
     Hkdf::<Sha256>::new(Some(&salt), shared)
         .expand(INFO, &mut key)
-        .expect("32 bytes is a valid HKDF length");
-    Aes256Gcm::new(&key.into())
+        .map_err(|_| SealError::Rejected)?;
+    Ok(Aes256Gcm::new(&key.into()))
 }
 
 /// Seals with a fresh ephemeral key and nonce.
@@ -76,8 +84,8 @@ pub fn seal(
 ) -> Result<String, SealError> {
     let mut ephemeral = [0u8; 32];
     let mut nonce = [0u8; 12];
-    getrandom::fill(&mut ephemeral).expect("the OS random source");
-    getrandom::fill(&mut nonce).expect("the OS random source");
+    getrandom::fill(&mut ephemeral).map_err(|_| SealError::Rejected)?;
+    getrandom::fill(&mut nonce).map_err(|_| SealError::Rejected)?;
     seal_with(recipient_public, mailbox_id, plaintext, ephemeral, nonce)
 }
 
@@ -94,7 +102,7 @@ pub fn seal_with(
     let ephemeral = StaticSecret::from(ephemeral_secret);
     let ephemeral_public = PublicKey::from(&ephemeral).to_bytes();
     let shared = ephemeral.diffie_hellman(&PublicKey::from(recipient));
-    let ciphertext = cipher(shared.as_bytes(), &ephemeral_public, &recipient)
+    let ciphertext = cipher(shared.as_bytes(), &ephemeral_public, &recipient)?
         .encrypt(
             &Nonce::from(nonce),
             Payload {
@@ -118,17 +126,18 @@ pub fn open(secret: &str, mailbox_id: &str, sealed: &str) -> Result<Vec<u8>, Sea
     let bytes = URL_SAFE_NO_PAD
         .decode(sealed.trim().trim_end_matches('='))
         .map_err(|_| SealError::Malformed)?;
-    if bytes.len() < HEADER_LEN + 16 || bytes[0] != VERSION {
+    let (version, rest) = bytes.split_first().ok_or(SealError::Malformed)?;
+    let (ephemeral, rest) = rest.split_first_chunk::<32>().ok_or(SealError::Malformed)?;
+    let (nonce, ciphertext) = rest.split_first_chunk::<12>().ok_or(SealError::Malformed)?;
+    if *version != VERSION || ciphertext.len() < 16 {
         return Err(SealError::Malformed);
     }
-    let ephemeral: [u8; 32] = bytes[1..33].try_into().expect("32 bytes");
-    let nonce: [u8; 12] = bytes[33..HEADER_LEN].try_into().expect("12 bytes");
-    let shared = secret.diffie_hellman(&PublicKey::from(ephemeral));
-    cipher(shared.as_bytes(), &ephemeral, &recipient)
+    let shared = secret.diffie_hellman(&PublicKey::from(*ephemeral));
+    cipher(shared.as_bytes(), ephemeral, &recipient)?
         .decrypt(
-            &Nonce::from(nonce),
+            &Nonce::from(*nonce),
             Payload {
-                msg: &bytes[HEADER_LEN..],
+                msg: ciphertext,
                 aad: mailbox_id.as_bytes(),
             },
         )

@@ -7,11 +7,11 @@ use std::sync::LazyLock;
 use scraper::{ElementRef, Html, Selector};
 
 use super::profile::groups;
-use super::{TD, TH, TR, selector, word_text};
+use super::{Pick, TD, TH, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{MentorData, MentorMessage, ProfileField};
 
-static TABLE: LazyLock<Selector> = LazyLock::new(|| selector("table"));
+static TABLE: LazyLock<Option<Selector>> = LazyLock::new(|| selector("table"));
 
 pub fn parse_mentor(details_html: &str, messages_html: &str) -> MentorData {
     let details = Html::parse_document(details_html);
@@ -31,9 +31,9 @@ pub fn parse_mentor(details_html: &str, messages_html: &str) -> MentorData {
 pub fn parse_messages(html: &str) -> Vec<MentorMessage> {
     let document = Html::parse_document(html);
     document
-        .select(&TABLE)
+        .pick(&TABLE)
         .flat_map(|table| {
-            let mut rows = table.select(&TR);
+            let mut rows = table.pick(&TR);
             let headings = rows.next().map(|row| cells(&row)).unwrap_or_default();
             rows.filter_map(move |row| {
                 let values = cells(&row);
@@ -56,8 +56,8 @@ pub fn parse_messages(html: &str) -> Vec<MentorMessage> {
 }
 
 fn cells(row: &ElementRef<'_>) -> Vec<String> {
-    let headings = row.select(&TH).map(|cell| word_text(&cell));
-    let cells = row.select(&TD).map(|cell| word_text(&cell));
+    let headings = row.pick(&TH).map(|cell| word_text(&cell));
+    let cells = row.pick(&TD).map(|cell| word_text(&cell));
     headings.chain(cells).collect()
 }
 

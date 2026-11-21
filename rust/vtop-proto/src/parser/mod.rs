@@ -20,18 +20,39 @@ pub mod timetable;
 
 use std::sync::LazyLock;
 
-use scraper::{ElementRef, Selector};
+use scraper::{ElementRef, Html, Selector};
 
 /// Compiles a selector literal. Only ever called with constant strings (all
-/// exercised by the parser tests), so a failure is a programming error.
-pub(crate) fn selector(css: &'static str) -> Selector {
-    #[allow(clippy::expect_used)]
-    Selector::parse(css).expect("constant CSS selector must be valid")
+/// exercised by the parser tests); one that fails to compile is `None` and
+/// matches nothing, through [`Pick`].
+pub(crate) fn selector(css: &'static str) -> Option<Selector> {
+    Selector::parse(css).ok()
 }
 
-pub(crate) static TR: LazyLock<Selector> = LazyLock::new(|| selector("tr"));
-pub(crate) static TD: LazyLock<Selector> = LazyLock::new(|| selector("td"));
-pub(crate) static TH: LazyLock<Selector> = LazyLock::new(|| selector("th"));
+/// `select` for the compiled selectors: `None` matches nothing.
+pub(crate) trait Pick<'a> {
+    fn pick(self, selector: &'a Option<Selector>) -> impl Iterator<Item = ElementRef<'a>>;
+}
+
+impl<'a> Pick<'a> for &'a Html {
+    fn pick(self, selector: &'a Option<Selector>) -> impl Iterator<Item = ElementRef<'a>> {
+        selector
+            .iter()
+            .flat_map(move |selector| self.select(selector))
+    }
+}
+
+impl<'a> Pick<'a> for ElementRef<'a> {
+    fn pick(self, selector: &'a Option<Selector>) -> impl Iterator<Item = ElementRef<'a>> {
+        selector
+            .iter()
+            .flat_map(move |selector| self.select(selector))
+    }
+}
+
+pub(crate) static TR: LazyLock<Option<Selector>> = LazyLock::new(|| selector("tr"));
+pub(crate) static TD: LazyLock<Option<Selector>> = LazyLock::new(|| selector("td"));
+pub(crate) static TH: LazyLock<Option<Selector>> = LazyLock::new(|| selector("th"));
 
 /// The element's text with the ends trimmed and every tab and newline
 /// removed (inner spaces are kept as they are).
@@ -71,7 +92,7 @@ mod tests {
 
     fn first_td(html: &str) -> String {
         let document = Html::parse_fragment(html);
-        let cell = document.select(&TD).next().expect("td");
+        let cell = document.pick(&TD).next().expect("td");
         format!("{}|{}", compact_text(&cell), word_text(&cell))
     }
 

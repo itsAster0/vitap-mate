@@ -2,7 +2,7 @@
 
 use scraper::{ElementRef, Html};
 
-use super::{TD, TR, compact_cell, compact_text};
+use super::{Pick, TD, TR, compact_cell, compact_text};
 use crate::now_unix;
 use crate::types::{AttendanceData, AttendanceRecord, FullAttendanceData, FullAttendanceRecord};
 
@@ -21,7 +21,7 @@ fn detail_link_args(cell: &ElementRef<'_>) -> Option<(String, String)> {
 }
 
 fn summary_row(row: ElementRef<'_>) -> Option<AttendanceRecord> {
-    let cells: Vec<_> = row.select(&TD).collect();
+    let cells: Vec<_> = row.pick(&TD).collect();
     if cells.len() < SUMMARY_MIN_CELLS {
         return None;
     }
@@ -48,11 +48,7 @@ fn summary_row(row: ElementRef<'_>) -> Option<AttendanceRecord> {
 pub fn parse_attendance(html: &str, sem: &str) -> AttendanceData {
     let document = Html::parse_document(html);
     AttendanceData {
-        records: document
-            .select(&TR)
-            .skip(1)
-            .filter_map(summary_row)
-            .collect(),
+        records: document.pick(&TR).skip(1).filter_map(summary_row).collect(),
         semester_id: sem.to_string(),
         update_time: now_unix(),
     }
@@ -69,20 +65,20 @@ pub fn parse_full_attendance(
 ) -> FullAttendanceData {
     let document = Html::parse_document(html);
     let records = document
-        .select(&TR)
+        .pick(&TR)
         .skip(DETAIL_HEADER_ROWS)
         .filter_map(|row| {
-            let cells: Vec<_> = row.select(&TD).collect();
-            if cells.len() <= 5 {
+            let cells: Vec<_> = row.pick(&TD).collect();
+            let [serial, date, slot, day_time, status, remark, ..] = cells.as_slice() else {
                 return None;
-            }
+            };
             Some(FullAttendanceRecord {
-                serial: compact_text(&cells[0]),
-                date: compact_text(&cells[1]),
-                slot: compact_text(&cells[2]),
-                day_time: compact_text(&cells[3]),
-                status: compact_text(&cells[4]),
-                remark: compact_text(&cells[5]),
+                serial: compact_text(serial),
+                date: compact_text(date),
+                slot: compact_text(slot),
+                day_time: compact_text(day_time),
+                status: compact_text(status),
+                remark: compact_text(remark),
             })
         })
         .collect();

@@ -2,6 +2,16 @@
 //! Worker. The edge is TypeScript and keeps its own copy of what it needs
 //! (`vtop-edge/src/shared/`); a change here must be made there too. No
 //! I/O, so it builds for every target.
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::string_slice
+    )
+)]
 
 pub mod account;
 pub mod device_sig;

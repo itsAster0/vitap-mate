@@ -5,6 +5,16 @@
 //!
 //! Nothing here logs. Cookies, passwords, OTPs and CSRF tokens never appear
 //! in a `Debug` output.
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::string_slice
+    )
+)]
 
 pub mod captcha;
 pub mod course_pages;

@@ -6,6 +6,16 @@
 //!
 //! Logging goes through the [`log`] facade with the targets `rust.auth` and
 //! `rust.network`. Cookies, passwords, OTPs and CSRF tokens are never logged.
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::string_slice
+    )
+)]
 
 pub mod client;
 pub mod config;

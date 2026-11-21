@@ -24,7 +24,7 @@ pub const CONTENT_TYPE: &str = "application/vnd.vmate.page+br";
 /// The dictionary file, as committed.
 pub const SOURCE: &str = include_str!("page_dictionary.json");
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct Source {
     pub vocabulary: Vec<String>,
     /// Page name → its shape: the fixture with strings emptied, numbers
@@ -41,12 +41,14 @@ struct Parts {
 fn parts() -> &'static Parts {
     static PARTS: OnceLock<Parts> = OnceLock::new();
     PARTS.get_or_init(|| {
-        let source: Source = serde_json::from_str(SOURCE).expect("page_dictionary.json is valid");
-        let compact =
-            |value: &serde_json::Value| serde_json::to_vec(value).expect("JSON serialises");
+        // The JSON is compiled in and checked by the tests; were it ever
+        // broken, pages would pack without a dictionary instead.
+        let source: Source = serde_json::from_str(SOURCE).unwrap_or_default();
+        let compact = |value: &serde_json::Value| serde_json::to_vec(value).unwrap_or_default();
+        let digest = Sha256::digest(SOURCE.as_bytes());
         Parts {
-            id: hex::encode(&Sha256::digest(SOURCE.as_bytes())[..6]),
-            vocabulary: serde_json::to_vec(&source.vocabulary).expect("JSON serialises"),
+            id: hex::encode(digest.get(..6).unwrap_or_default()),
+            vocabulary: serde_json::to_vec(&source.vocabulary).unwrap_or_default(),
             shapes: source
                 .shapes
                 .iter()

@@ -10,21 +10,23 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, TH, TR, selector, word_text};
+use super::{Pick, TD, TH, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{
     GeneralOutingData, GeneralOutingRecord, OutingApplyResult, OutingCancelResult, OutingOption,
     OutingStudent, WeekendOutingData, WeekendOutingRecord,
 };
 
-static INPUT: LazyLock<Selector> = LazyLock::new(|| selector("input[id]"));
-static REQUESTS: LazyLock<Selector> = LazyLock::new(|| selector("table#BookingRequests"));
-static REQUEST_SPANS: LazyLock<Selector> = LazyLock::new(|| selector("table#BookingRequests span"));
-static CANCEL_BUTTON: LazyLock<Selector> =
+static INPUT: LazyLock<Option<Selector>> = LazyLock::new(|| selector("input[id]"));
+static REQUESTS: LazyLock<Option<Selector>> = LazyLock::new(|| selector("table#BookingRequests"));
+static REQUEST_SPANS: LazyLock<Option<Selector>> =
+    LazyLock::new(|| selector("table#BookingRequests span"));
+static CANCEL_BUTTON: LazyLock<Option<Selector>> =
     LazyLock::new(|| selector("button[onclick*='deleteStudentBookingInfo']"));
-static PASS_LINK: LazyLock<Selector> = LazyLock::new(|| selector("a[data-url], a[data-leave-url]"));
-static OPTION: LazyLock<Selector> = LazyLock::new(|| selector("option"));
-static STYLED_SPAN: LazyLock<Selector> = LazyLock::new(|| selector("span[style]"));
+static PASS_LINK: LazyLock<Option<Selector>> =
+    LazyLock::new(|| selector("a[data-url], a[data-leave-url]"));
+static OPTION: LazyLock<Option<Selector>> = LazyLock::new(|| selector("option"));
+static STYLED_SPAN: LazyLock<Option<Selector>> = LazyLock::new(|| selector("span[style]"));
 
 const DEFAULT_OUT_HOURS: std::ops::RangeInclusive<u8> = 6..=22;
 const DEFAULT_IN_HOURS: std::ops::RangeInclusive<u8> = 6..=20;
@@ -132,7 +134,7 @@ pub fn parse_apply_response(html: &str, requests_before: usize) -> OutingApplyRe
     }
     OutingApplyResult {
         applied: false,
-        message: if document.select(&REQUESTS).next().is_some() {
+        message: if document.pick(&REQUESTS).next().is_some() {
             "VTOP did not add the request. Check the list before trying again.".to_string()
         } else {
             "VTOP sent back an unexpected page. Check the list before trying again.".to_string()
@@ -151,7 +153,7 @@ pub fn parse_cancel_response(html: &str, cancel_id: &str) -> OutingCancelResult 
             message: error,
         };
     }
-    if document.select(&REQUESTS).next().is_none() {
+    if document.pick(&REQUESTS).next().is_none() {
         return OutingCancelResult {
             cancelled: false,
             message: "VTOP sent back an unexpected page. Check the list.".to_string(),
@@ -188,17 +190,17 @@ impl RequestRow {
 }
 
 fn request_rows(document: &Html) -> Vec<RequestRow> {
-    let Some(table) = document.select(&REQUESTS).next() else {
+    let Some(table) = document.pick(&REQUESTS).next() else {
         return Vec::new();
     };
     let headers: Vec<String> = table
-        .select(&TH)
+        .pick(&TH)
         .map(|header| word_text(&header).to_lowercase())
         .collect();
     table
-        .select(&TR)
+        .pick(&TR)
         .filter_map(|row| {
-            let cells: Vec<ElementRef<'_>> = row.select(&TD).collect();
+            let cells: Vec<ElementRef<'_>> = row.pick(&TD).collect();
             if cells.is_empty() {
                 return None;
             }
@@ -207,7 +209,7 @@ fn request_rows(document: &Html) -> Vec<RequestRow> {
                 return None;
             }
             let pass_id = row
-                .select(&PASS_LINK)
+                .pick(&PASS_LINK)
                 .next()
                 .and_then(|link| {
                     link.value()
@@ -221,7 +223,7 @@ fn request_rows(document: &Html) -> Vec<RequestRow> {
             // with the id in `data-bookingId` (attribute names arrive
             // lower-cased), or the id written into the call itself.
             let cancel_id = row
-                .select(&CANCEL_BUTTON)
+                .pick(&CANCEL_BUTTON)
                 .next()
                 .and_then(|button| {
                     button
@@ -230,9 +232,8 @@ fn request_rows(document: &Html) -> Vec<RequestRow> {
                         .map(str::to_string)
                         .or_else(|| {
                             let call = button.value().attr("onclick")?;
-                            let start = call.find("deleteStudentBookingInfo(")?
-                                + "deleteStudentBookingInfo(".len();
-                            let arg = call[start..].split(')').next()?.trim();
+                            let (_, args) = call.split_once("deleteStudentBookingInfo(")?;
+                            let arg = args.split(')').next()?.trim();
                             arg.starts_with('\'')
                                 .then(|| arg.trim_matches('\'').to_string())
                         })
@@ -275,9 +276,9 @@ fn notice(document: &Html) -> String {
     if !popup.is_empty() {
         return popup;
     }
-    let in_requests: Vec<_> = document.select(&REQUEST_SPANS).map(|el| el.id()).collect();
+    let in_requests: Vec<_> = document.pick(&REQUEST_SPANS).map(|el| el.id()).collect();
     document
-        .select(&STYLED_SPAN)
+        .pick(&STYLED_SPAN)
         .filter(|span| !in_requests.contains(&span.id()))
         .filter(|span| {
             let style = span
@@ -294,7 +295,7 @@ fn notice(document: &Html) -> String {
 
 fn input_value(document: &Html, id: &str) -> String {
     document
-        .select(&INPUT)
+        .pick(&INPUT)
         .find(|input| input.value().attr("id") == Some(id))
         .and_then(|input| input.value().attr("value"))
         .map(|value| value.split_whitespace().collect::<Vec<_>>().join(" "))
@@ -303,7 +304,7 @@ fn input_value(document: &Html, id: &str) -> String {
 
 fn max_length(document: &Html, id: &str) -> u32 {
     document
-        .select(&INPUT)
+        .pick(&INPUT)
         .find(|input| input.value().attr("id") == Some(id))
         .and_then(|input| input.value().attr("maxlength"))
         .and_then(|value| value.trim().parse().ok())
@@ -315,7 +316,7 @@ fn select_options<'a>(document: &'a Html, id: &str) -> Vec<ElementRef<'a>> {
     let select = Selector::parse(&format!("select#{id}")).ok();
     select
         .and_then(|select| document.select(&select).next())
-        .map(|select| select.select(&OPTION).collect())
+        .map(|select| select.pick(&OPTION).collect())
         .unwrap_or_default()
 }
 
@@ -364,14 +365,13 @@ fn date_part(value: &str) -> String {
 /// `maxDate : '6'`. The first call wins; later ones are commented out.
 fn datepicker_number(html: &str, id: &str, key: &str) -> Option<u32> {
     let start = html.find(&format!("#{id}\").datepicker("))?;
-    let call = &html[start..];
-    let call = &call[..call.find("})").unwrap_or(call.len())];
+    let call = html.get(start..)?.split("})").next()?;
     number_after(call, key)
 }
 
 /// The first unsigned number after `marker`, skipping `:`, quotes and spaces.
 fn number_after(text: &str, marker: &str) -> Option<u32> {
-    let rest = &text[text.find(marker)? + marker.len()..];
+    let (_, rest) = text.split_once(marker)?;
     let rest = rest.trim_start_matches(|c: char| c.is_whitespace() || c == ':' || c == '\'');
     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
     digits.parse().ok()
@@ -380,15 +380,15 @@ fn number_after(text: &str, marker: &str) -> Option<u32> {
 /// Weekdays left open by `beforeShowDay`, which blocks days with
 /// `day != 2 && day != 3 ...` (0 = Sunday).
 fn allowed_weekdays(html: &str) -> Vec<u8> {
-    let Some(start) = html.find("beforeShowDay") else {
+    let Some((_, body)) = html.split_once("beforeShowDay") else {
         return DEFAULT_WEEKEND_DAYS.to_vec();
     };
-    let body = &html[start..];
-    let body = &body[..body.find(']').unwrap_or(body.len())];
+    let body = body.split(']').next().unwrap_or_default();
     let blocked: Vec<u8> = body
-        .match_indices("!=")
-        .filter_map(|(at, _)| {
-            body[at + 2..]
+        .split("!=")
+        .skip(1)
+        .filter_map(|after| {
+            after
                 .trim_start()
                 .chars()
                 .next()

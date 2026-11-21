@@ -138,9 +138,11 @@ pub fn signed_page(response: &Response) -> VtopResult<String> {
 
 /// Whether `url` (absolute or a path) is VTOP's login page.
 pub fn is_login_url(url: &str) -> bool {
-    let path = url
-        .split_once("://")
-        .map_or(url, |(_, rest)| rest.find('/').map_or("", |at| &rest[at..]));
+    let path = url.split_once("://").map_or(url, |(_, rest)| {
+        rest.find('/')
+            .and_then(|at| rest.get(at..))
+            .unwrap_or_default()
+    });
     path.to_ascii_lowercase().starts_with("/vtop/login")
 }
 

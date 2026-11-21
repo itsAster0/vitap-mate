@@ -41,7 +41,7 @@ impl OtpReply {
 /// Enough for VTOP's OTP replies; not a general JSON reader.
 fn json_string(body: &str, key: &str) -> Option<String> {
     let quoted = format!("\"{key}\"");
-    let mut rest = &body[body.find(&quoted)? + quoted.len()..];
+    let mut rest = body.split_once(quoted.as_str())?.1;
     rest = rest
         .trim_start()
         .strip_prefix(':')?
@@ -276,7 +276,7 @@ impl ResendOtp {
     fn send(&self) -> Step<u64> {
         Step::Send(otp_post(
             &self.base_url,
-            RESEND_PATHS[self.path],
+            RESEND_PATHS.get(self.path).copied().unwrap_or_default(),
             &[("_csrf", &self.csrf)],
         ))
     }

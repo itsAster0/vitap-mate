@@ -6,25 +6,27 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, TR, selector, word_text};
+use super::{Pick, TD, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{
     CourseLecture, CourseMaterial, CoursePageClass, CoursePageClasses, CoursePageCourse,
     CoursePageCourses, CoursePageDetail,
 };
 
-static COURSE_OPTION: LazyLock<Selector> = LazyLock::new(|| selector("select#courseCode option"));
-static TABLE: LazyLock<Selector> = LazyLock::new(|| selector("table"));
-static DOWNLOAD_LINK: LazyLock<Selector> = LazyLock::new(|| selector("a[href*='vtopDownload']"));
-static ANCHOR: LazyLock<Selector> = LazyLock::new(|| selector("a"));
-static SPAN: LazyLock<Selector> = LazyLock::new(|| selector("span"));
-static INPUT: LazyLock<Selector> = LazyLock::new(|| selector("input[id]"));
-static BUTTON: LazyLock<Selector> = LazyLock::new(|| selector("button[onclick]"));
+static COURSE_OPTION: LazyLock<Option<Selector>> =
+    LazyLock::new(|| selector("select#courseCode option"));
+static TABLE: LazyLock<Option<Selector>> = LazyLock::new(|| selector("table"));
+static DOWNLOAD_LINK: LazyLock<Option<Selector>> =
+    LazyLock::new(|| selector("a[href*='vtopDownload']"));
+static ANCHOR: LazyLock<Option<Selector>> = LazyLock::new(|| selector("a"));
+static SPAN: LazyLock<Option<Selector>> = LazyLock::new(|| selector("span"));
+static INPUT: LazyLock<Option<Selector>> = LazyLock::new(|| selector("input[id]"));
+static BUTTON: LazyLock<Option<Selector>> = LazyLock::new(|| selector("button[onclick]"));
 
 pub fn parse_courses(html: &str, semester_id: &str) -> CoursePageCourses {
     let document = Html::parse_document(html);
     let courses = document
-        .select(&COURSE_OPTION)
+        .pick(&COURSE_OPTION)
         .filter_map(|option| {
             let id = option.value().attr("value")?.trim().to_string();
             if id.is_empty() {
@@ -58,7 +60,7 @@ pub fn parse_courses(html: &str, semester_id: &str) -> CoursePageCourses {
 pub fn parse_classes(html: &str, semester_id: &str, course_id: &str) -> CoursePageClasses {
     let document = Html::parse_document(html);
     let classes = document
-        .select(&TABLE)
+        .pick(&TABLE)
         .find_map(|table| {
             let rows = header_rows(&table);
             rows.iter()
@@ -97,7 +99,7 @@ pub fn parse_classes(html: &str, semester_id: &str, course_id: &str) -> CoursePa
 
 pub fn parse_detail(html: &str, semester_id: &str, erp_id: &str) -> CoursePageDetail {
     let document = Html::parse_document(html);
-    let tables: Vec<Vec<HeaderRow>> = document.select(&TABLE).map(|t| header_rows(&t)).collect();
+    let tables: Vec<Vec<HeaderRow>> = document.pick(&TABLE).map(|t| header_rows(&t)).collect();
 
     let info = tables
         .iter()
@@ -140,13 +142,13 @@ pub fn parse_detail(html: &str, semester_id: &str, erp_id: &str) -> CoursePageDe
 
     let link_titled = |title: &str| {
         document
-            .select(&DOWNLOAD_LINK)
+            .pick(&DOWNLOAD_LINK)
             .find(|link| word_text(link).eq_ignore_ascii_case(title))
             .and_then(|link| download_path(&link))
             .unwrap_or_default()
     };
     let syllabus_path = document
-        .select(&DOWNLOAD_LINK)
+        .pick(&DOWNLOAD_LINK)
         .filter_map(|link| download_path(&link))
         .find(|path| path.starts_with("courseSyllabusDownload/"))
         .unwrap_or_default();
@@ -159,7 +161,7 @@ pub fn parse_detail(html: &str, semester_id: &str, erp_id: &str) -> CoursePageDe
         general_materials_path: link_titled("Download General Materials"),
         syllabus_path,
         has_course_plan: document
-            .select(&ANCHOR)
+            .pick(&ANCHOR)
             .any(|a| word_text(&a).eq_ignore_ascii_case("Download Course Plan")),
         lectures,
         update_time: now_unix(),
@@ -193,23 +195,23 @@ impl<'a> HeaderRow<'a> {
 }
 
 fn header_rows<'a>(table: &ElementRef<'a>) -> Vec<HeaderRow<'a>> {
-    let mut rows = table.select(&TR);
+    let mut rows = table.pick(&TR);
     let Some(header) = rows.next() else {
         return Vec::new();
     };
     let headers = std::rc::Rc::new(
         header
-            .select(&TD)
+            .pick(&TD)
             .map(|cell| word_text(&cell).to_lowercase())
             .collect::<Vec<_>>(),
     );
     rows.filter_map(|row| {
-        let cells: Vec<ElementRef<'a>> = row.select(&TD).collect();
+        let cells: Vec<ElementRef<'a>> = row.pick(&TD).collect();
         if cells.len() < headers.len() {
             return None;
         }
         let view_args = row
-            .select(&BUTTON)
+            .pick(&BUTTON)
             .filter_map(|button| button.value().attr("onclick"))
             .find_map(|call| call_args(call, "processViewStudentCourseDetail("));
         Some(HeaderRow {
@@ -223,8 +225,7 @@ fn header_rows<'a>(table: &ElementRef<'a>) -> Vec<HeaderRow<'a>> {
 
 /// The quoted arguments of `name(...)` in `script`.
 fn call_args(script: &str, name: &str) -> Option<Vec<String>> {
-    let start = script.find(name)? + name.len();
-    let inner = &script[start..start + script[start..].find(')')?];
+    let (inner, _) = script.split_once(name)?.1.split_once(')')?;
     Some(
         inner
             .split(',')
@@ -246,7 +247,7 @@ fn split_faculty(value: &str) -> (String, String) {
 /// The first span holds `14-07-2026`; returned as `2026-07-14`.
 fn lecture_date(cell: &ElementRef<'_>) -> String {
     let raw = cell
-        .select(&SPAN)
+        .pick(&SPAN)
         .next()
         .map(|span| word_text(&span))
         .unwrap_or_else(|| word_text(cell));
@@ -258,7 +259,7 @@ fn lecture_date(cell: &ElementRef<'_>) -> String {
 }
 
 fn materials(cell: &ElementRef<'_>) -> Vec<CourseMaterial> {
-    cell.select(&DOWNLOAD_LINK)
+    cell.pick(&DOWNLOAD_LINK)
         .filter_map(|link| {
             Some(CourseMaterial {
                 label: word_text(&link),
@@ -279,7 +280,7 @@ fn download_path(link: &ElementRef<'_>) -> Option<String> {
 
 fn input_value(document: &Html, id: &str) -> String {
     document
-        .select(&INPUT)
+        .pick(&INPUT)
         .find(|input| input.value().attr("id") == Some(id))
         .and_then(|input| input.value().attr("value"))
         .map(|value| value.trim().to_string())

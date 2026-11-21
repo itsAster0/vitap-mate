@@ -5,17 +5,18 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, TR, selector, word_cell};
+use super::{Pick, TD, TR, selector, word_cell};
 use crate::now_unix;
 use crate::types::{
     GradeHistoryAttempt, GradeHistoryCgpa, GradeHistoryData, GradeHistoryRecord,
     GradeHistoryStudentInfo,
 };
 
-static CUSTOM_TABLE: LazyLock<Selector> = LazyLock::new(|| selector("table.customTable"));
-static CONTENT_ROW: LazyLock<Selector> = LazyLock::new(|| selector("tr.tableContent"));
-static NESTED_ROW: LazyLock<Selector> = LazyLock::new(|| selector("tr.tableContent-level1"));
-static PLAIN_TABLE: LazyLock<Selector> = LazyLock::new(|| selector("table.table"));
+static CUSTOM_TABLE: LazyLock<Option<Selector>> = LazyLock::new(|| selector("table.customTable"));
+static CONTENT_ROW: LazyLock<Option<Selector>> = LazyLock::new(|| selector("tr.tableContent"));
+static NESTED_ROW: LazyLock<Option<Selector>> =
+    LazyLock::new(|| selector("tr.tableContent-level1"));
+static PLAIN_TABLE: LazyLock<Option<Selector>> = LazyLock::new(|| selector("table.table"));
 
 fn extract_text(el: Option<&ElementRef>) -> String {
     word_cell(el)
@@ -54,11 +55,11 @@ pub fn parse_grade_history(html: &str) -> GradeHistoryData {
     let mut records = Vec::<GradeHistoryRecord>::new();
     let mut cgpa = empty_cgpa;
 
-    let tables: Vec<_> = document.select(&CUSTOM_TABLE).collect();
+    let tables: Vec<_> = document.pick(&CUSTOM_TABLE).collect();
     if let Some(first_table) = tables.first() {
-        let first_content = first_table.select(&CONTENT_ROW).next();
+        let first_content = first_table.pick(&CONTENT_ROW).next();
         if let Some(row) = first_content {
-            let cells: Vec<_> = row.select(&TD).collect();
+            let cells: Vec<_> = row.pick(&TD).collect();
             if cells.len() >= 10 {
                 student = GradeHistoryStudentInfo {
                     reg_no: extract_text(cells.first()),
@@ -78,15 +79,15 @@ pub fn parse_grade_history(html: &str) -> GradeHistoryData {
 
     let mut attempts_map: HashMap<String, Vec<GradeHistoryAttempt>> = HashMap::new();
     if let Some(effective_table) = tables.get(1) {
-        for row in effective_table.select(&CONTENT_ROW) {
+        for row in effective_table.pick(&CONTENT_ROW) {
             if let Some(id) = row.value().attr("id") {
                 if !id.starts_with("detailsView_") {
                     continue;
                 }
                 let course_code = id.replacen("detailsView_", "", 1);
                 let mut attempts = Vec::new();
-                for nested in row.select(&NESTED_ROW) {
-                    let cells: Vec<_> = nested.select(&TD).collect();
+                for nested in row.pick(&NESTED_ROW) {
+                    let cells: Vec<_> = nested.pick(&TD).collect();
                     if cells.len() < 7 {
                         continue;
                     }
@@ -104,11 +105,11 @@ pub fn parse_grade_history(html: &str) -> GradeHistoryData {
             }
         }
 
-        for row in effective_table.select(&CONTENT_ROW) {
+        for row in effective_table.pick(&CONTENT_ROW) {
             if row.value().attr("id").is_some() {
                 continue;
             }
-            let cells: Vec<_> = row.select(&TD).collect();
+            let cells: Vec<_> = row.pick(&TD).collect();
             if cells.len() < 9 {
                 continue;
             }
@@ -133,14 +134,14 @@ pub fn parse_grade_history(html: &str) -> GradeHistoryData {
     }
 
     // Parse CGPA details table by header marker.
-    for table in document.select(&PLAIN_TABLE) {
+    for table in document.pick(&PLAIN_TABLE) {
         let text = extract_text(Some(&table));
         if !text.contains("CGPA") && !text.contains("Credits Registered") {
             continue;
         }
         let mut body_row: Option<ElementRef> = None;
-        for row in table.select(&TR) {
-            let cells: Vec<_> = row.select(&TD).collect();
+        for row in table.pick(&TR) {
+            let cells: Vec<_> = row.pick(&TD).collect();
             if cells.len() >= 11 {
                 let first = extract_text(cells.first());
                 if first.eq_ignore_ascii_case("Credits Registered") {
@@ -151,7 +152,7 @@ pub fn parse_grade_history(html: &str) -> GradeHistoryData {
             }
         }
         if let Some(row) = body_row {
-            let cells: Vec<_> = row.select(&TD).collect();
+            let cells: Vec<_> = row.pick(&TD).collect();
             cgpa = GradeHistoryCgpa {
                 credits_registered: extract_text(cells.first()),
                 credits_earned: extract_text(cells.get(1)),

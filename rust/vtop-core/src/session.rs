@@ -84,8 +84,9 @@ impl Cookie {
         let domain = host == self.domain
             || (!self.host_only && host.ends_with(&format!(".{}", self.domain)));
         let path = path == self.path
-            || (path.starts_with(&self.path)
-                && (self.path.ends_with('/') || path[self.path.len()..].starts_with('/')));
+            || path
+                .strip_prefix(self.path.as_str())
+                .is_some_and(|rest| self.path.ends_with('/') || rest.starts_with('/'));
         domain && path && (https || !self.secure) && !self.expired(now)
     }
 }
@@ -94,7 +95,7 @@ impl Cookie {
 fn default_path(path: &str) -> &str {
     match path.rfind('/') {
         Some(0) | None => "/",
-        Some(at) => &path[..at],
+        Some(at) => path.get(..at).unwrap_or("/"),
     }
 }
 
@@ -205,7 +206,11 @@ impl ResettableJar {
                 (Some(at), true) => {
                     cookies.remove(at);
                 }
-                (Some(at), false) => cookies[at] = cookie,
+                (Some(at), false) => {
+                    if let Some(old) = cookies.get_mut(at) {
+                        *old = cookie;
+                    }
+                }
                 (None, true) => {}
                 (None, false) => cookies.push(cookie),
             }

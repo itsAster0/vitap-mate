@@ -2,7 +2,7 @@
 
 use scraper::Html;
 
-use super::{TD, TR, compact_text};
+use super::{Pick, TD, TR, compact_text};
 use crate::now_unix;
 use crate::types::{ExamScheduleData, ExamScheduleRecord, PerExamScheduleRecord};
 
@@ -14,8 +14,8 @@ pub fn parse_schedule(html: &str, sem: &str) -> ExamScheduleData {
     let document = Html::parse_document(html);
     let mut exams: Vec<PerExamScheduleRecord> = Vec::new();
 
-    for row in document.select(&TR).skip(HEADER_ROWS) {
-        let cells: Vec<_> = row.select(&TD).collect();
+    for row in document.pick(&TR).skip(HEADER_ROWS) {
+        let cells: Vec<_> = row.pick(&TD).collect();
         if cells.len() < 3 {
             // A one-cell row names the next exam group.
             let Some(title) = cells.first() else {
@@ -26,7 +26,7 @@ pub fn parse_schedule(html: &str, sem: &str) -> ExamScheduleData {
                 records: Vec::new(),
             });
         } else if cells.len() >= RECORD_MIN_CELLS {
-            let text = |index: usize| compact_text(&cells[index]);
+            let text = |index: usize| cells.get(index).map(compact_text).unwrap_or_default();
             let record = ExamScheduleRecord {
                 serial: text(0),
                 slot: text(5),

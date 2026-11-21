@@ -2,16 +2,16 @@
 
 use scraper::Html;
 
-use super::{TD, TR, word_text};
+use super::{Pick, TD, TR, word_text};
 use crate::now_unix;
 use crate::types::{BiometricData, BiometricRecord};
 
 pub fn parse_biometric(html: &str, requested_date: &str) -> BiometricData {
     let document = Html::parse_document(html);
     let records = document
-        .select(&TR)
+        .pick(&TR)
         .filter_map(|row| {
-            let cells = row.select(&TD).collect::<Vec<_>>();
+            let cells = row.pick(&TD).collect::<Vec<_>>();
             let [serial, punch_date, punch_time, venue] = cells.as_slice() else {
                 return None;
             };

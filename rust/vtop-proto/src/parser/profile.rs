@@ -9,15 +9,15 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, TR, selector, word_text};
+use super::{Pick, TD, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{ProfileField, ProfileGroup, ProfileSection, StudentProfile};
 
-static LABEL: LazyLock<Selector> = LazyLock::new(|| selector("label"));
-static PARAGRAPH: LazyLock<Selector> = LazyLock::new(|| selector("p"));
-static PHOTO: LazyLock<Selector> = LazyLock::new(|| selector("img[src^='data:']"));
-static SECTION: LazyLock<Selector> = LazyLock::new(|| selector(".accordion-item"));
-static SECTION_TITLE: LazyLock<Selector> = LazyLock::new(|| selector(".accordion-header"));
+static LABEL: LazyLock<Option<Selector>> = LazyLock::new(|| selector("label"));
+static PARAGRAPH: LazyLock<Option<Selector>> = LazyLock::new(|| selector("p"));
+static PHOTO: LazyLock<Option<Selector>> = LazyLock::new(|| selector("img[src^='data:']"));
+static SECTION: LazyLock<Option<Selector>> = LazyLock::new(|| selector(".accordion-item"));
+static SECTION_TITLE: LazyLock<Option<Selector>> = LazyLock::new(|| selector(".accordion-header"));
 
 pub fn parse_profile(html: &str) -> StudentProfile {
     let document = Html::parse_document(html);
@@ -30,10 +30,10 @@ pub fn parse_profile(html: &str) -> StudentProfile {
             .unwrap_or_default()
     };
     let sections = document
-        .select(&SECTION)
+        .pick(&SECTION)
         .map(|item| ProfileSection {
             title: item
-                .select(&SECTION_TITLE)
+                .pick(&SECTION_TITLE)
                 .next()
                 .map(|title| word_text(&title))
                 .unwrap_or_default(),
@@ -43,7 +43,7 @@ pub fn parse_profile(html: &str) -> StudentProfile {
         .collect::<Vec<_>>();
 
     let mut name = document
-        .select(&PARAGRAPH)
+        .pick(&PARAGRAPH)
         .map(|p| word_text(&p))
         .find(|text| !text.is_empty())
         .unwrap_or_default();
@@ -70,14 +70,17 @@ pub fn parse_profile(html: &str) -> StudentProfile {
 /// The header card's `LABEL:` / value label pairs, keys without the colon.
 fn header_fields(document: &Html) -> Vec<(String, String)> {
     let labels = document
-        .select(&LABEL)
+        .pick(&LABEL)
         .map(|label| word_text(&label))
         .collect::<Vec<_>>();
     labels
         .windows(2)
         .filter_map(|pair| {
-            let key = pair[0].strip_suffix(':')?.trim();
-            (!pair[1].ends_with(':')).then(|| (key.to_owned(), pair[1].clone()))
+            let [key, value] = pair else {
+                return None;
+            };
+            let key = key.strip_suffix(':')?.trim();
+            (!value.ends_with(':')).then(|| (key.to_owned(), value.clone()))
         })
         .collect()
 }
@@ -90,8 +93,8 @@ pub(crate) fn groups(item: &ElementRef<'_>) -> Vec<ProfileGroup> {
         title: String::new(),
         fields: Vec::new(),
     }];
-    for row in item.select(&TR) {
-        let cells = row.select(&TD).collect::<Vec<_>>();
+    for row in item.pick(&TR) {
+        let cells = row.pick(&TD).collect::<Vec<_>>();
         match cells.as_slice() {
             [title] => {
                 let title = word_text(title);
@@ -135,7 +138,7 @@ fn field(sections: &[ProfileSection], label: &str) -> String {
 /// The inline photo's base64, without the `data:...;base64,` prefix.
 fn photo(document: &Html) -> String {
     document
-        .select(&PHOTO)
+        .pick(&PHOTO)
         .filter_map(|img| img.value().attr("src"))
         .find_map(|src| src.split_once("base64,"))
         .map(|(_, data)| data.chars().filter(|c| !c.is_whitespace()).collect())

@@ -4,18 +4,18 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{TD, TH, TR, selector, word_cell, word_text};
+use super::{Pick, TD, TH, TR, selector, word_cell, word_text};
 use crate::now_unix;
 use crate::types::{
     GradeCourseRecord, GradeDetailMark, GradeDetailsData, GradeRange, GradeViewData, SemesterInfo,
 };
 
-static SEMESTER_OPTION: LazyLock<Selector> =
+static SEMESTER_OPTION: LazyLock<Option<Selector>> =
     LazyLock::new(|| selector("select#semesterSubId option"));
-static DETAILS_BUTTON: LazyLock<Selector> = LazyLock::new(|| selector("button[onclick]"));
-static TABLE: LazyLock<Selector> = LazyLock::new(|| selector("table"));
-static OUTPUT: LazyLock<Selector> = LazyLock::new(|| selector("output"));
-static SPAN: LazyLock<Selector> = LazyLock::new(|| selector("span"));
+static DETAILS_BUTTON: LazyLock<Option<Selector>> = LazyLock::new(|| selector("button[onclick]"));
+static TABLE: LazyLock<Option<Selector>> = LazyLock::new(|| selector("table"));
+static OUTPUT: LazyLock<Option<Selector>> = LazyLock::new(|| selector("output"));
+static SPAN: LazyLock<Option<Selector>> = LazyLock::new(|| selector("span"));
 const GRADE_LABELS: [&str; 7] = ["S", "A", "B", "C", "D", "E", "F"];
 
 fn extract_text(el: Option<&ElementRef>) -> String {
@@ -31,17 +31,13 @@ fn looks_like_grade_range(input: &str) -> bool {
 }
 
 fn extract_course_id(button_cell: &ElementRef) -> String {
-    if let Some(button) = button_cell.select(&DETAILS_BUTTON).next()
+    if let Some(button) = button_cell.pick(&DETAILS_BUTTON).next()
         && let Some(onclick) = button.value().attr("onclick")
-        && let Some(start_idx) = onclick.find("getGradeViewDetails(")
+        && let Some((_, call)) = onclick.split_once("getGradeViewDetails(")
+        && let Some((_, right)) = call.split_once('\'')
+        && let Some((id, _)) = right.split_once('\'')
     {
-        let sliced = &onclick[start_idx..];
-        if let Some(first_quote) = sliced.find('\'') {
-            let right = &sliced[first_quote + 1..];
-            if let Some(second_quote) = right.find('\'') {
-                return right[..second_quote].to_string();
-            }
-        }
+        return id.to_string();
     }
     String::new()
 }
@@ -50,7 +46,7 @@ pub fn parse_grade_view(html: &str, sem: &str) -> GradeViewData {
     let document = Html::parse_document(html);
 
     let mut semesters = Vec::new();
-    for option in document.select(&SEMESTER_OPTION) {
+    for option in document.pick(&SEMESTER_OPTION) {
         if let Some(id) = option.value().attr("value") {
             let id_trim = id.trim();
             if id_trim.is_empty() {
@@ -65,14 +61,14 @@ pub fn parse_grade_view(html: &str, sem: &str) -> GradeViewData {
     }
 
     let mut courses = Vec::new();
-    for row in document.select(&TR) {
-        let cells: Vec<_> = row.select(&TD).collect();
+    for row in document.pick(&TR) {
+        let cells: Vec<_> = row.pick(&TD).collect();
         if cells.len() < 8 {
             continue;
         }
         let Some(button_cell) = cells
             .last()
-            .filter(|cell| cell.select(&DETAILS_BUTTON).next().is_some())
+            .filter(|cell| cell.pick(&DETAILS_BUTTON).next().is_some())
         else {
             continue;
         };
@@ -114,13 +110,13 @@ pub fn parse_grade_view_details(html: &str, sem: &str, course_id: &str) -> Grade
     // Extract grade ranges from the "Range of Grades" distribution table if present.
     // Parse by TD column index first so inline '#' markers do not shift grade mapping.
     // Fallback to span parsing while filtering out marker-only values.
-    for table in document.select(&TABLE) {
+    for table in document.pick(&TABLE) {
         let table_text = extract_text(Some(&table));
         if !table_text.contains("Range of Grades") {
             continue;
         }
-        for row in table.select(&TR) {
-            let cells: Vec<_> = row.select(&TD).collect();
+        for row in table.pick(&TR) {
+            let cells: Vec<_> = row.pick(&TD).collect();
             let labels = GRADE_LABELS;
             let mut parsed = Vec::new();
 
@@ -140,7 +136,7 @@ pub fn parse_grade_view_details(html: &str, sem: &str, course_id: &str) -> Grade
             if parsed.len() < 7 {
                 parsed.clear();
                 let mut cleaned_spans = Vec::new();
-                for sp in row.select(&SPAN) {
+                for sp in row.pick(&SPAN) {
                     let txt = clean_grade_range_text(extract_text(Some(&sp)));
                     if txt.is_empty() || !looks_like_grade_range(&txt) {
                         continue;
@@ -172,8 +168,8 @@ pub fn parse_grade_view_details(html: &str, sem: &str, course_id: &str) -> Grade
     let mut class_totals = Vec::<String>::new();
     let mut per_class_marks = Vec::<(String, Vec<GradeDetailMark>)>::new();
 
-    for table in document.select(&TABLE) {
-        let ths: Vec<_> = table.select(&TH).collect();
+    for table in document.pick(&TABLE) {
+        let ths: Vec<_> = table.pick(&TH).collect();
         if ths.len() < 2 {
             continue;
         }
@@ -200,8 +196,8 @@ pub fn parse_grade_view_details(html: &str, sem: &str, course_id: &str) -> Grade
         let mut parsed_grand_total = String::new();
         let mut table_marks = Vec::<GradeDetailMark>::new();
 
-        for row in table.select(&TR) {
-            let outputs: Vec<_> = row.select(&OUTPUT).collect();
+        for row in table.pick(&TR) {
+            let outputs: Vec<_> = row.pick(&OUTPUT).collect();
             if outputs.len() == 7 {
                 table_marks.push(GradeDetailMark {
                     serial: extract_text(outputs.first()),
@@ -215,15 +211,15 @@ pub fn parse_grade_view_details(html: &str, sem: &str, course_id: &str) -> Grade
                 continue;
             }
 
-            let tds: Vec<_> = row.select(&TD).collect();
+            let tds: Vec<_> = row.pick(&TD).collect();
             if !tds.is_empty() {
                 let th_text = row
-                    .select(&TH)
+                    .pick(&TH)
                     .map(|e| extract_text(Some(&e)))
                     .collect::<Vec<_>>()
                     .join(" ");
                 if th_text.contains("Total")
-                    && let Some(last_th) = row.select(&TH).last()
+                    && let Some(last_th) = row.pick(&TH).last()
                 {
                     parsed_grand_total = extract_text(Some(&last_th));
                 }
