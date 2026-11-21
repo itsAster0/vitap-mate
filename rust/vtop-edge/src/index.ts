@@ -477,14 +477,16 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (path.startsWith("/internal/")) return error(404, "not_found", "No such route.");
   const oauthReply = await oauth.handle(req, env, path);
   if (oauthReply) return oauthReply;
-  if (path === "/mcp" || path.startsWith("/mcp/")) return mcp(req, env);
+  if (path === "/mcp" || path.startsWith("/mcp/")) return mcp(req, env, path);
   return error(404, "not_found", "No such route.");
 }
 
-/** `/mcp`: a client with no token is told where to get one (MCP
+/** `/mcp` (and `/mcp/<key>`): a client with neither an `Authorization`
+ * header nor a key segment in the path is told where to get one (MCP
  * authorization); the rest go to the engine, whose 401s get the same hint. */
-async function mcp(req: Request, env: Env): Promise<Response> {
-  if (req.method !== "OPTIONS" && !req.headers.get("authorization")) return oauth.unauthorized(env);
+async function mcp(req: Request, env: Env, path: string): Promise<Response> {
+  const pathKey = path.startsWith("/mcp/") ? path.slice("/mcp/".length).split("/")[0].trim() : "";
+  if (req.method !== "OPTIONS" && !req.headers.get("authorization") && !pathKey) return oauth.unauthorized(env);
   const response = await passOn(req, env);
   if (response.status !== 401 || response.headers.has("www-authenticate")) return response;
   const out = new Response(response.body, response);

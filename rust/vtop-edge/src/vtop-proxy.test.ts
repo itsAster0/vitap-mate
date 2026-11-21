@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { proxyVtop, VTOP_ORIGIN } from "./vtop-proxy";
+import { MAX_BODY_BYTES, proxyVtop, VTOP_ORIGIN } from "./vtop-proxy";
 
 const PROXY = "https://edge.example";
 
@@ -106,5 +106,30 @@ describe("proxyVtop", () => {
     const res = await proxyVtop(new Request(`${PROXY}/vtop/content`), fail, 1000);
     expect(res.status).toBe(502);
     expect(((await res.json()) as { code: string }).code).toBe("vtop_unreachable");
+  });
+
+  it("rejects oversized request bodies with 413 too_large", async () => {
+    const { seen, fetcher } = capture(new Response("ok"));
+    const byHeader = await proxyVtop(
+      new Request(`${PROXY}/vtop/login`, {
+        method: "POST",
+        headers: { "content-length": String(MAX_BODY_BYTES + 1) },
+        body: "small",
+      }),
+      fetcher,
+    );
+    expect(byHeader.status).toBe(413);
+    expect(((await byHeader.json()) as { code: string }).code).toBe("too_large");
+
+    const byBody = await proxyVtop(
+      new Request(`${PROXY}/vtop/login`, {
+        method: "POST",
+        body: new Uint8Array(MAX_BODY_BYTES + 1),
+      }),
+      fetcher,
+    );
+    expect(byBody.status).toBe(413);
+    expect(((await byBody.json()) as { code: string }).code).toBe("too_large");
+    expect(seen).toHaveLength(0);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { accountObject } from "../test/account-harness";
 import { memorySql } from "../test/memory-sql";
@@ -88,13 +88,39 @@ describe("metadata", () => {
     expect((await r.call("OPTIONS", "/token")).status).toBe(204);
   });
 
-  it("answers /mcp without a token with where to get one", async () => {
+  it("answers /mcp and /mcp/ without a token with where to get one", async () => {
     const env = { PUBLIC_URL: BASE } as unknown as Env;
-    const res = await worker.fetch(new Request(`${BASE}/mcp`, { method: "POST", body: "{}" }), env);
-    expect(res.status).toBe(401);
-    expect(res.headers.get("www-authenticate")).toBe(
-      `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"`,
-    );
+    for (const path of ["/mcp", "/mcp/"]) {
+      const res = await worker.fetch(new Request(`${BASE}${path}`, { method: "POST", body: "{}" }), env);
+      expect(res.status).toBe(401);
+      expect(res.headers.get("www-authenticate")).toBe(
+        `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"`,
+      );
+    }
+  });
+
+  it("passes /mcp/<key> without Authorization to the engine and adds WWW-Authenticate on bare 401s", async () => {
+    const seen: Array<{ url: string; method?: string }> = [];
+    const env = { PUBLIC_URL: BASE, ENGINE_URL: "https://engine.example" } as unknown as Env;
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      seen.push({ url, method: init?.method });
+      if (url.endsWith("/mcp/vtm_bad")) return new Response("denied", { status: 401 });
+      return Response.json({ jsonrpc: "2.0", result: {} });
+    });
+    try {
+      const ok = await worker.fetch(new Request(`${BASE}/mcp/vtm_test`, { method: "POST", body: "{}" }), env);
+      expect(ok.status).toBe(200);
+      expect(seen[0]).toEqual({ url: "https://engine.example/mcp/vtm_test", method: "POST" });
+
+      const denied = await worker.fetch(new Request(`${BASE}/mcp/vtm_bad`, { method: "POST", body: "{}" }), env);
+      expect(denied.status).toBe(401);
+      expect(denied.headers.get("www-authenticate")).toBe(
+        `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"`,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

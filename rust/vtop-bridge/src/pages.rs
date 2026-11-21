@@ -1,8 +1,9 @@
 //! Every VTOP page the engine fetches for a phone, by name: the arguments
 //! it takes and the [`VtopClient`] call behind it. The names and arguments
-//! are the app's (`lib/vtop/backend/vtop_queries.dart`), so a new page
-//! is one entry there and one here. Only reads: what changes VTOP (outing
-//! applies and cancels) is always sent by the phone itself.
+//! match the app crate's (`rust/vtop-ffi`, via `page!` or `Core::fetch`; see
+//! `AGENTS.md`), so a new read page is one entry there and one here. Only
+//! reads: what changes VTOP (outing applies and cancels) is always sent by
+//! the phone itself.
 
 use std::collections::BTreeMap;
 

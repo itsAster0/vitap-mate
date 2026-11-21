@@ -336,24 +336,25 @@ pair_expired` when the sign-in ran out meanwhile.
 
 | Route | Auth | Notes |
 |---|---|---|
-| `/vtop/*` | none | compression proxy to `https://vtop.vitap.ac.in/vtop/*`, any method; cookies and redirects pass through |
+| `/vtop/*` | none | compression proxy to `https://vtop.vitap.ac.in/vtop/*`, any method; cookies and redirects pass through; bodies up to 1 MiB (`413 too_large`) |
 | `POST /v1/vtop/fetch` | signed | body passed to the engine's `/engine/fetch` as is |
 | `POST /v1/vtop/login` | signed | → `/engine/vtop-login` |
 | `POST /v1/vtop/login/otp` | signed | → `/engine/vtop-login/otp` |
 | `POST /v1/vtop/login/resend` | signed | → `/engine/vtop-login/resend` |
 
-Bodies up to 64 KiB (`413 too_large`). Answers are JSON (Brotli to the
-phone via Cloudflare) or `application/vnd.vmate.page+br` passed byte for
-byte. `504 vtop_timeout` after 32 s, `503 engine_unavailable`.
+Bodies up to 64 KiB (`413 too_large`) on `/v1/vtop/*`. Answers are JSON
+(Brotli to the phone via Cloudflare) or `application/vnd.vmate.page+br`
+passed byte for byte. `504 vtop_timeout` after 32 s, `503 engine_unavailable`.
 
 ## MCP
 
-`/mcp`, `/mcp/*`: passed to `ENGINE_URL` unchanged (the client's own
-`Authorization: Bearer vtm_…` included), with `x-forwarded-for` set to the
-client's address. Without an `Authorization` header (except `OPTIONS`) the
-edge answers `401` itself with `WWW-Authenticate: Bearer
+`/mcp`, `/mcp/<key>`: passed to `ENGINE_URL` unchanged (the client's own
+`Authorization: Bearer vtm_…` or path key `/mcp/vtm_…` included), with
+`x-forwarded-for` set to the client's address. On `/mcp` or `/mcp/` without
+an `Authorization` header (except `OPTIONS`) the edge answers `401` itself
+with `WWW-Authenticate: Bearer
 resource_metadata="<PUBLIC_URL>/.well-known/oauth-protected-resource/mcp"`;
-the engine's own `401`s get the same header.
+the engine's own `401`s get the same header if missing.
 
 ## OAuth for MCP clients
 

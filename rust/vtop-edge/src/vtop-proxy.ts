@@ -13,6 +13,9 @@ export const VTOP_ORIGIN = "https://vtop.vitap.ac.in";
  * hanging up. */
 export const VTOP_TIMEOUT_MS = 25_000;
 
+/** Cap proxied request bodies so `/vtop/*` cannot relay giant payloads. */
+export const MAX_BODY_BYTES = 1 << 20;
+
 /** Headers the phone sends that must NOT reach VTOP: hop-by-hop headers, the
  * ones that would describe the proxy instead of the phone, and the client-IP
  * headers Cloudflare adds (anything `cf-*` is stripped too). Everything else
@@ -56,6 +59,38 @@ function hostOnly(cookie: string): string {
     .join(";");
 }
 
+/** Reads `req`'s body up to `limit` bytes, returning null if `content-length`
+ * or the streamed bytes exceed it. */
+async function readBodyCapped(req: Request, limit: number): Promise<ArrayBuffer | null> {
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) return null;
+  if (!req.body) return new ArrayBuffer(0);
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out.buffer;
+}
+
 export async function proxyVtop(
   req: Request,
   fetcher: (req: Request) => Promise<Response> = (r) => fetch(r),
@@ -64,6 +99,10 @@ export async function proxyVtop(
   const url = new URL(req.url);
   if (!isVtopPath(url.pathname)) return error(404, "not_found", "No such route.");
   const proxy = url.origin;
+
+  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+  const body = hasBody ? await readBodyCapped(req, MAX_BODY_BYTES) : undefined;
+  if (body === null) return error(413, "too_large", "The request is too large.");
 
   const headers = new Headers();
   req.headers.forEach((value, name) => {
@@ -75,8 +114,6 @@ export async function proxyVtop(
         : value,
     );
   });
-  const hasBody = req.method !== "GET" && req.method !== "HEAD";
-  const body = hasBody ? await req.arrayBuffer() : undefined;
   // Covers VTOP's headers only; once it answers, the body streams through.
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
