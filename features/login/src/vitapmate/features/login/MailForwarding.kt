@@ -5,13 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.CoreException
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingState
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
 import vitapmate.data.askedOtp
@@ -53,11 +53,10 @@ object MailForwarding {
 
     // Outlives the sheet: closing it mid-way would drop Rust's call between edge requests, leaving
     // an address made on the edge but not saved here (or not tied to the student), or half removed.
-    private val scope = MainScope()
 
     /** Makes or joins the address; runs on after the sheet closes. */
     fun setUp() {
-        scope.launch { run("setup") { id -> AppCore.await().setUpForwarding(id) }?.let { Settings.otpSource = OtpSource.Forwarding } }
+        AppScope.launch { run("setup") { id -> AppCore.await().setUpForwarding(id) }?.let { Settings.otpSource = OtpSource.Forwarding } }
     }
 
     /** Pulls the latest forwarded mail; [quiet] skips the "nothing yet" toast and error toasts. */
@@ -71,7 +70,7 @@ object MailForwarding {
 
     /** Takes this phone off the address; runs on after the sheet closes. */
     fun turnOff() {
-        scope.launch {
+        AppScope.launch {
             run("off") { id ->
                 AppCore.await().turnOffForwarding(id)
                 AppCore.await().forwardingStatus(id)

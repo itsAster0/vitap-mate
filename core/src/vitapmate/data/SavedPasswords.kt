@@ -8,7 +8,6 @@ import androidx.credentials.GetPasswordOption
 import androidx.credentials.PasswordCredential
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialException
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -21,7 +20,7 @@ import vitapmate.observability.flow
 object SavedPasswords {
     /** Offers to save (or update) [username] and [password]; outlives the screen that asks. */
     fun offerSave(context: Context, username: String, password: String) {
-        MainScope().launch {
+        AppScope.launch {
             flow("password.save") { f ->
                 val error = try {
                     CredentialManager.create(context).createCredential(context, CreatePasswordRequest(username, password))

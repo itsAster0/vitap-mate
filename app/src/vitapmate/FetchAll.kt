@@ -5,9 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import vitapmate.data.Activity
+import vitapmate.data.AppScope
 import vitapmate.data.OtpPrompt
 import vitapmate.data.StoreCap
 import vitapmate.data.VtopSync
@@ -20,8 +20,6 @@ import vitapmate.observability.flow
  * row's subtitle. Flow `sync.all`.
  */
 object FetchAll {
-    private val scope = MainScope()
-
     var running by mutableStateOf(false)
         private set
 
@@ -33,7 +31,7 @@ object FetchAll {
         if (running) return
         running = true
         status = "Starting…"
-        scope.launch {
+        AppScope.launch {
             // The page being fetched, from the activity entries VtopSync adds.
             val follow = launch {
                 snapshotFlow { Activity.running.lastOrNull { it.label.startsWith(LABEL) }?.label }.collect { label ->

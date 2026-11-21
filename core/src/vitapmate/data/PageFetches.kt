@@ -4,7 +4,6 @@ import androidx.compose.runtime.mutableStateListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import vitapmate.observability.Log
 
@@ -199,4 +198,4 @@ open class SingleFlight internal constructor(
  * screen first, so on a slow link the page the student waits for isn't split with others. Only
  * sign-out cancels them.
  */
-object PageFetches : SingleFlight(MainScope())
+object PageFetches : SingleFlight(AppScope)

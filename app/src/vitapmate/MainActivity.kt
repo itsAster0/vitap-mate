@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
 import kotlinx.coroutines.launch
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.ThemeMode
@@ -126,9 +127,9 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         Foreground.stopped()
         // Picks up a timetable refreshed in the app.
-        lifecycleScope.launch { TimetableWidget.refresh(applicationContext) }
+        AppScope.launch { TimetableWidget.refresh(applicationContext) }
         // And outing pages fetched in it; the class update follows a changed timetable.
-        lifecycleScope.launch { LiveUpdates.refresh(applicationContext, "live.leave"); LiveUpdates.outings(applicationContext, "live.leave") }
-        lifecycleScope.launch { ClassMode.refresh(applicationContext, "classmode.leave") }
+        AppScope.launch { LiveUpdates.refresh(applicationContext, "live.leave"); LiveUpdates.outings(applicationContext, "live.leave") }
+        AppScope.launch { ClassMode.refresh(applicationContext, "classmode.leave") }
     }
 }

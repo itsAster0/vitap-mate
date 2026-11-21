@@ -4,7 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Semesters
@@ -48,12 +47,9 @@ object SemesterChoice {
         }
     }
 
-    // Outlives the picker: the sheet closes as soon as a semester is tapped.
-    private val scope = MainScope()
-
-    /** Shows [id]'s pages from now on; runs on, whatever screen asked. */
+    /** Shows [id]'s pages from now on; outlives the picker (the sheet closes on tap). */
     fun pick(id: String) {
-        scope.launch { select(id) }
+        AppScope.launch { select(id) }
     }
 
     private suspend fun select(id: String) = flow("semesters.select") { f ->
@@ -66,7 +62,7 @@ object SemesterChoice {
 
     /** Connected apps read the semester picked here; best effort (skipped before a key is made). */
     private fun sendToServer() {
-        scope.launch {
+        AppScope.launch {
             flow("semesters.server") { f ->
                 runCatching { withContext(Dispatchers.IO) { AppCore.await().sendServerSemester(f) } }
                     .onFailure { Log.info("ui.semesters", "not sent to the server: ${it::class.simpleName}", f) }

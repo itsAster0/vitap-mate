@@ -7,7 +7,6 @@ import androidx.compose.runtime.snapshotFlow
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -143,7 +142,6 @@ object StaleSweep {
     /** After the student's requests, wait this long in case more follow. */
     private const val QUIET_MS = 2_000L
 
-    private val scope = MainScope()
     private var job: Job? = null
     private var lastRun = 0L
 
@@ -153,7 +151,7 @@ object StaleSweep {
         if (ms > Settings.tunable(Tunable.SweepQuick) * 1000L || PageFetches.slowLink || !Settings.autoRefresh || !Foreground.shown) return
         if (job?.isActive == true || now - lastRun < Settings.tunable(Tunable.SweepCooldown) * 60_000L) return
         lastRun = now
-        job = scope.launch { sweep() }
+        job = AppScope.launch { sweep() }
     }
 
     private class Stop(val reason: String) : Exception(reason)

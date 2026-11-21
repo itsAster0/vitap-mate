@@ -15,12 +15,12 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.Tunable
@@ -44,7 +44,7 @@ class PushService : FirebaseMessagingService() {
         val data = message.data
         val kind = data["kind"] ?: "-"
         if (kind != "vtop_cookie_request") {
-            MainScope().launch { flow("push.message") { f -> Log.info("push", "message", f, mapOf("kind" to kind)) } }
+            AppScope.launch { flow("push.message") { f -> Log.info("push", "message", f, mapOf("kind" to kind)) } }
             return
         }
         val requestId = data["requestId"] ?: return
@@ -113,7 +113,7 @@ object Push {
     }
 
     internal fun send(context: Context, token: String) {
-        MainScope().launch {
+        AppScope.launch {
             flow("push.token") { f ->
                 val result = runCatching { withContext(Dispatchers.IO) { AppCore.await().setPushToken(f, token) } }
                 Log.info("push", "token", f, mapOf("sent" to "${result.isSuccess}"))

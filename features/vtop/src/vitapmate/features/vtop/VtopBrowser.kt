@@ -242,7 +242,7 @@ internal class VtopBrowser(
         val request = "${++menuSequence}"
         menuRequest = request
         view.evaluateJavascript(VtopScripts.waitForMenu(url, request), null)
-        view.postDelayed({ if (menuRequest == request) menuFailed() }, 11_000)
+        view.postDelayed({ if (this.view != null && menuRequest == request) menuFailed() }, 11_000)
     }
 
     private fun menuFailed() {
@@ -364,6 +364,11 @@ internal class VtopBrowser(
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val uri = request.url
             if (isVtop(uri)) return false
+            val scheme = uri.scheme?.lowercase()
+            if (scheme !in SAFE_SCHEMES) {
+                Log.warn(SRC, "blocked scheme", flow, mapOf("scheme" to scheme.orEmpty(), "main" to request.isForMainFrame.toString()))
+                return true
+            }
             Log.info(SRC, "left VTOP", flow, mapOf("host" to uri.host.orEmpty(), "main" to request.isForMainFrame.toString()))
             // Only a page the student opened goes to the browser; other frames stay blocked.
             if (request.isForMainFrame) {
@@ -433,6 +438,7 @@ internal class VtopBrowser(
 
     companion object {
         const val SRC = "ui.vtop"
+        private val SAFE_SCHEMES = setOf("https", "http", "mailto", "tel")
 
         fun isVtop(uri: Uri) = uri.scheme == "https" && uri.host == Uri.parse(VtopScripts.ORIGIN).host
 

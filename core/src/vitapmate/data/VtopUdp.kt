@@ -9,6 +9,7 @@ import java.net.Inet4Address
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -23,7 +24,7 @@ import vitapmate.core.UdpSocket
  */
 class VtopUdp(context: Context) : UdpNetwork {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
-    private val lookups = CoroutineScope(Dispatchers.IO)
+    private val lookups = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun open(): UdpSocket {
         val socket = DatagramSocket()

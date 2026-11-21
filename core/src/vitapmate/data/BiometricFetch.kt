@@ -22,7 +22,6 @@ import androidx.work.await
 import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -282,7 +281,7 @@ class BiometricFetchStop : BroadcastReceiver() {
         val semester = intent.getStringExtra(BiometricFetchWorker.SEMESTER) ?: return
         val pending = goAsync()
         val app = context.applicationContext
-        MainScope().launch {
+        AppScope.launch {
             try {
                 Settings.load(app)
                 AppCore.start(app)

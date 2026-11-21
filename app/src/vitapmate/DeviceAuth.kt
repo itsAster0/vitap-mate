@@ -23,8 +23,8 @@ fun interface DeviceAuth {
 }
 
 /**
- * The platform's [DeviceAuth]: a phone without a lock passes straight through; API 30+ and 28–29 use
- * [BiometricPrompt] with the screen lock allowed, older ones the keyguard's confirm screen.
+ * The platform's [DeviceAuth]: a phone without a lock passes straight through; API 29+ uses
+ * [BiometricPrompt] with the screen lock allowed, API 28 and older the keyguard's confirm screen.
  */
 @Composable
 fun rememberDeviceAuth(): DeviceAuth {
@@ -41,7 +41,7 @@ fun rememberDeviceAuth(): DeviceAuth {
             val keyguard = context.getSystemService(KeyguardManager::class.java)
             when {
                 keyguard?.isDeviceSecure != true -> onPassed()
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> prompt(context, title, onPassed)
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> prompt(context, title, onPassed)
                 else -> {
                     @Suppress("DEPRECATION")
                     val intent = keyguard.createConfirmDeviceCredentialIntent(title, null)
@@ -57,7 +57,7 @@ fun rememberDeviceAuth(): DeviceAuth {
     }
 }
 
-@androidx.annotation.RequiresApi(Build.VERSION_CODES.P)
+@androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
 private fun prompt(context: Context, title: String, onPassed: () -> Unit) {
     val builder = BiometricPrompt.Builder(context).setTitle(title)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

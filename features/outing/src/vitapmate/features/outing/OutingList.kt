@@ -22,7 +22,6 @@ import com.composables.icons.lucide.DoorOpen
 import com.composables.icons.lucide.Lucide
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.CoreException
@@ -32,6 +31,7 @@ import vitapmate.core.OutingRequest
 import vitapmate.core.OutingResult
 import vitapmate.core.OutingStanding
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.PageHandle
 import vitapmate.data.PageState
 import vitapmate.data.askedOtp
@@ -50,12 +50,6 @@ import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
 import vitapmate.ui.showToast
 
-/**
- * Writes to VTOP run here, not in a screen's scope: leaving the screen must not cut a request off
- * half sent. Their results only show once VTOP answers (no optimistic rows).
- */
-internal val writes = MainScope()
-
 /** What both lists show. */
 private class Summary(val open: Boolean, val notice: String, val facts: List<OutingFact>, val requests: List<OutingRequest>)
 
@@ -68,13 +62,13 @@ internal fun OutingList(kind: OutingKind) {
             val page = rememberPage("outing", { c, f -> c.cachedGeneralOuting(f) }, { c, f -> c.fetchGeneralOuting(f) }, { it.updatedAt }, item = kind.key) { it.requests.size }
             Requests(kind, page, { Summary(it.open, it.notice, it.facts, it.requests) }) { applying = true }
             val form = (page.state as? PageState.Ready)?.data
-            if (applying && form != null) GeneralSheet(form, onDismiss = { applying = false }, onMaybeSent = { writes.launch { refreshAfterWrite(page, "apply") } }) { result -> sent(page, result); applying = false }
+            if (applying && form != null) GeneralSheet(form, onDismiss = { applying = false }, onMaybeSent = { AppScope.launch { refreshAfterWrite(page, "apply") } }) { result -> sent(page, result); applying = false }
         }
         OutingKind.WEEKEND -> {
             val page = rememberPage("outing", { c, f -> c.cachedWeekendOuting(f) }, { c, f -> c.fetchWeekendOuting(f) }, { it.updatedAt }, item = kind.key) { it.requests.size }
             Requests(kind, page, { Summary(it.open, it.notice, it.facts, it.requests) }) { applying = true }
             val form = (page.state as? PageState.Ready)?.data
-            if (applying && form != null) WeekendSheet(form, onDismiss = { applying = false }, onMaybeSent = { writes.launch { refreshAfterWrite(page, "apply") } }) { result -> sent(page, result); applying = false }
+            if (applying && form != null) WeekendSheet(form, onDismiss = { applying = false }, onMaybeSent = { AppScope.launch { refreshAfterWrite(page, "apply") } }) { result -> sent(page, result); applying = false }
         }
     }
 }
@@ -82,7 +76,7 @@ internal fun OutingList(kind: OutingKind) {
 /** VTOP took the request: say so, then show the list VTOP has now. */
 private fun sent(page: PageHandle<*>, result: OutingResult) {
     showToast("Request sent", result.message)
-    writes.launch { refreshAfterWrite(page, "apply") }
+    AppScope.launch { refreshAfterWrite(page, "apply") }
 }
 
 /** Fetches the list again after a write (sent or maybe sent); never throws. */
@@ -184,7 +178,7 @@ private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> 
             confirm = null
             val cancelId = r.cancelId ?: return@CancelDialog
             cancelling = cancelling + r.key
-            writes.launch {
+            AppScope.launch {
                 try {
                     val result = flow("outing.cancel") { id ->
                         Log.info("ui.outing", "cancel", id, mapOf("kind" to kind.key))

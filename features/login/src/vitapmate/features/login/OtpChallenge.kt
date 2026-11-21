@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -15,6 +14,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CoreException
 import vitapmate.core.CoreInterface
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.Gmail
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
@@ -123,7 +123,8 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
             Log.info(src, "otp accepted", lastFlow)
             gmailOtp?.takeIf { it.code == code }?.let { otp ->
                 val flowId = lastFlow
-                tidyScope.launch { Gmail.tidyUp(otp, flowId) }
+                // Gmail clean-up runs after the prompt has closed.
+                AppScope.launch { Gmail.tidyUp(otp, flowId) }
             }
             return true
         } catch (e: CoreException.OtpRejected) {
@@ -240,8 +241,5 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
         }
     }
 }
-
-/** Gmail clean-up after the prompt has closed. */
-private val tidyScope = MainScope()
 
 private const val PULL_TIMEOUT_MS = 8_000L

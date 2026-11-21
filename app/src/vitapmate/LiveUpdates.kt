@@ -15,13 +15,13 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.format.DateFormat
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.ClassSlot
 import vitapmate.core.OutingRequest
 import vitapmate.core.OutingStanding
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.Settings
 import vitapmate.features.timetable.istDay
 import vitapmate.features.timetable.istMinute
@@ -262,7 +262,7 @@ class LiveUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         val app = context.applicationContext
-        MainScope().launch {
+        AppScope.launch {
             try {
                 Settings.load(app)
                 AppCore.start(app)

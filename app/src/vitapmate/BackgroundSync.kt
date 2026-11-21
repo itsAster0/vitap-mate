@@ -21,6 +21,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
@@ -29,6 +30,7 @@ import vitapmate.core.Change
 import vitapmate.core.ChangeKind
 import vitapmate.core.Core
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.Settings
 import vitapmate.data.StoreCap
 import vitapmate.data.VtopSync
@@ -50,6 +52,7 @@ object BackgroundSync {
     private const val WORK = "vtop_sync"
     /** Before channels were per kind; deleted when notifying. */
     private const val OLD_CHANNEL = "changes"
+    private val debugRegistered = AtomicBoolean(false)
 
     /** Whether it can be turned on: OTP auto-fill is set up and working. */
     fun available(): Boolean = OtpAutofill.inUse() != null
@@ -93,10 +96,11 @@ object BackgroundSync {
     fun registerDebugTrigger(context: Context) {
         val app = context.applicationContext
         if (app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE == 0) return
+        if (!debugRegistered.compareAndSet(false, true)) return
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
                 if (!intent.getBooleanExtra("simulate", false)) return runNow(app)
-                kotlinx.coroutines.MainScope().launch {
+                AppScope.launch {
                     coreFlow("dev.simulate_changes", Core::devSimulateChanges)
                     runNow(app)
                 }
@@ -163,7 +167,7 @@ class SeenReceiver : android.content.BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         val app = context.applicationContext
-        kotlinx.coroutines.MainScope().launch {
+        AppScope.launch {
             try {
                 Settings.load(app)
                 AppCore.start(app)

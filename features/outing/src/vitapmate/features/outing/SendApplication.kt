@@ -7,12 +7,13 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.OutingResult
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.askedOtp
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
 /**
- * Sends an application once in flow `outing.apply` (on [writes], so closing the screen doesn't cut
+ * Sends an application once in flow `outing.apply` (on [AppScope], so closing the screen doesn't cut
  * it off). [onResult] gets VTOP's answer; [onError] a failure's words (it may have reached VTOP);
  * an OTP wanted on the way opens the OTP prompt instead. [onDone] runs last either way.
  */
@@ -23,7 +24,7 @@ internal fun sendApplication(
     onError: (String) -> Unit,
     onDone: () -> Unit,
 ) {
-    writes.launch {
+    AppScope.launch {
         try {
             val result = flow("outing.apply") { id ->
                 Log.info("ui.outing", "apply", id, mapOf("kind" to kind))

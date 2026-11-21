@@ -16,7 +16,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -379,7 +378,8 @@ object OtpPrompt {
      */
     fun cancel() {
         message = null
-        scope.launch {
+        // Outlives the prompt, which closes as soon as it is cancelled.
+        AppScope.launch {
             try {
                 coreFlow("otp.cancel", Core::cancelOtp)
             } catch (e: CancellationException) {
@@ -389,7 +389,4 @@ object OtpPrompt {
             }
         }
     }
-
-    // Outlives the prompt, which closes as soon as it is cancelled.
-    private val scope = MainScope()
 }

@@ -20,11 +20,11 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import vitapmate.data.AppScope
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -45,7 +45,6 @@ sealed interface UpdatePill {
  * `app.update_check`; log src `update`.
  */
 object PlayUpdate {
-    private val scope = MainScope()
     private var checked = false
     private var manager: AppUpdateManager? = null
     /** An immediate flow was started: on resume, one Play left half done is resumed. */
@@ -64,7 +63,7 @@ object PlayUpdate {
         if (checked) return
         checked = true
         val manager = AppUpdateManagerFactory.create(activity.applicationContext).also { manager = it }
-        scope.launch {
+        AppScope.launch {
             flow("app.update_check") { f ->
                 val info = fresh(manager, f)
                 val available = info?.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
@@ -108,13 +107,13 @@ object PlayUpdate {
         val manager = manager?.takeIf { immediate } ?: return
         manager.appUpdateInfo.addOnSuccessListener { info ->
             if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS && !activity.isFinishing) {
-                scope.launch { flow("app.update_resume") { f -> startImmediate(activity, manager, info, f) } }
+                AppScope.launch { flow("app.update_resume") { f -> startImmediate(activity, manager, info, f) } }
             }
         }
     }
 
     /** The pill's "Update": Play's flexible flow, which asks first. */
-    fun update(activity: Activity) = scope.launch {
+    fun update(activity: Activity) = AppScope.launch {
         flow("app.update") { f ->
             if (preview) {
                 for (i in 0..20) { pill = UpdatePill.Downloading(i / 20f); delay(150) }
@@ -127,7 +126,7 @@ object PlayUpdate {
     }
 
     /** The pill's "Restart": installs the downloaded update. */
-    fun restart() = scope.launch {
+    fun restart() = AppScope.launch {
         flow("app.update_restart") { f ->
             Log.info("update", "restart", f, mapOf("preview" to "$preview"))
             if (preview) { pill = null; preview = false } else manager?.completeUpdate()
@@ -140,7 +139,7 @@ object PlayUpdate {
     }
 
     /** The blocking screen's "Update": Play's immediate flow, else the app's Play Store page. */
-    fun updateNow(activity: Activity) = scope.launch {
+    fun updateNow(activity: Activity) = AppScope.launch {
         flow("app.update_required") { f ->
             val manager = manager?.takeIf { !preview }
             val info = manager?.let { fresh(it, f) }
