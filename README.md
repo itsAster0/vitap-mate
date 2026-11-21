@@ -75,8 +75,10 @@ The debug key signs debug builds, so you need no keys to build and run the app.
 
 | Workflow | Runs on | Does |
 |---|---|---|
-| App Build | push to `main`, PRs | builds and tests the app, then replaces the `nightly` release |
-| Extension Build | push touching `extension/` | builds the Chrome zip and the signed Firefox `.xpi`, then replaces `extension-latest` |
+| App Build | push to `main`, PRs | builds and tests the app (`core` and `design`), then replaces the `nightly` release |
+| Rust Check | push to `main`, PRs touching `rust/` | runs `cargo fmt --check`, `cargo clippy`, and `cargo test --workspace` |
+| Edge Check | push to `main`, PRs touching `rust/vtop-edge/` | runs type checks and tests for the Cloudflare Worker |
+| Extension Build | push to `main`, PRs touching `extension/` | checks, tests and builds the Chrome zip and Firefox `.xpi`; signs and replaces `extension-latest` on `main` |
 
 ## Troubleshooting
 
