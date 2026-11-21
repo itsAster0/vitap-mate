@@ -13,18 +13,19 @@ run = [
   # API 28 = the app's minSdk (ATrace needs 23+). armeabi-v7a: budget phones with a 64-bit
   # chip on 32-bit Android (Redmi 9A/9i/9C, Galaxy A13/A03), which Play hides 64-bit-only apps from.
   # The .so builds std from source on a pinned nightly (needs rust-src), smaller by
-  # building std for size (optimize_for_size, keeping `backtrace`) and dropping derived Debug fields (`shallow` keeps the variant
-  # names; `none` would blank the logs, since obs.rs formats every tracing field, the
-  # message too, with {:?}). Panics unwind, so a panic fails one call, not the app, and
-  # obs.rs logs its message and file:line.
+  # building std for size (optimize_for_size + panic_immediate_abort, dropping unwind tables,
+  # backtrace and panic location strings) and dropping derived Debug fields (`shallow` keeps
+  # the variant names; `none` would blank the logs, since obs.rs formats every tracing field,
+  # the message too, with {:?}). Android crates deny unwrap/expect/indexing/panic in non-test code.
   # The flags are per Android target and live only in this step: host builds and the
-  # server stay on stable.
+  # server stay on stable with unwind.
   "rustup run nightly-2026-11-01 rustc --version >/dev/null 2>&1 || rustup toolchain install nightly-2026-11-01 --profile minimal --component rust-src --target aarch64-linux-android,armv7-linux-androideabi",
   '''
-  f="-Zfmt-debug=shallow"
-  CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="$f" CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_RUSTFLAGS="$f" \
+  f="-Zfmt-debug=shallow -Zlocation-detail=none -Zunstable-options -Cpanic=immediate-abort -C link-arg=-Wl,--icf=all"
+  CARGO_PROFILE_RELEASE_PANIC=abort \
+    CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="$f" CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_RUSTFLAGS="$f" \
     cargo +nightly-2026-11-01 ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs \
-    build --release -p vtop-ffi -Zbuild-std=std,panic_unwind -Zbuild-std-features=panic-unwind,backtrace,optimize_for_size
+    build --release -p vtop-ffi -Zbuild-std=std,panic_abort -Zbuild-std-features=optimize_for_size
   ''',
   # Bindgen reads the metadata from a host build: the stripped Android .so
   # keeps only dynamic symbols, which bindgen does not read. Same API.
