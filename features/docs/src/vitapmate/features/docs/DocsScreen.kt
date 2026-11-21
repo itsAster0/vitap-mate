@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -243,13 +244,12 @@ private fun SearchRow(query: String, onQuery: (String) -> Unit, sort: DocSort) {
     val scope = rememberCoroutineScope()
     Row(Modifier.padding(bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
         TextField(
-            query,
-            onQuery,
+            vitapmate.ui.rememberSyncedTextFieldState(query, onQuery),
             Modifier.weight(1f).testTag("docs.search"),
             placeholder = { Text("Search documents") },
             leadingIcon = { Icon(Lucide.Search, null, Modifier.size(18.dp)) },
             trailingIcon = { if (query.isNotEmpty()) IconButton({ onQuery("") }) { Icon(Lucide.X, "Clear search", Modifier.size(18.dp)) } },
-            singleLine = true,
+            lineLimits = TextFieldLineLimits.SingleLine,
             shape = RoundedCornerShape(Radii.pill),
             colors = TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
         )

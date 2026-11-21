@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -222,22 +223,20 @@ private fun PlanSummary(planner: Planner, plan: GpaPlan, count: Int, joined: Boo
         ) {
             Row(Modifier.padding(top = Space.md), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                 OutlinedTextField(
-                    planner.cgpa,
-                    { planner.cgpa = it },
+                    vitapmate.ui.rememberSyncedTextFieldState(planner.cgpa) { planner.cgpa = it },
                     Modifier.weight(1f).testTag("grades.plan.cgpa"),
                     label = { Text("Current CGPA") },
                     placeholder = { Text("8.35") },
-                    singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    lineLimits = TextFieldLineLimits.SingleLine,
                 )
                 OutlinedTextField(
-                    planner.completed,
-                    { planner.completed = it },
+                    vitapmate.ui.rememberSyncedTextFieldState(planner.completed) { planner.completed = it },
                     Modifier.weight(1f).testTag("grades.plan.completed"),
                     label = { Text("Completed credits") },
                     placeholder = { Text("54") },
-                    singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    lineLimits = TextFieldLineLimits.SingleLine,
                 )
             }
         }

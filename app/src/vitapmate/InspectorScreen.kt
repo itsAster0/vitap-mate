@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,13 +71,12 @@ fun InspectorScreen() {
             item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        query,
-                        { query = it },
+                        vitapmate.ui.rememberSyncedTextFieldState(query) { query = it },
                         Modifier.fillMaxWidth().testTag("inspector.search"),
                         placeholder = { Text("Search flows by name or id") },
                         leadingIcon = { Icon(Lucide.Search, null) },
                         trailingIcon = if (query.isEmpty()) null else ({ IconButton({ query = "" }) { Icon(Lucide.X, "Clear") } }),
-                        singleLine = true,
+                        lineLimits = TextFieldLineLimits.SingleLine,
                         shape = CircleShape,
                     )
                     LevelChips(min, "inspector.level") { min = it }

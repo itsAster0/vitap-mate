@@ -30,8 +30,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -236,8 +236,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                 Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                 Box(segmentModifier(usernameError != null || rejected), Alignment.CenterStart) {
                 OutlinedTextField(
-                    username,
-                    {
+                    vitapmate.ui.rememberSyncedTextFieldState(username) {
                         username = it
                         usernameError = null
                         rejected = false
@@ -254,8 +253,8 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                         keyboardType = KeyboardType.Ascii,
                         imeAction = ImeAction.Next,
                     ),
-                    keyboardActions = KeyboardActions(onNext = { passwordFocus.requestFocus() }),
-                    singleLine = true,
+                    onKeyboardAction = { passwordFocus.requestFocus() },
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     shape = MaterialTheme.shapes.large,
                     colors = fieldColors,
                 )

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -45,7 +47,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -168,23 +169,22 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
     }
     when (dialog) {
         "rename" -> {
-            var name by remember { mutableStateOf(TextFieldValue(doc.name, TextRange(0, doc.name.length))) }
+            val name = remember { TextFieldState(doc.name, TextRange(0, doc.name.length)) }
             val focus = remember { FocusRequester() }
             LaunchedEffect(Unit) { focus.requestFocus() }
             AppDialog(
                 onDismiss,
                 "Rename document",
                 "Save",
-                { onDismiss(); act("rename") { Docs.rename(doc.id, name.text) } },
+                { onDismiss(); act("rename") { Docs.rename(doc.id, name.text.toString()) } },
                 confirmEnabled = name.text.isNotBlank(),
                 confirmTag = "docs.rename.save",
             ) {
                 OutlinedTextField(
                     name,
-                    { name = it },
                     Modifier.fillMaxWidth().focusRequester(focus).testTag("docs.rename.field"),
                     textStyle = MaterialTheme.typography.bodyLarge,
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                 )
             }
         }

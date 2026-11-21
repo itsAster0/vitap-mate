@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -425,21 +427,21 @@ private suspend fun <T : Any> dev(name: String, work: suspend (Core, String) -> 
 /** Username and password for [Core.devSetAccount]; the password is never saved in instance state. */
 @Composable
 private fun CredentialsDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
-    var username by remember { mutableStateOf("") }
+    val username = rememberTextFieldState()
     var password by remember { mutableStateOf("") }
-    val ok = username.isNotBlank() && password.isNotEmpty()
+    val ok = username.text.isNotBlank() && password.isNotEmpty()
     AppDialog(
         onDismiss,
         "Set credentials",
         "Save",
         {
-            onSave(username.trim(), password)
+            onSave(username.text.toString().trim(), password)
             onDismiss()
         },
         confirmEnabled = ok,
         confirmTag = "dev.account.save",
     ) {
-        OutlinedTextField(username, { username = it }, Modifier.testTag("dev.account.username"), label = { Text("Username") }, singleLine = true)
+        OutlinedTextField(username, Modifier.testTag("dev.account.username"), label = { Text("Username") }, lineLimits = TextFieldLineLimits.SingleLine)
         PasswordField(password, { password = it }, "Password", "dev.account.password", Modifier.padding(top = 12.dp))
     }
 }
@@ -456,16 +458,17 @@ private fun TextDialog(
     onDefault: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var text by remember { mutableStateOf(current) }
+    val text = rememberTextFieldState(current)
+    val value = text.text.toString()
     AppDialog(
         onDismiss,
         title,
         "Save",
         {
-            onSave(text.trim())
+            onSave(value.trim())
             onDismiss()
         },
-        confirmEnabled = check(text),
+        confirmEnabled = check(value),
         confirmTag = "dev.edit.save",
         extra = {
             TextButton({
@@ -477,11 +480,10 @@ private fun TextDialog(
         Text(note)
         OutlinedTextField(
             text,
-            { text = it },
             Modifier.padding(top = 12.dp).testTag("dev.edit.field"),
-            singleLine = true,
-            isError = !check(text),
+            isError = !check(value),
             keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Uri),
+            lineLimits = TextFieldLineLimits.SingleLine,
         )
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -195,8 +196,7 @@ fun AccountScreen() {
                     Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                         Box(Modifier.fillMaxWidth().heightIn(min = 68.dp).clip(segment).background(AppTheme.colors.card), Alignment.CenterStart) {
                             OutlinedTextField(
-                                username,
-                                { username = it },
+                                vitapmate.ui.rememberSyncedTextFieldState(username) { username = it },
                                 Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).testTag("account.username").semantics { contentType = ContentType.Username },
                                 enabled = !saving,
                                 label = { Text("Username") },
@@ -207,7 +207,7 @@ fun AccountScreen() {
                                     keyboardType = KeyboardType.Ascii,
                                     imeAction = ImeAction.Next,
                                 ),
-                                singleLine = true,
+                                lineLimits = TextFieldLineLimits.SingleLine,
                                 shape = MaterialTheme.shapes.large,
                                 colors = fieldColors,
                             )

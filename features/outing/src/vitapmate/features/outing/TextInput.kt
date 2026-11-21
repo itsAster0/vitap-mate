@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -37,13 +40,13 @@ internal fun TextInput(
     val fill = scheme.surfaceContainerHigh
     Column(Modifier.fillMaxWidth()) {
         TextField(
-            value,
-            { if (it.length <= max) onChange(it) },
+            vitapmate.ui.rememberSyncedTextFieldState(value, onChange),
             Modifier.fillMaxWidth().then(if (error != null) Modifier.border(2.dp, scheme.error, shape) else Modifier).testTag(tag),
             label = { Text(label) },
             isError = error != null,
-            singleLine = true,
+            inputTransformation = InputTransformation.maxLength(max),
             keyboardOptions = keyboard,
+            lineLimits = TextFieldLineLimits.SingleLine,
             shape = shape,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = fill,

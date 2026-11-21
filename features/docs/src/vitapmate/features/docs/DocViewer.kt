@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -230,13 +231,12 @@ private val CELL = 132.dp
 @Composable
 private fun ViewerSearch(query: String, onChange: (String) -> Unit) {
     TextField(
-        query,
-        onChange,
+        vitapmate.ui.rememberSyncedTextFieldState(query, onChange),
         Modifier.fillMaxWidth().padding(Space.sm).testTag("docs.viewer.search"),
         placeholder = { Text("Search document") },
         leadingIcon = { Icon(Lucide.Search, null) },
         trailingIcon = { if (query.isNotEmpty()) IconButton({ onChange("") }) { Icon(Lucide.X, "Clear search") } },
-        singleLine = true,
+        lineLimits = TextFieldLineLimits.SingleLine,
         shape = RoundedCornerShape(Radii.pill),
         colors = TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
     )

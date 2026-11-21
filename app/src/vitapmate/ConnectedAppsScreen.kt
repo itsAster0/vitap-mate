@@ -29,8 +29,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -361,17 +363,17 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
         Note("Open the vitapmate extension in Chrome or Firefox, or connect an AI app such as Claude to $MCP_URL. It shows a QR code and a 10-character code.")
         Button(if (busy) null else scan, Modifier.fillMaxWidth().height(60.dp).testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
         OutlinedTextField(
-            text,
-            { text = it.take(16) },
+            vitapmate.ui.rememberSyncedTextFieldState(text) { text = it },
             Modifier.fillMaxWidth().focusRequester(typing).testTag("connected_apps.code"),
             enabled = !busy,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace, letterSpacing = 0.12.em),
             label = { Text("Or type the code") },
             placeholder = { Text("XXXXX-XXXXX") },
             isError = text.isNotBlank() && code == null && text.filter { it.isLetterOrDigit() }.length >= 10,
+            inputTransformation = InputTransformation.maxLength(16),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { code?.let(::pair) }),
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace, letterSpacing = 0.12.em),
+            onKeyboardAction = { code?.let(::pair) },
+            lineLimits = TextFieldLineLimits.SingleLine,
             shape = MaterialTheme.shapes.large,
         )
         Button(code?.takeIf { !busy }?.let { { pair(it) } }, Modifier.fillMaxWidth().testTag("connected_apps.pair_confirm"), variant = ButtonVariant.Outline) {
