@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.foundation.text.input.maxLengthReject
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -44,7 +44,7 @@ internal fun TextInput(
             Modifier.fillMaxWidth().then(if (error != null) Modifier.border(2.dp, scheme.error, shape) else Modifier).testTag(tag),
             label = { Text(label) },
             isError = error != null,
-            inputTransformation = InputTransformation.maxLength(max),
+            inputTransformation = InputTransformation.maxLengthReject(max),
             keyboardOptions = keyboard,
             lineLimits = TextFieldLineLimits.SingleLine,
             shape = shape,
