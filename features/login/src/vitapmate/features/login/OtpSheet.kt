@@ -64,6 +64,8 @@ import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import kotlinx.coroutines.launch
+import vitapmate.core.CoreInterface
+import vitapmate.data.AppCore
 import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ProgressBar
@@ -81,10 +83,16 @@ import vitapmate.ui.nums
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalComposeUiApi::class)
 @Composable
-internal fun OtpSheet(challenge: OtpChallenge, onSubmit: () -> Unit, onResend: () -> Unit, onCancel: () -> Unit) {
+internal fun OtpSheet(
+    challenge: OtpChallenge,
+    onSubmit: () -> Unit,
+    onResend: () -> Unit,
+    onCancel: () -> Unit,
+    core: suspend () -> CoreInterface = { AppCore.await() },
+) {
     val scheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
-    LaunchedEffect(challenge, challenge.round) { challenge.countDown() }
+    LaunchedEffect(challenge, challenge.round) { challenge.countDown(core) }
     val submit by rememberUpdatedState(onSubmit)
     LaunchedEffect(challenge, challenge.round) { challenge.autofill { if (challenge.canSubmit) submit() } }
     fun minimize(open: Boolean) {

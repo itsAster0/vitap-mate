@@ -47,6 +47,7 @@ import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
 import vitapmate.observability.logAction
 import vitapmate.ui.EmptyView
+import vitapmate.ui.LocalOpenDetail
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.is24Hour
 import vitapmate.ui.isoWeekday
@@ -167,9 +168,21 @@ private fun TimetableContent(tt: Timetable) {
             }
         }
     }
+    val openDetail = LocalOpenDetail.current
     sheet?.let { c ->
         val labFat = c.state == ClassDay.LAB_FAT
-        ClassSheet(c.slot, if (labFat) null else ext.attendance.forSlot(c.slot), labFat, h24, onDismiss = { sheet = null })
+        ClassSheet(
+            c.slot,
+            if (labFat) null else ext.attendance.forSlot(c.slot),
+            labFat,
+            h24,
+            onDismiss = { sheet = null },
+            onOpenAttendance = { record ->
+                sheet = null
+                scope.logAction("timetable.attendance", "ui.timetable", "open attendance ${record.key}", mapOf("course" to record.key))
+                openDetail.open("attendance", record.key, record.name.ifBlank { record.code })
+            },
+        )
     }
 }
 

@@ -12,27 +12,40 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.FileLink
 import vitapmate.data.AppCore
+import vitapmate.data.DocKind
 import vitapmate.data.Docs
 import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.DetailOpener
 import vitapmate.ui.showToast
 
 /**
  * Flow `coursepage.file`: Android's DownloadManager fetches the VTOP file from the link Rust signs
  * ([Docs.download]), it moves to the download folder (Docs) as document `coursepage:<id>` (source
- * `coursepage`) and opens in the phone's viewer. With [keep], a copy
- * already in Docs opens without fetching (lecture material and syllabi don't change); otherwise the
- * new copy replaces it. Failures are a toast; a re-login's OTP opens its prompt instead.
+ * `coursepage`), and opens in Docs' built-in viewer when supported (else the phone's viewer). With
+ * [keep], a copy already in Docs opens without fetching (lecture material and syllabi don't
+ * change); otherwise the new copy replaces it. Failures are a toast; a re-login's OTP opens its
+ * prompt instead.
  */
-internal suspend fun openCourseFile(context: Context, id: String, kind: String, keep: Boolean, fetch: suspend (Core, String) -> FileLink) {
+internal suspend fun openCourseFile(
+    context: Context,
+    opener: DetailOpener,
+    id: String,
+    kind: String,
+    keep: Boolean,
+    fetch: suspend (Core, String) -> FileLink,
+) {
     try {
         flow("coursepage.file") { f ->
             val (doc, kept) = Docs.download(context, "coursepage:$id", "coursepage", f, reuse = keep) { withContext(Dispatchers.IO) { fetch(AppCore.await(), f) } }
             Log.info("ui.coursepage", "file ready", f, mapOf("kind" to kind, "kept" to "$kept", "bytes" to "${doc.size}"))
+            if (doc.kind != DocKind.File) {
+                opener.open("docs", doc.id, doc.name)
+                return@flow
+            }
             Docs.opened(doc.id)
-            // TODO(docs): open in the Docs viewer once core has a way to; the phone's viewer until then.
             val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(doc.file.substringAfterLast('.', "").lowercase()) ?: "*/*"
             val uri = Docs.uriOf(doc).let { if (it.scheme == "file") FileProvider.getUriForFile(context, "${context.packageName}.logs", File(it.path!!)) else it }
             try {

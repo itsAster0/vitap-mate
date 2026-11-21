@@ -29,8 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Award
+import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Clock
 import com.composables.icons.lucide.Hash
 import com.composables.icons.lucide.Lucide
@@ -45,6 +47,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.clock
 import vitapmate.ui.formatMinutes
 import vitapmate.ui.nums
+import vitapmate.ui.tappable
 
 private val WEEKDAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
@@ -54,7 +57,14 @@ private val WEEKDAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Fri
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ClassSheet(slot: ClassSlot, record: AttendanceCourse?, labFat: Boolean, h24: Boolean, onDismiss: () -> Unit) {
+fun ClassSheet(
+    slot: ClassSlot,
+    record: AttendanceCourse?,
+    labFat: Boolean,
+    h24: Boolean,
+    onDismiss: () -> Unit,
+    onOpenAttendance: (AttendanceCourse) -> Unit = {},
+) {
     val scheme = MaterialTheme.colorScheme
 
     // One tile of the group: its label with the icon over the value.
@@ -115,7 +125,7 @@ fun ClassSheet(slot: ClassSlot, record: AttendanceCourse?, labFat: Boolean, h24:
             when {
                 labFat -> Note("Lab FAT: this session doesn't count towards attendance.")
                 record == null -> Note("No attendance for this course yet. It shows here once VTOP counts a class.")
-                else -> AttendanceBox(record)
+                else -> AttendanceBox(record) { onOpenAttendance(record) }
             }
         }
     }
@@ -132,12 +142,15 @@ private fun Note(text: String) = Text(
 /** The course's attendance: a ring with the percentage, VTOP's "x of y", and the advice when the setting is on. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AttendanceBox(record: AttendanceCourse) {
+private fun AttendanceBox(record: AttendanceCourse, onClick: () -> Unit) {
     val tone = toneOf(record)
     val skips = Settings.showSkipAdvice
-    // TODO(attendance): tap to open the course's attendance details once a shared route exists.
     Row(
-        Modifier.fillMaxWidth().background(tone.subtle, MaterialTheme.shapes.extraLarge).padding(16.dp).testTag("timetable.sheet.attendance"),
+        Modifier.fillMaxWidth()
+            .tappable(onClick, "Open attendance details", Role.Button, haptic = true)
+            .background(tone.subtle, MaterialTheme.shapes.extraLarge)
+            .padding(16.dp)
+            .testTag("timetable.sheet.attendance"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -155,5 +168,7 @@ private fun AttendanceBox(record: AttendanceCourse) {
             Text(if (skips) record.advice else "Attendance", style = MaterialTheme.typography.titleSmallEmphasized, color = tone.onSubtle)
             Text("${record.attended} of ${record.total} attended", style = MaterialTheme.typography.bodyMedium.nums(), color = tone.onSubtle)
         }
+        Spacer(Modifier.width(8.dp))
+        Icon(Lucide.ChevronRight, null, Modifier.size(18.dp), tint = tone.onSubtle.copy(alpha = 0.7f))
     }
 }

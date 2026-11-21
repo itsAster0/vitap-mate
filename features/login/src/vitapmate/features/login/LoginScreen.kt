@@ -95,7 +95,6 @@ import vitapmate.ui.Space
  * core (a stand-in in previews). Flows `login.sign_in`, `login.submit_otp`, `login.resend_otp`,
  * `login.cancel_otp`; log src `ui.login`. Fills from and offers to save to the phone's password
  * manager ([SavedPasswords]).
- * TODO: server / UDP sign-in and email-OTP auto-fill go here (not in the prototype).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -340,6 +339,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                 otp = null
                 scope.logAction("login.cancel_otp", "ui.login", "otp cancelled")
             },
+            core = core,
         )
     }
 }

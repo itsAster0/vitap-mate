@@ -31,7 +31,11 @@ internal fun OtpPill(challenge: OtpChallenge, onClick: () -> Unit, modifier: Mod
             Icon(Lucide.ShieldCheck, null, Modifier.size(18.dp))
             Spacer(Modifier.width(Space.sm))
             Text(
-                if (challenge.remaining > 0) "OTP · ${clock(challenge.remaining)}" else "OTP expired · Resend",
+                when {
+                    challenge.remaining > 0 -> "OTP · ${clock(challenge.remaining)}"
+                    challenge.resending -> "OTP · Resending…"
+                    else -> "OTP expired · Resend"
+                },
                 style = MaterialTheme.typography.labelLargeEmphasized.nums(),
             )
         }

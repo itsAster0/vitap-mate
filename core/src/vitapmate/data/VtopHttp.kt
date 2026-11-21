@@ -65,8 +65,15 @@ class VtopHttp(private val inspectProxy: String?, private val inspectCas: List<S
         val conn = URL(request.url).openConnection(proxy) as HttpURLConnection
         continuation.invokeOnCancellation { conn.disconnect() }
         Dispatchers.IO.asExecutor().execute {
-            runCatching { blocking(conn, request) }
-                .fold(continuation::resume) { e -> continuation.resumeWithException(if (e is IOException) failure(e) else e) }
+            runCatching { blocking(conn, request) }.fold(
+                onSuccess = { response ->
+                    if (continuation.isActive) continuation.resume(response)
+                    else request.downloadTo?.let { File(it).delete() }
+                },
+                onFailure = { e ->
+                    if (continuation.isActive) continuation.resumeWithException(if (e is IOException) failure(e) else e)
+                },
+            )
         }
     }
 
@@ -87,7 +94,15 @@ class VtopHttp(private val inspectProxy: String?, private val inspectCas: List<S
         val headers = conn.headerFields.flatMap { (name, values) -> if (name == null) emptyList() else values.map { Header(name, it) } }
         val stream = (if (code >= 400) conn.errorStream else conn.inputStream) ?: ByteArray(0).inputStream()
         return stream.use { input ->
-            val saved = request.downloadTo?.let { path -> File(path).outputStream().use { input.copyTo(it) } }
+            val saved = request.downloadTo?.let { path ->
+                val target = File(path)
+                try {
+                    target.outputStream().use { input.copyTo(it) }
+                } catch (e: Throwable) {
+                    target.delete()
+                    throw e
+                }
+            }
             HttpResponse(code.toUShort(), headers, request.url, if (saved == null) input.readBytes() else ByteArray(0), saved?.toULong())
         }
     }

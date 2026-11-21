@@ -33,7 +33,8 @@ private const val EXPIRED_MESSAGE = "The code expired. Ask for a new one to cont
  * or a network failure, keeps the prompt open with the reason; anything else is thrown to the
  * caller. Flows are `<prefix>.submit_otp` / `<prefix>.resend_otp` and lines go to [src]; the sheet
  * adds `<prefix>.minimize_otp` / `<prefix>.reopen_otp` (src `ui.otp`).
- * With mail forwarding or Gmail set up ([OtpAutofill]), [autofill] fills in the code. TODO: auto-resend.
+ * With mail forwarding or Gmail set up ([OtpAutofill]), [autofill] fills in the code and
+ * [countDown] asks VTOP for a new code once if the first round expires without one.
  */
 @Stable
 class OtpChallenge(vtopMessage: String, val prefix: String, private val src: String) {
@@ -70,19 +71,42 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
     var round by mutableIntStateOf(0)
         private set
 
+    /** At most one automatic resend per challenge when auto-fill is active and the first round expires. */
+    private var autoResent = false
+
     val canResend get() = remaining == 0 && !submitting && !resending
     val canSubmit get() = !submitting && !resending && code.length == 6
 
-    /** The countdown; run it in a `LaunchedEffect(challenge, challenge.round)`. */
-    suspend fun countDown() {
+    private val willAutoResend get() = !autoResent && OtpAutofill.inUse() != null
+
+    /**
+     * The countdown; run it in a `LaunchedEffect(challenge, challenge.round)`. When OTP auto-fill
+     * is active and the first round expires without an accepted code, calls [resend] once so a
+     * delayed or lost first email doesn't stall sign-in.
+     */
+    suspend fun countDown(core: (suspend () -> CoreInterface)? = null) {
         while (remaining > 0) {
             delay(1000)
-            if (remaining == 0) return // a rejected, expired code stopped it
+            if (remaining == 0) break // a rejected, expired code stopped it
             if (--remaining == 0) {
                 Log.info(src, "otp expired")
                 message = EXPIRED_MESSAGE
                 error = "This code has expired."
             }
+        }
+        // Wait for any in-flight verification to settle; if accepted, this effect is cancelled.
+        while (submitting) delay(100)
+        if (canResend && !autoResent && core != null && OtpAutofill.inUse() != null) {
+            autoResent = true
+            Log.info(src, "otp auto-resend after expiry")
+            try {
+                resend(core())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                error = problemOf(e, "").message
+            }
+            if (remaining == 0) minimized = false
         }
     }
 
@@ -212,7 +236,7 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
             }
             Log.info(src, if (filled.isEmpty()) "no otp from $where" else "no otp from $where accepted", id, mapOf("pulls" to "$pulls", "filled" to "${filled.size}"))
             source = null
-            minimized = false
+            if (!resending && !willAutoResend) minimized = false
         }
     }
 }

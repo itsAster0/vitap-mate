@@ -41,13 +41,20 @@ data class Feature(
 )
 
 
-/** Opens the current feature's [Feature.detail] for `item`, titled `title`. */
-fun interface DetailOpener {
-    fun open(item: String, title: String)
+/** Opens a feature's [Feature.detail] for `item`, titled `title` (the current feature by default, or another by id). */
+class DetailOpener(
+    private val current: String = "",
+    private val push: (feature: String, item: String, title: String) -> Unit = { _, _, _ -> },
+) {
+    fun open(item: String, title: String) {
+        if (current.isNotEmpty()) push(current, item, title)
+    }
+
+    fun open(feature: String, item: String, title: String) = push(feature, item, title)
 }
 
-/** Provided by the app for each feature's screens. */
-val LocalOpenDetail = staticCompositionLocalOf { DetailOpener { _, _ -> } }
+/** Provided by the app for each feature's screens and details. */
+val LocalOpenDetail = staticCompositionLocalOf { DetailOpener() }
 
 /**
  * Space a feature's scrolling content leaves at the bottom so its last item clears the floating

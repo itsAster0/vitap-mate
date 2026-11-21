@@ -71,13 +71,14 @@ import vitapmate.ui.rememberSyncedPager
 private enum class DetailTab(val label: String) { Overview("Overview"), Calculator("Calculator") }
 
 /**
- * One course, inside [CourseSheet] ([key] is [AttendanceCourse.key], enough to reload after process death),
+ * One course, inside [CourseSheet] (with [title]) or as a pushed detail screen ([title] null; the
+ * app bar holds it). [key] is [AttendanceCourse.key], enough to reload after process death;
  * `page.attendance_detail` (the saved history first, then VTOP), in two tabs over a pager:
  * Overview (percentage, counts, [Insights], every class day by day) and [Calculator].
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun CourseDetail(key: String, title: String) {
+internal fun CourseDetail(key: String, title: String? = null) {
     val page = rememberPage(
         "attendance_detail",
         { core, flow -> core.cachedAttendanceDetail(flow, key) },
@@ -102,7 +103,7 @@ internal fun CourseDetail(key: String, title: String) {
     val ready = state as? PageState.Ready
     val busy = state is PageState.Loading || ready?.refreshing == true
     // The title, and beside it the refresh (a pull would drag the sheet).
-    Row(Modifier.fillMaxWidth().padding(start = Space.xl, end = Space.sm, bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
+    if (title != null) Row(Modifier.fillMaxWidth().padding(start = Space.xl, end = Space.sm, bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
             Modifier.weight(1f),
@@ -119,7 +120,7 @@ internal fun CourseDetail(key: String, title: String) {
             if (busy) LoadingIndicator(Modifier.size(24.dp)) else Icon(Lucide.RefreshCw, "Refresh", Modifier.size(20.dp))
         }
     }
-    PageScaffold(state, { page.refresh("retry") }, isEmpty = { false }, empty = {}, pullToRefresh = false) { detail ->
+    PageScaffold(state, { page.refresh(if (title != null) "retry" else "pull") }, isEmpty = { false }, empty = {}, pullToRefresh = title == null) { detail ->
         val course = detail.course
         // A swipe that lands on the other tab selects it.
         val pager = rememberSyncedPager(DetailTab.entries, tab) { landed ->

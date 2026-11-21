@@ -12,6 +12,7 @@ import androidx.annotation.RequiresApi
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
@@ -58,12 +59,47 @@ class VtopHttpEngine(context: Context) : HttpTransport {
 
     private suspend fun exchange(request: HttpRequest): HttpResponse = suspendCancellableCoroutine { continuation ->
         val body = ByteArrayOutputStream()
-        val file = request.downloadTo?.let { FileOutputStream(File(it)) }
+        val target = request.downloadTo?.let(::File)
+        var file: FileOutputStream? = null
         var saved = 0L
         var redirect: UrlResponseInfo? = null
 
+        fun closeFile() {
+            val stream = file ?: return
+            file = null
+            runCatching { stream.close() }
+        }
+
+        fun cleanup() {
+            closeFile()
+            target?.delete()
+        }
+
+        fun failWrite(e: IOException, r: UrlRequest? = null) {
+            cleanup()
+            r?.cancel()
+            if (continuation.isActive) {
+                continuation.resumeWithException(TransportException.Other("${e::class.java.simpleName}: ${e.message}"))
+            }
+        }
+
         fun answer(info: UrlResponseInfo, whole: Boolean) {
-            file?.close()
+            if (whole) {
+                val stream = file
+                file = null
+                try {
+                    stream?.close()
+                } catch (e: IOException) {
+                    failWrite(e)
+                    return
+                }
+            } else {
+                closeFile()
+            }
+            if (!continuation.isActive) {
+                if (whole) target?.delete()
+                return
+            }
             val host = request.url.substringAfter("://").substringBefore('/')
             if (protocols.put(host, info.negotiatedProtocol) != info.negotiatedProtocol) {
                 Log.info("http", "engine protocol", fields = mapOf("host" to host, "protocol" to info.negotiatedProtocol))
@@ -73,7 +109,7 @@ class VtopHttpEngine(context: Context) : HttpTransport {
             val headers = info.headers.asList
                 .filterNot { decoded && (it.key.equals("content-encoding", true) || it.key.equals("content-length", true)) }
                 .map { Header(it.key, it.value) }
-            val saving = file != null && whole
+            val saving = target != null && whole
             continuation.resume(HttpResponse(info.httpStatusCode.toUShort(), headers, request.url, if (saving) ByteArray(0) else body.toByteArray(), if (saving) saved.toULong() else null))
         }
 
@@ -83,13 +119,33 @@ class VtopHttpEngine(context: Context) : HttpTransport {
                 r.cancel()
             }
 
-            override fun onResponseStarted(r: UrlRequest, info: UrlResponseInfo) = r.read(ByteBuffer.allocateDirect(64 * 1024))
+            override fun onResponseStarted(r: UrlRequest, info: UrlResponseInfo) {
+                if (target != null) {
+                    try {
+                        file = FileOutputStream(target)
+                    } catch (e: IOException) {
+                        failWrite(e, r)
+                        return
+                    }
+                }
+                r.read(ByteBuffer.allocateDirect(64 * 1024))
+            }
 
             override fun onReadCompleted(r: UrlRequest, info: UrlResponseInfo, buffer: ByteBuffer) {
                 buffer.flip()
-                if (file != null) {
-                    saved += buffer.remaining()
-                    file.channel.write(buffer)
+                val stream = file
+                if (stream != null) {
+                    try {
+                        val channel = stream.channel
+                        while (buffer.hasRemaining()) {
+                            val written = channel.write(buffer)
+                            if (written <= 0) throw IOException("short write to download file")
+                            saved += written
+                        }
+                    } catch (e: IOException) {
+                        failWrite(e, r)
+                        return
+                    }
                 } else {
                     body.write(ByteArray(buffer.remaining()).also(buffer::get))
                 }
@@ -100,13 +156,13 @@ class VtopHttpEngine(context: Context) : HttpTransport {
             override fun onSucceeded(r: UrlRequest, info: UrlResponseInfo) = answer(info, whole = true)
 
             override fun onFailed(r: UrlRequest, info: UrlResponseInfo?, error: HttpException) {
-                file?.close()
-                continuation.resumeWithException(failure(error))
+                cleanup()
+                if (continuation.isActive) continuation.resumeWithException(failure(error))
             }
 
             override fun onCanceled(r: UrlRequest, info: UrlResponseInfo?) {
                 val at = redirect
-                if (at != null) answer(at, whole = false) else file?.close()
+                if (at != null) answer(at, whole = false) else cleanup()
             }
         }
         val builder = engine.newUrlRequestBuilder(request.url, executor, callback)

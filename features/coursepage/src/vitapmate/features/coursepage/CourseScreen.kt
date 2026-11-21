@@ -70,6 +70,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
+import vitapmate.ui.LocalOpenDetail
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.SectionHeader
 import vitapmate.ui.SkeletonList
@@ -142,6 +143,7 @@ private fun SectionPicker(view: CourseView, onPick: (String) -> Unit) {
 @Composable
 private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
     val context = LocalContext.current
+    val opener = LocalOpenDetail.current
     val scope = rememberCoroutineScope()
     val now by rememberNow()
     val today = epochDayOf(now)
@@ -154,7 +156,7 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
             busy = busy + key
             scope.launch {
                 try {
-                    openCourseFile(context, "${plan.classId}:$key", kind, keep, fetch)
+                    openCourseFile(context, opener, "${plan.classId}:$key", kind, keep, fetch)
                 } finally {
                     busy = busy - key
                 }

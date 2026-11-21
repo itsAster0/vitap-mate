@@ -154,9 +154,13 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder, onSignedOut: () 
         is Route.FlowLog -> FlowScreen(route.flow)
         is Route.Detail -> {
             val detail = featureById(route.feature)?.detail ?: return Page(route.title, "detail") { ComingSoon(route.feature) }
+            val nav = LocalNav.current
             Page(route.title, "detail.${route.feature}") { padding ->
                 Box(Modifier.padding(top = padding.calculateTopPadding())) {
-                    CompositionLocalProvider(LocalContentPadding provides PaddingValues(bottom = padding.calculateBottomPadding())) {
+                    CompositionLocalProvider(
+                        LocalContentPadding provides PaddingValues(bottom = padding.calculateBottomPadding()),
+                        LocalOpenDetail provides DetailOpener(route.feature) { feature, item, title -> nav.push(Route.Detail(feature, item, title)) },
+                    ) {
                         detail(route.item)
                     }
                 }
@@ -179,13 +183,14 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder, onSignedOut: () 
             else -> {
                 val f = featureById(route.id) ?: return Page(route.id, route.id) { ComingSoon(route.id) }
                 if (f.fullScreen) return Box(Modifier.fillMaxSize().testTag("screen.${f.id}")) { f.content() }
+                val nav = LocalNav.current
                 Page(f.label, f.id, f.actions) { padding ->
                     Box(Modifier.padding(top = padding.calculateTopPadding()).padding(horizontal = 8.dp)) {
-                        CompositionLocalProvider(LocalContentPadding provides PaddingValues(bottom = padding.calculateBottomPadding())) {
-                            val nav = LocalNav.current
-                            CompositionLocalProvider(LocalOpenDetail provides DetailOpener { item, title -> nav.push(Route.Detail(f.id, item, title)) }) {
-                                tabStates.SaveableStateProvider("tab.${f.id}") { f.content() }
-                            }
+                        CompositionLocalProvider(
+                            LocalContentPadding provides PaddingValues(bottom = padding.calculateBottomPadding()),
+                            LocalOpenDetail provides DetailOpener(f.id) { feature, item, title -> nav.push(Route.Detail(feature, item, title)) },
+                        ) {
+                            tabStates.SaveableStateProvider("tab.${f.id}") { f.content() }
                         }
                     }
                 }
