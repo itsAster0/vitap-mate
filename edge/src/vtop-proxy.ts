@@ -4,7 +4,7 @@
 // phone uses this origin as VTOP's, so redirects and cookies are kept on it.
 // Only VTOP's own `/vtop/` paths are forwarded, to VTOP and nowhere else.
 
-import { error } from "./common";
+import { error, notFound } from "./common";
 
 export const VTOP_ORIGIN = "https://vtop.vitap.ac.in";
 
@@ -97,7 +97,7 @@ export async function proxyVtop(
   timeoutMs = VTOP_TIMEOUT_MS,
 ): Promise<Response> {
   const url = new URL(req.url);
-  if (!isVtopPath(url.pathname)) return error(404, "not_found", "No such route.");
+  if (!isVtopPath(url.pathname)) return notFound();
   const proxy = url.origin;
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
@@ -132,6 +132,8 @@ export async function proxyVtop(
     if (abort.signal.aborted) return error(504, "vtop_timeout", "VTOP took too long to answer.");
     // The phone reached us, so this is VTOP being down, not the phone.
     console.log(`vtop-proxy: VTOP unreachable: ${e}`);
+    // Legacy: 502 here, 503 for the same code elsewhere. The app's proxy
+    // route reads a JSON 502-504 as the edge failing (vtop-ffi route.rs).
     return error(502, "vtop_unreachable", "VTOP can't be reached right now.");
   } finally {
     clearTimeout(timer);

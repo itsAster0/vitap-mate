@@ -3,7 +3,8 @@
 
 import { vi } from "vitest";
 
-import { Account, loadAccount, prepareAccountDb, saveAccount } from "../src/account";
+import { Account } from "../src/account";
+import { loadAccount, prepareAccountDb, saveAccount } from "../src/account-db";
 import type { AccountRecord } from "../src/account-state";
 import type { Env } from "../src/common";
 import { memorySql } from "./memory-sql";

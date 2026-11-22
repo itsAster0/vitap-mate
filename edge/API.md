@@ -1,8 +1,15 @@
 # vtop-edge API
 
 The Worker at `https://vmate.aster0.dev`. JSON in and out unless noted.
-Errors are `{ "code": "...", "error": "human text" }` with the HTTP status.
-Times are unix seconds unless a field says RFC 3339.
+Errors are `{ "code": "...", "error": "human text" }` with the HTTP status;
+`code` is snake_case and stable, `error` is for people, and a few add fields
+(`stale_time` adds `serverTime`). Every route answers `404 not_found` for no
+such route, `405 method_not_allowed` for a known path with another method,
+`400 bad_request` for a body that is not the JSON it wants, and `500
+internal_error` when the edge fails. Exceptions: `/vtop/*` and `/mcp` pass the
+upstream answer on, OAuth's `/register` and `/token` use RFC 6749's `{ error,
+error_description }`, and the `/vtop/*` proxy answers `502 vtop_unreachable`
+(503 elsewhere). Times are unix seconds unless a field says RFC 3339.
 
 ## Auth
 
@@ -34,7 +41,7 @@ msg = "vm1\n" + METHOD + "\n" + pathWithQuery + "\n" + time + "\n" + hex(sha256(
   `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 - The edge sends base64url without padding and accepts it with or without.
 - Same scheme as `vtop_shared::device_sig` (test vector in
-  `src/auth.test.ts`).
+  `rust/vtop-shared/vectors/device_sig.json`).
 
 Failures, before the route runs:
 
@@ -46,6 +53,74 @@ Failures, before the route runs:
 
 A body may be sent deflate-raw compressed with `x-vtop-encoding:
 deflate-raw` (up to 1 MiB inflated), on every JSON route.
+
+## Routes
+
+Every route, with its auth kind; the sections below give the details.
+
+<!-- routes:start -->
+<!-- Made from src/routes.ts by `bun run docs`; do not edit. -->
+
+| Method | Path | Auth | Summary |
+|---|---|---|---|
+| GET | `/healthz` | none | Service, version and Cloudflare location. |
+| ANY | `/vtop/*` | none | Compression proxy to VTOP for phones. |
+| POST | `/v1/devices/register` | signed | Registers an install's keys; returns its device id. |
+| POST | `/v1/devices/update` | signed | Changes the install's FCM token, label or seal key. |
+| POST | `/v1/devices/info` | signed | The install as the edge keeps it. |
+| POST | `/v1/devices/delete` | signed | Deletes the install, optionally leaving its address and account. |
+| GET | `/v1/events` | signed | The install's event log: catch-up, WebSocket or server-sent events. |
+| GET | `/v1/udp` | signed | The UDP gateway's host, ports and keys. |
+| POST | `/v1/app/status` | signed | A linked phone's view of its account. |
+| POST | `/v1/app/session/clear` | signed | Drops the account's cached VTOP session. |
+| POST | `/v1/app/login` | signed | Has the server sign in with the saved credentials. |
+| POST | `/v1/mail-otp/register` | signed | Makes a forwarding address for this install. |
+| POST | `/v1/mail-otp/delete` | signed | Leaves the address, or deletes it. |
+| POST | `/v1/mail-otp/inbox` | signed | The latest sealed OTP and Gmail confirmation. |
+| POST | `/v1/mail-otp/owner` | signed | Ties the address to the VTOP student. |
+| POST | `/v1/mail-otp/reclaim` | signed | Joins this install to the student's address. |
+| POST | `/v1/mail-otp/devices` | signed | The installs on the address. |
+| POST | `/v1/mail-otp/devices/remove` | signed | Takes another install off the address. |
+| POST | `/v1/vtop/fetch` | signed | Fetches a page on the engine. |
+| POST | `/v1/vtop/fetch-batch` | signed | Fetches several pages of a semester in one call. |
+| POST | `/v1/vtop/login` | signed | Signs in to VTOP on the engine. |
+| POST | `/v1/vtop/login/otp` | signed | Sends the sign-in OTP. |
+| POST | `/v1/vtop/login/resend` | signed | Asks VTOP to send the OTP again. |
+| GET | `/v1/whoami` | key | The access key's account and settings. |
+| POST | `/v1/session` | key | A VTOP session: cached, or a pending request. |
+| GET | `/v1/session/requests/{id}` | key | Polls a pending session request. |
+| POST | `/v1/session/expire` | key | Drops the cached session. |
+| POST | `/v1/pair` | none | The extension polls for the key made for its code. |
+| POST | `/v1/pair/info` | none | Whether a pairing code is a browser's or an MCP client's. |
+| POST | `/v1/link` | signed | Links this phone to the student's account. |
+| POST | `/v1/keys` | signed | Makes an access key. |
+| POST | `/v1/keys/revoke` | signed | Revokes an access key. |
+| POST | `/v1/keys/outings` | signed | Lets a key apply for outings, or not. |
+| POST | `/v1/keys/move` | signed | Moves keys from unlinked phones to this one. |
+| POST | `/v1/account` | signed | The account view. |
+| POST | `/v1/account/forget-credentials` | signed | Forgets the saved password. |
+| POST | `/v1/account/delete` | signed | Deletes the account. |
+| POST | `/v1/account/settings` | signed | Changes the account settings. |
+| POST | `/v1/account/semester` | signed | Sets the semester agents use. |
+| POST | `/v1/account/remove-phone` | signed | Unlinks a phone. |
+| POST | `/v1/account/clear-sign-ins` | signed | Drops the sign-in history. |
+| POST | `/v1/session/answer` | signed | A phone's answer to a session request. |
+| POST | `/v1/account/credentials-rejected` | signed | VTOP rejected the password on the phone. |
+| GET | `/.well-known/oauth-protected-resource` | none | RFC 9728 resource metadata. |
+| GET | `/.well-known/oauth-protected-resource/mcp` | none | RFC 9728 resource metadata. |
+| GET | `/.well-known/oauth-authorization-server` | none | RFC 8414 server metadata. |
+| GET | `/.well-known/oauth-authorization-server/mcp` | none | RFC 8414 server metadata. |
+| GET | `/authorize` | none | The pairing page for an MCP client. |
+| POST | `/register` | none | Registers an MCP client (RFC 7591). |
+| POST | `/token` | none | Swaps a code and PKCE verifier for an access key. |
+| POST | `/authorize/poll` | none | The pairing page polls for approval. |
+| ANY | `/mcp` | key | MCP, passed on to the engine. |
+| ANY | `/mcp/{key}` | key | MCP with the key in the path, passed on to the engine. |
+| POST | `/internal/mail-otp/await` | internal | The engine waits for a student's next OTP. |
+| POST | `/internal/udp-keys` | internal | The UDP gateway reports its keys. |
+| POST | `/internal/accounts/login-done` | internal | The engine reports a server sign-in. |
+
+<!-- routes:end -->
 
 ## Health
 
@@ -133,7 +208,7 @@ read page comes from it.
   page's `data` as `/v1/vtop/fetch` answers it. A page with other arguments
   stands in for one not recorded (another day's biometrics).
 - Recorded from a real account (a debuggable app with `demo_record.json` in
-  its data folder), then `bun run demo <recording>` in `rust/vtop-edge` swaps
+  its data folder), then `bun run demo <recording>` in `edge/` swaps
   in a made-up student and fails if a personal value is left.
 
 ## Devices
@@ -377,7 +452,11 @@ one session in one round trip:
 
 ## MCP
 
-`/mcp`, `/mcp/<key>`: passed to `ENGINE_URL` unchanged (the client's own
+| Route | Auth | Notes |
+|---|---|---|
+| `/mcp`, `/mcp/<key>` | key | any method, passed to the engine |
+
+Passed to `ENGINE_URL` unchanged (the client's own
 `Authorization: Bearer vtm_…` or path key `/mcp/vtm_…` included), with
 `x-forwarded-for` set to the client's address. On `/mcp` or `/mcp/` without
 an `Authorization` header (except `OPTIONS`) the edge answers `401` itself
@@ -401,7 +480,7 @@ are `{ error, error_description }` (RFC 6749), `cache-control: no-store`.
 | `GET /.well-known/oauth-authorization-server`, `…/mcp` | none | — | RFC 8414: `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `response_types_supported: ["code"]`, `grant_types_supported: ["authorization_code"]`, `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none"]`, `authorization_response_iss_parameter_supported: true` |
 | `POST /register` | none | RFC 7591 JSON: `redirect_uris` (1–5), `client_name?`, `grant_types?` (must include `authorization_code`) | `201 { client_id, client_id_issued_at, client_name, redirect_uris, grant_types, response_types, token_endpoint_auth_method: "none" }`; `400 invalid_redirect_uri`, `400 invalid_client_metadata` |
 | `GET /authorize` | none | `response_type=code`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method=S256`, `state?`, `resource?`, `scope?` (ignored) | the pairing page (HTML); `400` page for an unknown client or unregistered `redirect_uri` (nothing is sent to it); other errors go back to `redirect_uri` with `error`, `error_description`, `state`, `iss` |
-| `POST /authorize/poll` | none | `{ poll }` (from the page) | `202 { status: "pending", pollAfterMs }`, `200 { status: "ready", redirect }`, `410 { status: "expired" }` |
+| `POST /authorize/poll` | none | `{ poll }` (from the page) | `202 { status: "pending", pollAfterMs }`, `200 { status: "ready", redirect }`, `410 { status: "expired", code: "request_expired", error }` (`400` with `bad_request` for a malformed `poll`) |
 | `POST /token` | none | form: `grant_type=authorization_code`, `code`, `client_id`, `redirect_uri`, `code_verifier`, `resource?` | `{ access_token: "vtm_…", token_type: "Bearer" }`; `400 invalid_grant` (unknown, used or expired code, other client, other `redirect_uri`, verifier mismatch), `unsupported_grant_type`, `invalid_request`, `invalid_target` |
 
 Rules:

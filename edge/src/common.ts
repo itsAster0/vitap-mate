@@ -37,9 +37,33 @@ export function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-/** `{"code", "error"}`, as the bridge answers. */
-export function error(status: number, code: string, message: string): Response {
-  return Response.json({ code, error: message }, { status });
+/** Extra fields after `code` and `error`, and headers, of an error reply. */
+export type ErrorInit = { fields?: Record<string, unknown>; headers?: HeadersInit };
+
+/** The body of every error the edge answers with: `{ code, error }`, as
+ * the bridge answers too. `code` is snake_case and stable (clients match
+ * on it); `error` is human text. */
+export function errorBody(code: string, message: string, fields?: Record<string, unknown>): Record<string, unknown> {
+  return { code, error: message, ...fields };
+}
+
+/** An error reply, `{ code, error }` with `status`. Every route answers its
+ * errors with this, except OAuth's RFC 6749 errors (oauth.ts). */
+export function error(status: number, code: string, message: string, init: ErrorInit = {}): Response {
+  return Response.json(errorBody(code, message, init.fields), { status, headers: init.headers });
+}
+
+export function notFound(): Response {
+  return error(404, "not_found", "No such route.");
+}
+
+export function methodNotAllowed(): Response {
+  return error(405, "method_not_allowed", "Method not allowed.");
+}
+
+/** A route threw: the Worker answers this instead of Cloudflare's page. */
+export function internalError(): Response {
+  return error(500, "internal_error", "Something went wrong on the server. Try again.");
 }
 
 /** `GET /healthz`: the service, its version and the Cloudflare location

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { memorySql } from "../test/memory-sql";
-import { loadAccount, prepareAccountDb, saveAccount } from "./account";
+import { loadAccount, prepareAccountDb, saveAccount } from "./account-db";
 import { AccountRecord } from "./account-state";
 
 const NOW = 1_800_000_000;

@@ -9,6 +9,7 @@ import type { Env } from "./common";
 import type { DeviceInfo } from "./device";
 import worker from "./index";
 import { fromBase64Url, toBase64Url } from "./shared/base64";
+import { MAIL_OWNER } from "./shared/engine-api";
 
 const T = 1_800_000_000;
 const SECRET = "test-secret";
@@ -354,7 +355,7 @@ describe("mail-otp tokens", () => {
     const m = mailEnv();
     const token = await owned(m);
     expect(claimsOf(token)).toMatchObject({ sub: "22BCE0001", dev: deviceId });
-    expect(m.engine).toEqual(["/internal/mail-otp/owner"]);
+    expect(m.engine).toEqual([MAIL_OWNER]);
 
     const owner = await m.post("/v1/mail-otp/owner", { id: "k3f9x2ab7q", accountToken: token });
     expect(owner.status).toBe(204);
@@ -363,7 +364,7 @@ describe("mail-otp tokens", () => {
     expect(reclaim.status).toBe(200);
     expect(await reclaim.json()).toMatchObject({ id: "k3f9x2ab7q" });
     expect(reclaim.headers.has(TOKEN_HEADER)).toBe(false);
-    expect(m.engine).toEqual(["/internal/mail-otp/owner"]);
+    expect(m.engine).toEqual([MAIL_OWNER]);
 
     // By cookie, reclaim issues one too.
     const byCookie = await m.post("/v1/mail-otp/reclaim", { session: { cookies: "A=1" } });

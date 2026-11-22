@@ -6,14 +6,15 @@ import type { Env } from "./common";
 import type { DeviceInfo } from "./device";
 import worker from "./index";
 import { toBase64Url } from "./shared/base64";
+import vector from "../../rust/vtop-shared/vectors/device_sig.json";
 
 const EDGE = "https://vmate.aster0.dev";
 const T = 1_800_000_000;
 
 // vtop-shared's `device_sig` test vector.
-const VECTOR_SEED = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA";
-const VECTOR_PUBLIC = "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ";
-const VECTOR_SIG = "t56VLtrjIqH8PQQHcZZIoPNs43L0LSjOwAWk4dYtKYTCuwDHxsIGtfb6LhQGuJ3_uUAmXBSVs7enz4oqtPWRCw";
+const VECTOR_SEED = vector.seed;
+const VECTOR_PUBLIC = vector.public;
+const VECTOR_SIG = vector.sig;
 
 const seed = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 const signKey = ed25519.getPublicKey(seed);
@@ -81,9 +82,13 @@ describe("device signatures", () => {
   it("match vtop-shared's test vector", async () => {
     expect(toBase64Url(seed)).toBe(VECTOR_SEED);
     expect(toBase64Url(signKey)).toBe(VECTOR_PUBLIC);
-    const body = new TextEncoder().encode('{"a":1}');
+    const body = new TextEncoder().encode(vector.body);
+    expect(new TextDecoder().decode(signedMessage(vector.method, vector.path, String(vector.time), body))).toBe(vector.message);
     const req = (sig: string) =>
-      new Request(`${EDGE}/v1/devices/register`, { method: "POST", headers: { "x-vm-time": String(T), "x-vm-sig": sig } });
+      new Request(`${EDGE}${vector.path}`, {
+        method: vector.method,
+        headers: { "x-vm-time": String(vector.time), "x-vm-sig": sig },
+      });
     expect(await checkSignature(req(VECTOR_SIG), body, signKey)).toBeNull();
     // Padding on input is accepted too.
     expect(await checkSignature(req(`${VECTOR_SIG}==`), body, signKey)).toBeNull();
@@ -93,7 +98,7 @@ describe("device signatures", () => {
   it("hash an empty body as SHA-256 of nothing", () => {
     const message = new TextDecoder().decode(signedMessage("get", "/v1/events?after=3", String(T), new Uint8Array()));
     expect(message).toBe(
-      `vm1\nGET\n/v1/events?after=3\n${T}\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+      `vm1\nGET\n/v1/events?after=3\n${T}\n${vector.emptyBodySha256}`,
     );
   });
 

@@ -6,7 +6,7 @@
 // that accepts it (the engine compresses its own hop too), or a page the
 // engine packed with the phone's page dictionary, passed on byte for byte.
 
-import { error, type Env, variable } from "./common";
+import { error, type Env, methodNotAllowed, notFound, variable } from "./common";
 
 /** Phone route → engine route. Bodies pass through unchanged. */
 export const PHONE_ROUTES: Record<string, string> = {
@@ -37,8 +37,8 @@ export async function phoneVtop(
   timeoutMs = ENGINE_TIMEOUT_MS,
 ): Promise<Response> {
   const enginePath = PHONE_ROUTES[new URL(req.url).pathname];
-  if (!enginePath) return error(404, "not_found", "No such route.");
-  if (req.method !== "POST") return error(405, "method_not_allowed", "Use POST.");
+  if (!enginePath) return notFound();
+  if (req.method !== "POST") return methodNotAllowed();
   if (body.byteLength > MAX_BODY_BYTES) return error(413, "too_large", "The request is too large.");
 
   const abort = new AbortController();

@@ -7,7 +7,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 
-import { type Env, error, now } from "./common";
+import { type Env, notFound, now, unknownDevice } from "./common";
 import { send } from "./fcm";
 import * as sql from "./sql";
 
@@ -250,10 +250,10 @@ export class Device extends DurableObject<Env> {
   override async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
     if (req.method !== "GET" || url.pathname !== "/v1/events") {
-      return error(404, "not_found", "No such route.");
+      return notFound();
     }
     const doc = this.doc();
-    if (!doc) return error(404, "unknown_device", "This install is not registered.");
+    if (!doc) return unknownDevice();
     const after = Number.parseInt(url.searchParams.get("after") ?? "", 10);
     const events = this.eventsAfter(Number.isSafeInteger(after) && after > 0 ? after : 0);
     if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") {

@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { KEY_PREFIX, hash, hashesEqual, randomToken } from "./tokens";
 import { accountId } from "./engine-api";
+import vectors from "../../../rust/vtop-shared/vectors/tokens.json";
 
 describe("tokens", () => {
   it("hashes as vtop-shared does", () => {
     // vtop-shared's `hashes_are_hex_sha256`.
-    expect(hash("a")).toBe("ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb");
+    for (const v of vectors.hashes) expect(hash(v.secret)).toBe(v.hash);
   });
 
   it("makes prefixed random tokens", () => {
@@ -22,6 +23,6 @@ describe("tokens", () => {
   });
 
   it("makes account ids as the engine does", () => {
-    expect(accountId(" 23abc4567 ")).toBe("23ABC4567");
+    for (const v of vectors.accountIds) expect(accountId(v.registrationNumber)).toBe(v.id);
   });
 });

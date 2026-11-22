@@ -25,7 +25,7 @@ import { DurableObject } from "cloudflare:workers";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, randomBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 
-import { type Env, mcpUrl, now, str, variable } from "./common";
+import { type Env, badRequest, error, mcpUrl, methodNotAllowed, now, str, variable } from "./common";
 import { pairCode } from "./pair";
 import { qrSvg } from "./qr";
 import { toBase64Url } from "./shared/base64";
@@ -331,12 +331,14 @@ export function challenge(env: Env): string {
 
 /** `/mcp` with no bearer token: where to get one. */
 export function unauthorized(env: Env): Response {
-  return Response.json(
-    { code: "unauthorized", error: "Connect with OAuth or an access key from the app." },
-    { status: 401, headers: { "www-authenticate": challenge(env) } },
-  );
+  return error(401, "unauthorized", "Connect with OAuth or an access key from the app.", {
+    headers: { "www-authenticate": challenge(env) },
+  });
 }
 
+/** Legacy exception to `{ code, error }`: `/register`, `/token` (and
+ * `/authorize`'s redirects) answer RFC 6749's `{ error, error_description }`,
+ * which every OAuth client reads. */
 function oauthError(error: string, description: string, status = 400): Response {
   return Response.json({ error, error_description: description }, { status, headers: { "cache-control": "no-store" } });
 }
@@ -470,12 +472,16 @@ export async function poll(req: Request, env: Env): Promise<Response> {
   } catch {
     // Read as unknown below.
   }
-  if (!/^[0-9a-f]{64}$/.test(id)) return Response.json({ status: "expired" }, { status: 400 });
+  // `status` is what the pairing page reads; `code` and `error` as everywhere.
+  if (!/^[0-9a-f]{64}$/.test(id)) return error(400, "bad_request", "poll must be a poll id.", { fields: { status: "expired" } });
   const polled = await oauthStub(env).poll(id, issuer(env), now());
   if (polled.status === "ready") console.log("oauth: an authorize request was approved");
   const headers = { "cache-control": "no-store" };
   if (polled.status === "pending") return Response.json({ ...polled, pollAfterMs: POLL_AFTER_MS }, { status: 202, headers });
-  return Response.json(polled, { status: polled.status === "ready" ? 200 : 410, headers });
+  if (polled.status === "expired") {
+    return error(410, "request_expired", "The sign-in request expired.", { fields: { status: "expired" }, headers });
+  }
+  return Response.json(polled, { headers });
 }
 
 /** `POST /token`: authorization_code with PKCE, form-encoded. */
@@ -511,7 +517,7 @@ export async function token(req: Request, env: Env): Promise<Response> {
  * client behind an authorize page's code, or `{ kind: "browser" }`. */
 export async function pairInfo(body: Record<string, unknown> | null, env: Env): Promise<Response> {
   const code = pairCode(str(body?.code));
-  if (code === null) return Response.json({ code: "bad_request", error: "code must be a pairing code." }, { status: 400 });
+  if (code === null) return badRequest("code must be a pairing code.");
   const app = await oauthStub(env).pending(code, now());
   return Response.json(app ? { kind: "mcp", ...app } : { kind: "browser" });
 }
@@ -529,18 +535,14 @@ export async function handle(req: Request, env: Env, path: string): Promise<Resp
   ];
   if (open.includes(path)) {
     if (method === "OPTIONS") return cors(new Response(null, { status: 204 }));
-    if (path.startsWith("/.well-known/oauth-protected-resource")) return cors(method === "GET" ? protectedResource(env) : notAllowed());
-    if (path.startsWith("/.well-known/")) return cors(method === "GET" ? authorizationServer(env) : notAllowed());
-    if (method !== "POST") return cors(notAllowed());
+    if (path.startsWith("/.well-known/oauth-protected-resource")) return cors(method === "GET" ? protectedResource(env) : methodNotAllowed());
+    if (path.startsWith("/.well-known/")) return cors(method === "GET" ? authorizationServer(env) : methodNotAllowed());
+    if (method !== "POST") return cors(methodNotAllowed());
     return cors(path === "/register" ? await register(req, env) : await token(req, env));
   }
-  if (path === "/authorize") return method === "GET" ? authorize(req, env) : notAllowed();
-  if (path === "/authorize/poll") return method === "POST" ? poll(req, env) : notAllowed();
+  if (path === "/authorize") return method === "GET" ? authorize(req, env) : methodNotAllowed();
+  if (path === "/authorize/poll") return method === "POST" ? poll(req, env) : methodNotAllowed();
   return null;
-}
-
-function notAllowed(): Response {
-  return Response.json({ code: "method_not_allowed", error: "Method not allowed." }, { status: 405 });
 }
 
 // ---- the page -----------------------------------------------------------------

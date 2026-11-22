@@ -1,20 +1,20 @@
 import { x25519 } from "@noble/curves/ed25519.js";
-import { utf8ToBytes } from "@noble/hashes/utils.js";
+import { hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { describe, expect, it } from "vitest";
 
 import { fromBase64Url, toBase64Url } from "./base64";
+import vector from "../../../rust/vtop-shared/vectors/mail_seal.json";
 import { isPublicKey, open, seal, sealWith } from "./mail-seal";
 
-// The inputs and box of vtop-shared's `vector_matches_the_worker`: the app
-// and the engine open what the edge seals only while these agree.
-const VECTOR_SECRET = new Uint8Array(32).fill(7);
-const VECTOR_EPHEMERAL = new Uint8Array(32).fill(9);
-const VECTOR_NONCE = new Uint8Array(12).fill(3);
-const VECTOR_ID = "k3f9x2ab7q";
-const VECTOR_PLAINTEXT = '{"kind":"otp","code":"401295","sentAt":1760000000}';
-const VECTOR_PUBLIC = "E75P6uryBMf9M1j8nAByGIHRdCeBKCJ-xnTzf3_pe20";
-const VECTOR_BOX =
-  "AVfbSzWfI65eFG5OJRIFZwRyJQY0jBUMFHU9DJM9BNQhAwMDAwMDAwMDAwMDnR9M8IRFhOh0oPy3nhcTWiVq8Xs8ocPlv23PRQgSBmfqtiQ3PzC4XkT7cks8QLqiNiJ4346hVr5T_nZryOFoQRCE";
+// The inputs and box vtop-shared's `vector_matches_the_worker` checks too:
+// the app and the engine open what the edge seals only while these agree.
+const VECTOR_SECRET = hexToBytes(vector.secret);
+const VECTOR_EPHEMERAL = hexToBytes(vector.ephemeral);
+const VECTOR_NONCE = hexToBytes(vector.nonce);
+const VECTOR_ID = vector.mailboxId;
+const VECTOR_PLAINTEXT = vector.plaintext;
+const VECTOR_PUBLIC = vector.public;
+const VECTOR_BOX = vector.box;
 
 function keypair() {
   const { secretKey, publicKey } = x25519.keygen();

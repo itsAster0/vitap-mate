@@ -8,8 +8,8 @@
 #                              sent on every call to the engine, required
 #                              on /internal/*
 #   ACCOUNT_TOKEN_SECRET       signs account tokens (account-token.ts)
-# The engine (vtop-bridge) runs on Railway from ../Dockerfile.engine, at
-# ENGINE_URL below; UDP mode's gateway runs on the VPS (../vps) and reports
+# The engine (vtop-bridge) runs on Railway from ../rust/Dockerfile.engine, at
+# ENGINE_URL below; UDP mode's gateway runs on the VPS (../rust/vps) and reports
 # its host, ports and keys to POST /internal/udp-keys.
 #
 # A new Worker (the old `vitapmate-edge` on vmate-api.aster0.dev is left

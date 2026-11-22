@@ -3,6 +3,7 @@
 // session first, how a request looks to its client. No Worker APIs here,
 // so it is tested on its own.
 
+import { errorBody } from "./common";
 import { KEY_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
 
 /** How long a cached session is handed out before a new one is fetched. */
@@ -615,7 +616,7 @@ export class RequestRecord {
   /** The reply of a poll, and its status code. */
   pollView(now: number): { status: number; body: unknown } {
     if (now >= this.expiresAt && this.status === "pending") {
-      return { status: 410, body: { code: "request_expired", error: "The session request expired." } };
+      return { status: 410, body: errorBody("request_expired", "The session request expired.") };
     }
     switch (this.status) {
       case "pending":
@@ -624,7 +625,9 @@ export class RequestRecord {
         return { status: 200, body: ready(this.cookies ?? "", sourceView(this.source, null, false)) };
       case "error": {
         const error = this.error ?? "";
-        return { status: 200, body: { status: "error", code: errorCode(error), error } };
+        // A poll that worked, about a request that failed: 200, with the
+        // error fields as every error reply has them.
+        return { status: 200, body: { status: "error", ...errorBody(errorCode(error), error) } };
       }
     }
   }

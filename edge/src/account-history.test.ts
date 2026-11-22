@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { accountObject } from "../test/account-harness";
 import { AccountRecord, RequestRecord } from "./account-state";
-import { gmailGrantOf, keyVia } from "./account";
+import { keyVia } from "./account";
+import { gmailGrantOf } from "./account-db";
 
 function linked(): AccountRecord {
   const at = Math.floor(Date.now() / 1000);

@@ -41,13 +41,17 @@ import {
   enginePost,
   error,
   healthBody,
+  internalError,
   isInternal,
   jsonBody,
+  methodNotAllowed,
+  notFound,
   notInternal,
   now,
   ownerStub,
   parseJson,
   str,
+  unknownDevice,
   variable,
 } from "./common";
 import type { DeviceChanges } from "./device";
@@ -144,7 +148,7 @@ async function deviceUpdate(auth: Signed, env: Env): Promise<Response> {
 /** `POST /v1/devices/info`: the install as the edge keeps it. */
 async function deviceInfo(auth: Signed, env: Env): Promise<Response> {
   const summary = await deviceStub(env, auth.device.id).summary();
-  return summary ? Response.json({ deviceId: auth.device.id, ...summary }) : error(404, "unknown_device", "This install is not registered.");
+  return summary ? Response.json({ deviceId: auth.device.id, ...summary }) : unknownDevice();
 }
 
 /** `POST /v1/devices/delete`: the install deletes itself. With `mailbox`
@@ -450,7 +454,23 @@ const SIGNED: Record<string, (auth: Signed, req: Request, env: Env) => Promise<R
   ),
 };
 
+/** Paths of the signed routes, to tell a wrong method from no route. */
+const SIGNED_PATHS = new Set(["/v1/devices/register", ...Object.keys(SIGNED).map((key) => key.split(" ")[1])]);
+
 // ---- entry points -----------------------------------------------------------
+
+/** Every reply but `/vtop/*` and `/mcp` (passed on) and OAuth's RFC 6749
+ * errors is the route's own or `{ code, error }` (common.ts `error`); a
+ * throw becomes `500 internal_error` instead of Cloudflare's HTML page. */
+async function fetchHandler(req: Request, env: Env): Promise<Response> {
+  try {
+    return await route(req, env);
+  } catch (e) {
+    const path = new URL(req.url).pathname;
+    console.log(`edge: ${req.method} ${path} threw: ${e}`);
+    return account.handles(path) ? withCors(internalError(), req.headers.get("origin"), env) : internalError();
+  }
+}
 
 async function route(req: Request, env: Env): Promise<Response> {
   const path = new URL(req.url).pathname;
@@ -465,7 +485,7 @@ async function route(req: Request, env: Env): Promise<Response> {
     const auth = await signed(req, env);
     return auth instanceof Response ? auth : phoneRoute(auth, req, env);
   }
-  if (path in PHONE_ROUTES) return error(405, "method_not_allowed", "Use POST.");
+  if (SIGNED_PATHS.has(path)) return methodNotAllowed();
   if (method === "POST" && path === "/internal/mail-otp/await") return mailAwait(req, env);
   if (method === "POST" && path === "/internal/udp-keys") return udpKeys(req, env);
   if (path.startsWith("/internal/accounts/")) return account.internal(req, env, path);
@@ -474,11 +494,11 @@ async function route(req: Request, env: Env): Promise<Response> {
     const response = method === "OPTIONS" ? empty() : await account.handle(req, env, path);
     return withCors(response, origin, env);
   }
-  if (path.startsWith("/internal/")) return error(404, "not_found", "No such route.");
+  if (path.startsWith("/internal/")) return notFound();
   const oauthReply = await oauth.handle(req, env, path);
   if (oauthReply) return oauthReply;
   if (path === "/mcp" || path.startsWith("/mcp/")) return mcp(req, env, path);
-  return error(404, "not_found", "No such route.");
+  return notFound();
 }
 
 /** `/mcp` (and `/mcp/<key>`): a client with neither an `Authorization`
@@ -586,6 +606,6 @@ async function handToWaiters(env: Env, id: string, payload: Payload, plaintext: 
 }
 
 export default {
-  fetch: route,
+  fetch: fetchHandler,
   email,
 } satisfies ExportedHandler<Env>;

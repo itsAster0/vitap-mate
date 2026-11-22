@@ -59,10 +59,7 @@ export async function checkSignature(req: Request, body: Uint8Array, signKey: Ui
   if (!/^\d{1,12}$/.test(time) || sig?.length !== 64) return badSignature();
   const serverTime = now();
   if (Math.abs(serverTime - Number(time)) > MAX_SKEW_SECS) {
-    return Response.json(
-      { code: "stale_time", error: "The phone's clock is off; correct it by serverTime.", serverTime },
-      { status: 401 },
-    );
+    return error(401, "stale_time", "The phone's clock is off; correct it by serverTime.", { fields: { serverTime } });
   }
   const url = new URL(req.url);
   const message = signedMessage(req.method, `${url.pathname}${url.search}`, time, body);

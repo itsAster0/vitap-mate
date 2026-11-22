@@ -5,7 +5,7 @@
 // - Edge: the `vmate-edge` Worker on vmate.aster0.dev, its Durable Objects
 //   and secrets (wrangler.toml is kept for `wrangler dev` and the tests).
 // - Engine: Railway `engine-v2` in the `vitapmate` project, built from
-//   ../Dockerfile.engine.
+//   ../rust/Dockerfile.engine.
 // - Gateway: the UDP gateway on the Linode fedora-in-maa (Chennai), built on nest (x86_64,
 //   over NetBird; GATEWAY_BUILDER), pushed to GHCR (public) and run over SSH as
 //   the `vitapmate-gateway` container. GATEWAY_SSH is the Docker host, e.g.
@@ -36,7 +36,7 @@ export const Engine = Effect.gen(function* () {
   return yield* Railway.Service("Engine", {
     project,
     name: "engine-v2",
-    context: "..",
+    context: "../rust",
     dockerfilePath: "Dockerfile.engine",
     port: 8080,
     env: {
@@ -107,7 +107,7 @@ export const Gateway = Effect.gen(function* () {
       username: yield* Config.String("GHCR_USERNAME").pipe(Config.withDefault("itsAster0")),
       password: yield* Config.Redacted("GHCR_TOKEN"),
     },
-    build: { context: "..", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
+    build: { context: "../rust", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
   });
   return yield* Docker.Container("Gateway", {
     context: host,
