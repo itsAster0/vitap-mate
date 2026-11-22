@@ -2,6 +2,18 @@ package vitapmate.features.docs
 
 import vitapmate.ui.rememberHaptics
 import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
+import com.composables.icons.lucide.CheckCheck
+import com.composables.icons.lucide.EllipsisVertical
+import com.composables.icons.lucide.Share2
+import com.composables.icons.lucide.SquareCheckBig
+import com.composables.icons.lucide.Trash2
+import vitapmate.ui.AppDialog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -112,8 +124,9 @@ private val pickable = arrayOf(
 )
 
 /**
- * Docs (the Flutter app's `docs_page.dart`): saved files in a grid, searchable and sorted, the
- * last opened one in a "Continue viewing" card; tap opens the viewer, long press the actions.
+ * Docs (the Flutter app's `docs_page.dart`): saved files in a grid, searchable, sorted and
+ * filtered by kind, the last opened one in a "Continue viewing" card; tap opens the viewer, long
+ * press starts selecting (share, delete, or the actions for one).
  * Flows `docs.open/import/view/rename/delete/share`, log src `ui.docs` (counts and kinds only).
  */
 @Composable
@@ -124,10 +137,19 @@ internal fun DocsScreen() {
     var query by rememberSaveable { mutableStateOf("") }
     var actions by remember { mutableStateOf<String?>(null) }
     var asMenu by rememberSaveable { mutableStateOf(false) }
+    var kind by rememberSaveable { mutableStateOf<DocKind?>(null) }
+    // Ids picked by a long press; non-empty is selection mode.
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val all = Docs.docs
     val sort = Docs.sort
-    val shown = remember(all, sort, query) { queryDocs(all, sort, query) }
-    val searching = query.isNotBlank()
+    val kinds = remember(all) { all.map { it.kind }.distinct().sorted() }
+    val shown = remember(all, sort, query, kind) { queryDocs(all, sort, query, kind) }
+    val searching = query.isNotBlank() || kind != null
+    val picked = remember(all, selected) { all.filter { it.id in selected } }
+    val selecting = picked.isNotEmpty()
+    BackHandler(selecting) { selected = emptySet() }
+    val toggle = { doc: Doc -> selected = if (doc.id in selected) selected - doc.id else selected + doc.id }
 
     // What the student changed in the folder outside the app, caught up each time Docs opens.
     LaunchedEffect(Unit) { Docs.refresh() }
@@ -202,7 +224,20 @@ internal fun DocsScreen() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }, key = "search") { SearchRow(query, { query = it }, sort) }
+        if (kinds.size > 1) item(span = { GridItemSpan(maxLineSpan) }, key = "kinds") { KindChips(kinds, kind) { kind = it } }
         item(span = { GridItemSpan(maxLineSpan) }, key = "count") {
+            if (selecting) return@item SelectionBar(
+                picked.size,
+                allShown = shown.all { it.id in selected },
+                onClear = { selected = emptySet() },
+                onAll = { selected = if (shown.all { it.id in selected }) emptySet() else selected + shown.map { it.id } },
+                onShare = {
+                    scope.logAction("docs.share", SRC, "share ${picked.size}")
+                    shareAll(context, picked)
+                },
+                onDelete = { confirmDelete = true },
+                onMore = picked.singleOrNull()?.let { { actions = it.id; selected = emptySet() } },
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(start = Space.xs)) {
                     Text(
@@ -232,10 +267,74 @@ internal fun DocsScreen() {
             }
         }
         itemsIndexed(shown, key = { _, d -> d.id }) { i, doc ->
-            DocCard(doc, i, Modifier.animateItem(), onOpen = { open(doc) }, onLongPress = { actions = doc.id })
+            DocCard(doc, i, Modifier.animateItem(), doc.id in selected, onOpen = { if (selecting) toggle(doc) else open(doc) }, onLongPress = { toggle(doc) })
         }
     }
     actions?.let(Docs::byId)?.let { DocActions(it, scope) { actions = null } }
+    if (confirmDelete) {
+        val gone = picked
+        AppDialog(
+            { confirmDelete = false },
+            if (gone.size == 1) "Delete \"${gone.single().name}\"?" else "Delete ${gone.size} documents?",
+            "Delete",
+            {
+                confirmDelete = false
+                selected = emptySet()
+                scope.launch {
+                    try {
+                        flow("docs.delete") { f ->
+                            gone.forEach { Docs.remove(it.id) }
+                            Log.info(SRC, "delete", f, mapOf("deleted" to "${gone.size}", "count" to "${Docs.docs.size}"))
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        Log.warn(SRC, "delete failed: ${e::class.simpleName}")
+                        showToast("Something went wrong", "Please try again.")
+                    }
+                }
+            },
+            icon = Lucide.Trash2,
+            danger = true,
+            confirmTag = "docs.delete.confirm",
+        ) { Text("Their files are removed from the download folder too.") }
+    }
+}
+
+/** Selection mode's bar in place of the count: how many, select all, share, delete, and the actions for one. */
+@Composable
+private fun SelectionBar(count: Int, allShown: Boolean, onClear: () -> Unit, onAll: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit, onMore: (() -> Unit)?) {
+    val danger = AppTheme.tones.danger
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.pill)).background(MaterialTheme.colorScheme.secondaryContainer).padding(4.dp).testTag("docs.selection"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClear, Modifier.testTag("docs.selection.clear")) { Icon(Lucide.X, "Stop selecting") }
+        Text("$count selected", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+        IconButton(onAll, Modifier.testTag("docs.selection.all")) { Icon(if (allShown) Lucide.SquareCheckBig else Lucide.CheckCheck, if (allShown) "Select none" else "Select all") }
+        IconButton(onShare, Modifier.testTag("docs.selection.share")) { Icon(Lucide.Share2, "Share") }
+        IconButton(onDelete, Modifier.testTag("docs.selection.delete")) { Icon(Lucide.Trash2, "Delete", tint = danger.base) }
+        if (onMore != null) IconButton(onMore, Modifier.testTag("docs.selection.more")) { Icon(Lucide.EllipsisVertical, "More") }
+    }
+}
+
+/** One chip per kind in Docs, with All; picking one shows only that kind. */
+@Composable
+private fun KindChips(kinds: List<DocKind>, picked: DocKind?, onPick: (DocKind?) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = Space.xs).testTag("docs.kinds")) {
+        item { FilterChip(picked == null, { onPick(null) }, { Text("All") }, Modifier.testTag("docs.kind.all")) }
+        items(kinds) { k ->
+            FilterChip(picked == k, { onPick(if (picked == k) null else k) }, { Text(kindsLabel(k)) }, Modifier.testTag("docs.kind.${k.name.lowercase()}"))
+        }
+    }
+}
+
+private fun kindsLabel(kind: DocKind) = when (kind) {
+    DocKind.Pdf -> "PDFs"
+    DocKind.Image -> "Images"
+    DocKind.Spreadsheet -> "Sheets"
+    DocKind.Text -> "Text"
+    DocKind.File -> "Other"
 }
 
 @Composable
@@ -315,12 +414,13 @@ private fun openedLabel(ms: Long?): String {
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun DocCard(doc: Doc, index: Int, modifier: Modifier, onOpen: () -> Unit, onLongPress: () -> Unit) {
+private fun DocCard(doc: Doc, index: Int, modifier: Modifier, selected: Boolean, onOpen: () -> Unit, onLongPress: () -> Unit) {
     val (tone, icon) = visualOf(doc)
     val haptics = rememberHaptics()
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val press by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.96f else 1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
+    val press by androidx.compose.animation.core.animateFloatAsState(if (pressed || selected) 0.94f else 1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
+    val ring by animateColorAsState(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
     // Cards rise in one after another the first time the grid shows.
     val enter = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -337,6 +437,7 @@ private fun DocCard(doc: Doc, index: Int, modifier: Modifier, onOpen: () -> Unit
             }
             .clip(RoundedCornerShape(26.dp))
             .background(AppTheme.colors.card)
+            .border(3.dp, ring, RoundedCornerShape(26.dp))
             .combinedClickable(interaction, null, onClick = onOpen, onLongClick = {
                 haptics.longPress()
                 onLongPress()
@@ -355,7 +456,13 @@ private fun DocCard(doc: Doc, index: Int, modifier: Modifier, onOpen: () -> Unit
                 Icon(icon, null, Modifier.size(22.dp), tint = tone.base)
             }
             Spacer(Modifier.weight(1f))
-            ToneBadge(kindLabel(doc), tone = Tone(tone.base, MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), tone.onSubtle))
+            if (selected) {
+                Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.primary, CircleShape), Alignment.Center) {
+                    Icon(Lucide.Check, "Selected", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                }
+            } else {
+                ToneBadge(kindLabel(doc), tone = Tone(tone.base, MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), tone.onSubtle))
+            }
         }
         Column(Modifier.weight(1f).padding(start = 14.dp, top = 10.dp, end = 14.dp, bottom = 14.dp)) {
             Text(doc.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)

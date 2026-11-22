@@ -50,8 +50,6 @@ import vitapmate.ui.ButtonVariant
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Space
-import vitapmate.ui.SystemPdf
-import vitapmate.ui.systemPdfSupported
 
 /**
  * The outing pass from Docs ([item] `<general|weekend>:<pass id>`) drawn page by page at the screen's
@@ -65,24 +63,16 @@ internal fun PassScreen(item: String) {
     val passId = item.substringAfter(':')
     val context = LocalContext.current
     var pages by remember { mutableStateOf<List<Bitmap>?>(null) }
-    // The saved pass in Jetpack PDF's viewer, where the platform has it (sharp when zoomed at the gate).
-    var uri by remember { mutableStateOf<String?>(null) }
     var failure by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
     BoxWithConstraints(Modifier.fillMaxSize().testTag("outing.pass.screen"), Alignment.Center) {
         val widthPx = with(LocalDensity.current) { (maxWidth - Space.lg * 2).roundToPx() }.coerceAtLeast(1)
         LaunchedEffect(passId, attempt, widthPx) {
             failure = null
-            uri = null
             try {
                 pages = flow("outing.pass") { id ->
                     val doc = passDoc(context, kind, passId, id)
                     Docs.opened(doc.id)
-                    if (doc.uri.isNotEmpty() && systemPdfSupported()) {
-                        Log.info("ui.outing", "pass shown", id, mapOf("kind" to kind.key, "viewer" to "system"))
-                        uri = doc.uri
-                        return@flow emptyList()
-                    }
                     withContext(Dispatchers.IO) { render(Docs.open(doc), widthPx) }
                         .also { Log.info("ui.outing", "pass shown", id, mapOf("kind" to kind.key, "pages" to "${it.size}")) }
                 }
@@ -95,14 +85,7 @@ internal fun PassScreen(item: String) {
             StateRegistry.report("ui.outing.pass", mapOf("kind" to kind.key, "pages" to pages?.size, "failed" to (failure != null)))
         }
         val shown = pages
-        val system = uri
         when {
-            failure == null && system != null -> SystemPdf(
-                system,
-                Modifier.fillMaxSize().testTag("outing.pass.page"),
-                padding = PaddingValues(start = Space.lg, top = Space.sm, end = Space.lg, bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg),
-                onFailed = { failure = failureOf(it, "") },
-            )
             shown != null -> LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = Space.lg, top = Space.sm, end = Space.lg, bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg),

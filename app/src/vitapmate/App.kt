@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -27,6 +28,7 @@ import vitapmate.data.AccountState
 import vitapmate.data.InspectorOpener
 import vitapmate.data.LocalInspector
 import vitapmate.data.SemesterChoice
+import vitapmate.data.Settings
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.features.login.ChooseSemester
@@ -72,6 +74,8 @@ fun App() {
             semesterRead = true
         }
     }
+    // Set while the semester picker shows, for the first time on this install: [Onboarding] follows it.
+    var onboarding by rememberSaveable { mutableStateOf(false) }
     val nav = rememberNav()
     val deviceAuth = rememberDeviceAuth()
     // A problem's "Sign in": a rejected password is fixed on the Account page in place (the
@@ -105,7 +109,16 @@ fun App() {
                     if (yes) {
                         when {
                             !semesterRead -> {}
-                            SemesterChoice.selected == null -> ChooseSemester()
+                            SemesterChoice.selected == null -> {
+                                ChooseSemester()
+                                // Once per install, the setup page follows the first pick.
+                                LaunchedEffect(Unit) { onboarding = !Settings.onboarded }
+                            }
+                            onboarding -> Onboarding {
+                                Log.info("ui.shell", "onboarding done")
+                                Settings.onboarded = true
+                                onboarding = false
+                            }
                             else -> Shell(nav, onSignedOut = toLogin)
                         }
                     } else {

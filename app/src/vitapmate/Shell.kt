@@ -43,6 +43,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import vitapmate.ui.NavBarSpace
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
@@ -52,6 +53,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import vitapmate.data.Foreground
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 
@@ -69,6 +71,16 @@ fun Shell(nav: Nav, onSignedOut: () -> Unit) {
         scroll.state.offset = 0f
         Log.info("ui.shell", "route ${nav.top.key}", fields = mapOf("tab" to nav.tab.orEmpty(), "stack" to keys.joinToString(">")))
         StateRegistry.report("route", mapOf("route" to nav.top.key, "tab" to nav.tab, "stack" to keys, "tabs" to tabs))
+    }
+    // The Mess or exams tab picks its page from the exam schedule (read again each time the app comes back) and the clock.
+    val messOrExams = MessOrExams.ID in tabs
+    LaunchedEffect(messOrExams, Foreground.resumes) {
+        if (!messOrExams) return@LaunchedEffect
+        MessOrExams.refresh()
+        while (true) {
+            delay(60_000)
+            MessOrExams.tick()
+        }
     }
     // Opening a page sees its changes in the inbox.
     LaunchedEffect(nav.top.key) { pageOpened(nav.top.key) }

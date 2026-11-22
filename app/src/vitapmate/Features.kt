@@ -4,6 +4,7 @@ import com.composables.icons.lucide.LayoutGrid
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.SquareActivity
+import com.composables.icons.lucide.Utensils
 import vitapmate.features.attendance.attendanceFeature
 import vitapmate.features.biometric.biometricFeature
 import vitapmate.features.calendar.calendarFeature
@@ -46,8 +47,9 @@ val builtIns: List<Feature> = listOf(
     Feature(INSPECTOR, "Inspector", Lucide.SquareActivity) {},
 )
 
-/** What can be a tab: features first, then the built-ins. */
-val tabChoices: List<Feature> = features.filterNot { it.fullScreen } + builtIns.filter { it.id != INSPECTOR }
+/** What can be a tab: features first, then [MessOrExams] (named for both in the tab picker), then the built-ins. */
+val tabChoices: List<Feature> = features.filterNot { it.fullScreen } +
+    Feature(MessOrExams.ID, "Mess or exams", Lucide.Utensils) {} + builtIns.filter { it.id != INSPECTOR }
 
 /** Need a real VTOP session or the server: hidden for the demo account ([AccountState.demo]). */
 val notInDemo = setOf(vtopFeature.id)
@@ -55,4 +57,4 @@ val notInDemo = setOf(vtopFeature.id)
 /** Whether [f] is offered to this account. */
 fun available(f: Feature): Boolean = !(AccountState.demo && f.id in notInDemo)
 
-fun featureById(id: String): Feature? = (features + builtIns).firstOrNull { it.id == id }
+fun featureById(id: String): Feature? = if (id == MessOrExams.ID) MessOrExams.feature else (features + builtIns).firstOrNull { it.id == id }

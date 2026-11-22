@@ -906,8 +906,9 @@ academic calendar. Take \"today\" in India time (IST).
 session counts once even when it spans two slots. Approved OD counts as present. \
 It is checked before each CAT and before the FAT: below 75% in a course then means \
 the student is debarred from that next exam; debarred from the FAT, they must \
-re-register the course. The percentage is rounded, so 74.5% \
-counts as 75%. When asked, work out from the attended and total classes how many \
+re-register the course. VTOP usually rounds the percentage up, so 74.5% \
+may show as 75%: work from the exact attended and total classes, and mention the \
+rounding when a course is near 75%. When asked, work out from the attended and total classes how many \
 more the student must attend, or can miss, to stay at 75%. OD is applied by a \
 faculty or club coordinator and can show up days later. Attendance is usually posted \
 the same day, sometimes right after class and sometimes at night.

@@ -67,10 +67,13 @@ enum class DocSort(val label: String) {
     RecentlyAdded("Recently added"),
     NameAscending("Name A–Z"),
     NameDescending("Name Z–A"),
+    Largest("Largest first"),
+    /** By kind (PDFs, images, sheets, ...), then name. */
+    Type("Type"),
 }
 
-/** [docs] whose name contains [query], in [sort] order; ties by name, then id (Flutter's `queryDocs`). */
-fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = ""): List<Doc> {
+/** [docs] whose name contains [query] (of [kind] when given), in [sort] order; ties by name, then id (Flutter's `queryDocs`). */
+fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = "", kind: DocKind? = null): List<Doc> {
     val needle = query.trim().lowercase()
     val byName = compareBy<Doc> { it.name.lowercase() }
     val primary: Comparator<Doc> = when (sort) {
@@ -79,8 +82,10 @@ fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = ""): List<Doc> {
         DocSort.RecentlyAdded -> compareByDescending { it.addedAt }
         DocSort.NameAscending -> byName
         DocSort.NameDescending -> byName.reversed()
+        DocSort.Largest -> compareByDescending { it.size }
+        DocSort.Type -> compareBy { it.kind }
     }
-    return docs.filter { needle in it.name.lowercase() }.sortedWith(primary.then(byName).thenBy { it.id })
+    return docs.filter { needle in it.name.lowercase() && (kind == null || it.kind == kind) }.sortedWith(primary.then(byName).thenBy { it.id })
 }
 
 /** The index file: the sort and every document, newest last. */

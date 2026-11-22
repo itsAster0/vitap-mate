@@ -84,7 +84,8 @@ holiday or there are no classes, say so and stop.
 one class.
 3. For each of those courses, from get_attendance, take attended and total classes \
 and work out the percentage after missing that day's classes (total goes up, attended \
-does not). VTOP rounds, so 74.5% counts as 75%.
+does not). VTOP usually rounds up, so 74.5% \
+may show as 75%: give the exact figure, and mention the rounding when it is near 75%.
 4. Answer per course: safe to miss, or not, with the percentage before and after and \
 how many classes of margin are left. Warn if the next CAT or FAT is close, since \
 attendance is checked before each exam.

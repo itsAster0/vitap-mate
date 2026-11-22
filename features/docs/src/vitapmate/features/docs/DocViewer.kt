@@ -92,9 +92,9 @@ internal fun DocViewer(id: String) {
     Box(Modifier.fillMaxSize().padding(LocalContentPadding.current).testTag("docs.viewer")) { DocContent(doc, embedded = false) }
 }
 
-/** [doc] drawn by its kind; [embedded] is Docs' "Continue viewing" card (no saved position, the menu's next meal only). */
+/** [doc] drawn by its kind; [embedded] is Docs' "Continue viewing" card (no saved position, the menu's next meal only); [inTab] is the app's Mess tab. */
 @Composable
-internal fun DocContent(doc: Doc, embedded: Boolean) {
+internal fun DocContent(doc: Doc, embedded: Boolean, inTab: Boolean = false) {
     var failed by remember(doc.uri) { mutableStateOf<Throwable?>(null) }
     val fail: (Throwable) -> Unit = { e ->
         if (e !is CancellationException) {
@@ -111,7 +111,7 @@ internal fun DocContent(doc: Doc, embedded: Boolean) {
     }
     failed?.let { return EmptyView(Lucide.FileX, "Couldn't read this file", message = (it as? vitapmate.data.MessMenuFormatException)?.message) }
     when {
-        doc.kind == DocKind.Spreadsheet && doc.asMessMenu -> MessMenuView(doc, compact = embedded, onFailed = fail)
+        doc.kind == DocKind.Spreadsheet && doc.asMessMenu -> MessMenuView(doc, compact = embedded, onFailed = fail, inTab = inTab)
         doc.kind == DocKind.Pdf -> PdfView(doc, embedded, fail)
         doc.kind == DocKind.Image -> ImageView(doc, embedded, fail)
         doc.kind == DocKind.Spreadsheet -> SheetView(doc, embedded, fail)

@@ -113,10 +113,12 @@ private const val SHEET_KEY = "mess_menu_sheet"
 
 /**
  * A spreadsheet read as the monthly mess menu: opens on today, with the meal on now (or up next)
- * marked by Settings → Mess Timings. [compact] is the "Continue viewing" card: that meal only.
+ * marked by Settings → Mess Timings. [compact] is that meal only (the "Continue viewing" card).
+ * [inTab] is the app's Mess tab, under a bar that already shows the date: today is headed by where
+ * the day's meals stand instead, and the meal-only view is the full card.
  */
 @Composable
-internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> Unit) {
+internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> Unit, inTab: Boolean = false) {
     val menu by produceState<MessMenu?>(null, doc.uri) { value = runCatching { loadMessMenu(doc) }.onFailure(onFailed).getOrNull() }
     val data = menu ?: return Loading()
     val context = LocalContext.current
@@ -131,7 +133,7 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
     val sheet = data.sheets[sheetIndex.coerceIn(0, data.sheets.lastIndex)]
     val windows = MessTimings.windows
     val minute = minuteOf(now)
-    if (compact) return UpNext(sheet, year, month, today, minute, windows)
+    if (compact) return UpNext(sheet, year, month, today, minute, windows, framed = inTab)
 
     val first = epochDay(year, month, 1)
     val last = epochDay(year, month + 1, 1) - 1
@@ -169,11 +171,15 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
                 val focusMeal = if (onToday) currentOrNextMeal(minute, windows) else null
                 Column {
                     Text(
-                        if (onToday) "Today" else formatDay(day, "EEEE"),
-                        Modifier.padding(start = 2.dp, top = Space.lg),
+                        when {
+                            onToday && inTab -> mealsStand(focusMeal, minute, windows)
+                            onToday -> "Today"
+                            else -> formatDay(day, "EEEE")
+                        },
+                        Modifier.padding(start = 2.dp, top = Space.lg, bottom = if (onToday && inTab) Space.md else 0.dp),
                         style = MaterialTheme.typography.headlineMediumEmphasized,
                     )
-                    Text(
+                    if (!(onToday && inTab)) Text(
                         formatDay(day, if (onToday) "EEEE, d MMMM" else "d MMMM"),
                         Modifier.padding(start = 2.dp, bottom = Space.md),
                         style = MaterialTheme.typography.bodyMedium,
@@ -234,7 +240,7 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
 
 /** The meal on now or next (tomorrow's breakfast after dinner). */
 @Composable
-private fun UpNext(sheet: MessSheet, year: Int, month: Int, today: Int, minute: Int, windows: Map<Meal, MealWindow>) {
+private fun UpNext(sheet: MessSheet, year: Int, month: Int, today: Int, minute: Int, windows: Map<Meal, MealWindow>, framed: Boolean) {
     val meal = currentOrNextMeal(minute, windows) ?: Meal.Breakfast
     val day = if (currentOrNextMeal(minute, windows) == null) today + 1 else today
     val cal = calendarOf(day)
@@ -245,17 +251,26 @@ private fun UpNext(sheet: MessSheet, year: Int, month: Int, today: Int, minute: 
         }
     }
     val window = windows.getValue(meal)
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(Space.md)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(Space.md).padding(bottom = if (framed) 96.dp else 0.dp)) {
         MealCard(
             meal,
             sheet.itemsFor(cal.get(Calendar.DAY_OF_MONTH), meal),
             window,
             if (day == today && minute >= window.start) MealStatus.Now else MealStatus.Next,
             minute,
-            framed = false,
+            framed = framed,
             whenLabel = "Tomorrow".takeIf { day != today },
+            shape = MaterialTheme.shapes.extraLarge,
         )
     }
+}
+
+/** Today's heading in the Mess tab: the meal on now and when it ends, the next and when it starts, or done for the day. */
+private fun mealsStand(meal: Meal?, minute: Int, windows: Map<Meal, MealWindow>): String {
+    meal ?: return "Done for today"
+    val window = windows.getValue(meal)
+    return if (minute >= window.start) "${meal.label} now · ends in ${formatMinutes(window.end - minute)}"
+    else "${meal.label} in ${formatMinutes(window.start - minute)}"
 }
 
 /** Mon–Sun of the selected week, with arrows to step through the month. */

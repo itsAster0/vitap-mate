@@ -85,6 +85,19 @@ private fun uriOf(context: Context, doc: Doc): Uri = Docs.uriOf(doc).let { uri -
 private fun mimeOf(doc: Doc): String =
     MimeTypeMap.getSingleton().getMimeTypeFromExtension(doc.file.substringAfterLast('.', "").lowercase()) ?: "application/octet-stream"
 
+/** Shares several [docs] at once through the share sheet (one goes through [share]). */
+internal fun shareAll(context: Context, docs: List<Doc>) {
+    if (docs.size == 1) return share(context, docs.single())
+    val uris = docs.map { uriOf(context, it) }
+    val types = docs.map(::mimeOf).distinct()
+    val send = Intent(Intent.ACTION_SEND_MULTIPLE)
+        .setType(types.singleOrNull() ?: types.map { it.substringBefore('/') }.distinct().singleOrNull()?.let { "$it/*" } ?: "*/*")
+        .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    send.clipData = ClipData.newRawUri(docs.first().name, uris.first()).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
+    context.startActivity(Intent.createChooser(send, "${docs.size} documents"))
+}
+
 /** Shares [doc] through the share sheet. */
 internal fun share(context: Context, doc: Doc) {
     val uri = uriOf(context, doc)

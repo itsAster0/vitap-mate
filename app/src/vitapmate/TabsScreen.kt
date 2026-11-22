@@ -103,7 +103,7 @@ fun TabsScreen() {
             item {
                 ListGroup("Not in the bar", Modifier.padding(top = 8.dp), footer = if (full) "The bar is full; remove a tab to add another." else null) {
                     tabChoices.filter { it.id !in tabs && available(it) }.forEach { f ->
-                        GroupItem(f.label, "settings.add.${f.id}", f.icon, enabled = !full, trailing = {
+                        GroupItem(f.label, "settings.add.${f.id}", f.icon, if (f.id == MessOrExams.ID) "Exams from an hour before a paper until 20 min into it, else the meal on now, else the whole mess menu" else null, enabled = !full, trailing = {
                             FilledTonalButton(onClick = { save(NavTabs.add(tabs, f.id)) }, modifier = Modifier.testTag("settings.add.${f.id}.add"), enabled = !full, shapes = ButtonDefaults.shapes()) {
                                 Icon(Lucide.Plus, "Add ${f.label}", Modifier.size(18.dp))
                                 Spacer(Modifier.size(6.dp))

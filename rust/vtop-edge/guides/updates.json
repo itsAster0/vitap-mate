@@ -30,10 +30,6 @@
       "title": "Tools",
       "items": [
         "Docs lists the files in your download folder and the mess menu, with the mess timings you set.",
-        {
-          "text": "PDFs in Docs and the outing pass stay sharp when you zoom, and you can select and copy their text and tap their links, on most phones with Android 12 and later.",
-          "since": 3001010
-        },
         "Profile shows your VTOP profile and your mentor.",
         "VTOP opens the full site, already signed in, for pages the app doesn't cover."
       ]
@@ -119,7 +115,6 @@
         {
           "title": "Improved",
           "items": [
-            "PDFs in Docs and the outing pass open in Android's PDF viewer where your phone has it: sharp at any zoom, with text you can select and copy, links you can tap and a scroll thumb for long files.",
             "The timetable widget is rebuilt and follows your wallpaper's colours as before.",
             "In class uses Android 15's Modes, with its own icon and a description of when it turns on.",
             "The forwarding guide and these notes now load when you open them and stay saved on your phone, so they can be corrected without an app update.",

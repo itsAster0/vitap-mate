@@ -4,8 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DocsTest {
-    private fun doc(id: String, name: String, added: Long, opened: Long? = null) =
-        Doc(id, name, "$id.pdf", "content://test/$id", DocKind.Pdf, 1, "import", added, opened)
+    private fun doc(id: String, name: String, added: Long, opened: Long? = null, kind: DocKind = DocKind.Pdf, size: Long = 1) =
+        Doc(id, name, "$id.pdf", "content://test/$id", kind, size, "import", added, opened)
 
     private val docs = listOf(
         doc("a", "Mess menu", added = 3, opened = 10),
@@ -24,6 +24,19 @@ class DocsTest {
         assertEquals(listOf("d", "a", "c", "b"), queryDocs(docs, DocSort.RecentlyAdded).map { it.id })
         assertEquals(listOf("d", "c", "a", "b"), queryDocs(docs, DocSort.NameAscending).map { it.id })
         assertEquals(listOf("b", "a", "c", "d"), queryDocs(docs, DocSort.NameDescending).map { it.id })
+    }
+
+    @Test
+    fun largestAndTypeSorts() {
+        val mixed = listOf(
+            doc("p", "b pass", 1, kind = DocKind.Pdf, size = 50),
+            doc("i", "photo", 1, kind = DocKind.Image, size = 900),
+            doc("s", "menu", 1, kind = DocKind.Spreadsheet, size = 50),
+            doc("q", "a notes", 1, kind = DocKind.Pdf, size = 10),
+        )
+        assertEquals(listOf("i", "p", "s", "q"), queryDocs(mixed, DocSort.Largest).map { it.id })
+        assertEquals(listOf("q", "p", "i", "s"), queryDocs(mixed, DocSort.Type).map { it.id })
+        assertEquals(listOf("q", "p"), queryDocs(mixed, DocSort.NameAscending, kind = DocKind.Pdf).map { it.id })
     }
 
     @Test

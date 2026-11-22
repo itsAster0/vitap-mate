@@ -136,6 +136,9 @@ object Settings {
     /** Calendar: classes, exams and the academic calendar in a calendar on the phone (app's CalendarSync); off by default. */
     var calendarSync by flag("settings_calendar_sync", false)
 
+    /** The setup page after the first semester pick (app's Onboarding) was seen; shown once per install. */
+    var onboarded by flag("settings_onboarded", false)
+
     /** Semester ids whose Wrapped was opened. */
     var wrappedSeen by ids("settings_wrapped_seen")
 
