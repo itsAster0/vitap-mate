@@ -2,6 +2,7 @@ package vitapmate.features.attendance
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.ClassKind
@@ -64,14 +65,20 @@ internal fun AttendanceCourse.advice(showSkip: Boolean): String? = when {
 internal fun AttendanceCourse.labs(n: Int) = if (!isLab) "" else if (n == 1) " lab" else " labs"
 
 /**
- * The percentage VTOP would show (it rounds up: 31 of 34 is 92%) after attending [attend] and
- * missing [skip] more classes (sessions for labs), with [od] absences turned to present by on-duty
- * approvals still to come, and whether the exact figure is still at 75% or above.
+ * The exact percentage, not rounded, after attending [attend] and missing [skip] more classes
+ * (sessions for labs, each two of VTOP's periods), with [od] absences turned to present by on-duty
+ * approvals still to come, and whether it is still at 75% or above.
  */
-internal fun AttendanceCourse.projected(attend: Int, skip: Int, od: Int = 0): Pair<Int, Boolean> {
-    val (a, t) = sessions
-    val total = t + attend + skip
-    if (total == 0) return 0 to true
-    val attended = a + attend + od
-    return (attended * 100 + total - 1) / total to (attended * 4 >= total * 3)
+internal fun AttendanceCourse.projected(attend: Int, skip: Int, od: Int = 0): Pair<Double, Boolean> {
+    val unit = if (isLab) 2 else 1
+    val total = counted + unit * (attend + skip)
+    if (total == 0) return 0.0 to true
+    val attended = attended + unit * (attend + od)
+    return attended * 100.0 / total to (attended * 4 >= total * 3)
+}
+
+/** [percent] to one decimal, cut rather than rounded so 74.96 never reads 75: "74.9", "75". */
+internal fun percentText(percent: Double): String {
+    val tenths = floor(percent * 10 + 1e-6).toLong()
+    return if (tenths % 10 == 0L) "${tenths / 10}" else "${tenths / 10}.${tenths % 10}"
 }

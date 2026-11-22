@@ -59,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
@@ -73,8 +74,8 @@ import vitapmate.ui.Space
 import vitapmate.ui.nums
 
 /**
- * The detail page's Calculator tab. "What if": attend N / skip N more → the percentage VTOP would
- * show, in the tone it lands in (warning when only VTOP's rounding keeps it at 75%). With [plans]
+ * The detail page's Calculator tab. "What if": attend N / skip N more → the exact percentage, not
+ * VTOP's rounded one, in the tone it lands in. With [plans]
  * (Rust, from the timetable and academic calendar), a second card: until the next exam or the
  * semester's end, the classes left as a strip (filled: must attend, hollow: can miss), both
  * counts at the chosen goal (75–90%), and the best reachable; "Try it" plays that split out in
@@ -116,13 +117,11 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
     ) {
         item("whatif") {
             val reset = attending > 0 || missing > 0 || od > 0
-            val (percent, exactSafe) = course.projected(attending, missing, od)
-            val now = course.projected(0, 0).first
-            val tone = when {
-                percent < 75 -> tones.danger
-                exactSafe -> tones.success
-                else -> tones.warning
-            }
+            val (percent, safe) = course.projected(attending, missing, od)
+            val shown = percentText(percent)
+            // The change between the two figures as shown, so "+1.7" matches 74.3 → 76.
+            val delta = shown.toDouble() - percentText(course.projected(0, 0).first).toDouble()
+            val tone = if (safe) tones.success else tones.danger
             val card = AppTheme.colors.card
             // The card takes the tone the what-if lands in; neutral while nothing is changed.
             val fill = if (reset) tone.subtle else card
@@ -145,7 +144,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                     Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
                         Text(
                             buildAnnotatedString {
-                                append("$percent")
+                                append(shown)
                                 withStyle(SpanStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp)) { append("%") }
                             },
                             Modifier.testTag("attendance.detail.calc.result"),
@@ -153,9 +152,9 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                             color = ink,
                             maxLines = 1,
                         )
-                        if (percent != now) {
+                        if (delta != 0.0) {
                             Text(
-                                if (percent > now) "+${percent - now}" else "−${now - percent}",
+                                (if (delta > 0) "+" else "−") + percentText(abs(delta)),
                                 Modifier.padding(start = Space.md, bottom = Space.sm)
                                     .background(tone.base, CircleShape)
                                     .padding(horizontal = 10.dp, vertical = 3.dp)
@@ -176,7 +175,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                         }
                     }
                     AttendanceLine(
-                        percent.toDouble(),
+                        percent,
                         tone.base,
                         Modifier.padding(top = Space.lg),
                         thickness = 14.dp,

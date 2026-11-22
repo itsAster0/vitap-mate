@@ -259,12 +259,8 @@ private fun UnpostedNote(courses: Int, modifier: Modifier = Modifier) {
 @Composable
 private fun PlanRow(course: AttendanceCourse, attend: Int, skip: Int, unposted: Int, modifier: Modifier = Modifier) {
     val tones = AppTheme.tones
-    val (percent, exactSafe) = course.projected(attend, skip)
-    val tone = when {
-        percent < 75 -> tones.danger
-        exactSafe -> tones.success
-        else -> tones.warning
-    }
+    val (percent, safe) = course.projected(attend, skip)
+    val tone = if (safe) tones.success else tones.danger
     val unit = { n: Int -> course.labs(n).ifEmpty { if (n == 1) " class" else " classes" } }
     Row(modifier.fillMaxWidth().testTag("attendance.skip_day.course.${course.key}"), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -280,9 +276,9 @@ private fun PlanRow(course: AttendanceCourse, attend: Int, skip: Int, unposted: 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text("${course.projected(0, 0).first}% → ", style = MaterialTheme.typography.labelLarge.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${percentText(course.projected(0, 0).first)}% → ", style = MaterialTheme.typography.labelLarge.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            "$percent%",
+            "${percentText(percent)}%",
             Modifier.background(tone.subtle, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelLargeEmphasized.nums(),
             color = tone.onSubtle,
