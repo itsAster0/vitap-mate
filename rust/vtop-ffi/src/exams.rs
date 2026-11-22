@@ -12,7 +12,7 @@ use crate::calendar::exam_name;
 use crate::records::{self, ExamPaper, TimetableDay};
 use crate::{ClassKind, Core, CoreError, traced, traced_sync};
 
-pub(crate) const EXAMS: &str = "exam_schedule.json";
+pub(crate) const EXAMS: &str = vtop_core::spec::EXAM_SCHEDULE.file;
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct Exams {
@@ -79,9 +79,7 @@ impl Core {
     pub async fn fetch_exams(&self, flow: String) -> Result<Exams, CoreError> {
         traced("fetch_exams", &flow, async {
             let data = self
-                .fetch(EXAMS, "exam_schedule", &[], |client, semester| {
-                    Box::pin(client.exam_schedule(semester))
-                })
+                .fetch(&vtop_core::spec::EXAM_SCHEDULE, None, &[])
                 .await?;
             Ok(logged(Exams::new(data, records::ist_now())))
         })

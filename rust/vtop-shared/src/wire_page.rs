@@ -15,6 +15,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::engine::BatchPage;
+
 /// The gateway does not hold the session with this hash: send it.
 pub const NEED_SESSION: u16 = 428;
 /// The answer is too large for the UDP transport: use HTTPS.
@@ -29,6 +31,35 @@ pub const VERSION: u8 = 1;
 /// (`/v1/vtop/login`, its `/otp` and `/resend`, and `/v1/app/login`), with
 /// that request's JSON body in `args[SIGN_IN_BODY]`. They carry no session.
 pub const SIGN_IN_BODY: &str = "body";
+/// A batch of pages ([`crate::engine::PageBatch`]) is named by its edge path, with its pages
+/// in `args` by two-digit index ([`batch_args`]); its answer is packed under this name too.
+pub const BATCH: &str = "/v1/vtop/fetch-batch";
+
+/// `pages` as a batch request's `args`: a page's name, or its JSON when it has arguments.
+pub fn batch_args(pages: &[BatchPage]) -> BTreeMap<String, String> {
+    let page = |page: &BatchPage| match page.args.is_empty() {
+        true => page.name.clone(),
+        false => serde_json::to_string(page).unwrap_or_default(),
+    };
+    pages
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (format!("{i:02}"), page(p)))
+        .collect()
+}
+
+/// The pages of a batch request's `args`, in order.
+pub fn batch_pages(args: &BTreeMap<String, String>) -> Option<Vec<BatchPage>> {
+    args.values()
+        .map(|page| match page.starts_with('{') {
+            true => serde_json::from_str(page).ok(),
+            false => Some(BatchPage {
+                name: page.clone(),
+                args: BTreeMap::new(),
+            }),
+        })
+        .collect()
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WirePageRequest {
@@ -274,6 +305,22 @@ mod tests {
         let newer = [0, VERSION + 1, 0];
         assert_eq!(WirePageRequest::version(&newer), VERSION + 1);
         assert!(WirePageRequest::decode(&newer).is_none());
+    }
+
+    #[test]
+    fn batch_pages_round_trip_in_order() {
+        let page = |name: &str, args: &[(&str, &str)]| BatchPage {
+            name: name.into(),
+            args: args
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        };
+        let mut pages: Vec<_> = (0..11).map(|i| page(&format!("p{i}"), &[])).collect();
+        pages.push(page("biometric", &[("date", "28/10/2026")]));
+        let args = batch_args(&pages);
+        assert_eq!(args["00"], "p0");
+        assert_eq!(batch_pages(&args).unwrap(), pages);
     }
 
     #[test]

@@ -10,7 +10,7 @@ use vtop_core::types::{MarksData, MarksRecord, MarksRecordEach};
 
 use crate::{ClassKind, Core, CoreError, PAGES, traced, traced_sync};
 
-const MARKS: &str = "marks.json";
+pub(crate) const MARKS: &str = vtop_core::spec::MARKS.file;
 /// When the app first saw each assessment posted (`<course key>/<title>` →
 /// Unix seconds), next to the marks: `pages/<semester>/marks_seen.json`.
 const SEEN: &str = "marks_seen.json";
@@ -116,13 +116,9 @@ impl Core {
     /// each assessment first showed up.
     pub async fn fetch_marks(&self, flow: String) -> Result<Marks, CoreError> {
         traced("fetch_marks", &flow, async {
-            let data = self
-                .fetch(MARKS, "marks", &[], |client, semester| {
-                    Box::pin(client.marks(semester))
-                })
-                .await?;
+            let data = self.fetch(&vtop_core::spec::MARKS, None, &[]).await?;
             let path = format!("{PAGES}/{}/{SEEN}", data.semester_id);
-            let mut seen = self.read(&path).unwrap_or_default();
+            let mut seen = self.read_kept(&path).unwrap_or_default();
             if note_posted(&data, &mut seen) {
                 self.write(&path, &seen);
             }

@@ -15,6 +15,7 @@ use rmcp::{prompt_handler, schemars, tool, tool_handler, tool_router, ServerHand
 use serde::{Deserialize, Serialize};
 use vtop_core::client::CourseFile;
 use vtop_core::inputs::{BiometricDate, CourseFilePath, CourseId, CourseType, SemesterId};
+use vtop_core::spec::{self, Query};
 use vtop_core::types::StudentProfile;
 use vtop_core::{VtopClient, VtopError, VtopResult};
 
@@ -382,7 +383,7 @@ impl VtopTools {
             return tool_error("no caller on the request");
         };
         let data = match with_retry(self.source.as_ref(), &key, |client| async move {
-            client.semesters().await
+            client.fetch(&spec::SEMESTERS, &Query::NONE).await
         })
         .await
         {
@@ -412,7 +413,11 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.attendance(&semester).await }
+            async move {
+                client
+                    .fetch(&spec::ATTENDANCE, &Query::for_semester(semester.as_str()))
+                    .await
+            }
         })
         .await
     }
@@ -439,7 +444,20 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let (semester, course, kind) = (semester.clone(), course.clone(), kind.clone());
-            async move { client.full_attendance(&semester, &course, &kind).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::FULL_ATTENDANCE,
+                        &Query {
+                            semester: Some(semester.as_str()),
+                            args: &[
+                                ("course_id", course.as_str()),
+                                ("course_type", kind.as_str()),
+                            ],
+                        },
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -459,7 +477,11 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.timetable(&semester).await }
+            async move {
+                client
+                    .fetch(&spec::TIMETABLE, &Query::for_semester(semester.as_str()))
+                    .await
+            }
         })
         .await
     }
@@ -479,7 +501,11 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.marks(&semester).await }
+            async move {
+                client
+                    .fetch(&spec::MARKS, &Query::for_semester(semester.as_str()))
+                    .await
+            }
         })
         .await
     }
@@ -499,7 +525,14 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.exam_schedule(&semester).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::EXAM_SCHEDULE,
+                        &Query::for_semester(semester.as_str()),
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -519,7 +552,11 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.grade_view(&semester).await }
+            async move {
+                client
+                    .fetch(&spec::GRADES, &Query::for_semester(semester.as_str()))
+                    .await
+            }
         })
         .await
     }
@@ -545,7 +582,17 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let (semester, course) = (semester.clone(), course.clone());
-            async move { client.grade_view_details(&semester, &course).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::GRADE_DETAILS,
+                        &Query {
+                            semester: Some(semester.as_str()),
+                            args: &[("course_id", course.as_str())],
+                        },
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -559,8 +606,10 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        self.fetch(&parts, |client| async move { client.grade_history().await })
-            .await
+        self.fetch(&parts, |client| async move {
+            client.fetch(&spec::GRADE_HISTORY, &Query::NONE).await
+        })
+        .await
     }
 
     #[tool(
@@ -578,7 +627,17 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let date = date.clone();
-            async move { client.biometric_history(&date).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::BIOMETRIC,
+                        &Query {
+                            semester: None,
+                            args: &[("date", date.as_str())],
+                        },
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -593,7 +652,10 @@ impl VtopTools {
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
         self.fetch(&parts, |client| async move {
-            client.profile().await.map(for_agent)
+            client
+                .fetch(&spec::PROFILE, &Query::NONE)
+                .await
+                .map(for_agent)
         })
         .await
     }
@@ -607,8 +669,10 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        self.fetch(&parts, |client| async move { client.mentor().await })
-            .await
+        self.fetch(&parts, |client| async move {
+            client.fetch(&spec::MENTOR, &Query::NONE).await
+        })
+        .await
     }
 }
 
@@ -655,7 +719,14 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.academic_calendar(&semester).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::ACADEMIC_CALENDAR,
+                        &Query::for_semester(semester.as_str()),
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -675,7 +746,14 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let semester = semester.clone();
-            async move { client.course_page_courses(&semester).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::COURSE_PAGE_COURSES,
+                        &Query::for_semester(semester.as_str()),
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -701,7 +779,17 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let (semester, course) = (semester.clone(), course.clone());
-            async move { client.course_page_classes(&semester, &course).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::COURSE_PAGE_CLASSES,
+                        &Query {
+                            semester: Some(semester.as_str()),
+                            args: &[("course_id", &course)],
+                        },
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -728,7 +816,17 @@ impl VtopTools {
         };
         self.fetch(&parts, |client| {
             let (semester, erp, class) = (semester.clone(), erp.clone(), class.clone());
-            async move { client.course_page_detail(&semester, &erp, &class).await }
+            async move {
+                client
+                    .fetch(
+                        &spec::COURSE_PAGE_DETAIL,
+                        &Query {
+                            semester: Some(semester.as_str()),
+                            args: &[("erp_id", &erp), ("class_id", &class)],
+                        },
+                    )
+                    .await
+            }
         })
         .await
     }
@@ -799,7 +897,17 @@ impl VtopTools {
             async move {
                 let mut found = Vec::with_capacity(days.len());
                 for date in &days {
-                    found.push(client.biometric_history(date).await?);
+                    found.push(
+                        client
+                            .fetch(
+                                &spec::BIOMETRIC,
+                                &Query {
+                                    semester: None,
+                                    args: &[("date", date.as_str())],
+                                },
+                            )
+                            .await?,
+                    );
                 }
                 Ok(found)
             }
@@ -816,10 +924,9 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        self.fetch(
-            &parts,
-            |client| async move { client.general_outing().await },
-        )
+        self.fetch(&parts, |client| async move {
+            client.fetch(&spec::GENERAL_OUTING, &Query::NONE).await
+        })
         .await
     }
 
@@ -832,10 +939,9 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        self.fetch(
-            &parts,
-            |client| async move { client.weekend_outing().await },
-        )
+        self.fetch(&parts, |client| async move {
+            client.fetch(&spec::WEEKEND_OUTING, &Query::NONE).await
+        })
         .await
     }
 

@@ -128,8 +128,9 @@ object ExamDayRefresh {
 /**
  * The Flutter app's open-app stale refresher: after a quick page fetch (the session is live and
  * the network good), at most every 15 min, while the app is shown and Auto Refresh is on, pages
- * not on screen that are older than 12 h are fetched one at a time (attendance, then the calendar
- * when a day old, timetable, marks, exams, the semester list, histories behind their summary). It
+ * not on screen that are older than 12 h are fetched: attendance, timetable, marks, exams and the
+ * semester list as one batch (one round trip on the Server and UDP routes, [Core.fetchPages]), then
+ * the calendar when a day old, then histories behind their summary one at a time. It
  * doesn't start on a slow link ([PageFetches.slowLink]), waits while anything else talks to VTOP,
  * takes [PageFetches]' lanes at the lowest priority (a page the student opens goes first) and
  * stops at the first failure, slow or dropped page, so it never competes with the student; an OTP
@@ -159,16 +160,20 @@ object StaleSweep {
     private suspend fun sweep() = flow("sync.stale", unattended = true) { f ->
         val core = AppCore.await()
         var fetched = 0
-        suspend fun step(id: String, label: String, updatedAt: (Core) -> Long?, fetch: suspend (Core) -> Unit) {
+        /** Page [id]'s saved time (0 for none), or null when it is on screen or new enough. */
+        suspend fun due(id: String, updatedAt: (Core) -> Long?): Long? {
             // Pages on screen refresh themselves.
-            if (PageFetches.isShown(id)) return
-            val at = withContext(Dispatchers.IO) { updatedAt(core) }
-            if (at != null && System.currentTimeMillis() / 1000 - at < Settings.tunable(Tunable.SweepMaxAge) * 3600L) return
+            if (PageFetches.isShown(id)) return null
+            val at = withContext(Dispatchers.IO) { updatedAt(core) } ?: return 0
+            return at.takeIf { System.currentTimeMillis() / 1000 - it >= Settings.tunable(Tunable.SweepMaxAge) * 3600L }
+        }
+        /** Fetches the pages saved at [ats] (one, or a batch as [id]), each given [Tunable.SlowPage]. */
+        suspend fun run(id: String, label: String, ats: List<Long>, fetch: suspend (Core) -> Unit) {
             snapshotFlow { Activity.running.isEmpty() }.first { it }
             delay(QUIET_MS.milliseconds)
             if (!Settings.autoRefresh || !Foreground.shown) throw Stop("app left or auto refresh off")
             val ms = try {
-                PageFetches.start("$id/stale/", f, user = false, hasCache = at != null, background = true) {
+                PageFetches.start("$id/stale/", f, user = false, hasCache = ats.none { it == 0L }, background = true) {
                     val start = System.nanoTime()
                     Activity.track(label, f) { withContext(Dispatchers.IO) { fetch(core) } }
                     (System.nanoTime() - start) / 1_000_000
@@ -181,17 +186,30 @@ object StaleSweep {
                 BackgroundProblems.report(e, f)
                 throw Stop("$id failed: ${e::class.simpleName}")
             }
-            fetched++
-            Log.info("sync.stale", "fetched $id", f, mapOf("page" to id, "ms" to "$ms", "age_s" to "${at?.let { System.currentTimeMillis() / 1000 - it }}"))
-            if (ms > Settings.tunable(Tunable.SlowPage) * 1000L) throw Stop("network is slow (${ms} ms page)")
+            fetched += ats.size
+            val ages = ats.joinToString(",") { if (it == 0L) "null" else "${System.currentTimeMillis() / 1000 - it}" }
+            Log.info("sync.stale", "fetched $id", f, mapOf("page" to id, "ms" to "$ms", "age_s" to ages))
+            if (ms > Settings.tunable(Tunable.SlowPage) * 1000L * ats.size) throw Stop("network is slow (${ms} ms for ${ats.size} pages)")
+        }
+        suspend fun step(id: String, label: String, updatedAt: (Core) -> Long?, fetch: suspend (Core) -> Unit) {
+            due(id, updatedAt)?.let { run(id, label, listOf(it), fetch) }
         }
         try {
-            step("attendance", "Refreshing attendance", { it.cachedAttendance(f)?.updatedAt }) { it.fetchAttendance(f) }
+            // One round trip on the Server and UDP routes: (page id, Rust's page name, saved time).
+            val batch = listOf<Triple<String, String, (Core) -> Long?>>(
+                Triple("attendance", "attendance") { it.cachedAttendance(f)?.updatedAt },
+                Triple("timetable", "timetable") { it.cachedTimetable(f)?.updatedAt },
+                Triple("marks", "marks") { it.cachedMarks(f)?.updatedAt },
+                Triple("exams", "exam_schedule") { it.cachedExams(f)?.updatedAt },
+                Triple("semesters", "semesters") { it.cachedSemesters(f)?.updatedAt },
+            ).mapNotNull { (id, name, updatedAt) -> due(id, updatedAt)?.let { Triple(id, name, it) } }
+            if (batch.isNotEmpty()) {
+                val ids = batch.joinToString("+") { it.first }
+                run(ids, "Refreshing ${batch.joinToString(", ") { it.first }}", batch.map { it.third }) { c ->
+                    c.fetchPages(f, batch.map { it.second }).firstNotNullOfOrNull { it.error }?.let { throw it }
+                }
+            }
             SemesterChoice.selected?.let { CalendarRefresh.ifOld(it, "sync", anyway = true) }
-            step("timetable", "Refreshing timetable", { it.cachedTimetable(f)?.updatedAt }) { it.fetchTimetable(f) }
-            step("marks", "Refreshing marks", { it.cachedMarks(f)?.updatedAt }) { it.fetchMarks(f) }
-            step("exams", "Refreshing exams", { it.cachedExams(f)?.updatedAt }) { it.fetchExams(f) }
-            step("semesters", "Loading semesters", { it.cachedSemesters(f)?.updatedAt }) { it.fetchSemesters(f) }
             SemesterChoice.readCache(f)
             if (!PageFetches.isShown("attendance")) {
                 for (key in withContext(Dispatchers.IO) { core.mismatchedAttendanceDetails(f) }) {

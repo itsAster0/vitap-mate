@@ -1,21 +1,18 @@
 //! The VTOP client. Login lives in [`auth`], the security OTP in [`otp`],
-//! CAPTCHA solving in `vtop_proto::captcha`, and one module per group of endpoints
-//! holds the fetchers.
+//! CAPTCHA solving in `vtop_proto::captcha`; every read page runs from its
+//! `vtop_proto::spec` through [`VtopClient::fetch`], and the outing writes and
+//! downloads have a module each.
 //!
 //! Fetchers take `&self`, so one signed-in client can serve several requests
 //! at once. Login and OTP take `&mut self` because they drive a multi-step
 //! flow that must not interleave with itself.
 
-mod academics;
 mod auth;
-mod biometric;
 mod course_page;
 mod email_otp;
-mod exams;
 mod hostel;
 mod http;
 mod otp;
-mod profile;
 mod transport;
 
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -30,7 +27,8 @@ use crate::session::{
 };
 use crate::types::PersistedVtopSession;
 use vtop_proto::http::{join_url, url_parts, Method, Request};
-use vtop_proto::machine::{Machine, OnePost, Signed, Step};
+use vtop_proto::machine::{Machine, Signed, Step};
+use vtop_proto::spec::{PageSpec, Query};
 
 pub use course_page::{CourseFile, CourseFileInfo, FileLink};
 #[cfg(feature = "reqwest")]
@@ -324,14 +322,12 @@ impl VtopClient {
         })
     }
 
-    /// Signs in if needed, then runs the one page request `request` builds.
-    pub(super) async fn page(
-        &self,
-        context: &str,
-        request: impl FnOnce(&Signed) -> Request,
-    ) -> VtopResult<String> {
-        let signed = self.signed(context).await?;
-        self.run(context, OnePost::new(request(&signed))).await
+    /// Read page `spec` for `query`: the arguments checked, then signed in if
+    /// needed and fetched and parsed.
+    pub async fn fetch<T>(&self, spec: &PageSpec<T>, query: &Query<'_>) -> VtopResult<T> {
+        let start = (spec.build)(query)?;
+        let signed = self.signed(spec.name).await?;
+        self.run(spec.name, start(signed)).await
     }
 
     /// Runs a `vtop-proto` machine over the transport. Each request goes through

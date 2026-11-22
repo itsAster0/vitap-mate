@@ -6,8 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use tracing::info;
-use vtop_core::VtopError;
-use vtop_core::inputs::SemesterId;
 use vtop_core::types::{
     AcademicCalendarData, AttendanceData, GeneralOutingData, SemesterData, TimetableData,
     WeekendOutingData,
@@ -24,7 +22,6 @@ use crate::outing::{self, OutingStanding};
 use crate::records::{
     self, Attendance, AttendanceCourse, AttendedClass, ClassKind, ClassSlot, ClassStatus, Timetable,
 };
-use crate::route::page;
 use crate::{
     ATTENDANCE, CALENDAR, Core, CoreError, PAGES, SEMESTERS, TIMETABLE, traced, traced_sync,
 };
@@ -397,21 +394,20 @@ impl Core {
     pub async fn fetch_wrapped_previous(&self, flow: String) -> Result<(), CoreError> {
         traced("fetch_wrapped_previous", &flow, async {
             let Some((previous, _)) = self
-                .read::<SemesterData>(SEMESTERS)
+                .read_kept::<SemesterData>(SEMESTERS)
                 .and_then(|list| self.previous_semester(&list))
             else {
                 info!("no older semester");
                 return Ok(());
             };
             let path = format!("{PAGES}/{previous}/{ATTENDANCE}");
-            if self.read::<AttendanceData>(&path).is_some() {
+            if self.read_kept::<AttendanceData>(&path).is_some() {
                 info!("older semester's attendance cached");
                 return Ok(());
             }
-            let id = SemesterId::parse(&previous)?;
-            let data: AttendanceData = page!(self, "attendance", Some(&previous), [], |client| {
-                client.attendance(&id)
-            })?;
+            let data = self
+                .page(&vtop_core::spec::ATTENDANCE, Some(&previous), &[])
+                .await?;
             if let Some(parent) = self.at(&path).parent() {
                 let _ = fs::create_dir_all(parent);
             }
@@ -432,7 +428,7 @@ const IRON_STREAK_MIN: i32 = 15;
 
 impl Core {
     fn wrapped(&self, flow: &str, today: i32) -> Option<WrappedReport> {
-        let list = self.read::<SemesterData>(SEMESTERS)?;
+        let list = self.read_kept::<SemesterData>(SEMESTERS)?;
         let semester_id = self.pick(&list)?;
         let calendar = SemesterCalendar::of(&self.read_page::<AcademicCalendarData>(CALENDAR)?);
         let (Some(first_day), Some(last_day)) =
@@ -491,7 +487,7 @@ impl Core {
             .and_then(|(history, this)| cgpa(history, this));
         let previous = self.previous_semester(&list).and_then(|(id, name)| {
             let before_courses = self
-                .read::<AttendanceData>(&format!("{PAGES}/{id}/{ATTENDANCE}"))
+                .read_kept::<AttendanceData>(&format!("{PAGES}/{id}/{ATTENDANCE}"))
                 .map(|data| Attendance::from(data).courses);
             let gpa_before = history
                 .as_ref()
@@ -548,9 +544,9 @@ impl Core {
             grades,
             cgpa,
             outings: outings(
-                self.read::<GeneralOutingData>(&format!("{PAGES}/{}", outing::GENERAL))
+                self.read_kept::<GeneralOutingData>(&format!("{PAGES}/{}", outing::GENERAL))
                     .as_ref(),
-                self.read::<WeekendOutingData>(&format!("{PAGES}/{}", outing::WEEKEND))
+                self.read_kept::<WeekendOutingData>(&format!("{PAGES}/{}", outing::WEEKEND))
                     .as_ref(),
                 first_day,
                 window_end.min(today - 1),

@@ -8,13 +8,11 @@ use std::fs;
 
 use tracing::info;
 use vtop_core::VtopError;
-use vtop_core::inputs::BiometricDate;
 use vtop_core::types::{BiometricData, BiometricRecord};
 
-use crate::route::page;
 use crate::{Core, CoreError, PAGES, records, traced, traced_sync};
 
-const DIR: &str = "biometric";
+const DIR: &str = vtop_core::spec::BIOMETRIC.file;
 
 /// The most days a range covers, one VTOP request per day not cached (as
 /// the MCP's get_biometric_range).
@@ -128,13 +126,14 @@ impl Core {
 
 impl Core {
     pub(crate) fn cached_day(&self, day: i32) -> Option<BiometricData> {
-        self.read(&format!("{PAGES}/{DIR}/{day}.json"))
+        self.read_kept(&format!("{PAGES}/{DIR}/{day}.json"))
     }
 
     async fn fetch_day(&self, day: i32) -> Result<BiometricData, CoreError> {
         let text = vtop_date(day);
-        let date = BiometricDate::parse(&text)?;
-        let data = page!(self, "biometric", None, ["date" => &text], |client| client.biometric_history(&date))?;
+        let data = self
+            .page(&vtop_core::spec::BIOMETRIC, None, &[("date", &text)])
+            .await?;
         let _ = fs::create_dir_all(self.at(PAGES).join(DIR));
         self.write(&format!("{PAGES}/{DIR}/{day}.json"), &data);
         Ok(data)
@@ -273,7 +272,7 @@ mod tests {
     fn dates_read_as_vtop_writes_them() {
         assert_eq!(vtop_date(DAY), "18/07/2026");
         assert_eq!(vtop_date(0), "01/01/1970");
-        assert!(BiometricDate::parse(&vtop_date(DAY)).is_ok());
+        assert!(vtop_core::inputs::BiometricDate::parse(&vtop_date(DAY)).is_ok());
     }
 
     #[test]

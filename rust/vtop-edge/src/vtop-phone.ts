@@ -11,6 +11,7 @@ import { error, type Env, variable } from "./common";
 /** Phone route → engine route. Bodies pass through unchanged. */
 export const PHONE_ROUTES: Record<string, string> = {
   "/v1/vtop/fetch": "/engine/fetch",
+  "/v1/vtop/fetch-batch": "/engine/fetch-batch",
   "/v1/vtop/login": "/engine/vtop-login",
   "/v1/vtop/login/otp": "/engine/vtop-login/otp",
   "/v1/vtop/login/resend": "/engine/vtop-login/resend",

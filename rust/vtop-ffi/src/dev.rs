@@ -12,9 +12,8 @@ use serde_json::json;
 use tracing::{info, warn};
 
 use crate::exams::EXAMS;
+use crate::marks::MARKS;
 
-/// The marks page (as in `marks.rs`).
-const MARKS: &str = "marks.json";
 use vtop_core::VtopConfig;
 use vtop_core::types::{
     AttendanceData, ExamScheduleData, FullAttendanceData, MarksData, PersistedVtopSession,
@@ -25,7 +24,7 @@ use vtop_core::sync::RwLock;
 
 use crate::{
     ACCOUNT, ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS,
-    SESSION, Session, TIMETABLE, forwarding, records, traced, traced_sync,
+    SESSION, Session, TIMETABLE, decoded, forwarding, records, traced, traced_sync,
 };
 
 /// The Flutter app's Cookie-Editor domain.
@@ -204,7 +203,7 @@ impl Core {
             let Some(path) = self.page_path(ATTENDANCE) else {
                 return Ok(false);
             };
-            let Some(mut data) = self.read::<AttendanceData>(&path) else {
+            let Some(mut data) = self.read_kept::<AttendanceData>(&path) else {
                 return Ok(false);
             };
             data.records.clear();
@@ -225,7 +224,7 @@ impl Core {
             let mut dropped = 0;
             for entry in fs::read_dir(self.at(&dir)).into_iter().flatten().flatten() {
                 let file = format!("{dir}/{}", entry.file_name().to_string_lossy());
-                let Some(mut data) = self.read::<FullAttendanceData>(&file) else {
+                let Some(mut data) = self.read_kept::<FullAttendanceData>(&file) else {
                     continue;
                 };
                 if drop_latest(&mut data) {
@@ -247,7 +246,7 @@ impl Core {
         traced_sync("dev_simulate_changes", &flow, || {
             let mut changed = 0;
             if let Some(path) = self.page_path(ATTENDANCE)
-                && let Some(mut data) = self.read::<AttendanceData>(&path)
+                && let Some(mut data) = self.read_kept::<AttendanceData>(&path)
                 && let Some(record) = data.records.iter_mut().find(|r| {
                     r.classes_attended.parse::<u32>().is_ok_and(|a| a > 0)
                         && r.total_classes.parse::<u32>().is_ok_and(|t| t > 1)
@@ -262,7 +261,7 @@ impl Core {
                 changed += 1;
             }
             if let Some(path) = self.page_path(MARKS)
-                && let Some(mut data) = self.read::<MarksData>(&path)
+                && let Some(mut data) = self.read_kept::<MarksData>(&path)
                 && let Some(mark) = data
                     .records
                     .iter_mut()
@@ -275,7 +274,7 @@ impl Core {
                 changed += 1;
             }
             if let Some(path) = self.page_path(TIMETABLE)
-                && let Some(mut data) = self.read::<TimetableData>(&path)
+                && let Some(mut data) = self.read_kept::<TimetableData>(&path)
                 && !data.slots.is_empty()
             {
                 data.slots.remove(0);
@@ -283,7 +282,7 @@ impl Core {
                 changed += 1;
             }
             if let Some(path) = self.page_path(EXAMS)
-                && let Some(mut data) = self.read::<ExamScheduleData>(&path)
+                && let Some(mut data) = self.read_kept::<ExamScheduleData>(&path)
                 && let Some(exam) = data.exams.iter_mut().find(|e| !e.records.is_empty())
             {
                 exam.records.remove(0);
@@ -351,7 +350,7 @@ impl Core {
 impl Core {
     /// The picked semester, if the cached list still has it.
     fn selected_semester(&self) -> Option<String> {
-        self.pick(&self.read::<SemesterData>(SEMESTERS)?)
+        self.pick(&self.read_kept::<SemesterData>(SEMESTERS)?)
     }
 
     /// `file`'s path under the selected semester's pages.
@@ -399,6 +398,7 @@ fn remove(path: &Path) {
     {
         warn!(%error, "not removed");
     }
+    decoded::forget(path);
 }
 
 fn remove_dir(path: &Path) {
@@ -407,6 +407,7 @@ fn remove_dir(path: &Path) {
     {
         warn!(%error, "not removed");
     }
+    decoded::forget(path);
 }
 
 #[cfg(test)]

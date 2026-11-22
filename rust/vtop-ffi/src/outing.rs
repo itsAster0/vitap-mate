@@ -15,6 +15,7 @@ use vtop_core::client::{
     GeneralOutingApplication, OutingKind as VtopOutingKind, WeekendOutingApplication,
 };
 use vtop_core::inputs::{ContactNumber, OutingDate, OutingPassId, OutingTime};
+use vtop_core::spec;
 use vtop_core::types::{
     GeneralOutingData, GeneralOutingRecord, OutingApplyResult, OutingCancelResult, OutingStudent,
     WeekendOutingData, WeekendOutingRecord,
@@ -22,12 +23,11 @@ use vtop_core::types::{
 use vtop_core::{VtopError, VtopResult};
 
 use crate::course_page::{FileLink, file_link};
-use crate::route::page;
 use crate::{Core, CoreError, PAGES, records, traced, traced_sync};
 
 /// Outings are not per semester; under `pages/` so signing out drops them.
-pub(crate) const GENERAL: &str = "outing_general.json";
-pub(crate) const WEEKEND: &str = "outing_weekend.json";
+pub(crate) const GENERAL: &str = spec::GENERAL_OUTING.file;
+pub(crate) const WEEKEND: &str = spec::WEEKEND_OUTING.file;
 
 /// VTOP's general outing page refuses a leaving time less than this far off
 /// (minutes).
@@ -243,7 +243,7 @@ impl Core {
     pub fn cached_general_outing(&self, flow: String) -> Option<GeneralOuting> {
         traced_sync("cached_general_outing", &flow, || {
             Ok(self
-                .read::<GeneralOutingData>(&format!("{PAGES}/{GENERAL}"))
+                .read_kept::<GeneralOutingData>(&format!("{PAGES}/{GENERAL}"))
                 .map(|data| logged_general(GeneralOuting::new(data, now()))))
         })
         .ok()
@@ -253,8 +253,7 @@ impl Core {
     /// Fetches the general outing page (form and requests) and caches it.
     pub async fn fetch_general_outing(&self, flow: String) -> Result<GeneralOuting, CoreError> {
         traced("fetch_general_outing", &flow, async {
-            let data = page!(self, "general_outing", None, [], |client| client
-                .general_outing())?;
+            let data = self.page(&spec::GENERAL_OUTING, None, &[]).await?;
             self.write_outing(GENERAL, &data);
             Ok(logged_general(GeneralOuting::new(data, now())))
         })
@@ -264,7 +263,7 @@ impl Core {
     pub fn cached_weekend_outing(&self, flow: String) -> Option<WeekendOuting> {
         traced_sync("cached_weekend_outing", &flow, || {
             Ok(self
-                .read::<WeekendOutingData>(&format!("{PAGES}/{WEEKEND}"))
+                .read_kept::<WeekendOutingData>(&format!("{PAGES}/{WEEKEND}"))
                 .map(|data| logged_weekend(WeekendOuting::new(data, now()))))
         })
         .ok()
@@ -274,8 +273,7 @@ impl Core {
     /// Fetches the weekend outing page (form and requests) and caches it.
     pub async fn fetch_weekend_outing(&self, flow: String) -> Result<WeekendOuting, CoreError> {
         traced("fetch_weekend_outing", &flow, async {
-            let data = page!(self, "weekend_outing", None, [], |client| client
-                .weekend_outing())?;
+            let data = self.page(&spec::WEEKEND_OUTING, None, &[]).await?;
             self.write_outing(WEEKEND, &data);
             Ok(logged_weekend(WeekendOuting::new(data, now())))
         })
@@ -291,7 +289,8 @@ impl Core {
         form: GeneralOutingForm,
     ) -> Result<OutingResult, CoreError> {
         traced("apply_general_outing", &flow, async {
-            if let Some(saved) = self.read::<GeneralOutingData>(&format!("{PAGES}/{GENERAL}")) {
+            if let Some(saved) = self.read_kept::<GeneralOutingData>(&format!("{PAGES}/{GENERAL}"))
+            {
                 let rules = GeneralOutingRules::from(&saved);
                 general_check(
                     &rules,
@@ -326,7 +325,8 @@ impl Core {
         form: WeekendOutingForm,
     ) -> Result<OutingResult, CoreError> {
         traced("apply_weekend_outing", &flow, async {
-            if let Some(saved) = self.read::<WeekendOutingData>(&format!("{PAGES}/{WEEKEND}")) {
+            if let Some(saved) = self.read_kept::<WeekendOutingData>(&format!("{PAGES}/{WEEKEND}"))
+            {
                 let rules = WeekendOutingRules::from(&saved);
                 weekend_check(
                     &rules,
@@ -406,7 +406,7 @@ impl Core {
 }
 
 impl Core {
-    fn write_outing(&self, file: &str, data: &impl serde::Serialize) {
+    fn write_outing(&self, file: &str, data: &(impl serde::Serialize + 'static)) {
         let _ = fs::create_dir_all(self.at(PAGES));
         self.write(&format!("{PAGES}/{file}"), data);
     }

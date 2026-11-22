@@ -12,6 +12,7 @@
 //! semester pick changes (that copy may be months old). Opening a page counts its kind as seen
 //! ([`Core::mark_page_seen`]). Logs carry counts and kinds only.
 
+use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::sync::{Mutex, PoisonError};
@@ -24,6 +25,8 @@ use vtop_core::types::{
     GeneralOutingData, GradeViewData, MarksData, TimetableData, WeekendOutingData,
 };
 
+use crate::grades::GRADES;
+use crate::marks::MARKS;
 use crate::outing::{GENERAL, WEEKEND, format_day};
 use crate::records::{Attendance, AttendanceCourse, ClassKind, epoch_day, today_ist_day};
 use crate::{
@@ -31,11 +34,9 @@ use crate::{
 };
 
 pub(crate) const FILE: &str = "changes.json";
-const MARKS: &str = "marks.json";
 const EXAMS: &str = crate::exams::EXAMS;
-const GRADES: &str = "grades.json";
-/// A course's lecture plan, where its files are listed.
-const PLANS: &str = "course_page/plan/";
+/// A course's lecture plans (`<class>.json`), where its files are listed.
+const PLANS: &str = vtop_core::spec::COURSE_PAGE_DETAIL.file;
 /// The same change again within this window is one change.
 const DEDUPE_MS: i64 = 10 * 60 * 1000;
 /// A cap on count besides the app's byte cap ([`Core::trim_changes`]).
@@ -347,7 +348,7 @@ fn kind_of_page(page: &str) -> Option<ChangeKind> {
 impl Core {
     /// Before `file` (a path under the cache dir) is replaced by `new`: the changes against the
     /// copy there, recorded. Only the pages compared here are read; any other write costs nothing.
-    pub(crate) fn record_changes(&self, file: &str, new: &[u8]) {
+    pub(crate) fn record_changes(&self, file: &str, value: &dyn Any, new: &[u8]) {
         let Some(rest) = file.strip_prefix(&format!("{PAGES}/")) else {
             return;
         };
@@ -360,23 +361,24 @@ impl Core {
         if !compared(page) {
             return;
         }
-        let picked = self.read::<String>(SELECTED);
+        let picked = self.read_kept::<String>(SELECTED);
         // Grades may come from the semester before the pick (no grades yet in the picked one).
         if page != GRADES && semester != NO_SEMESTER && picked.as_deref() != Some(semester) {
             return;
         }
-        let Ok(old) = fs::read(self.at(file)) else {
+        if !self.at(file).is_file() {
             // A first copy: nothing to compare, but it is primed now.
             self.update_store(|store| {
                 prime(store, picked.as_deref(), semester, page);
             });
             return;
-        };
+        }
         let context = Context {
             names: self.course_names(semester),
             today: today_ist_day(),
         };
-        let drafts = detect(page, &old, new, &context);
+        let old = Saved { core: self, file };
+        let drafts = detect(page, &old, &Written { value, json: new }, &context);
         self.update_store(|store| {
             if !prime(store, picked.as_deref(), semester, page) {
                 return; // First write since the pick changed: the old copy may be stale.
@@ -402,7 +404,8 @@ impl Core {
         if semester == NO_SEMESTER {
             return names;
         }
-        if let Some(data) = self.read::<AttendanceData>(&format!("{PAGES}/{semester}/{ATTENDANCE}"))
+        if let Some(data) =
+            self.read_kept::<AttendanceData>(&format!("{PAGES}/{semester}/{ATTENDANCE}"))
         {
             for course in Attendance::from(data).courses {
                 if !course.name.trim().is_empty() {
@@ -410,7 +413,9 @@ impl Core {
                 }
             }
         }
-        if let Some(data) = self.read::<TimetableData>(&format!("{PAGES}/{semester}/{TIMETABLE}")) {
+        if let Some(data) =
+            self.read_kept::<TimetableData>(&format!("{PAGES}/{semester}/{TIMETABLE}"))
+        {
             for slot in data.slots {
                 if !slot.name.trim().is_empty() {
                     names
@@ -441,7 +446,7 @@ fn compared(page: &str) -> bool {
         page,
         ATTENDANCE | MARKS | TIMETABLE | EXAMS | GRADES | CALENDAR | GENERAL | WEEKEND
     ) || page.starts_with(&format!("{ATTENDANCE_DETAIL}/"))
-        || page.starts_with(PLANS)
+        || page.starts_with(&format!("{PLANS}/"))
 }
 
 /// Marks `semester/page` as written; a new pick starts over. Whether it was primed before (so
@@ -521,13 +526,57 @@ fn now_ms() -> i64 {
         .map_or(0, |elapsed| elapsed.as_millis() as i64)
 }
 
+/// One copy of a page to compare, decoded as the page's type.
+pub(crate) trait Version {
+    fn decode<T: DeserializeOwned + Clone + Send + Sync + 'static>(&self) -> Option<T>;
+}
+
+/// Its JSON.
+impl<B: AsRef<[u8]> + ?Sized> Version for B {
+    fn decode<T: DeserializeOwned + Clone + Send + Sync + 'static>(&self) -> Option<T> {
+        serde_json::from_slice(self.as_ref()).ok()
+    }
+}
+
+/// The copy on disk, through the decoded-page cache (a screen likely read it already).
+struct Saved<'a> {
+    core: &'a Core,
+    file: &'a str,
+}
+
+impl Version for Saved<'_> {
+    fn decode<T: DeserializeOwned + Clone + Send + Sync + 'static>(&self) -> Option<T> {
+        self.core.read_kept(self.file)
+    }
+}
+
+/// The copy being written: the value itself when it is the page's type, else its JSON.
+struct Written<'a> {
+    value: &'a dyn Any,
+    json: &'a [u8],
+}
+
+impl Version for Written<'_> {
+    fn decode<T: DeserializeOwned + Clone + Send + Sync + 'static>(&self) -> Option<T> {
+        match self.value.downcast_ref::<T>() {
+            Some(value) => Some(value.clone()),
+            None => self.json.decode(),
+        }
+    }
+}
+
 /// The changes between two copies of `page`; none when either doesn't parse.
-pub(crate) fn detect(page: &str, old: &[u8], new: &[u8], context: &Context) -> Vec<Draft> {
-    fn both<T: DeserializeOwned>(old: &[u8], new: &[u8]) -> Option<(T, T)> {
-        Some((
-            serde_json::from_slice(old).ok()?,
-            serde_json::from_slice(new).ok()?,
-        ))
+pub(crate) fn detect(
+    page: &str,
+    old: &(impl Version + ?Sized),
+    new: &(impl Version + ?Sized),
+    context: &Context,
+) -> Vec<Draft> {
+    fn both<T: DeserializeOwned + Clone + Send + Sync + 'static>(
+        old: &(impl Version + ?Sized),
+        new: &(impl Version + ?Sized),
+    ) -> Option<(T, T)> {
+        Some((old.decode()?, new.decode()?))
     }
     match page {
         ATTENDANCE => both(old, new).map(|(o, n)| attendance(o, n)),
@@ -538,7 +587,9 @@ pub(crate) fn detect(page: &str, old: &[u8], new: &[u8], context: &Context) -> V
         CALENDAR => both(old, new).map(|(o, n)| calendar(&o, &n, context.today)),
         GENERAL => both(old, new).map(|(o, n)| general_outing(&o, &n)),
         WEEKEND => both(old, new).map(|(o, n)| weekend_outing(&o, &n)),
-        _ if page.starts_with(PLANS) => both(old, new).map(|(o, n)| files(&o, &n, context)),
+        _ if page.starts_with(&format!("{PLANS}/")) => {
+            both(old, new).map(|(o, n)| files(&o, &n, context))
+        }
         _ => page
             .strip_prefix(&format!("{ATTENDANCE_DETAIL}/"))
             .and_then(|name| name.strip_suffix(".json"))

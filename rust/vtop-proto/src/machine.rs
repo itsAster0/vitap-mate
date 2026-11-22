@@ -48,6 +48,19 @@ impl<M: Machine> Machine for &mut M {
     }
 }
 
+/// A boxed machine, as [`crate::spec`] builds them.
+impl<M: Machine + ?Sized> Machine for Box<M> {
+    type Output = M::Output;
+
+    fn start(&mut self) -> Step<M::Output> {
+        (**self).start()
+    }
+
+    fn feed(&mut self, response: Response) -> Step<M::Output> {
+        (**self).feed(response)
+    }
+}
+
 /// What a signed-in request needs from the session. `Debug` hides the CSRF
 /// token and the registration number.
 #[derive(Clone, PartialEq, Eq)]

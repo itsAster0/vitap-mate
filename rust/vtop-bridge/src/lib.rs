@@ -88,6 +88,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
+        .route(vtop_shared::engine::FETCH_BATCH, post(fetch::fetch_batch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))
         .route(vtop_shared::engine::VTOP_LOGIN_OTP, post(vtop_login::otp))
         .route(

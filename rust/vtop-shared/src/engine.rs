@@ -14,6 +14,10 @@ pub const LOGIN: &str = "/engine/login";
 /// Engine: fetches and parses one page on a phone's session ([`PageFetch`]),
 /// answering `{"data": …}`. The edge's `/v1/vtop/fetch` passes it on.
 pub const FETCH: &str = "/engine/fetch";
+/// Engine: several pages on one session ([`PageBatch`]), answering `{"data": [answer…]}` in
+/// the request's order, each `{"data": …}` or `{"code", "error"}`; `401 session_expired` for
+/// the whole batch when VTOP ended the session. The edge's `/v1/vtop/fetch-batch` passes it on.
+pub const FETCH_BATCH: &str = "/engine/fetch-batch";
 /// Engine: signs in with a phone's username and password, keeping nothing.
 /// Answers `{"status": "ok", session}`, or `{"status": "otp_required",
 /// session, message, issuedAt}` with the half-done session for the phone
@@ -210,6 +214,27 @@ pub struct PageFetch {
     /// back packed with it when the engine holds the same one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dictionary: Option<String>,
+}
+
+/// Pages of one semester read on one session, for one round trip. No `Debug`: it holds cookies.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageBatch {
+    pub session: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semester: Option<String>,
+    pub pages: Vec<BatchPage>,
+    /// As [`PageFetch::dictionary`]; the whole answer is packed under
+    /// [`crate::wire_page::BATCH`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dictionary: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BatchPage {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub args: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

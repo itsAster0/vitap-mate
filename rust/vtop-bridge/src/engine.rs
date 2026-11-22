@@ -9,7 +9,7 @@
 //!
 //! Routes (`Authorization: Bearer $INTERNAL_TOKEN`):
 //! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
-//! (in `fetch`), and
+//! and `/engine/fetch-batch` (in `fetch`), and
 //! `/internal/mail-otp/owner` (whose a session is, as an owner hash).
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1292,6 +1292,71 @@ mod tests {
             serde_json::from_slice(&page_dictionary::unpack("semesters", &packed).unwrap())
                 .unwrap();
         assert!(!page["semesters"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_batch_answers_each_page_on_its_own() {
+        let (_vtop, app) = vtop_with_semesters().await;
+        let pages =
+            json!([{ "name": "semesters" }, { "name": "nope" }, { "name": "grade_details" }]);
+        let (status, body) = post(
+            &app,
+            "/engine/fetch-batch",
+            RELAY,
+            json!({ "session": signed_in(), "semester": "AP1", "pages": pages }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let answers = body["data"].as_array().unwrap();
+        assert!(!answers[0]["data"]["semesters"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(answers[1]["code"], "unknown_page");
+        assert_eq!(answers[2]["code"], "bad_arguments");
+    }
+
+    #[tokio::test]
+    async fn a_batch_without_cookies_asks_for_a_sign_in() {
+        let (status, body) = post(
+            &phone_app(),
+            "/engine/fetch-batch",
+            RELAY,
+            json!({ "session": { "cookies": "" }, "pages": [{ "name": "semesters" }] }),
+        )
+        .await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::UNAUTHORIZED, Some("session_expired"))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_batch_comes_packed_for_the_same_dictionary() {
+        use vtop_shared::page_dictionary;
+        let (_vtop, app) = vtop_with_semesters().await;
+        let body = json!({
+            "session": signed_in(),
+            "pages": [{ "name": "semesters" }, { "name": "semesters" }],
+            "dictionary": page_dictionary::id(),
+        });
+        let request = Request::builder()
+            .method("POST")
+            .uri("/engine/fetch-batch")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {RELAY}"))
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(
+            response.headers()["content-type"],
+            page_dictionary::CONTENT_TYPE
+        );
+        let packed = response.into_body().collect().await.unwrap().to_bytes();
+        let json = page_dictionary::unpack(vtop_shared::wire_page::BATCH, &packed).unwrap();
+        let answers: Value = serde_json::from_slice(&json).unwrap();
+        assert_eq!(answers.as_array().unwrap().len(), 2);
+        assert!(answers[1]["data"]["semesters"].is_array());
     }
 
     #[tokio::test]

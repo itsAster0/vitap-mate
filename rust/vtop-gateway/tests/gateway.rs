@@ -4,11 +4,11 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use tokio::net::UdpSocket;
 use vtop_gateway::{run, Config};
-use vtop_shared::engine::UDP_KEYS_INTERNAL;
+use vtop_shared::engine::{BatchPage, UDP_KEYS_INTERNAL};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    session_hash, WirePageRequest, WirePageResponse, NEED_SESSION, SIGN_IN_BODY, UNSUPPORTED,
-    VERSION,
+    batch_args, session_hash, WirePageRequest, WirePageResponse, BATCH, NEED_SESSION, SIGN_IN_BODY,
+    UNSUPPORTED, VERSION,
 };
 use vtop_wire::client::{fetch, ClientConfig};
 use wiremock::matchers::{body_partial_json, header, method, path};
@@ -132,6 +132,62 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
     assert_eq!(
         WirePageResponse::decode(&got.body).unwrap().status,
         NEED_SESSION
+    );
+}
+
+#[tokio::test]
+async fn a_batch_goes_to_the_engines_batch_route() {
+    let engine = MockServer::start().await;
+    let answer =
+        serde_json::json!({ "data": [{ "data": {} }, { "code": "unknown_page", "error": "x" }] });
+    Mock::given(method("POST"))
+        .and(path("/engine/fetch-batch"))
+        .and(header("authorization", "Bearer internal-token"))
+        .and(body_partial_json(serde_json::json!({
+            "semester": "AP2026275",
+            "pages": [{ "name": "attendance" }, { "name": "biometric", "args": { "date": "28/10/2026" } }],
+            "session": { "cookies": "JSESSIONID=abc" }
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&answer))
+        .expect(1)
+        .mount(&engine)
+        .await;
+    let (port, key) = gateway(&engine).await;
+    let cfg = ClientConfig {
+        host: "127.0.0.1".into(),
+        ports: vec![port],
+        server_key: key,
+        state_dir: std::env::temp_dir().join(format!("vtop-gateway-batch-{}", std::process::id())),
+        request_in_handshake: false,
+    };
+    let pages = [
+        BatchPage {
+            name: "attendance".into(),
+            args: Default::default(),
+        },
+        BatchPage {
+            name: "biometric".into(),
+            args: [("date".to_string(), "28/10/2026".to_string())].into(),
+        },
+    ];
+    let body = WirePageRequest {
+        request_id: None,
+        name: BATCH.into(),
+        semester: Some("AP2026275".into()),
+        args: batch_args(&pages),
+        dictionary: None,
+        session_hash: session_hash(SESSION),
+        session: Some(SESSION.into()),
+        account: None,
+    }
+    .encode()
+    .unwrap();
+    let got = fetch(&cfg, &body, Duration::from_secs(20)).await.unwrap();
+    let got = WirePageResponse::decode(&got.body).unwrap();
+    assert_eq!(got.status, 200);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&got.body).unwrap(),
+        answer
     );
 }
 

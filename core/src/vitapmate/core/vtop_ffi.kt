@@ -1052,6 +1052,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_route(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_pages(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_clear_server_session(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_clear_server_sign_ins(
@@ -1327,6 +1329,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_set_route(`ptr`: Long,`flow`: RustBuffer.ByValue,`route`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_pages(`ptr`: Long,`flow`: RustBuffer.ByValue,`names`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_clear_server_session(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_clear_server_sign_ins(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -1888,6 +1892,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_route() and 0xFFFF) != 35705) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_pages() and 0xFFFF) != 51510) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_session() and 0xFFFF) != 4581) {
@@ -3531,6 +3538,12 @@ public interface CoreInterface {
      * Saves the choice; earlier failures are forgotten so it is tried straight away.
      */
     fun `setRoute`(`flow`: kotlin.String, `route`: Route)
+    
+    /**
+     * Fetches and caches `names` (of [`BATCHED`]) as their own fetches do, in one round trip
+     * on the Server and UDP routes; one page failing leaves the others fetched.
+     */
+    suspend fun `fetchPages`(`flow`: kotlin.String, `names`: List<kotlin.String>): List<PageFetched>
     
     /**
      * Drops the sealed VTOP session the server keeps for the extension and MCP.
@@ -5773,6 +5786,33 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     }
     
     
+
+    
+    /**
+     * Fetches and caches `names` (of [`BATCHED`]) as their own fetches do, in one round trip
+     * on the Server and UDP routes; one page failing leaves the others fetched.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchPages`(`flow`: kotlin.String, `names`: List<kotlin.String>) : List<PageFetched> {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_pages(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterSequenceString.lower(`names`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceTypePageFetched.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
 
     
     /**
@@ -12828,6 +12868,47 @@ public object FfiConverterTypeOutingWhen: FfiConverterRustBuffer<OutingWhen> {
 
 
 /**
+ * A page of [`Core::fetch_pages`], and why it was not fetched.
+ */
+data class PageFetched (
+    var `name`: kotlin.String
+    , 
+    var `error`: CoreException?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePageFetched: FfiConverterRustBuffer<PageFetched> {
+    override fun read(buf: ByteBuffer): PageFetched {
+        return PageFetched(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalTypeCoreError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PageFetched) = (
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterOptionalTypeCoreError.allocationSize(value.`error`)
+    )
+
+    override fun write(value: PageFetched, buf: ByteBuffer) {
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterOptionalTypeCoreError.write(value.`error`, buf)
+    }
+}
+
+
+
+/**
  * The MCP client (Claude and others) whose sign-in page shows a pairing code: asked before the
  * student approves, so the sheet can name it.
  */
@@ -19281,6 +19362,38 @@ public object FfiConverterOptionalTypeClassStatus: FfiConverterRustBuffer<ClassS
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeCoreError: FfiConverterRustBuffer<CoreException?> {
+    override fun read(buf: ByteBuffer): CoreException? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeCoreError.read(buf)
+    }
+
+    override fun allocationSize(value: CoreException?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeCoreError.allocationSize(value)
+        }
+    }
+
+    override fun write(value: CoreException?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeCoreError.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeRoute: FfiConverterRustBuffer<Route?> {
     override fun read(buf: ByteBuffer): Route? {
         if (buf.get().toInt() == 0) {
@@ -20735,6 +20848,34 @@ public object FfiConverterSequenceTypeOutingWhen: FfiConverterRustBuffer<List<Ou
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeOutingWhen.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypePageFetched: FfiConverterRustBuffer<List<PageFetched>> {
+    override fun read(buf: ByteBuffer): List<PageFetched> {
+        val len = buf.getInt()
+        return List<PageFetched>(len) {
+            FfiConverterTypePageFetched.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<PageFetched>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypePageFetched.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<PageFetched>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypePageFetched.write(it, buf)
         }
     }
 }

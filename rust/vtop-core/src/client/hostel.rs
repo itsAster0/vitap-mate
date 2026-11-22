@@ -1,4 +1,4 @@
-//! Hostel outings: the lists, apply and cancel, and the pass, run as the
+//! Hostel outings: apply and cancel, and the pass, run as the
 //! `vtop-proto` outing machines. Apply and cancel are sent once, never
 //! retried.
 
@@ -7,8 +7,7 @@ use crate::error::VtopResult;
 use crate::inputs::OutingPassId;
 use crate::machine::OnePost;
 use crate::outing::{self, Application, Apply, Cancel};
-use crate::parser::hostel;
-use crate::types::{GeneralOutingData, OutingApplyResult, OutingCancelResult, WeekendOutingData};
+use crate::types::{OutingApplyResult, OutingCancelResult};
 
 pub use crate::outing::{
     check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
@@ -16,32 +15,6 @@ pub use crate::outing::{
 };
 
 impl VtopClient {
-    pub async fn general_outing_page(&self) -> VtopResult<String> {
-        self.page("get_general_outing", |s| {
-            outing::list(s, OutingKind::General)
-        })
-        .await
-    }
-
-    pub async fn general_outing(&self) -> VtopResult<GeneralOutingData> {
-        Ok(hostel::parse_general_outing(
-            &self.general_outing_page().await?,
-        ))
-    }
-
-    pub async fn weekend_outing_page(&self) -> VtopResult<String> {
-        self.page("get_weekend_outing", |s| {
-            outing::list(s, OutingKind::Weekend)
-        })
-        .await
-    }
-
-    pub async fn weekend_outing(&self) -> VtopResult<WeekendOutingData> {
-        Ok(hostel::parse_weekend_outing(
-            &self.weekend_outing_page().await?,
-        ))
-    }
-
     pub async fn apply_general_outing(
         &self,
         application: &GeneralOutingApplication,

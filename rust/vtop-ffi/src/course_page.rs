@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use tracing::info;
 use vtop_core::VtopError;
 use vtop_core::inputs::{CourseFilePath, SemesterId};
+use vtop_core::spec;
 use vtop_core::types::{
     CoursePageClass, CoursePageClasses, CoursePageCourse, CoursePageCourses, CoursePageDetail,
     TimetableData,
@@ -16,11 +17,11 @@ use vtop_core::types::{
 
 use crate::{Core, CoreError, TIMETABLE, records, traced, traced_sync};
 
-const COURSES: &str = "course_page.json";
+const COURSES: &str = spec::COURSE_PAGE_COURSES.file;
 /// A course's sections: `course_page/classes/<course id>.json`.
-const CLASSES: &str = "course_page/classes";
+const CLASSES: &str = spec::COURSE_PAGE_CLASSES.file;
 /// A section's lecture plan: `course_page/plan/<class id>.json`.
-const PLANS: &str = "course_page/plan";
+const PLANS: &str = spec::COURSE_PAGE_DETAIL.file;
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct CoursePage {
@@ -141,11 +142,7 @@ impl Core {
     /// Fetches the selected semester's course list and caches it.
     pub async fn fetch_course_page(&self, flow: String) -> Result<CoursePage, CoreError> {
         traced("fetch_course_page", &flow, async {
-            let data = self
-                .fetch(COURSES, "course_page_courses", &[], |client, semester| {
-                    Box::pin(client.course_page_courses(semester))
-                })
-                .await?;
+            let data = self.fetch(&spec::COURSE_PAGE_COURSES, None, &[]).await?;
             Ok(logged(data.into()))
         })
         .await
@@ -190,15 +187,9 @@ impl Core {
             let course_id = plain(&course_id)?;
             let classes = self
                 .fetch(
-                    &classes_file(course_id),
-                    "course_page_classes",
+                    &spec::COURSE_PAGE_CLASSES,
+                    Some(&classes_file(course_id)),
                     &[("course_id", course_id)],
-                    |client, semester| {
-                        let course_id = course_id.to_string();
-                        Box::pin(
-                            async move { client.course_page_classes(semester, &course_id).await },
-                        )
-                    },
                 )
                 .await?;
             let mut view = self.view(course_id, classes.clone(), class_id.as_deref());
@@ -211,17 +202,9 @@ impl Core {
                     .unwrap_or_default();
                 let detail = self
                     .fetch(
-                        &plan_file(&selected),
-                        "course_page_detail",
+                        &spec::COURSE_PAGE_DETAIL,
+                        Some(&plan_file(&selected)),
                         &[("erp_id", &erp_id), ("class_id", &selected)],
-                        |client, semester| {
-                            let (erp_id, selected) = (erp_id.clone(), selected.clone());
-                            Box::pin(async move {
-                                client
-                                    .course_page_detail(semester, &erp_id, &selected)
-                                    .await
-                            })
-                        },
                     )
                     .await?;
                 view.add_plan(detail);
@@ -262,7 +245,7 @@ impl Core {
         traced("course_plan_link", &flow, async {
             self.current()?;
             let semester = self
-                .read::<vtop_core::types::SemesterData>(crate::SEMESTERS)
+                .read_kept::<vtop_core::types::SemesterData>(crate::SEMESTERS)
                 .and_then(|list| self.pick(&list))
                 .ok_or(CoreError::SemesterNeeded)?;
             let semester = SemesterId::parse(&semester)?;

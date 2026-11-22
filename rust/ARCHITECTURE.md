@@ -17,16 +17,24 @@ rust/                    Cargo workspace
 
 | Module | Holds |
 | --- | --- |
-| `client/mod.rs` | `VtopClient`, its builder, shared response handling, session import/export |
+| `client/mod.rs` | `VtopClient`, its builder, `fetch(spec, query)` for every read page, shared response handling, session import/export |
 | `client/auth.rs` | password + CAPTCHA login, session validation and restore |
 | `client/otp.rs` | security OTP submit, redirect follow-up, resend |
-| `client/captcha.rs` | embedded CAPTCHA model, on `spawn_blocking` (there is no remote solver) |
+| `client/email_otp.rs` | login that answers the OTP itself, from a code source or Gmail |
+| `client/hostel.rs` | outing apply and cancel, and the pass |
+| `client/course_page.rs` | the course page's files and the course plan |
+| `client/transport.rs` | the `Transport` trait: one hop, no redirects, no cookies |
 | `client/http.rs` | the reqwest client: headers, VTOP intermediate CA, timeouts, pool |
-| `client/{academics,exams,biometric}.rs` | one method per endpoint, plus `*_page` for raw HTML |
 | `session.rs` | auth state, CSRF, registration number, resettable cookie jar, `SessionState` |
-| `parser/` | one parser per page; `page.rs` for login/landing pages |
-| `inputs.rs` | validated inputs (semester id, OTP, date, password...) |
-| `types.rs`, `error.rs` | the data types and `VtopError` that the app and the server both use |
+| `gmail.rs` | reads the OTP mail from the student's Gmail |
+| `sync.rs` | the async lock and the timer, with no runtime |
+
+The parsers, page machines, page registry, inputs, types and `VtopError` are
+vtop-proto's, re-exported here at their old paths. `vtop_proto::spec` lists
+every read page once as a `PageSpec`: its name and arguments (what the app
+sends the engine), its cache file and its machine. `VtopClient::fetch` runs
+any of them, and the engine serves everything in `spec::each`, so a new read
+page is a parser, a machine and a spec.
 
 A few design points:
 
@@ -54,6 +62,25 @@ takes the caller's flow id first. `mise run rust-android` builds
 `libvtop_ffi.so` into `app/jniLibs/` and generates the Kotlin bindings
 (`core/src/vitapmate/core/vtop_ffi.kt`).
 
+- **Pages.** A feature's `fetch_x` calls `Core::fetch(&spec::X, ...)`,
+  which fetches the page for the picked semester and saves it at
+  `pages/<semester>/<spec file>`; `Core::page` fetches one without saving.
+  Both ask the route first (the server or UDP) and fall back to
+  `VtopClient::fetch` on the phone. `cached_x` reads the saved copy with
+  `read_page`.
+- **Decoded copies** (`decoded.rs`). The semester list, the pick and every
+  page stay decoded in memory after the first read, keyed by path and
+  type, so screens that read the same page many times parse it once. A
+  copy is used only while the file's length, modified time and inode are
+  what they were when it was read; a write drops it, and sign-out,
+  another student, Developer's clears and a forgotten pick drop what they
+  remove. At most 4 MB of JSON is kept, the least recently used going
+  first.
+- **Route policy** (`route/plan.rs`). Which route to try, the 5-minute
+  skips and the steps of a server fetch (consent, the fetch, one sign-in
+  again) are pure: no I/O and no clock, the caller passes `now`.
+  `route.rs` keeps the one plan and runs its steps.
+
 ## VTOP from the phone
 
 ```
@@ -78,7 +105,10 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   web view stay on the phone. Udp sends the same request to the gateway first
   (`udp.rs`, a Kotlin `DatagramSocket` in `VtopUdp.kt`). A route that fails is
   skipped for 5 minutes and the request goes on to Direct. The log line
-  `route used` names the route each call took.
+  `route used` names the route each call took. The open-app sweep sends its
+  pages as one batch (`Core::fetch_pages`, `route/batch.rs`,
+  `/v1/vtop/fetch-batch`), asked about once; on Direct, or a server without
+  batches, they are fetched a few at a time on the phone.
 - **Cookie consent** (`vtop-ffi/src/consent.rs`). Every path that sends the
   VTOP session (or the saved password) to our servers calls `consent::allowed`
   first: Proxy, Server and Udp, the server OTP, Connected apps, the Server page,
@@ -150,7 +180,7 @@ keeps them for 6 hours, or until the gateway says it has another key.
   expected arrival times and asks for fresh symbols. Rate, round trip and
   loss are kept per network.
 - **Gateway** (`vtop-gateway`): no VTOP logic. It calls `/engine/fetch`
-  (and the `/engine/vtop-login*` routes) with `INTERNAL_TOKEN`, returning
+  (`/engine/fetch-batch` for a batch, and the `/engine/vtop-login*` routes) with `INTERNAL_TOKEN`, returning
   the answer byte for byte. It keeps each device's VTOP session for six
   hours so requests carry an 8-byte hash instead of the cookies
   (`vtop_shared::wire_page`).
@@ -191,5 +221,5 @@ and `~/vitapmate-gateway/data` for the keys.
   gateway over localhost UDP (30% loss, restarts, replays, two processes).
 - `vtop-gateway`: the client through the gateway to a mock engine.
 - `vtop-edge` (`bun run test`): accounts, devices, mail OTP, the `/vtop/` proxy.
-- `vtop-ffi/src/tests.rs` and `outing/tests.rs`: the app's crate.
+- `vtop-ffi/src/tests.rs`, `outing/tests.rs` and next to each module: the app's crate.
 - `vtop-core/examples/parse_bench.rs`: parser timings on fixtures or raw pages.

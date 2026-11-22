@@ -32,7 +32,8 @@ pub use client::VtopClient;
 pub use config::VtopConfig;
 pub use session::SessionState;
 pub use vtop_proto::{
-    course_pages, error, http, inputs, login, machine, now_unix, otp, outing, pages, parser, types,
+    course_pages, error, http, inputs, login, machine, now_unix, otp, outing, pages, parser, spec,
+    types,
 };
 pub use vtop_proto::{VtopError, VtopResult};
 pub use vtop_shared::mail_seal;

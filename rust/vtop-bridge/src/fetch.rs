@@ -4,6 +4,7 @@
 //! nothing, and answers `{"data": …}` (the parsed page, as vtop-core's
 //! serde JSON), Brotli-compressed when the caller accepts it; or, for a
 //! phone holding the same page dictionary, the page packed with it.
+//! `POST /engine/fetch-batch` ([`fetch_batch`]) does several pages in one round trip.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,9 +14,12 @@ use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use futures::StreamExt;
+use serde_json::{json, Value};
 use vtop_core::{SessionState, VtopClient, VtopError};
-use vtop_shared::engine::PageFetch;
+use vtop_shared::engine::{PageBatch, PageFetch};
 use vtop_shared::page_dictionary;
+use vtop_shared::wire_page::BATCH;
 
 use crate::engine::require_secret;
 use crate::error::ApiError;
@@ -39,38 +43,11 @@ pub async fn fetch(
     if session.cookies.trim().is_empty() {
         return Err(expired());
     }
-    let def = pages::find(&request.name).ok_or_else(|| {
-        ApiError::new(
-            StatusCode::NOT_FOUND,
-            "unknown_page",
-            format!("No page named {}.", request.name),
-        )
-    })?;
-    let args: Args = request.args;
-    if args.len() != def.args.len() || !def.args.iter().all(|name| args.contains_key(*name)) {
-        return Err(bad_arguments(format!(
-            "{} takes: {}.",
-            def.name,
-            def.args.join(", ")
-        )));
-    }
-    let client = VtopClient::builder()
-        .config(state.vtop.clone())
-        .with_session(&session)
-        .map_err(|error| vtop_error(&error))?;
+    let client = client(&state, &session)?;
     let semester = request.semester.unwrap_or_default();
-    let data = tokio::time::timeout(FETCH_TIMEOUT, (def.call)(&client, &semester, &args))
-        .await
-        .map_err(|_| {
-            ApiError::new(
-                StatusCode::GATEWAY_TIMEOUT,
-                "vtop_timeout",
-                "VTOP took too long to answer.",
-            )
-        })?
-        .map_err(|error| vtop_error(&error))?;
+    let data = page(&client, &request.name, &semester, &request.args).await?;
     if request.dictionary.as_deref() == Some(page_dictionary::id()) {
-        if let Some(packed) = page_pack::pack(def.name, &data) {
+        if let Some(packed) = page_pack::pack(&request.name, &data) {
             return Ok((
                 [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
                 packed,
@@ -79,6 +56,114 @@ pub async fn fetch(
         }
     }
     Ok(Json(serde_json::json!({ "data": data })).into_response())
+}
+
+/// The pages a batch may name; more are refused.
+const MAX_BATCH: usize = 16;
+/// Pages of a batch fetched at once on its one client.
+const BATCH_AT_ONCE: usize = 4;
+
+/// `POST /engine/fetch-batch`: [`PageBatch`]'s pages on one session, at most
+/// [`BATCH_AT_ONCE`] at a time, all within [`FETCH_TIMEOUT`]. Each answer is the page's
+/// `{"data"}` or its own `{"code", "error"}`, so one bad page does not fail the rest; an
+/// expired session fails the whole batch, as it would every page.
+pub async fn fetch_batch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<PageBatch>, JsonRejection>,
+) -> Result<Response, ApiError> {
+    require_secret(&state, &headers)?;
+    let Json(request) = body.map_err(|_| bad_arguments("Invalid JSON body."))?;
+    if request.pages.len() > MAX_BATCH {
+        return Err(bad_arguments(format!("At most {MAX_BATCH} pages.")));
+    }
+    let session: SessionState = serde_json::from_value(request.session)
+        .map_err(|_| bad_arguments("session is not a VTOP session."))?;
+    if session.cookies.trim().is_empty() {
+        return Err(expired());
+    }
+    let client = client(&state, &session)?;
+    let semester = request.semester.unwrap_or_default();
+    let deadline = tokio::time::Instant::now() + FETCH_TIMEOUT;
+    // Built first: a closure inside the stream trips axum's `Send` check.
+    let pages: Vec<_> = request
+        .pages
+        .iter()
+        .map(|p| tokio::time::timeout_at(deadline, page(&client, &p.name, &semester, &p.args)))
+        .collect();
+    let answers: Vec<Result<Value, ApiError>> = futures::stream::iter(pages)
+        .buffered(BATCH_AT_ONCE)
+        .map(|answer| answer.unwrap_or_else(|_| Err(timed_out())))
+        .collect()
+        .await;
+    if let Some(Err(error)) = answers
+        .iter()
+        .find(|answer| matches!(answer, Err(e) if e.code == "session_expired"))
+    {
+        return Err(error.clone());
+    }
+    let data: Vec<Value> = answers
+        .into_iter()
+        .map(|answer| match answer {
+            Ok(data) => json!({ "data": data }),
+            Err(e) => json!({ "code": e.code, "error": e.message }),
+        })
+        .collect();
+    tracing::info!(pages = data.len(), "batch");
+    let data = json!({ "data": data });
+    if request.dictionary.as_deref() == Some(page_dictionary::id()) {
+        if let Some(packed) = page_pack::pack(BATCH, &data["data"]) {
+            return Ok((
+                [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
+                packed,
+            )
+                .into_response());
+        }
+    }
+    Ok(Json(data).into_response())
+}
+
+/// A client on the phone's session, borrowed for this request.
+fn client(state: &AppState, session: &SessionState) -> Result<VtopClient, ApiError> {
+    VtopClient::builder()
+        .config(state.vtop.clone())
+        .with_session(session)
+        .map_err(|error| vtop_error(&error))
+}
+
+/// Page `name` with its `args` checked, within [`FETCH_TIMEOUT`].
+async fn page(
+    client: &VtopClient,
+    name: &str,
+    semester: &str,
+    args: &Args,
+) -> Result<Value, ApiError> {
+    let def = pages::find(name).ok_or_else(|| {
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "unknown_page",
+            format!("No page named {name}."),
+        )
+    })?;
+    if args.len() != def.args.len() || !def.args.iter().all(|name| args.contains_key(*name)) {
+        return Err(bad_arguments(format!(
+            "{} takes: {}.",
+            def.name,
+            def.args.join(", ")
+        )));
+    }
+    tokio::time::timeout(FETCH_TIMEOUT, (def.call)(client, semester, args))
+        .await
+        .map_err(|_| timed_out())?
+        .map_err(|error| vtop_error(&error))
+}
+
+fn timed_out() -> ApiError {
+    ApiError::new(
+        StatusCode::GATEWAY_TIMEOUT,
+        "vtop_timeout",
+        "VTOP took too long to answer.",
+    )
 }
 
 fn bad_arguments(message: impl Into<String>) -> ApiError {

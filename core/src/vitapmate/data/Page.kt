@@ -298,25 +298,27 @@ fun <T> rememberPage(
         if (fetchedFor != semester && page.state is PageState.Ready && PageFetches.succeededWithin(page.key, Settings.tunable(Tunable.JustFetched) * 60_000L)) {
             fetchedFor = semester
         }
-        val trigger = when {
-            page.state !is PageState.Ready -> "open" // nothing to show: always fetch
-            // The screen left mid-fetch and it still runs: join it (no request) to show its result.
-            PageFetches.isRunning(page.key) -> "rejoin"
-            !Settings.autoRefresh -> return@LaunchedEffect
-            fetchedFor != semester -> "open"
-            page.isStale() -> "stale"
-            else -> return@LaunchedEffect
-        }
+        val ready = page.state is PageState.Ready
+        val trigger = refreshTrigger(
+            PageWake.Open,
+            ready = ready,
+            running = ready && PageFetches.isRunning(page.key),
+            autoRefresh = Settings.autoRefresh,
+            fetched = fetchedFor == semester,
+            stale = page.isStale(),
+        ) ?: return@LaunchedEffect
         page.refresh(trigger, user = false)
         if (page.state.let { it is PageState.Ready && it.problem == null }) fetchedFor = semester
     }
     LaunchedEffect(page, OtpPrompt.generation) {
-        if (OtpPrompt.generation != otpAtStart) page.refresh("otp")
+        if (OtpPrompt.generation != otpAtStart) page.refresh(refreshTrigger(PageWake.Otp) ?: return@LaunchedEffect)
     }
     // Back in the app after a while: old data is fetched again.
     val resumesAtStart = remember { Foreground.resumes }
     LaunchedEffect(page, Foreground.resumes) {
-        if (Foreground.resumes != resumesAtStart && Settings.autoRefresh && page.isStale()) page.refresh("resume", user = false)
+        if (Foreground.resumes == resumesAtStart) return@LaunchedEffect
+        val trigger = refreshTrigger(PageWake.Resume, autoRefresh = Settings.autoRefresh, stale = page.isStale())
+        page.refresh(trigger ?: return@LaunchedEffect, user = false)
     }
     DisposableEffect(page) {
         PageFetches.shown(id, true)
@@ -326,6 +328,35 @@ fun <T> rememberPage(
         }
     }
     return page
+}
+
+/** What wakes a page's refresh effect: the screen opened, the OTP prompt was answered, the app came back. */
+internal enum class PageWake { Open, Otp, Resume }
+
+/**
+ * Why [rememberPage] fetches on [wake], or null for no fetch. [ready]: something is shown;
+ * [running]: its fetch still runs (the screen left mid-fetch); [fetched]: this screen fetched the
+ * selected semester already; [stale]: older than [Tunable.PageMaxAge].
+ */
+internal fun refreshTrigger(
+    wake: PageWake,
+    ready: Boolean = true,
+    running: Boolean = false,
+    autoRefresh: Boolean = true,
+    fetched: Boolean = true,
+    stale: Boolean = false,
+): String? = when (wake) {
+    PageWake.Otp -> "otp"
+    PageWake.Resume -> "resume".takeIf { autoRefresh && stale }
+    PageWake.Open -> when {
+        !ready -> "open" // nothing to show: always fetch
+        // Join it (no request) to show its result.
+        running -> "rejoin"
+        !autoRefresh -> null
+        !fetched -> "open"
+        stale -> "stale"
+        else -> null
+    }
 }
 
 /**

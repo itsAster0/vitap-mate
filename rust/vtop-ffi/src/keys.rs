@@ -415,7 +415,7 @@ impl Core {
     /// Adds this phone to the account's phones, with the semester picked here.
     async fn link_with(&self, server: &str, flow: &str, action: &str) -> Result<(), CoreError> {
         let mut link = json!({ "label": crate::server::label() });
-        if let Some(semester) = self.read::<String>(crate::SELECTED) {
+        if let Some(semester) = self.read_kept::<String>(crate::SELECTED) {
             crate::json_set(&mut link, "semesterId", json!(semester));
         }
         self.account_post(server, "/v1/link", flow, action, true, link)

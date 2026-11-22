@@ -37,6 +37,23 @@ describe("phoneVtop", () => {
     expect(await seen[0].json()).toEqual(body);
   });
 
+  it("passes a batch to the engine's batch route, body unchanged", async () => {
+    const answer = { data: [{ data: { records: [] } }, { code: "vtop_unavailable", error: "x" }] };
+    const { seen, fetcher } = capture(Response.json(answer));
+    const body = { session: { cookies: "JSESSIONID=a" }, semester: "AP1", pages: [{ name: "attendance" }, { name: "marks" }] };
+    const res = await phoneVtop(post("/v1/vtop/fetch-batch", body), env, fetcher);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(answer);
+    expect(seen[0].url).toBe("https://engine.example/engine/fetch-batch");
+    expect(await seen[0].json()).toEqual(body);
+  });
+
+  it("passes an older engine's 404 on, so the phone fetches page by page", async () => {
+    const { fetcher } = capture(new Response("", { status: 404 }));
+    const res = await phoneVtop(post("/v1/vtop/fetch-batch", { pages: [] }), env, fetcher);
+    expect(res.status).toBe(404);
+  });
+
   it("passes a packed page on byte for byte", async () => {
     const bytes = new Uint8Array([0x1b, 0x00, 0xff, 0x7f, 0x80]);
     const { fetcher } = capture(new Response(bytes, { headers: { "content-type": PACKED_PAGE } }));

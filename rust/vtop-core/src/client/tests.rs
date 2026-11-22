@@ -7,7 +7,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use super::*;
-use crate::inputs::{OutingPassId, SemesterId};
+use crate::inputs::OutingPassId;
+use crate::spec::{Query, ATTENDANCE};
 
 const CONTENT_PAGE: &str = r#"<html><input name="_csrf" value="csrf-1">
 <input type="hidden" name="authorizedIDX" value="22BCE0001"></html>"#;
@@ -137,8 +138,8 @@ fn config(base_url: String) -> VtopConfig {
     }
 }
 
-fn semester() -> SemesterId {
-    SemesterId::parse("AP2026").unwrap()
+fn semester() -> Query<'static> {
+    Query::for_semester("AP2026")
 }
 
 #[tokio::test]
@@ -157,7 +158,7 @@ async fn full_session_state_skips_validation() {
         .with_session(&state)
         .unwrap();
 
-    let data = client.attendance(&semester()).await.unwrap();
+    let data = client.fetch(&ATTENDANCE, &semester()).await.unwrap();
 
     assert_eq!(data.records.len(), 1);
     assert_eq!(data.records[0].course_id, "AP2026001");
@@ -182,8 +183,8 @@ async fn cookie_only_session_validates_once_then_reuses() {
         .with_session(&state)
         .unwrap();
 
-    client.attendance(&semester()).await.unwrap();
-    client.attendance(&semester()).await.unwrap();
+    client.fetch(&ATTENDANCE, &semester()).await.unwrap();
+    client.fetch(&ATTENDANCE, &semester()).await.unwrap();
 
     assert_eq!(mock.hits("/vtop/content"), 1);
     assert_eq!(mock.hits("/vtop/processViewStudentAttendance"), 2);
@@ -209,9 +210,9 @@ async fn concurrent_fetches_share_one_validation() {
 
     let semester = semester();
     let (a, b, c) = tokio::join!(
-        client.attendance(&semester),
-        client.attendance(&semester),
-        client.attendance(&semester)
+        client.fetch(&ATTENDANCE, &semester),
+        client.fetch(&ATTENDANCE, &semester),
+        client.fetch(&ATTENDANCE, &semester)
     );
     assert!(a.is_ok() && b.is_ok() && c.is_ok());
     assert_eq!(mock.hits("/vtop/content"), 1);
@@ -233,7 +234,7 @@ async fn login_redirect_expires_the_session() {
         .unwrap();
     *mock.expired.lock().unwrap() = true;
 
-    let result = client.attendance(&semester()).await;
+    let result = client.fetch(&ATTENDANCE, &semester()).await;
 
     assert_eq!(result.unwrap_err(), VtopError::SessionExpired);
     assert!(!client.is_authenticated());
@@ -275,7 +276,7 @@ async fn persisted_session_round_trips_cookies() {
         .collect();
     cookies.sort_unstable();
     assert_eq!(cookies, ["JSESSIONID=abc", "SERVERID=s1"]);
-    client.attendance(&semester()).await.unwrap();
+    client.fetch(&ATTENDANCE, &semester()).await.unwrap();
     assert_eq!(mock.hits("/vtop/content"), 1);
 }
 
@@ -336,7 +337,7 @@ async fn a_404_on_a_signed_in_page_expires_the_session() {
         .unwrap();
     *mock.not_found.lock().unwrap() = true;
 
-    let result = client.attendance(&semester()).await;
+    let result = client.fetch(&ATTENDANCE, &semester()).await;
 
     assert_eq!(result.unwrap_err(), VtopError::SessionExpired);
 }
@@ -351,7 +352,7 @@ async fn a_single_vtop_5xx_is_retried() {
         .unwrap();
     *mock.failures_left.lock().unwrap() = 1;
 
-    client.attendance(&semester()).await.unwrap();
+    client.fetch(&ATTENDANCE, &semester()).await.unwrap();
 
     assert_eq!(mock.hits("/vtop/processViewStudentAttendance"), 2);
 }
@@ -366,7 +367,7 @@ async fn a_gateway_timeout_is_not_retried_and_keeps_the_session() {
         .unwrap();
     *mock.gateway_timeout.lock().unwrap() = true;
 
-    let error = client.attendance(&semester()).await.unwrap_err();
+    let error = client.fetch(&ATTENDANCE, &semester()).await.unwrap_err();
 
     assert!(matches!(error, VtopError::VtopUnavailable(ref m) if m.contains("too long")));
     assert_eq!(mock.hits("/vtop/processViewStudentAttendance"), 1);
@@ -396,7 +397,7 @@ async fn persisted_trio_restores_without_validation_and_keeps_login_time() {
         .unwrap();
 
     assert!(client.is_authenticated());
-    client.attendance(&semester()).await.unwrap();
+    client.fetch(&ATTENDANCE, &semester()).await.unwrap();
     assert_eq!(mock.hits("/vtop/content"), 0);
 
     let saved = client.export_persisted_session(5);
@@ -420,7 +421,7 @@ async fn validating_a_cookie_does_not_invent_a_login_time() {
         })
         .unwrap();
 
-    client.attendance(&semester()).await.unwrap();
+    client.fetch(&ATTENDANCE, &semester()).await.unwrap();
 
     assert!(client.is_authenticated());
     assert_eq!(client.logged_in_at(), None);

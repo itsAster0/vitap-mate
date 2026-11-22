@@ -21,6 +21,7 @@ use vtop_core::client::{
     WeekendOutingApplication,
 };
 use vtop_core::inputs::{ContactNumber, OutingDate, OutingPassId, OutingTime};
+use vtop_core::spec::{self, Query};
 use vtop_core::types::{GeneralOutingData, OutingStudent, WeekendOutingData};
 use vtop_core::{now_unix, VtopError, VtopResult};
 
@@ -342,7 +343,7 @@ impl VtopTools {
 
         let Some(code) = args.confirmation else {
             let form = match with_retry(self.source.as_ref(), &key, |client| async move {
-                client.general_outing().await
+                client.fetch(&spec::GENERAL_OUTING, &Query::NONE).await
             })
             .await
             {
@@ -384,7 +385,7 @@ impl VtopTools {
             async move {
                 // A second send of the same code (or a retry after VTOP
                 // dropped the session mid-send) must not file it twice.
-                let form = client.general_outing().await?;
+                let form = client.fetch(&spec::GENERAL_OUTING, &Query::NONE).await?;
                 if form.records.iter().any(|record| {
                     record.from_date == out_iso
                         && record.place.eq_ignore_ascii_case(&application.place)
@@ -444,7 +445,7 @@ impl VtopTools {
 
         let Some(code) = args.confirmation else {
             let form = match with_retry(self.source.as_ref(), &key, |client| async move {
-                client.weekend_outing().await
+                client.fetch(&spec::WEEKEND_OUTING, &Query::NONE).await
             })
             .await
             {
@@ -488,7 +489,7 @@ impl VtopTools {
         let result = with_retry(self.source.as_ref(), &key, |client| {
             let (application, date_iso) = (application.clone(), date_iso.clone());
             async move {
-                let form = client.weekend_outing().await?;
+                let form = client.fetch(&spec::WEEKEND_OUTING, &Query::NONE).await?;
                 if form.records.iter().any(|record| record.date == date_iso) {
                     return Err(invalid(
                         "a weekend outing for this date is already on VTOP; see get_weekend_outing",
@@ -544,14 +545,14 @@ impl VtopTools {
                 async move {
                     Ok(match kind {
                         OutingKind::General => client
-                            .general_outing()
+                            .fetch(&spec::GENERAL_OUTING, &Query::NONE)
                             .await?
                             .records
                             .into_iter()
                             .find(|record| record.cancel_id == id.as_str())
                             .map(|record| serde_json::to_value(record).unwrap_or_default()),
                         OutingKind::Weekend => client
-                            .weekend_outing()
+                            .fetch(&spec::WEEKEND_OUTING, &Query::NONE)
                             .await?
                             .records
                             .into_iter()

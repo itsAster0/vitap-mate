@@ -1,20 +1,18 @@
-//! Every VTOP page the engine fetches for a phone, by name: the arguments
-//! it takes and the [`VtopClient`] call behind it. The names and arguments
-//! match the app crate's (`rust/vtop-ffi`, via `page!` or `Core::fetch`; see
-//! `AGENTS.md`), so a new read page is one entry there and one here. Only
-//! reads: what changes VTOP (outing applies and cancels) is always sent by
-//! the phone itself.
+//! Every VTOP page the engine fetches for a phone, by name: the read pages
+//! of `vtop_proto::spec` (the names and arguments the app sends), then the
+//! files a phone asks about. Only reads: what changes VTOP (outing applies
+//! and cancels) is always sent by the phone itself.
 
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use base64::Engine as _;
 use futures::future::BoxFuture;
 use serde::Serialize;
 use serde_json::Value;
 use vtop_core::client::OutingKind;
-use vtop_core::inputs::{
-    BiometricDate, CourseFilePath, CourseId, CourseType, OutingPassId, SemesterId,
-};
+use vtop_core::inputs::{CourseFilePath, OutingPassId, SemesterId};
+use vtop_core::spec::{self, PageSpec, Query};
 use vtop_core::{VtopClient, VtopError, VtopResult};
 
 /// A page's arguments, by name.
@@ -22,8 +20,11 @@ pub type Args = BTreeMap<String, String>;
 
 /// Fetches one page: the client, the request's semester (empty for pages
 /// that are not per semester), the arguments (all of [`PageDef::args`]).
-pub type PageCall =
-    for<'a> fn(&'a VtopClient, &'a str, &'a Args) -> BoxFuture<'a, VtopResult<Value>>;
+pub type PageCall = Box<
+    dyn for<'a> Fn(&'a VtopClient, &'a str, &'a Args) -> BoxFuture<'a, VtopResult<Value>>
+        + Send
+        + Sync,
+>;
 
 pub struct PageDef {
     pub name: &'static str,
@@ -43,6 +44,40 @@ fn arg<'a>(args: &'a Args, name: &str) -> &'a str {
     args.get(name).map(String::as_str).unwrap_or_default()
 }
 
+/// Forces `call`'s signature, which a closure boxed straight away can't infer.
+fn page(
+    name: &'static str,
+    args: &'static [&'static str],
+    call: impl for<'a> Fn(&'a VtopClient, &'a str, &'a Args) -> BoxFuture<'a, VtopResult<Value>>
+        + Send
+        + Sync
+        + 'static,
+) -> PageDef {
+    PageDef {
+        name,
+        args,
+        call: Box::new(call),
+    }
+}
+
+/// Collects [`spec::each`] as [`PageDef`]s.
+struct Defs(Vec<PageDef>);
+
+impl spec::Visit for Defs {
+    fn page<T: Serialize + Send + 'static>(&mut self, spec: &'static PageSpec<T>) {
+        self.0.push(page(spec.name, spec.args, move |c, s, a| {
+            Box::pin(async move {
+                let args: Vec<_> = a.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+                let query = Query {
+                    semester: Some(s),
+                    args: &args,
+                };
+                json(c.fetch(spec, &query).await?)
+            })
+        }));
+    }
+}
+
 /// A [`PageCall`] from a body that may use `c` (client), `s` (semester)
 /// and `a` (arguments) and `.await?`.
 macro_rules! call {
@@ -58,44 +93,6 @@ macro_rules! call {
     };
 }
 
-call!(semesters, |c, s, a| c.semesters().await?);
-call!(attendance, |c, s, a| c
-    .attendance(&SemesterId::parse(s)?)
-    .await?);
-call!(full_attendance, |c, s, a| c
-    .full_attendance(
-        &SemesterId::parse(s)?,
-        &CourseId::parse(arg(a, "course_id"))?,
-        &CourseType::parse(arg(a, "course_type"))?,
-    )
-    .await?);
-call!(timetable, |c, s, a| c
-    .timetable(&SemesterId::parse(s)?)
-    .await?);
-call!(marks, |c, s, a| c.marks(&SemesterId::parse(s)?).await?);
-call!(exam_schedule, |c, s, a| c
-    .exam_schedule(&SemesterId::parse(s)?)
-    .await?);
-call!(grades, |c, s, a| c
-    .grade_view(&SemesterId::parse(s)?)
-    .await?);
-call!(academic_calendar, |c, s, a| c
-    .academic_calendar(&SemesterId::parse(s)?)
-    .await?);
-call!(grade_details, |c, s, a| c
-    .grade_view_details(
-        &SemesterId::parse(s)?,
-        &CourseId::parse(arg(a, "course_id"))?
-    )
-    .await?);
-call!(grade_history, |c, s, a| c.grade_history().await?);
-call!(biometric, |c, s, a| c
-    .biometric_history(&BiometricDate::parse(arg(a, "date"))?)
-    .await?);
-call!(profile, |c, s, a| c.profile().await?);
-call!(mentor, |c, s, a| c.mentor().await?);
-call!(general_outing, |c, s, a| c.general_outing().await?);
-call!(weekend_outing, |c, s, a| c.weekend_outing().await?);
 call!(outing_pass, |c, s, a| {
     let kind = match arg(a, "kind") {
         "general" => OutingKind::General,
@@ -110,15 +107,6 @@ call!(outing_pass, |c, s, a| {
         .outing_pass(kind, &OutingPassId::parse(arg(a, "pass_id"))?)
         .await?)
 });
-call!(course_page_courses, |c, s, a| c
-    .course_page_courses(&SemesterId::parse(s)?)
-    .await?);
-call!(course_page_classes, |c, s, a| c
-    .course_page_classes(&SemesterId::parse(s)?, arg(a, "course_id"))
-    .await?);
-call!(course_page_detail, |c, s, a| c
-    .course_page_detail(&SemesterId::parse(s)?, arg(a, "erp_id"), arg(a, "class_id"))
-    .await?);
 call!(course_file_info, |c, s, a| c
     .course_page_file_info(&CourseFilePath::parse(arg(a, "path"))?)
     .await?);
@@ -131,41 +119,16 @@ fn pdf(bytes: Vec<u8>) -> Value {
     serde_json::json!({ "pdf": base64::engine::general_purpose::STANDARD.encode(bytes) })
 }
 
-const fn page(name: &'static str, args: &'static [&'static str], call: PageCall) -> PageDef {
-    PageDef { name, args, call }
-}
-
-pub static PAGES: &[PageDef] = &[
-    page("semesters", &[], semesters),
-    page("attendance", &[], attendance),
-    page(
-        "full_attendance",
-        &["course_id", "course_type"],
-        full_attendance,
-    ),
-    page("timetable", &[], timetable),
-    page("marks", &[], marks),
-    page("exam_schedule", &[], exam_schedule),
-    page("grades", &[], grades),
-    page("academic_calendar", &[], academic_calendar),
-    page("grade_details", &["course_id"], grade_details),
-    page("grade_history", &[], grade_history),
-    page("biometric", &["date"], biometric),
-    page("profile", &[], profile),
-    page("mentor", &[], mentor),
-    page("general_outing", &[], general_outing),
-    page("weekend_outing", &[], weekend_outing),
-    page("outing_pass", &["kind", "pass_id"], outing_pass),
-    page("course_page_courses", &[], course_page_courses),
-    page("course_page_classes", &["course_id"], course_page_classes),
-    page(
-        "course_page_detail",
-        &["erp_id", "class_id"],
-        course_page_detail,
-    ),
-    page("course_file_info", &["path"], course_file_info),
-    page("course_plan_info", &["class_id"], course_plan_info),
-];
+pub static PAGES: LazyLock<Vec<PageDef>> = LazyLock::new(|| {
+    let mut pages = Defs(Vec::new());
+    spec::each(&mut pages);
+    pages.0.extend([
+        page("outing_pass", &["kind", "pass_id"], outing_pass),
+        page("course_file_info", &["path"], course_file_info),
+        page("course_plan_info", &["class_id"], course_plan_info),
+    ]);
+    pages.0
+});
 
 #[cfg(test)]
 mod tests {

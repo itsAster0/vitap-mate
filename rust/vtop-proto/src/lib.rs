@@ -27,6 +27,7 @@ pub mod otp;
 pub mod outing;
 pub mod pages;
 pub mod parser;
+pub mod spec;
 pub mod types;
 
 pub use error::{VtopError, VtopResult};

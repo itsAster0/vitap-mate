@@ -1,9 +1,6 @@
 //! The requests for each signed-in VTOP page, byte for byte what the old
 //! client sent, and machines for the pages that take more than one request.
-//! Each `fn` returns the [`Request`]; run it with [`OnePost`] and parse the
-//! page with [`crate::parser`].
-//!
-//! [`OnePost`]: crate::machine::OnePost
+//! Each `fn` returns the [`Request`]; [`crate::spec`] pairs it with its parser.
 
 use crate::error::VtopResult;
 use crate::http::{Request, Response, url_encode};

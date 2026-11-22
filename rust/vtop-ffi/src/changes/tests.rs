@@ -413,7 +413,7 @@ fn plan(paths: &[&str]) -> Vec<u8> {
 
 #[test]
 fn new_course_files() {
-    let page = format!("{PLANS}C1.json");
+    let page = format!("{PLANS}/C1.json");
     let out = dt(&page, &plan(&["a"]), &plan(&["a", "b", "c"]));
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].title, "Digital Image Processing");

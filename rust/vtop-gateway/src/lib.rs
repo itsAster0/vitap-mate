@@ -4,7 +4,8 @@
 //! phone ──UDP (vtop-wire)──► gateway ──HTTPS──► engine /engine/fetch ──► VTOP
 //! ```
 //!
-//! Page fetches and sign-ins ([`SIGN_IN_BODY`]); changes to VTOP stay on
+//! Page fetches, batches of them ([`BATCH`], to `/engine/fetch-batch`) and sign-ins
+//! ([`SIGN_IN_BODY`]); changes to VTOP stay on
 //! HTTPS. It runs on its own host (UDP needs one) and calls the engine
 //! exactly as the edge does (`Authorization: Bearer $INTERNAL_TOKEN`, the
 //! phone's session in the body) and passes the answer back byte for byte,
@@ -27,12 +28,13 @@ use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use vtop_shared::engine::{
-    PageFetch, FETCH, UDP_KEYS_INTERNAL, VTOP_LOGIN, VTOP_LOGIN_OTP, VTOP_LOGIN_RESEND,
+    PageBatch, PageFetch, FETCH, FETCH_BATCH, UDP_KEYS_INTERNAL, VTOP_LOGIN, VTOP_LOGIN_OTP,
+    VTOP_LOGIN_RESEND,
 };
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    session_hash, WirePageRequest, WirePageResponse, BUSY, NEED_SESSION, SIGN_IN_BODY, TOO_LARGE,
-    UNSUPPORTED, VERSION,
+    batch_pages, session_hash, WirePageRequest, WirePageResponse, BATCH, BUSY, NEED_SESSION,
+    SIGN_IN_BODY, TOO_LARGE, UNSUPPORTED, VERSION,
 };
 use vtop_wire::fec::MAX_RESPONSE;
 use vtop_wire::gateway::{Gateway, NewRequest, Token};
@@ -334,19 +336,33 @@ impl Engine {
         }
     }
 
-    /// [page] from the engine on [session].
+    /// [page] (or a [BATCH] of pages) from the engine on [session].
     async fn fetch(&self, session: serde_json::Value, page: &WirePageRequest) -> WirePageResponse {
-        let body = PageFetch {
-            session,
-            name: page.name.clone(),
-            semester: page.semester.clone(),
-            args: page.args.clone(),
-            dictionary: page.dictionary.clone(),
+        let (route, body) = if page.name == BATCH {
+            let Some(pages) = batch_pages(&page.args) else {
+                return error(400, "bad_request", "The batch does not decode.");
+            };
+            let batch = PageBatch {
+                session,
+                semester: page.semester.clone(),
+                pages,
+                dictionary: page.dictionary.clone(),
+            };
+            (FETCH_BATCH, serde_json::to_value(batch))
+        } else {
+            let fetch = PageFetch {
+                session,
+                name: page.name.clone(),
+                semester: page.semester.clone(),
+                args: page.args.clone(),
+                dictionary: page.dictionary.clone(),
+            };
+            (FETCH, serde_json::to_value(fetch))
         };
         let sent = self
-            .post(page, format!("{}{FETCH}", self.url))
+            .post(page, format!("{}{route}", self.url))
             .bearer_auth(&self.token)
-            .json(&body)
+            .json(&body.unwrap_or_default())
             .send()
             .await;
         let answer = match sent {

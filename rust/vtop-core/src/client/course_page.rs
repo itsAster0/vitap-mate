@@ -1,5 +1,5 @@
-//! The course page: every class of a course this semester, and each
-//! class's lecture plan with its reference material.
+//! The course page's files: a lecture's material, the syllabus, a bundle and
+//! the course plan (its pages are in `vtop_proto::spec`).
 
 use log::warn;
 use vtop_proto::course_pages::{self, file_head, plain_id};
@@ -8,50 +8,10 @@ use vtop_proto::http::{Method, Request};
 use super::{network_error, send_error, HopResponse, VtopClient, NETWORK};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{CourseFilePath, SemesterId};
-use crate::parser::course_page;
 
 pub use vtop_proto::course_pages::{CourseFile, CourseFileInfo};
 
 impl VtopClient {
-    /// The menu page, which lists the semesters.
-    pub async fn course_page_menu(&self) -> VtopResult<String> {
-        self.page("get_course_page", course_pages::menu).await
-    }
-
-    /// The courses offered in [semester], as a `<select>` fragment.
-    pub async fn course_page_courses_page(&self, semester: &SemesterId) -> VtopResult<String> {
-        self.page("get_course_page_courses", |s| {
-            course_pages::courses(s, semester)
-        })
-        .await
-    }
-
-    /// Every class of the course [course_id] (the value of a course
-    /// option): slot, faculty and the ids to open its lecture plan.
-    pub async fn course_page_classes_page(
-        &self,
-        semester: &SemesterId,
-        course_id: &str,
-    ) -> VtopResult<String> {
-        self.page("get_course_page_classes", |s| {
-            course_pages::classes(s, semester, course_id)
-        })
-        .await
-    }
-
-    /// One class's lecture plan and materials.
-    pub async fn course_page_detail_page(
-        &self,
-        semester: &SemesterId,
-        erp_id: &str,
-        class_id: &str,
-    ) -> VtopResult<String> {
-        self.page("get_course_page_detail", |s| {
-            course_pages::detail(s, semester, erp_id, class_id)
-        })
-        .await
-    }
-
     /// Downloads what one of the course page's `vtopDownload('…')` links
     /// points at: a lecture's material, the syllabus or a material bundle.
     pub async fn course_page_file(&self, path: &CourseFilePath) -> VtopResult<CourseFile> {
@@ -247,44 +207,6 @@ impl CourseFileDownload {
             content_type: self.content_type,
             bytes,
         })
-    }
-}
-
-impl VtopClient {
-    pub async fn course_page_courses(
-        &self,
-        semester: &SemesterId,
-    ) -> VtopResult<crate::types::CoursePageCourses> {
-        let page = self.course_page_courses_page(semester).await?;
-        Ok(course_page::parse_courses(&page, semester.as_str()))
-    }
-
-    pub async fn course_page_classes(
-        &self,
-        semester: &SemesterId,
-        course_id: &str,
-    ) -> VtopResult<crate::types::CoursePageClasses> {
-        let course_id = plain_id(course_id, "course id")?;
-        let page = self.course_page_classes_page(semester, course_id).await?;
-        Ok(course_page::parse_classes(
-            &page,
-            semester.as_str(),
-            course_id,
-        ))
-    }
-
-    pub async fn course_page_detail(
-        &self,
-        semester: &SemesterId,
-        erp_id: &str,
-        class_id: &str,
-    ) -> VtopResult<crate::types::CoursePageDetail> {
-        let erp_id = plain_id(erp_id, "faculty id")?;
-        let class_id = plain_id(class_id, "class id")?;
-        let page = self
-            .course_page_detail_page(semester, erp_id, class_id)
-            .await?;
-        Ok(course_page::parse_detail(&page, semester.as_str(), erp_id))
     }
 }
 

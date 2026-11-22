@@ -16,6 +16,7 @@ mod calendar;
 mod changes;
 mod consent;
 mod cookies;
+mod decoded;
 mod demo;
 mod dev;
 mod device;
@@ -28,7 +29,6 @@ mod transport;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::SystemTime;
 
@@ -36,14 +36,15 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::field::Empty;
 use tracing::{Instrument, Span, info, info_span, warn};
-use vtop_core::inputs::{CourseId, CourseType, Password, SemesterId, Username};
+use vtop_core::inputs::{Password, Username};
 use vtop_core::session::CookieStore;
+use vtop_core::spec::{self, PageSpec, Query};
 use vtop_core::sync::RwLock;
 use vtop_core::types::{
     AcademicCalendarData, AttendanceData, FullAttendanceData, PersistedVtopSession, SemesterData,
     TimetableData,
 };
-use vtop_core::{VtopClient, VtopError, VtopResult};
+use vtop_core::{VtopClient, VtopError};
 
 pub use biometric::{BiometricDay, Punch, PunchKind};
 pub use calendar::{
@@ -91,16 +92,16 @@ uniffi::setup_scaffolding!();
 
 const ACCOUNT: &str = "account.json";
 const SESSION: &str = "session.json";
-const SEMESTERS: &str = "semesters.json";
+const SEMESTERS: &str = spec::SEMESTERS.file;
 /// The semester the student picked; pages wait for it, as in the Flutter app.
 const SELECTED: &str = "semester.json";
 /// Pages are cached per semester: `pages/<semester id>/<page>.json`.
 const PAGES: &str = "pages";
-const ATTENDANCE: &str = "attendance.json";
-const TIMETABLE: &str = "timetable.json";
-const CALENDAR: &str = "calendar.json";
+const ATTENDANCE: &str = spec::ATTENDANCE.file;
+const TIMETABLE: &str = spec::TIMETABLE.file;
+const CALENDAR: &str = spec::ACADEMIC_CALENDAR.file;
 /// One course's class-by-class history: `attendance_detail/<course key>.json`.
-const ATTENDANCE_DETAIL: &str = "attendance_detail";
+const ATTENDANCE_DETAIL: &str = spec::FULL_ATTENDANCE.file;
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum SignIn {
@@ -275,25 +276,6 @@ impl Session {
         self.server_otp = false;
         Ok(())
     }
-}
-
-/// A fetch of one page for a semester.
-trait PageOp<T>:
-    for<'a> Fn(
-        &'a VtopClient,
-        &'a SemesterId,
-    ) -> Pin<Box<dyn Future<Output = VtopResult<T>> + Send + 'a>>
-    + Sync
-{
-}
-
-impl<T, F> PageOp<T> for F where
-    F: for<'a> Fn(
-            &'a VtopClient,
-            &'a SemesterId,
-        ) -> Pin<Box<dyn Future<Output = VtopResult<T>> + Send + 'a>>
-        + Sync
-{
 }
 
 type Slot = RwLock<Session>;
@@ -591,7 +573,7 @@ impl Core {
     pub fn cached_semesters(&self, flow: String) -> Option<Semesters> {
         traced_sync("cached_semesters", &flow, || {
             Ok(self
-                .read::<SemesterData>(SEMESTERS)
+                .read_kept::<SemesterData>(SEMESTERS)
                 .map(|list| self.semesters(list)))
         })
         .ok()
@@ -601,7 +583,7 @@ impl Core {
     /// Fetches the semester list from VTOP (newest first) and caches it.
     pub async fn fetch_semesters(&self, flow: String) -> Result<Semesters, CoreError> {
         traced("fetch_semesters", &flow, async {
-            let list = route::page!(self, "semesters", None, [], |client| client.semesters())?;
+            let list: SemesterData = self.page(&spec::SEMESTERS, None, &[]).await?;
             if list.semesters.is_empty() {
                 return Err(VtopError::ParseError("VTOP lists no semesters".into()).into());
             }
@@ -617,7 +599,7 @@ impl Core {
     pub fn select_semester(&self, flow: String, id: String) -> Result<(), CoreError> {
         traced_sync("select_semester", &flow, || {
             if !self
-                .read::<SemesterData>(SEMESTERS)
+                .read_kept::<SemesterData>(SEMESTERS)
                 .is_some_and(|list| list.semesters.iter().any(|semester| semester.id == id))
             {
                 return Err(CoreError::Other {
@@ -642,11 +624,7 @@ impl Core {
 
     pub async fn fetch_attendance(&self, flow: String) -> Result<Attendance, CoreError> {
         traced("fetch_attendance", &flow, async {
-            let data = self
-                .fetch(ATTENDANCE, "attendance", &[], |client, semester| {
-                    Box::pin(client.attendance(semester))
-                })
-                .await?;
+            let data = self.fetch(&spec::ATTENDANCE, None, &[]).await?;
             info!(courses = data.records.len(), "attendance");
             Ok(data.into())
         })
@@ -698,35 +676,22 @@ impl Core {
             }
             let course = match self.cached_course(&course_key) {
                 Some(course) => course,
-                None => Attendance::from(
-                    self.fetch(ATTENDANCE, "attendance", &[], |client, semester| {
-                        Box::pin(client.attendance(semester))
-                    })
-                    .await?,
-                )
-                .courses
-                .into_iter()
-                .find(|course| course.key == course_key)
-                .ok_or_else(|| CoreError::Other {
-                    reason: format!("no course {course_key} in this semester's attendance"),
-                })?,
+                None => Attendance::from(self.fetch(&spec::ATTENDANCE, None, &[]).await?)
+                    .courses
+                    .into_iter()
+                    .find(|course| course.key == course_key)
+                    .ok_or_else(|| CoreError::Other {
+                        reason: format!("no course {course_key} in this semester's attendance"),
+                    })?,
             };
-            let (id, kind) = (
-                CourseId::parse(&course.course_id)?,
-                CourseType::parse(&course.course_type)?,
-            );
             let data = self
                 .fetch(
-                    &detail_file(&course),
-                    "full_attendance",
+                    &spec::FULL_ATTENDANCE,
+                    Some(&detail_file(&course)),
                     &[
                         ("course_id", &course.course_id),
                         ("course_type", &course.course_type),
                     ],
-                    |client, semester| {
-                        let (id, kind) = (id.clone(), kind.clone());
-                        Box::pin(async move { client.full_attendance(semester, &id, &kind).await })
-                    },
                 )
                 .await?;
             info!(course = %course.key, classes = data.records.len(), "attendance detail");
@@ -926,11 +891,7 @@ impl Core {
     /// the month list, then one per month) and caches it.
     pub async fn fetch_calendar(&self, flow: String) -> Result<AcademicCalendar, CoreError> {
         traced("fetch_calendar", &flow, async {
-            let data = self
-                .fetch(CALENDAR, "academic_calendar", &[], |client, semester| {
-                    Box::pin(client.academic_calendar(semester))
-                })
-                .await?;
+            let data = self.fetch(&spec::ACADEMIC_CALENDAR, None, &[]).await?;
             Ok(calendar_view(&data))
         })
         .await
@@ -938,11 +899,7 @@ impl Core {
 
     pub async fn fetch_timetable(&self, flow: String) -> Result<Timetable, CoreError> {
         traced("fetch_timetable", &flow, async {
-            let data = self
-                .fetch(TIMETABLE, "timetable", &[], |client, semester| {
-                    Box::pin(client.timetable(semester))
-                })
-                .await?;
+            let data = self.fetch(&spec::TIMETABLE, None, &[]).await?;
             info!(slots = data.slots.len(), "timetable");
             Ok(data.into())
         })
@@ -966,28 +923,21 @@ impl Core {
             .is_ok_and(|current| Arc::ptr_eq(&current, slot))
     }
 
-    /// Fetches a page of the selected semester and caches it as `file` for
-    /// that semester.
-    /// `page` and `args` name it for the server route (`vtop-bridge/src/pages.rs`).
-    async fn fetch<T: Serialize + DeserializeOwned + Send>(
+    /// Page `spec` of the selected semester, fetched and cached at `file` (by default the
+    /// spec's) under that semester.
+    async fn fetch<T: Serialize + DeserializeOwned + Send + 'static>(
         &self,
-        file: &str,
-        page: &str,
+        spec: &PageSpec<T>,
+        file: Option<&str>,
         args: &[(&str, &str)],
-        op: impl PageOp<T>,
     ) -> Result<T, CoreError> {
         self.current()?; // Signed out wins over no pick.
         let semester = self
-            .read::<SemesterData>(SEMESTERS)
+            .read_kept::<SemesterData>(SEMESTERS)
             .and_then(|list| self.pick(&list))
             .ok_or(CoreError::SemesterNeeded)?;
-        let id = SemesterId::parse(&semester).map_err(CoreError::from)?;
-        let data = match self.server_page(page, Some(&semester), args).await {
-            Some(result) => result?,
-            None => signed_in!(self, |client| op(client, &id))?,
-        };
-        self.record_demo(page, Some(&semester), args, &data);
-        let path = format!("{PAGES}/{semester}/{file}");
+        let data = self.page(spec, Some(&semester), args).await?;
+        let path = format!("{PAGES}/{semester}/{}", file.unwrap_or(spec.file));
         if let Some(parent) = self.at(&path).parent() {
             let _ = fs::create_dir_all(parent);
         }
@@ -995,9 +945,25 @@ impl Core {
         Ok(data)
     }
 
+    /// Page `spec` from the server when the route says so (`Core::server_page`), else from
+    /// VTOP here; not cached.
+    async fn page<T: Serialize + DeserializeOwned + Send>(
+        &self,
+        spec: &PageSpec<T>,
+        semester: Option<&str>,
+        args: &[(&str, &str)],
+    ) -> Result<T, CoreError> {
+        let data = match self.server_page(spec.name, semester, args).await {
+            Some(result) => result?,
+            None => signed_in!(self, |client| client.fetch(spec, &Query { semester, args }))?,
+        };
+        self.record_demo(spec.name, semester, args, &data);
+        Ok(data)
+    }
+
     /// The student's pick, if `list` still has it.
     fn pick(&self, list: &SemesterData) -> Option<String> {
-        let selected = self.read::<String>(SELECTED)?;
+        let selected = self.read_kept::<String>(SELECTED)?;
         list.semesters
             .iter()
             .any(|semester| semester.id == selected)
@@ -1060,9 +1026,12 @@ impl Core {
     }
 
     /// A cached page of the selected semester.
-    fn read_page<T: DeserializeOwned>(&self, file: &str) -> Option<T> {
-        let list = self.read::<SemesterData>(SEMESTERS)?;
-        self.read(&format!("{PAGES}/{}/{file}", self.pick(&list)?))
+    fn read_page<T: DeserializeOwned + Clone + Send + Sync + 'static>(
+        &self,
+        file: &str,
+    ) -> Option<T> {
+        let list = self.read_kept::<SemesterData>(SEMESTERS)?;
+        self.read_kept(&format!("{PAGES}/{}/{file}", self.pick(&list)?))
     }
 
     /// The client has no OTP challenge left to take a code for (the app restarted, or a call
@@ -1259,6 +1228,7 @@ impl Core {
             }
             _ => {}
         }
+        decoded::forget(&self.dir);
     }
 
     /// Where `file` lives: the change inbox in the cache folder, everything
@@ -1273,19 +1243,29 @@ impl Core {
     }
 
     fn read<T: DeserializeOwned>(&self, file: &str) -> Option<T> {
-        let bytes = fs::read(self.at(file)).ok()?;
-        serde_json::from_slice(&bytes)
-            .inspect_err(|error| warn!(file, %error, "unreadable"))
-            .ok()
+        decode(file, &fs::read(self.at(file)).ok()?)
+    }
+
+    /// [`Core::read`] for the semester list, the pick and pages, which stay decoded in memory
+    /// while the file is unchanged ([`decoded`]); other files are read each time.
+    fn read_kept<T: DeserializeOwned + Clone + Send + Sync + 'static>(
+        &self,
+        file: &str,
+    ) -> Option<T> {
+        if file.starts_with(&format!("{PAGES}/")) || file == SEMESTERS || file == SELECTED {
+            decoded::read(&self.at(file), |bytes| decode(file, bytes))
+        } else {
+            self.read(file)
+        }
     }
 
     /// Writes `value` as JSON through a temporary file, so a crash never
     /// leaves half a file. A page compared for the change inbox records
     /// what changed against the copy it replaces.
-    fn write(&self, file: &str, value: &impl Serialize) {
+    fn write<T: Serialize + 'static>(&self, file: &str, value: &T) {
         match serde_json::to_vec(value) {
             Ok(bytes) => {
-                self.record_changes(file, &bytes);
+                self.record_changes(file, value, &bytes);
                 self.write_bytes(file, &bytes);
             }
             Err(error) => warn!(file, %error, "not saved"),
@@ -1304,10 +1284,17 @@ impl Core {
         let path = self.at(file);
         let temp = path.with_extension("tmp");
         let result = fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, &path));
+        decoded::forget(&path);
         if let Err(error) = result {
             warn!(file, %error, "not saved");
         }
     }
+}
+
+fn decode<T: DeserializeOwned>(file: &str, bytes: &[u8]) -> Option<T> {
+    serde_json::from_slice(bytes)
+        .inspect_err(|error| warn!(file, %error, "unreadable"))
+        .ok()
 }
 
 /// A history this young (seconds) is served again instead of fetched.

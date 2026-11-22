@@ -338,6 +338,7 @@ pair_expired` when the sign-in ran out meanwhile.
 |---|---|---|
 | `/vtop/*` | none | compression proxy to `https://vtop.vitap.ac.in/vtop/*`, any method; cookies and redirects pass through; bodies up to 1 MiB (`413 too_large`) |
 | `POST /v1/vtop/fetch` | signed | body passed to the engine's `/engine/fetch` as is |
+| `POST /v1/vtop/fetch-batch` | signed | body passed to the engine's `/engine/fetch-batch` as is (below) |
 | `POST /v1/vtop/login` | signed | → `/engine/vtop-login` |
 | `POST /v1/vtop/login/otp` | signed | → `/engine/vtop-login/otp` |
 | `POST /v1/vtop/login/resend` | signed | → `/engine/vtop-login/resend` |
@@ -345,6 +346,34 @@ pair_expired` when the sign-in ran out meanwhile.
 Bodies up to 64 KiB (`413 too_large`) on `/v1/vtop/*`. Answers are JSON
 (Brotli to the phone via Cloudflare) or `application/vnd.vmate.page+br`
 passed byte for byte. `504 vtop_timeout` after 32 s, `503 engine_unavailable`.
+
+**Batches.** `/v1/vtop/fetch-batch` fetches several pages of one semester on
+one session in one round trip:
+
+```json
+{ "session": { "cookies": "…", "csrf_token": "…", "registration_number": "…" },
+  "semester": "AP2026275", "dictionary": "<page dictionary id>",
+  "pages": [ { "name": "attendance" }, { "name": "biometric", "args": { "date": "28/10/2026" } } ] }
+```
+
+- `pages`: 1–16, names and `args` as in `/v1/vtop/fetch`; `semester` applies
+  to every page. The engine runs 4 at a time on one VTOP client, all within
+  25 s.
+- `200 { "data": [answer, …] }`, one answer per page in order: `{ "data": … }`
+  (the page, as `/v1/vtop/fetch` answers it) or that page's own
+  `{ "code", "error" }` (`unknown_page`, `bad_arguments`, `vtop_unavailable`,
+  `vtop_timeout`, `parse_error`, …), so one bad page does not fail the rest.
+- `401 session_expired` for the whole batch when VTOP ended the session (any
+  page saying so); `400 bad_arguments` for a malformed body or over 16 pages.
+- With the phone's `dictionary`, the `data` array comes packed
+  (`application/vnd.vmate.page+br`) with the dictionary for the name
+  `/v1/vtop/fetch-batch`.
+- A server without batches answers `404` (`not_found` from an older edge, a
+  bare `404` from an older engine); the app then fetches page by page.
+- Over UDP the same batch is a request named `/v1/vtop/fetch-batch` whose
+  `args` are the pages by two-digit index (`"00"`, `"01"`, …), each its name or,
+  with arguments, its JSON (`vtop_shared::wire_page::batch_args`); the gateway
+  sends it to `/engine/fetch-batch`.
 
 ## MCP
 
@@ -415,7 +444,7 @@ Every call carries `Authorization: Bearer <INTERNAL_TOKEN>`:
 reports to `/internal/accounts/login-done`), `/internal/mail-otp/owner`
 (`{ cookies }` → `{ ownerHash, registrationNumber }`, `401` if VTOP
 refuses; an engine without `registrationNumber` means no token), and the
-`/engine/fetch`, `/engine/vtop-login*` routes above. `/mcp` keeps the
+`/engine/fetch`, `/engine/fetch-batch`, `/engine/vtop-login*` routes above. `/mcp` keeps the
 client's header instead.
 
 ## Configuration

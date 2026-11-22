@@ -813,3 +813,205 @@ fn sign_out_forgets_the_connection_choice() {
         route::Route::Direct
     );
 }
+
+/// A core on `name`'s folder with semesters AP1 (picked) and AP0, each with `courses`
+/// attendance courses coded `<semester>-<n>`.
+fn kept_fixture(name: &str, courses: usize) -> (Core, PathBuf) {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join(SEMESTERS),
+        r#"{"semesters":[{"id":"AP1","name":"Fall"},{"id":"AP0","name":"Winter"}],"update_time":7}"#,
+    )
+    .unwrap();
+    fs::write(dir.join(SELECTED), r#""AP1""#).unwrap();
+    for semester in ["AP1", "AP0"] {
+        fs::create_dir_all(dir.join(PAGES).join(semester)).unwrap();
+        fs::write(
+            dir.join(PAGES).join(semester).join(ATTENDANCE),
+            attendance_json(semester, courses, "30"),
+        )
+        .unwrap();
+    }
+    let core = Core {
+        dir: dir.clone(),
+        cache: dir.clone(),
+        slot: Mutex::new(None),
+    };
+    (core, dir)
+}
+
+fn attendance_json(semester: &str, courses: usize, attended: &str) -> String {
+    let records: Vec<String> = (0..courses)
+        .map(|n| {
+            format!(
+                r#"{{"serial":"{n}","category":"","course_name":"{semester}-{n} - Course {n} - Embedded Theory","course_code":"{semester}-{n}","course_type":"ETH","faculty_detail":"70001 - A FACULTY - SCOPE","classes_attended":"{attended}","total_classes":"34","attendance_percentage":"89","attendence_fat_cat":"","debar_status":"","course_id":"AP2026{n}"}}"#
+            )
+        })
+        .collect();
+    format!(
+        r#"{{"records":[{}],"semester_id":"{semester}","update_time":1}}"#,
+        records.join(",")
+    )
+}
+
+fn first_course(core: &Core) -> Option<(String, i32)> {
+    let course = core.cached_attendance("f".into())?.courses.remove(0);
+    Some((course.code, course.attended))
+}
+
+#[test]
+fn kept_pages_follow_writes() {
+    let (core, dir) = kept_fixture("kept-write", 1);
+    let page = dir.join(PAGES).join("AP1").join(ATTENDANCE);
+    assert_eq!(first_course(&core), Some(("AP1-0".into(), 30)));
+    assert_eq!(decoded::kept(&page), 1, "kept after the first read");
+    assert_eq!(first_course(&core), Some(("AP1-0".into(), 30)));
+
+    let mut data: AttendanceData = serde_json::from_str(&attendance_json("AP1", 1, "31")).unwrap();
+    core.write(&format!("{PAGES}/AP1/{ATTENDANCE}"), &data);
+    assert_eq!(decoded::kept(&page), 0, "a write drops it");
+    assert_eq!(first_course(&core), Some(("AP1-0".into(), 31)));
+
+    // Replaced on disk without `write` (same length): the stamp catches it.
+    fs::write(&page, attendance_json("AP1", 1, "32")).unwrap();
+    assert_eq!(first_course(&core), Some(("AP1-0".into(), 32)));
+    // Gone from disk: gone here too.
+    fs::remove_file(&page).unwrap();
+    assert_eq!(first_course(&core), None);
+    assert_eq!(decoded::kept(&page), 0);
+
+    // Written with another type at the same path: each type is kept apart.
+    data.records.clear();
+    core.write(&format!("{PAGES}/AP1/{ATTENDANCE}"), &data);
+    assert!(
+        core.cached_attendance("f".into())
+            .unwrap()
+            .courses
+            .is_empty()
+    );
+    let raw = core.read_kept::<serde_json::Value>(&format!("{PAGES}/AP1/{ATTENDANCE}"));
+    assert_eq!(raw.unwrap()["records"], serde_json::json!([]));
+    assert_eq!(decoded::kept(&page), 2);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn kept_pages_follow_the_semester() {
+    let (core, dir) = kept_fixture("kept-sem", 1);
+    assert_eq!(first_course(&core).unwrap().0, "AP1-0");
+    assert_eq!(
+        core.cached_semesters("f".into())
+            .unwrap()
+            .selected
+            .as_deref(),
+        Some("AP1")
+    );
+    core.select_semester("f".into(), "AP0".into()).unwrap();
+    assert_eq!(first_course(&core).unwrap().0, "AP0-0");
+    assert_eq!(
+        core.cached_semesters("f".into())
+            .unwrap()
+            .selected
+            .as_deref(),
+        Some("AP0")
+    );
+
+    // A new list without the pick: no page.
+    let list: SemesterData =
+        serde_json::from_str(r#"{"semesters":[{"id":"AP1","name":"Fall"}],"update_time":8}"#)
+            .unwrap();
+    core.write(SEMESTERS, &list);
+    assert_eq!(first_course(&core), None);
+    assert_eq!(core.cached_semesters("f".into()).unwrap().selected, None);
+
+    // Developer's reset forgets the pick.
+    core.select_semester("f".into(), "AP1".into()).unwrap();
+    assert_eq!(first_course(&core).unwrap().0, "AP1-0");
+    core.dev_reset_semester("f".into()).unwrap();
+    assert_eq!(first_course(&core), None);
+    assert_eq!(decoded::kept(&dir.join(SELECTED)), 0);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn kept_pages_go_with_clears_and_sign_out() {
+    let (core, dir) = kept_fixture("kept-clear", 1);
+    let page = dir.join(PAGES).join("AP1").join(ATTENDANCE);
+    assert!(first_course(&core).is_some());
+    core.dev_clear_cache("f".into(), dev::CacheScope::Semester)
+        .unwrap();
+    assert_eq!((first_course(&core), decoded::kept(&page)), (None, 0));
+
+    fs::create_dir_all(page.parent().unwrap()).unwrap();
+    fs::write(&page, attendance_json("AP1", 1, "30")).unwrap();
+    assert!(first_course(&core).is_some());
+    core.dev_clear_cache("f".into(), dev::CacheScope::All)
+        .unwrap();
+    assert_eq!((first_course(&core), decoded::kept(&page)), (None, 0));
+
+    fs::create_dir_all(page.parent().unwrap()).unwrap();
+    fs::write(&page, attendance_json("AP1", 1, "30")).unwrap();
+    assert!(first_course(&core).is_some());
+    assert!(core.cached_semesters("f".into()).is_some());
+    core.sign_out("f".into());
+    assert_eq!(first_course(&core), None);
+    assert!(core.cached_semesters("f".into()).is_none());
+    assert_eq!(
+        decoded::kept(&page) + decoded::kept(&dir.join(SEMESTERS)),
+        0
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn kept_pages_are_bounded() {
+    let (core, dir) = kept_fixture("kept-bound", 1);
+    // Six pages just under a quarter of the budget each: the first read goes first.
+    let big = (1 << 20) - 200;
+    let files: Vec<String> = (0..6).map(|n| format!("{PAGES}/AP1/big{n}.json")).collect();
+    for file in &files {
+        fs::write(core.at(file), serde_json::to_vec(&"x".repeat(big)).unwrap()).unwrap();
+        assert!(core.read_kept::<String>(file).is_some());
+    }
+    assert_eq!(
+        decoded::kept(&core.at(&files[0])),
+        0,
+        "least recently used goes"
+    );
+    assert_eq!(decoded::kept(&core.at(&files[5])), 1);
+    // Over a quarter of the budget: never kept.
+    let huge = format!("{PAGES}/AP1/huge.json");
+    fs::write(
+        core.at(&huge),
+        serde_json::to_vec(&"x".repeat(2 << 20)).unwrap(),
+    )
+    .unwrap();
+    assert!(core.read_kept::<String>(&huge).is_some());
+    assert_eq!(decoded::kept(&core.at(&huge)), 0);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// `cargo test --release -p vtop-ffi cached_page_bench -- --ignored --nocapture`
+#[test]
+#[ignore = "timing, run by hand"]
+fn cached_page_bench() {
+    let (core, dir) = kept_fixture("bench", 12);
+    assert_eq!(
+        core.cached_attendance("f".into()).unwrap().courses.len(),
+        12
+    );
+    let start = std::time::Instant::now();
+    for _ in 0..1000 {
+        std::hint::black_box(core.cached_attendance("f".into()));
+    }
+    let attendance = start.elapsed();
+    let start = std::time::Instant::now();
+    for _ in 0..1000 {
+        std::hint::black_box(core.read_page::<AttendanceData>(ATTENDANCE));
+    }
+    let read_page = start.elapsed();
+    println!("1000 cached_attendance: {attendance:?}; 1000 read_page: {read_page:?}");
+    let _ = fs::remove_dir_all(&dir);
+}

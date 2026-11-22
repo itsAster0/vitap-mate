@@ -13,22 +13,20 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use tracing::{info, warn};
-use vtop_core::VtopError;
-use vtop_core::inputs::{CourseId, SemesterId};
+use vtop_core::spec;
 use vtop_core::types::{
     GradeDetailMark, GradeDetailsData, GradeHistoryData, GradeHistoryRecord, GradeViewData,
     SemesterData, TimetableData,
 };
 
 use crate::marks::{ScoreBand, is_reevaluation, normalized, strip_reevaluation};
-use crate::route::page;
 use crate::{Core, CoreError, PAGES, SEMESTERS, TIMETABLE, traced, traced_sync};
 
-const GRADES: &str = "grades.json";
+pub(crate) const GRADES: &str = spec::GRADES.file;
 /// One course's breakdown: `pages/<semester>/grade_details/<course id>.json`.
-const DETAILS: &str = "grade_details";
+const DETAILS: &str = spec::GRADE_DETAILS.file;
 /// Not per semester: `pages/grade_history.json`.
-const HISTORY: &str = "grade_history.json";
+const HISTORY: &str = spec::GRADE_HISTORY.file;
 
 /// Grades in the order the app lists them; others follow.
 const ORDER: [&str; 9] = ["S", "A", "B", "C", "D", "E", "F", "N", "P"];
@@ -292,7 +290,9 @@ impl Core {
     ) -> Option<GradeDetails> {
         traced_sync("cached_grade_details", &flow, || {
             let path = self.details_path(&semester_id, &course_id)?;
-            Ok(self.read::<GradeDetailsData>(&path).map(GradeDetails::from))
+            Ok(self
+                .read_kept::<GradeDetailsData>(&path)
+                .map(GradeDetails::from))
         })
         .ok()
         .flatten()
@@ -308,11 +308,13 @@ impl Core {
     ) -> Result<GradeDetails, CoreError> {
         traced("fetch_grade_details", &flow, async {
             let path = self.details_path(&semester_id, &course_id)?;
-            let (semester, course) = (
-                SemesterId::parse(&semester_id)?,
-                CourseId::parse(&course_id)?,
-            );
-            let data = page!(self, "grade_details", Some(&semester_id), ["course_id" => &course_id], |client| client.grade_view_details(&semester, &course))?;
+            let data = self
+                .page(
+                    &spec::GRADE_DETAILS,
+                    Some(&semester_id),
+                    &[("course_id", &course_id)],
+                )
+                .await?;
             if let Some(parent) = self.at(&path).parent() {
                 let _ = fs::create_dir_all(parent);
             }
@@ -333,7 +335,7 @@ impl Core {
     pub fn cached_grade_history(&self, flow: String) -> Option<GradeHistory> {
         traced_sync("cached_grade_history", &flow, || {
             Ok(self
-                .read::<GradeHistoryData>(&format!("{PAGES}/{HISTORY}"))
+                .read_kept::<GradeHistoryData>(&format!("{PAGES}/{HISTORY}"))
                 .map(|data| logged_history(GradeHistory::from(data))))
         })
         .ok()
@@ -343,8 +345,7 @@ impl Core {
     /// Fetches the grade history and caches it.
     pub async fn fetch_grade_history(&self, flow: String) -> Result<GradeHistory, CoreError> {
         traced("fetch_grade_history", &flow, async {
-            let data = page!(self, "grade_history", None, [], |client| client
-                .grade_history())?;
+            let data = self.page(&spec::GRADE_HISTORY, None, &[]).await?;
             let _ = fs::create_dir_all(self.at(PAGES));
             self.write(&format!("{PAGES}/{HISTORY}"), &data);
             Ok(logged_history(GradeHistory::from(data)))
@@ -480,7 +481,7 @@ impl Core {
     /// the pick to fall back to.
     fn grade_semesters(&self, requested: &str) -> Result<(String, Option<String>), CoreError> {
         let list = self
-            .read::<SemesterData>(SEMESTERS)
+            .read_kept::<SemesterData>(SEMESTERS)
             .ok_or(CoreError::SemesterNeeded)?;
         if !requested.is_empty() {
             return if list
@@ -506,15 +507,13 @@ impl Core {
     }
 
     fn cached_grade_view(&self, semester: &str) -> Option<Grades> {
-        self.read::<GradeViewData>(&format!("{PAGES}/{semester}/{GRADES}"))
+        self.read_kept::<GradeViewData>(&format!("{PAGES}/{semester}/{GRADES}"))
             .map(|data| Grades::new(data, semester))
     }
 
     /// `semester` (one VTOP lists) fetched and cached.
     async fn fetch_grade_view(&self, semester: &str) -> Result<Grades, CoreError> {
-        let id = SemesterId::parse(semester)?;
-        let data = page!(self, "grades", Some(semester), [], |client| client
-            .grade_view(&id))?;
+        let data = self.page(&spec::GRADES, Some(semester), &[]).await?;
         let path = format!("{PAGES}/{semester}/{GRADES}");
         if let Some(parent) = self.at(&path).parent() {
             let _ = fs::create_dir_all(parent);

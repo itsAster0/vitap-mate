@@ -256,7 +256,7 @@ impl Core {
     /// nothing while no semester is picked, or (it runs unasked) until the student ticked
     /// "don't ask again" for [`CookieKind::Account`]; fails with `not_linked` before a key is made.
     pub async fn send_server_semester(&self, flow: String) -> Result<(), CoreError> {
-        let Some(semester) = self.read::<String>(crate::SELECTED) else {
+        let Some(semester) = self.read_kept::<String>(crate::SELECTED) else {
             return Ok(());
         };
         let path = "/v1/account/semester";

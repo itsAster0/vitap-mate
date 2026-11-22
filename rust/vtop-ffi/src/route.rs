@@ -7,11 +7,16 @@
 //!   (`/v1/vtop/login`); writes, downloads and the web view stay on the phone.
 //! - UDP: the server route over vm1 ([`Core::udp_page`]), then over HTTPS.
 //!
-//! A route that fails is skipped for [`SKIP_S`] and the request goes on to the next, finally
+//! A route that fails is skipped for [`plan::SKIP_S`] and the request goes on to the next, finally
 //! Direct; the student never has to change the setting to get their data. Proxy, Server and UDP
 //! send the VTOP session, so each asks first ([`consent::allowed`]); a no goes Direct and is not
 //! skipped, so the next fetch the student watches asks again. A background run uses the chosen
 //! route only when the student ticked "don't ask again", else Direct.
+//!
+//! The policy itself is [`plan`], with no I/O; this module keeps its one instance and runs it.
+
+mod batch;
+mod plan;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -30,9 +35,9 @@ use crate::consent::{self, CookieKind};
 use crate::device::EdgeError;
 use crate::{Core, CoreError, Slot, traced_sync, transport, unix_now};
 
+use plan::{Next, Outcome, RoutePlan, ServerError, ServerFetch};
+
 pub(crate) const FILE: &str = "route.json";
-/// How long a failed route is skipped before it is tried again.
-const SKIP_S: i64 = 5 * 60;
 
 #[derive(
     Debug,
@@ -81,21 +86,21 @@ struct Saved {
 
 /// Global, as the transport is.
 struct State {
-    chosen: Route,
+    plan: RoutePlan,
     /// The edge, for the proxy's origin.
     server: String,
-    skipped: BTreeMap<Route, (i64, String)>,
-    last: Option<(Route, i64)>,
     /// The span and route of the last "route used" line: one line per call, not per hop.
     logged: Option<(Option<u64>, Route)>,
+    /// Pages a batch brought, by flow and name, for that flow's page fetches to take
+    /// ([`batch`]).
+    prefetched: BTreeMap<(String, String), Value>,
 }
 
 const NONE: State = State {
-    chosen: Route::Direct,
+    plan: RoutePlan::new(),
     server: String::new(),
-    skipped: BTreeMap::new(),
-    last: None,
     logged: None,
+    prefetched: BTreeMap::new(),
 };
 
 #[cfg(not(test))]
@@ -120,29 +125,20 @@ async fn consented(flow: &str, action: &str) -> bool {
     consent::allowed(flow, CookieKind::Route, action, &server, true).await
 }
 
-/// Whether `route` should be tried now: the chosen one covers it (UDP falls back to the HTTPS
-/// server route) and it isn't skipped.
+/// [`RoutePlan::active`] now.
 fn active(route: Route) -> bool {
-    let state = state();
-    let chosen = state.chosen == route || (state.chosen == Route::Udp && route == Route::Server);
-    chosen
-        && state
-            .skipped
-            .get(&route)
-            .is_none_or(|(until, _)| *until <= unix_now())
+    state().plan.active(route, unix_now())
 }
 
 fn failed(route: Route, reason: &str) {
     warn!(?route, reason, "route failed; skipped for 5 min");
-    state()
-        .skipped
-        .insert(route, (unix_now() + SKIP_S, reason.to_string()));
+    let outcome = Outcome::Failed(reason.to_string());
+    state().plan.on_result(route, outcome, unix_now());
 }
 
 fn used(route: Route) {
     let mut state = state();
-    state.skipped.remove(&route);
-    state.last = Some((route, unix_now()));
+    state.plan.on_result(route, Outcome::Used, unix_now());
     let span = tracing::Span::current().id().map(|id| id.into_u64());
     if state.logged != Some((span, route)) {
         state.logged = Some((span, route));
@@ -156,49 +152,26 @@ pub(crate) fn load(core: &Core) {
     let server = core.forwarding_server();
     info!(?chosen, "route");
     let mut state = state();
-    (state.chosen, state.server) = (chosen, server);
+    (state.plan.chosen, state.server) = (chosen, server);
 }
 
 /// Back to Direct with nothing skipped (signed out: the next student picks their own).
 pub(crate) fn forget() {
-    let mut state = state();
-    state.chosen = Route::Direct;
-    state.skipped.clear();
-    state.last = None;
+    state().plan.forget();
 }
 
 #[uniffi::export]
 impl Core {
     pub fn route_status(&self, flow: String) -> RouteStatus {
         let _ = traced_sync("route_status", &flow, || Ok(()));
-        let state = state();
-        let now = unix_now();
-        let mut skipped: Vec<SkippedRoute> = state
-            .skipped
-            .iter()
-            .filter(|(_, (until, _))| *until > now)
-            .map(|(route, (until, reason))| SkippedRoute {
-                route: *route,
-                until: *until,
-                reason: reason.clone(),
-            })
-            .collect();
-        skipped.sort_by_key(|skip| skip.until);
-        RouteStatus {
-            chosen: state.chosen,
-            last_used: state.last.map(|(route, _)| route),
-            last_used_at: state.last.map(|(_, at)| at),
-            skipped,
-        }
+        state().plan.status(unix_now())
     }
 
     /// Saves the choice; earlier failures are forgotten so it is tried straight away.
     pub fn set_route(&self, flow: String, route: Route) -> Result<(), CoreError> {
         traced_sync("set_route", &flow, || {
             self.write(FILE, &Saved { route });
-            let mut state = state();
-            state.chosen = route;
-            state.skipped.clear();
+            state().plan.choose(route);
             info!(?route, "route chosen");
             Ok(())
         })
@@ -298,30 +271,6 @@ impl Transport for Routed {
     }
 }
 
-/// Runs `$call` on the phone (`signed_in!`), or fetches page `$name` on the server when the
-/// route says so and the server answers.
-macro_rules! page {
-    ($core:expr, $name:expr, $semester:expr, [$($key:expr => $value:expr),*], |$client:ident| $call:expr) => {{
-        let core = $core;
-        let args: &[(&str, &str)] = &[$(($key, $value)),*];
-        let result = match core.server_page($name, $semester, args).await {
-            Some(result) => result,
-            None => signed_in!(core, |$client| $call),
-        };
-        if let Ok(data) = &result {
-            core.record_demo($name, $semester, args, data);
-        }
-        result
-    }};
-}
-pub(crate) use page;
-
-/// The edge's answer as [`ServerError`]: the session ran out, or the server part failed.
-enum ServerError {
-    Expired,
-    Failed(String),
-}
-
 impl From<EdgeError> for ServerError {
     fn from(error: EdgeError) -> Self {
         match error {
@@ -345,28 +294,19 @@ impl Core {
         if let Some(page) = self.demo_page(name, semester, args).await {
             return Some(page);
         }
-        if !active(Route::Server) && !active(Route::Udp) {
-            return None;
-        }
-        let slot = self.current().ok()?;
         let flow = transport::flow();
-        let action = format!("Fetch {name} through the server");
-        // Decided once and before the loop, never across the lock: a code that goes in meanwhile
-        // can't let the session (or, on expiry, the password) go out unasked.
-        let otp = slot.read().await.otp.is_some();
-        if otp || !consented(&flow, &action).await {
-            return None;
+        let batched = state().prefetched.remove(&(flow.clone(), name.to_string()));
+        if let Some(data) = batched.filter(|_| args.is_empty()) {
+            return Some(
+                serde_json::from_value(data).map_err(|error| CoreError::Other {
+                    reason: format!("unreadable {name}: {error}"),
+                }),
+            );
         }
-        for attempt in 0..2 {
-            let (session, seen) = {
-                let session = slot.read().await;
-                if session.otp.is_some() {
-                    return None; // Waiting for a code: the phone's path tells the student.
-                }
-                (session.client.session_state(), session.logins)
-            };
+        let action = format!("Fetch {name} through the server");
+        let send = |session| {
             let request = PageFetch {
-                session: serde_json::to_value(&session).unwrap_or_default(),
+                session,
                 name: name.to_string(),
                 semester: semester.map(str::to_string),
                 args: args
@@ -376,35 +316,58 @@ impl Core {
                 // Built in: the engine packs the page with it (plain JSON if its copy differs).
                 dictionary: Some(page_dictionary::id().to_string()),
             };
-            match self.page_on_server(&flow, &request).await {
-                Ok(data) => {
-                    return match serde_json::from_value(data) {
-                        Ok(page) if self.is_current(&slot) => Some(Ok(page)),
-                        Ok(_) => Some(Err(CoreError::NotSignedIn)),
-                        Err(error) => {
-                            failed(Route::Server, &format!("unreadable {name}: {error}"));
-                            None
+            let flow = &flow;
+            async move {
+                let data = self.page_on_server(flow, &request).await?;
+                serde_json::from_value(data)
+                    .map_err(|error| ServerError::Failed(format!("unreadable {name}: {error}")))
+            }
+        };
+        self.on_server(&flow, &action, send).await
+    }
+
+    /// `send`'s answer on the server with the session (as JSON), signing in there again once
+    /// when it expired; None when the route is off, the student said no, or the server failed
+    /// (the phone fetches).
+    async fn on_server<R, F: Future<Output = Result<R, ServerError>>>(
+        &self,
+        flow: &str,
+        action: &str,
+        send: impl Fn(Value) -> F,
+    ) -> Option<Result<R, CoreError>> {
+        state().plan.next(unix_now())?;
+        let slot = self.current().ok()?;
+        // Asked once and before the first fetch, never across the lock: a code that goes in
+        // meanwhile can't let the session (or, on expiry, the password) go out unasked.
+        let mut fetch = ServerFetch::default();
+        let mut next = ServerFetch::start(slot.read().await.otp.is_some());
+        let mut seen = 0;
+        loop {
+            next = match next {
+                Next::Ask => fetch.consented(consented(flow, action).await),
+                Next::Fetch => {
+                    let session = {
+                        let session = slot.read().await;
+                        if session.otp.is_some() {
+                            return None; // Waiting for a code: the phone's path tells the student.
                         }
+                        seen = session.logins;
+                        session.client.session_state()
                     };
-                }
-                Err(ServerError::Expired) if attempt == 0 => {
-                    match self.server_relogin(&slot, seen, &flow).await {
-                        Ok(()) => {}
-                        Err(ServerError::Failed(reason)) => {
-                            failed(Route::Server, &reason);
-                            return None;
-                        }
-                        Err(ServerError::Expired) => return None,
+                    match send(serde_json::to_value(&session).unwrap_or_default()).await {
+                        Ok(answer) if self.is_current(&slot) => return Some(Ok(answer)),
+                        Ok(_) => return Some(Err(CoreError::NotSignedIn)),
+                        Err(error) => fetch.fetched(error),
                     }
                 }
-                Err(ServerError::Expired) => return None,
-                Err(ServerError::Failed(reason)) => {
+                Next::Relogin => fetch.relogged(self.server_relogin(&slot, seen, flow).await),
+                Next::Fail(reason) => {
                     failed(Route::Server, &reason);
                     return None;
                 }
-            }
+                Next::GiveUp => return None,
+            };
         }
-        None
     }
 
     /// The page's `data`, over UDP while that route is on, else over HTTPS.
@@ -558,7 +521,7 @@ mod tests {
     use crate::forwarding::tests::{Edge, serve};
 
     /// A signed-in core on `route`, its server the test edge.
-    async fn core_on(name: &str, route: Route) -> (Core, Arc<Mutex<Edge>>) {
+    pub(super) async fn core_on(name: &str, route: Route) -> (Core, Arc<Mutex<Edge>>) {
         let dir =
             std::env::temp_dir().join(format!("vtop-ffi-route-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
@@ -669,7 +632,8 @@ mod tests {
     async fn three_hops(gate: &consent::tests::TestGate) -> Vec<String> {
         {
             let mut state = state();
-            (state.chosen, state.server) = (Route::Proxy, "https://edge.test".into());
+            state.plan.choose(Route::Proxy);
+            state.server = "https://edge.test".into();
         }
         let hops = Arc::new(Hops::default());
         let routed = Routed(hops.clone());
@@ -705,7 +669,7 @@ mod tests {
     async fn proxy_denied_goes_straight_to_vtop() {
         let urls = three_hops(&consent::tests::no()).await;
         assert!(urls.iter().all(|url| url.starts_with(DEFAULT_BASE_URL)));
-        assert!(state().skipped.is_empty());
+        assert!(state().plan.status(unix_now()).skipped.is_empty());
     }
 
     #[test]

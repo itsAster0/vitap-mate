@@ -149,6 +149,27 @@ impl Core {
     /// Page `request`'s parsed `data`, fetched through the UDP gateway; `Err(reason)` on any
     /// failure, for the route to fall back.
     pub(crate) async fn udp_page(&self, flow: &str, request: &PageFetch) -> Result<Value, String> {
+        let page = WirePageRequest {
+            request_id: Some(flow.to_string()),
+            name: request.name.clone(),
+            semester: request.semester.clone(),
+            args: request.args.clone(),
+            dictionary: request.dictionary.clone(),
+            session_hash: 0,
+            session: None,
+            account: None,
+        };
+        self.udp_fetch(flow, page, request.session.to_string())
+            .await
+    }
+
+    /// `page` (one page, or a batch) on `session` through the UDP gateway: the answer's `data`.
+    pub(crate) async fn udp_fetch(
+        &self,
+        flow: &str,
+        mut page: WirePageRequest,
+        session: String,
+    ) -> Result<Value, String> {
         let deadline = Instant::now() + TIMEOUT;
         let network = NETWORK
             .lock()
@@ -168,17 +189,7 @@ impl Core {
             Some(gateway) => gateway,
             None => self.udp_gateway(&server, flow).await?,
         };
-        let session = request.session.to_string();
-        let mut page = WirePageRequest {
-            request_id: Some(flow.to_string()),
-            name: request.name.clone(),
-            semester: request.semester.clone(),
-            args: request.args.clone(),
-            dictionary: request.dictionary.clone(),
-            session_hash: session_hash(&session),
-            session: None,
-            account: None,
-        };
+        page.session_hash = session_hash(&session);
         loop {
             let key = gateway
                 .key(self.server_now())
@@ -259,6 +270,8 @@ mod tests {
     use std::net::UdpSocket as StdSocket;
 
     use serde_json::json;
+    use vtop_shared::engine::BatchPage;
+    use vtop_shared::wire_page::{BATCH, batch_args, batch_pages};
     use vtop_wire::gateway::Gateway as WireGateway;
 
     use super::*;
@@ -330,6 +343,14 @@ mod tests {
                     session = page.session.clone().or(session);
                     let (status, body) = match &session {
                         None => (NEED_SESSION, json!({ "code": "need_session" })),
+                        Some(_) if page.name == BATCH => {
+                            let pages = batch_pages(&page.args).unwrap();
+                            let answers: Vec<_> = pages
+                                .iter()
+                                .map(|p| json!({ "data": { "page": p.name } }))
+                                .collect();
+                            (200, json!({ "data": answers }))
+                        }
                         Some(_) => (200, json!({ "data": { "page": page.name } })),
                     };
                     let answer = WirePageResponse {
@@ -382,6 +403,28 @@ mod tests {
         assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
         let page = core.udp_page("0f10d00e", &request).await;
         assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
+        // A batch, as `route::batch` sends one.
+        let pages = ["attendance", "marks"].map(|name| BatchPage {
+            name: name.into(),
+            args: Default::default(),
+        });
+        let batch = WirePageRequest {
+            request_id: Some("0f10d00e".into()),
+            name: BATCH.into(),
+            semester: Some("AP1".into()),
+            args: batch_args(&pages),
+            dictionary: Some("d1c7".into()),
+            session_hash: 0,
+            session: None,
+            account: None,
+        };
+        let answers = core
+            .udp_fetch("0f10d00e", batch, request.session.to_string())
+            .await;
+        assert_eq!(
+            answers.unwrap(),
+            json!([{ "data": { "page": "attendance" } }, { "data": { "page": "marks" } }])
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

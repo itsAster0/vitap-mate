@@ -44,13 +44,13 @@ keystore/             release keystore (gitignored; never read or print it)
 
 | Change | Place |
 |---|---|
-| New VTOP page | Parser in `rust/vtop-proto/src/parser/` and its machine in `rust/vtop-proto/src/pages.rs`, call in `rust/vtop-core/src/client/`, FFI in the feature's file `rust/vtop-ffi/src/<feature>.rs` (its own `#[uniffi::export] impl Core` block, `cached_x` and `fetch_x`, flow id first) and an entry in `rust/vtop-bridge/src/pages.rs`. Read pages go through `page!` or `Core::fetch` with the bridge's page name, so the server routes can fetch them. Then run `mise run rust-android`. |
+| New VTOP page | Parser in `rust/vtop-proto/src/parser/`, its machine in `rust/vtop-proto/src/pages.rs`, and a `PageSpec` (name, args, cache file, machine) in `rust/vtop-proto/src/spec.rs`, listed in `spec::each`. vtop-core runs it with `VtopClient::fetch(&spec, &query)` and the engine serves everything in `spec::each`, so a read page needs nothing in vtop-core or vtop-bridge (writes and downloads keep a method in `rust/vtop-core/src/client/`). FFI in the feature's file `rust/vtop-ffi/src/<feature>.rs` (its own `#[uniffi::export] impl Core` block, `cached_x` and `fetch_x`, flow id first): `fetch_x` calls `Core::fetch(&spec::X, ...)`, which caches it under the picked semester (`Core::page` for one not cached), and `cached_x` reads it back with `read_page`. Both go by the chosen route, so the server routes fetch it too. Never rename a spec's name, args or file: old apps and the deployed engine use them. Then run `mise run rust-android`. |
 | Use a VTOP page in a feature | `rememberPage("<id>", { c, f -> c.cachedX(f) }, { c, f -> c.fetchX(f) }, ...)` in the screen, drawn with `PageScaffold` (see `core/src/vitapmate/data/Page.kt`). |
 | New screen | `features/<name>/` with a `module.yaml` that depends on `//design` only, and `src/vitapmate/features/<name>/` exposing `val <name>Feature: Feature`. Add one line to `project.yaml` and one to `app/src/vitapmate/Features.kt`. A feature never imports another; code two features share moves to `design` (UI) or `core` (data). |
 | Shared widget | `design/src/vitapmate/ui/`, one widget per file. |
 | Shell, nav, Settings, Developer, Inspector UI | `app/src/vitapmate/`. |
 | Data, settings store, downloads, files | `core/src/vitapmate/data/`. |
-| How the app reaches VTOP | `rust/vtop-ffi/src/route.rs` (Direct, Proxy, Server, Udp, and the 5-minute skip after a failure). |
+| How the app reaches VTOP | `rust/vtop-ffi/src/route.rs` (Direct, Proxy, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/route/plan.rs`. |
 | Logging | Kotlin: `core/src/vitapmate/observability/` (`Log`, `flow()`). Rust: `tracing`, with the pipeline in `rust/vtop-ffi/src/obs.rs`. |
 | Server-side state | Durable Objects in `rust/vtop-edge`, never the engine or the gateway. Document each route in `rust/vtop-edge/API.md`. |
 
