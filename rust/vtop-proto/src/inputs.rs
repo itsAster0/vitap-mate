@@ -184,7 +184,7 @@ impl OutingDate {
         VtopError::ConfigurationError("outing date must look like 11-Oct-2026".to_string())
     }
 
-    /// Days since 1970-01-01 (Howard Hinnant's days_from_civil).
+    /// Days since 1970-01-01.
     pub fn day_number(&self) -> i64 {
         let mut parts = self.0.split('-');
         let day: i64 = parts.next().and_then(|d| d.parse().ok()).unwrap_or(1);
@@ -193,12 +193,7 @@ impl OutingDate {
             .and_then(|m| MONTHS.iter().position(|name| *name == m))
             .map_or(1, |index| index as i64 + 1);
         let year: i64 = parts.next().and_then(|y| y.parse().ok()).unwrap_or(1970);
-        let year = if month <= 2 { year - 1 } else { year };
-        let era = year.div_euclid(400);
-        let year_of_era = year - era * 400;
-        let day_of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
-        let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-        era * 146_097 + day_of_era - 719_468
+        crate::dates::day_number(day, month, year)
     }
 
     pub fn as_str(&self) -> &str {

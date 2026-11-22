@@ -41,7 +41,7 @@ impl VtopClient {
                 return EmailOtpLogin {
                     result: other,
                     gmail_error: None,
-                }
+                };
             }
         };
         let otp_required = || Err(VtopError::OTPRequired(message.clone(), issued_at));
@@ -88,7 +88,7 @@ impl VtopClient {
                     return EmailOtpLogin {
                         result: Err(error),
                         gmail_error: None,
-                    }
+                    };
                 }
             }
         }

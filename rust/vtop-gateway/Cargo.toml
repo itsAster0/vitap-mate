@@ -1,7 +1,9 @@
 [package]
 name = "vtop-gateway"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+license = "MIT"
+publish = false
 description = "The UDP gateway for the app's experimental UDP mode: vtop-wire on the phone side, the engine's /engine/fetch over HTTPS on the other. Runs on the VPS (Railway takes no UDP)."
 
 [dependencies]
@@ -20,3 +22,6 @@ x25519-dalek = { version = "3", features = ["static_secrets"] }
 
 [dev-dependencies]
 wiremock = "0.6"
+
+[lints]
+workspace = true

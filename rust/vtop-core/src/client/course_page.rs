@@ -5,7 +5,7 @@ use log::warn;
 use vtop_proto::course_pages::{self, file_head, plain_id};
 use vtop_proto::http::{Method, Request};
 
-use super::{network_error, send_error, HopResponse, VtopClient, NETWORK};
+use super::{HopResponse, NETWORK, VtopClient, network_error, send_error};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{CourseFilePath, SemesterId};
 

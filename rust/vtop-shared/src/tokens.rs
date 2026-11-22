@@ -1,5 +1,5 @@
 //! How secrets are compared: by their SHA-256, as hex. The edge
-//! (`vtop-edge/src/shared/tokens.ts`) hashes the same way.
+//! (`edge/src/shared/tokens.ts`) hashes the same way.
 
 use sha2::{Digest, Sha256};
 
@@ -20,12 +20,16 @@ pub fn hashes_equal(a: &str, b: &str) -> bool {
 mod tests {
     use super::*;
 
+    /// Shared with the edge's `tokens.test.ts`.
+    fn vectors() -> serde_json::Value {
+        serde_json::from_str(include_str!("../vectors/tokens.json")).unwrap()
+    }
+
     #[test]
     fn hashes_are_hex_sha256() {
-        assert_eq!(
-            hash("a"),
-            "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
-        );
+        for v in vectors()["hashes"].as_array().unwrap() {
+            assert_eq!(hash(v["secret"].as_str().unwrap()), v["hash"]);
+        }
     }
 
     #[test]

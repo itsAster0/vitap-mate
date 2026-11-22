@@ -22,12 +22,12 @@ use std::time::{Duration, Instant};
 
 use crate::fec::{self, DATA_WIRE};
 use crate::frame::{
-    header, reset_token, Keys, ReplayWindow, IP_UDP, T_DATA, T_DONE, T_HS1, T_HS2, T_REQ, T_RESET,
-    T_WORKING, T_WRONG_KEY,
+    IP_UDP, Keys, ReplayWindow, T_DATA, T_DONE, T_HS1, T_HS2, T_REQ, T_RESET, T_WORKING,
+    T_WRONG_KEY, header, reset_token,
 };
 use crate::link::RATE_FLOOR;
-use crate::msg::{now_us, Data, Req, LOSS_UNKNOWN};
-use crate::noise::{random_key, Responder};
+use crate::msg::{Data, LOSS_UNKNOWN, Req, now_us};
+use crate::noise::{Responder, random_key};
 
 pub const FRESH_MS: u64 = 120_000;
 /// The client's own duplicate of a packet arrives within this; a later copy

@@ -43,6 +43,10 @@ fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 pub fn obs_init(data_dir: String) {
     static SUBSCRIBER: Once = Once::new();
     SUBSCRIBER.call_once(|| {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "a second init keeps the first subscriber"
+        )]
         let _ = tracing_subscriber::registry()
             .with(tracing_subscriber::filter::LevelFilter::INFO)
             .with(Pipeline)
@@ -108,11 +112,19 @@ fn emit(level: &str, src: &str, msg: &str, fields: Map<String, Value>) {
     let Some(log) = log.as_mut() else { return };
     // Logging never breaks the app: a full disk only loses lines.
     if log.file.metadata().is_ok_and(|meta| meta.len() > MAX_BYTES) {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "the log can't report its own write failure"
+        )]
         let _ = fs::rename(&log.path, log.path.with_extension("jsonl.1"));
         if let Ok(file) = File::create(&log.path) {
             log.file = file;
         }
     }
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "the log can't report its own write failure"
+    )]
     let _ = writeln!(log.file, "{}", Value::Object(line));
 }
 
@@ -128,14 +140,42 @@ struct SpanData {
     started: Instant,
 }
 
+/// Field name parts whose text values never reach a log line.
+const SECRET_PARTS: [&str; 9] = [
+    "cookie", "password", "otp", "csrf", "token", "key", "secret", "sealed", "session",
+];
+
+/// Parts that make a `..._code` name an ordinary code (`status_code`, `error_code`).
+const PLAIN_CODES: [&str; 3] = ["status", "error", "http"];
+
+const REDACTED: &str = "[redacted]";
+
+/// Whether a field named `name` may hold a secret. It goes by the name's `_` and `.` parts
+/// (plural `s` dropped), so `flow`, `status` or `keyword` stay; a lone `code` is an edge or
+/// HTTP error code, while `pair_code` or `otp_code` is a secret. Numbers and bools are never
+/// redacted (counts, lengths, times and flags), only text.
+fn secret_name(name: &str) -> bool {
+    let parts: Vec<&str> = name.split(['_', '.']).collect();
+    let any = |words: &[&str]| {
+        parts.iter().any(|part| {
+            words.contains(part)
+                || part
+                    .strip_suffix('s')
+                    .is_some_and(|one| words.contains(&one))
+        })
+    };
+    let code = parts.len() > 1 && any(&["code"]) && !any(&PLAIN_CODES);
+    code || any(&SECRET_PARTS)
+}
+
 struct Fields<'a>(&'a mut Map<String, Value>);
 
 impl Visit for Fields<'_> {
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
-        self.insert(field, format!("{value:?}").into());
+        self.insert_text(field, &format!("{value:?}"));
     }
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.insert(field, value.into());
+        self.insert_text(field, value);
     }
     fn record_i64(&mut self, field: &Field, value: i64) {
         self.insert(field, value.into());
@@ -149,6 +189,16 @@ impl Visit for Fields<'_> {
 }
 
 impl Fields<'_> {
+    /// A text value, unless its name says it may be a secret.
+    fn insert_text(&mut self, field: &Field, value: &str) {
+        let value = if secret_name(field.name()) {
+            REDACTED
+        } else {
+            value
+        };
+        self.insert(field, value.into());
+    }
+
     fn insert(&mut self, field: &Field, value: Value) {
         // tracing-log's own fields (log.target, log.file, ...).
         if !field.name().starts_with("log.") {
@@ -283,3 +333,91 @@ fn logcat(level: &str, text: &str) {
 
 #[cfg(not(target_os = "android"))]
 fn logcat(_level: &str, _text: &str) {}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    #[test]
+    fn secret_names_are_caught_and_plain_ones_kept() {
+        for name in [
+            "cookie",
+            "cookies",
+            "password",
+            "otp",
+            "otp_code",
+            "pair_code",
+            "csrf",
+            "csrf_token",
+            "token",
+            "refresh_token",
+            "key",
+            "api_key",
+            "seal_secret",
+            "sealed",
+            "session",
+            "session_id",
+            "external.cookie",
+        ] {
+            assert!(secret_name(name), "{name} kept");
+        }
+        for name in [
+            "flow",
+            "status",
+            "code",
+            "status_code",
+            "error_code",
+            "http_code",
+            "path",
+            "regno",
+            "keyword",
+            "monkey",
+            "outcome",
+            "ms",
+        ] {
+            assert!(!secret_name(name), "{name} redacted");
+        }
+    }
+
+    /// Records each event's fields as the pipeline does.
+    struct Capture(Arc<Mutex<Map<String, Value>>>);
+
+    impl<S: Subscriber> Layer<S> for Capture {
+        fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+            event.record(&mut Fields(&mut locked(&self.0)));
+        }
+    }
+
+    #[test]
+    fn secret_text_fields_are_redacted() {
+        let seen = Arc::new(Mutex::new(Map::new()));
+        let subscriber = tracing_subscriber::registry().with(Capture(seen.clone()));
+        tracing::subscriber::with_default(subscriber, || {
+            let csrf = "csrf-secret";
+            tracing::info!(
+                flow = "f-1",
+                status = 403,
+                code = "mailbox_not_found",
+                cookies = 3,
+                password = "hunter2",
+                otp_code = "493817",
+                ?csrf,
+                session = %"JSESSIONID=abc",
+                "edge refused"
+            );
+        });
+        let seen = locked(&seen);
+        let text = Value::Object(seen.clone()).to_string();
+        for secret in ["hunter2", "493817", "csrf-secret", "JSESSIONID"] {
+            assert!(!text.contains(secret), "{secret} logged: {text}");
+        }
+        assert_eq!(seen["flow"], "f-1");
+        assert_eq!(seen["status"], 403);
+        assert_eq!(seen["code"], "mailbox_not_found");
+        assert_eq!(seen["cookies"], 3);
+        assert_eq!(seen["password"], REDACTED);
+        assert_eq!(seen["message"], "edge refused");
+    }
+}

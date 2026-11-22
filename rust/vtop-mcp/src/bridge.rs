@@ -158,11 +158,11 @@ impl SessionSource for BridgeClient {
             match status {
                 StatusCode::ACCEPTED => {}
                 StatusCode::OK if body.get("status").and_then(Value::as_str) == Some("ready") => {
-                    return session_of(&body)
+                    return session_of(&body);
                 }
                 StatusCode::OK => return Err(error_text(&body, "the session request failed")),
                 StatusCode::GONE => {
-                    return Err("phone_timeout: The phone did not answer in time.".to_string())
+                    return Err("phone_timeout: The phone did not answer in time.".to_string());
                 }
                 other => return Err(error_text(&body, other.as_str())),
             }
@@ -237,8 +237,8 @@ impl SessionSource for CachedSessions {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
 

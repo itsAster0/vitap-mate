@@ -1,13 +1,18 @@
+#![expect(
+    clippy::print_stderr,
+    reason = "a start-up failure's last line, on stderr before the exit code"
+)]
+
 use std::sync::Arc;
 use std::time::Duration;
 
 use tracing_subscriber::EnvFilter;
 use vtop_bridge::config::Config;
 use vtop_bridge::engine::HttpEdge;
-use vtop_bridge::gmail::{GoogleOAuthRefresher, DEFAULT_TOKEN_URL};
+use vtop_bridge::gmail::{DEFAULT_TOKEN_URL, GoogleOAuthRefresher};
 use vtop_bridge::login::CoreLogin;
 use vtop_bridge::verify::CoreVerifier;
-use vtop_bridge::{router, AppState, Parts};
+use vtop_bridge::{AppState, Parts, router};
 
 #[tokio::main]
 async fn main() {
@@ -87,6 +92,10 @@ async fn main() {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "an error ends the wait, as a ctrl-c would"
+        )]
         let _ = tokio::signal::ctrl_c().await;
     };
     #[cfg(unix)]

@@ -11,8 +11,8 @@ use std::time::{Duration, SystemTime};
 use serde_json::json;
 use tracing::{info, warn};
 
-use crate::exams::EXAMS;
-use crate::marks::MARKS;
+use crate::pages::exams::EXAMS;
+use crate::pages::marks::MARKS;
 
 use vtop_core::VtopConfig;
 use vtop_core::types::{
@@ -22,9 +22,12 @@ use vtop_core::types::{
 
 use vtop_core::sync::RwLock;
 
+use crate::pages::records;
+use crate::remote::edge;
+use crate::store::decoded;
 use crate::{
     ACCOUNT, ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS,
-    SESSION, Session, TIMETABLE, decoded, forwarding, records, traced, traced_sync,
+    SESSION, Session, Shared, TIMETABLE, traced, traced_sync,
 };
 
 /// The Flutter app's Cookie-Editor domain.
@@ -37,11 +40,13 @@ pub struct DevConfig {
     pub session_reuse_minutes: u32,
     /// Upper bound for one VTOP request, seconds; 0 = vtop-core's default.
     pub request_timeout_s: u32,
-    /// The app is debuggable (`FLAG_DEBUGGABLE`): Developer → Chat's servers may apply. The
-    /// .so is always a release build, so this comes from the app, not `debug_assertions`.
+    /// The app is debuggable (`FLAG_DEBUGGABLE`): demo pages may be recorded
+    /// (`demo_record.json`). The .so is always a release build, so this comes from the app, not
+    /// `debug_assertions`.
     pub debuggable: bool,
 }
 
+/// What [`dev_configure`] set, for [`Core::new`] to take a copy of.
 static CONFIG: Mutex<Option<DevConfig>> = Mutex::new(None);
 
 /// Sets [`DevConfig`]; call before the core is made. (Developer → Inspect Traffic is the app's
@@ -57,30 +62,32 @@ pub fn dev_configure(config: DevConfig) {
     *CONFIG.lock().unwrap_or_else(PoisonError::into_inner) = Some(config);
 }
 
-/// Whether [`dev_configure`] said the app is debuggable; false when it wasn't called.
-pub(crate) fn debuggable() -> bool {
-    config().is_some_and(|c| c.debuggable)
-}
-
-fn config() -> Option<DevConfig> {
+/// The config [`dev_configure`] set, for a new core.
+pub(crate) fn handed() -> Option<DevConfig> {
     CONFIG
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clone()
 }
 
+/// Whether [`dev_configure`] said the app is debuggable; false when it wasn't called.
+pub(crate) fn debuggable(shared: &Shared) -> bool {
+    shared.dev.as_ref().is_some_and(|c| c.debuggable)
+}
+
 /// The client config every new VTOP client gets.
-pub(crate) fn vtop_config() -> VtopConfig {
+pub(crate) fn vtop_config(shared: &Shared) -> VtopConfig {
     let mut vtop = VtopConfig::default();
-    if let Some(seconds) = config().map(|c| c.request_timeout_s).filter(|s| *s > 0) {
+    let timeout = shared.dev.as_ref().map(|c| c.request_timeout_s);
+    if let Some(seconds) = timeout.filter(|s| *s > 0) {
         vtop.request_timeout = Duration::from_secs(seconds.into());
     }
     vtop
 }
 
 /// Whether `saved` may be restored under the session-reuse limit.
-pub(crate) fn reusable(saved: &PersistedVtopSession) -> bool {
-    let minutes = config().map_or(0, |c| c.session_reuse_minutes);
+pub(crate) fn reusable(shared: &Shared, saved: &PersistedVtopSession) -> bool {
+    let minutes = shared.dev.as_ref().map_or(0, |c| c.session_reuse_minutes);
     let now_ms = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_millis() as u64);
@@ -117,7 +124,7 @@ impl Core {
         traced("dev_clear_session", &flow, async {
             let slot = self.current()?;
             let mut session = slot.write().await;
-            session.restart()?;
+            session.restart(&self.shared)?;
             remove(&self.at(SESSION));
             info!("session dropped; the next fetch signs in again");
             Ok(())
@@ -142,12 +149,16 @@ impl Core {
                 rejected: false,
                 registration_number: None,
             };
-            let fresh = Session::new(account.clone())?;
+            let fresh = Session::new(account.clone(), &self.shared)?;
             match self.current() {
                 Ok(slot) => {
                     let mut session = slot.write().await;
                     // The session moves to a client holding the new credentials; cookies in
                     // the shared store stay there.
+                    #[expect(
+                        clippy::disallowed_methods,
+                        reason = "moves to the new local client; nothing leaves the phone"
+                    )]
                     let mut saved = session.client.export_persisted_session(0);
                     if session.cookies.is_shared() {
                         saved.cookies = None;
@@ -299,6 +310,10 @@ impl Core {
     pub async fn dev_cookie_editor_json(&self, flow: String) -> Result<Option<String>, CoreError> {
         traced("dev_cookie_editor_json", &flow, async {
             let slot = self.current()?;
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "returned to Developer for the student to copy; Rust sends it nowhere"
+            )]
             let header = slot.read().await.client.cookie_header().unwrap_or_default();
             let cookies = cookie_editor(&header);
             info!(cookies = cookies.len(), "cookies for cookie-editor");
@@ -326,7 +341,7 @@ impl Core {
         url: Option<String>,
     ) -> Result<(), CoreError> {
         traced_sync("dev_set_forwarding_server", &flow, || {
-            let path = self.at(forwarding::SERVER_FILE);
+            let path = self.at(edge::SERVER_FILE);
             match url.as_deref().map(str::trim).filter(|url| !url.is_empty()) {
                 Some(url) => {
                     if !(url.starts_with("http://") || url.starts_with("https://")) {
@@ -426,11 +441,7 @@ mod tests {
             fs::write(dir.join(PAGES).join(semester).join("marks_seen.json"), "{}").unwrap();
         }
         fs::write(dir.join(PAGES).join("profile.json"), "{}").unwrap();
-        let core = Core {
-            dir: dir.clone(),
-            cache: dir.clone(),
-            slot: Mutex::new(None),
-        };
+        let core = Core::for_test(&dir);
         (core, dir)
     }
 
@@ -464,13 +475,9 @@ mod tests {
             rejected: false,
             registration_number: None,
         };
-        fs::write(
-            dir.join(crate::ACCOUNT),
-            serde_json::to_vec(&account).unwrap(),
-        )
-        .unwrap();
+        fs::write(dir.join(ACCOUNT), serde_json::to_vec(&account).unwrap()).unwrap();
         fs::write(dir.join(SESSION), "{}").unwrap();
-        let mut session = Session::new(account).unwrap();
+        let mut session = Session::new(account, &core.shared).unwrap();
         session.otp = Some("pending".into());
         core.install(Some(Arc::new(RwLock::new(session))));
 
@@ -515,7 +522,7 @@ mod tests {
         };
         fs::write(dir.join(ACCOUNT), serde_json::to_vec(&rejected).unwrap()).unwrap();
         core.current().unwrap().write().await.account = rejected;
-        fs::write(dir.join(forwarding::FILE), "{}").unwrap();
+        fs::write(dir.join(crate::remote::forwarding::FILE), "{}").unwrap();
         core.dev_set_account("f".into(), "other".into(), "pw-2".into())
             .await
             .unwrap();
@@ -532,7 +539,7 @@ mod tests {
         assert_eq!(fs::read_to_string(dir.join(SESSION)).unwrap(), session);
         let cookies = core.dev_cookie_editor_json("f".into()).await.unwrap();
         assert!(cookies.is_some_and(|json| json.contains("JSESSIONID")));
-        for kept in [SEMESTERS, SELECTED, forwarding::FILE] {
+        for kept in [SEMESTERS, SELECTED, crate::remote::forwarding::FILE] {
             assert!(dir.join(kept).exists(), "{kept}");
         }
         assert!(dir.join(PAGES).join("AP1").join("marks_seen.json").exists());

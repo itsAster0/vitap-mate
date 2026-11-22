@@ -49,9 +49,9 @@ fn page(
     name: &'static str,
     args: &'static [&'static str],
     call: impl for<'a> Fn(&'a VtopClient, &'a str, &'a Args) -> BoxFuture<'a, VtopResult<Value>>
-        + Send
-        + Sync
-        + 'static,
+    + Send
+    + Sync
+    + 'static,
 ) -> PageDef {
     PageDef {
         name,
@@ -81,8 +81,11 @@ impl spec::Visit for Defs {
 /// A [`PageCall`] from a body that may use `c` (client), `s` (semester)
 /// and `a` (arguments) and `.await?`.
 macro_rules! call {
-    ($name:ident, |$c:ident, $s:ident, $a:ident| $body:expr) => {
-        #[allow(unused_variables)]
+    ($name:ident, |$c:ident, $s:ident, $a:ident| $body:expr_2021) => {
+        #[allow(
+            unused_variables,
+            reason = "a page's body uses only some of c, s and a"
+        )]
         fn $name<'a>(
             $c: &'a VtopClient,
             $s: &'a str,
@@ -100,7 +103,7 @@ call!(outing_pass, |c, s, a| {
         other => {
             return Err(VtopError::ConfigurationError(format!(
                 "No outing kind {other}."
-            )))
+            )));
         }
     };
     pdf(c

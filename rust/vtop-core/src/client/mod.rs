@@ -23,10 +23,10 @@ use crate::config::VtopConfig;
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{Password, RegistrationNumber, Username};
 use crate::session::{
-    parse_cookie_pairs, CookieStore, ResettableJar, SessionManager, SessionState,
+    CookieStore, ResettableJar, SessionManager, SessionState, parse_cookie_pairs,
 };
 use crate::types::PersistedVtopSession;
-use vtop_proto::http::{join_url, url_parts, Method, Request};
+use vtop_proto::http::{Method, Request, join_url, url_parts};
 use vtop_proto::machine::{Machine, Signed, Step};
 use vtop_proto::spec::{PageSpec, Query};
 
@@ -34,12 +34,12 @@ pub use course_page::{CourseFile, CourseFileInfo, FileLink};
 #[cfg(feature = "reqwest")]
 pub use email_otp::EmailOtpLogin;
 pub use hostel::{
-    check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
-    WeekendOutingApplication,
+    GeneralOutingApplication, OutingKind, WeekendOutingApplication, check_general_outing,
+    check_weekend_outing,
 };
+pub use http::VITAP_INTERMEDIATE_CA_PEM;
 #[cfg(feature = "reqwest")]
 pub use http::https_client;
-pub use http::VITAP_INTERMEDIATE_CA_PEM;
 pub use transport::{Hop, HopFuture, HopResponse, Transport, TransportError};
 
 const AUTH: &str = "rust.auth";
@@ -412,10 +412,9 @@ impl VtopClient {
             if !headers
                 .iter()
                 .any(|(name, _)| name.eq_ignore_ascii_case("cookie"))
+                && let Some(cookies) = self.jar.header_for(&url)
             {
-                if let Some(cookies) = self.jar.header_for(&url) {
-                    headers.push(("cookie".to_string(), cookies));
-                }
+                headers.push(("cookie".to_string(), cookies));
             }
             let mut hop = self.hop(method, url.clone(), headers, body);
             hop.download_to = download_to.map(std::path::Path::to_path_buf);
@@ -532,6 +531,10 @@ impl VtopClient {
         }
         .await;
         if result.is_err() {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "the download's error is the one returned; the file may not exist"
+            )]
             let _ = std::fs::remove_file(to);
         }
         result
@@ -633,8 +636,8 @@ impl VtopClient {
         }
     }
 
-    /// Replaces this client's session with `snapshot` (for example one a
-    /// vtop-server logged in for). With a CSRF token and registration number
+    /// Replaces this client's session with `snapshot` (for example one the
+    /// engine logged in for). With a CSRF token and registration number
     /// the session is trusted as signed in; with a pending OTP it waits for
     /// [`Self::submit_security_otp`]; with only cookies it is validated on
     /// first use.
@@ -666,11 +669,11 @@ impl VtopClient {
             state.auth_stage = AuthStage::AwaitingOtp {
                 issued_at_unix_seconds,
             };
-        } else if let Some(registration_number) = registration_number {
-            if snapshot.csrf_token.is_some() {
-                state.session.set_registration_number(registration_number);
-                state.session.set_authenticated(true);
-            }
+        } else if let Some(registration_number) = registration_number
+            && snapshot.csrf_token.is_some()
+        {
+            state.session.set_registration_number(registration_number);
+            state.session.set_authenticated(true);
         }
         Ok(())
     }
@@ -678,6 +681,17 @@ impl VtopClient {
     /// Unix seconds of the last real login on this session, if known.
     pub fn logged_in_at(&self) -> Option<u64> {
         self.state().logged_in_at
+    }
+
+    /// Unix seconds at which the pending security OTP was issued, when a login waits for one.
+    /// Unlike [`Self::session_state`] it reads no cookies.
+    pub fn otp_issued_at(&self) -> Option<u64> {
+        match self.state().auth_stage {
+            AuthStage::AwaitingOtp {
+                issued_at_unix_seconds,
+            } => Some(issued_at_unix_seconds),
+            _ => None,
+        }
     }
 
     // ---- simple accessors ------------------------------------------------
@@ -745,6 +759,10 @@ fn first_bytes(path: &std::path::Path, count: u64) -> Vec<u8> {
     use std::io::Read;
     let mut bytes = Vec::new();
     if let Ok(file) = std::fs::File::open(path) {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "a short or failed read leaves the bytes read so far, which is all this needs"
+        )]
         let _ = file.take(count).read_to_end(&mut bytes);
     }
     bytes

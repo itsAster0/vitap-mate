@@ -1,0 +1,12 @@
+{
+  "comment": "device_sig (vm1): a request signed with a fixed seed (bytes 0x01..=0x20). vtop-shared's device_sig tests and the edge's src/auth.test.ts both check it.",
+  "seed": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+  "public": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+  "method": "POST",
+  "path": "/v1/devices/register",
+  "time": 1800000000,
+  "body": "{\"a\":1}",
+  "message": "vm1\nPOST\n/v1/devices/register\n1800000000\n015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862",
+  "sig": "t56VLtrjIqH8PQQHcZZIoPNs43L0LSjOwAWk4dYtKYTCuwDHxsIGtfb6LhQGuJ3_uUAmXBSVs7enz4oqtPWRCw",
+  "emptyBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

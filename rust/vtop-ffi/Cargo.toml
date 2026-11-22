@@ -2,7 +2,9 @@
 name = "vtop-ffi"
 version = "0.1.0"
 edition = "2024"
-description = "UniFFI core for the Compose prototype: sign-in, cache and ready-to-draw records"
+license = "MIT"
+publish = false
+description = "UniFFI core for the app: sign-in, cache and ready-to-draw records"
 
 [lib]
 name = "vtop_ffi"
@@ -39,3 +41,6 @@ android_log-sys = "0.3"
 # feature out of the app build).
 vtop-core = { path = "../vtop-core", features = ["reqwest"] }
 tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "time"] }
+
+[lints]
+workspace = true

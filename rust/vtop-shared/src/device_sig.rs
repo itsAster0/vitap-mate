@@ -2,9 +2,9 @@
 //! seed (32 bytes, base64url without padding) and sends, with every request:
 //! `x-vm-device` (its id), `x-vm-time` (unix seconds) and `x-vm-sig`, the
 //! signature over [`message`]. The edge checks it with WebCrypto in its
-//! TypeScript copy (`vtop-edge`), against [`tests::VECTOR_SIG`].
+//! TypeScript copy (`edge/`), against `vectors/device_sig.json`.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 
@@ -15,7 +15,10 @@ pub const SIG: &str = "x-vm-sig";
 /// A new seed, base64url. It stays on the phone.
 // No key is better than a weak one: without the OS random source this
 // aborts. Making it fallible changes the callers in vtop-ffi and vtop-bridge.
-#[allow(clippy::expect_used)]
+#[allow(
+    clippy::expect_used,
+    reason = "no key is better than a weak one: abort without the OS random source"
+)]
 pub fn generate_seed() -> String {
     let mut seed = [0u8; 32];
     getrandom::fill(&mut seed).expect("the OS random source");
@@ -70,12 +73,25 @@ pub fn verify(public: &str, sig: &str, method: &str, path: &str, time: i64, body
 mod tests {
     use super::*;
 
-    /// Seed of 32 bytes 0x01..=0x20; the request is POST /v1/devices/register at
-    /// 1800000000 with body `{"a":1}`.
-    pub const VECTOR_SEED: &str = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA";
-    pub const VECTOR_PUBLIC: &str = "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ";
-    pub const VECTOR_SIG: &str =
-        "t56VLtrjIqH8PQQHcZZIoPNs43L0LSjOwAWk4dYtKYTCuwDHxsIGtfb6LhQGuJ3_uUAmXBSVs7enz4oqtPWRCw";
+    /// A request signed with a fixed seed, shared with the edge's
+    /// `auth.test.ts`.
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vector {
+        seed: String,
+        public: String,
+        method: String,
+        path: String,
+        time: i64,
+        body: String,
+        message: String,
+        sig: String,
+        empty_body_sha256: String,
+    }
+
+    fn vector() -> Vector {
+        serde_json::from_str(include_str!("../vectors/device_sig.json")).unwrap()
+    }
 
     #[test]
     fn signs_and_verifies() {
@@ -126,21 +142,15 @@ mod tests {
     #[test]
     fn empty_body_hash() {
         let m = String::from_utf8(message("get", "/v1/events", 1, b"")).unwrap();
-        assert!(m.ends_with("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
+        assert!(m.ends_with(&vector().empty_body_sha256));
     }
 
     #[test]
-    fn vector() {
-        let sig = sign(
-            VECTOR_SEED,
-            "POST",
-            "/v1/devices/register",
-            1_800_000_000,
-            br#"{"a":1}"#,
-        )
-        .unwrap();
-        assert_eq!(public_key(VECTOR_SEED).unwrap(), VECTOR_PUBLIC);
-        assert_eq!(sig, VECTOR_SIG);
+    fn vector_matches_the_edge() {
+        let v = vector();
+        let sig = sign(&v.seed, &v.method, &v.path, v.time, v.body.as_bytes()).unwrap();
+        assert_eq!(public_key(&v.seed).unwrap(), v.public);
+        assert_eq!(sig, v.sig);
     }
 
     /// Known answers pinned before the dalek 3 / sha2 0.11 bump: RFC 8032 §7.1
@@ -160,26 +170,20 @@ mod tests {
             hex::encode(rfc.sign(b"").to_bytes()),
             "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
         );
+        let v = vector();
         assert_eq!(
-            message("post", "/v1/devices/register", 1_800_000_000, br#"{"a":1}"#),
-            b"vm1\nPOST\n/v1/devices/register\n1800000000\n015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+            message(&v.method.to_lowercase(), &v.path, v.time, v.body.as_bytes()),
+            v.message.as_bytes()
         );
-        let request = ("POST", "/v1/devices/register", 1_800_000_000, br#"{"a":1}"#);
-        assert!(verify(
-            VECTOR_PUBLIC,
-            VECTOR_SIG,
-            request.0,
-            request.1,
-            request.2,
-            request.3
-        ));
+        let body = v.body.as_bytes();
+        assert!(verify(&v.public, &v.sig, &v.method, &v.path, v.time, body));
         assert!(!verify(
-            VECTOR_PUBLIC,
-            VECTOR_SIG,
-            request.0,
-            request.1,
-            request.2 + 1,
-            request.3
+            &v.public,
+            &v.sig,
+            &v.method,
+            &v.path,
+            v.time + 1,
+            body
         ));
         assert_eq!(URL_SAFE_NO_PAD.decode(generate_seed()).unwrap().len(), 32);
     }

@@ -5,6 +5,7 @@ use std::sync::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::RegistrationNumber;
+use crate::types::CookieNames;
 pub(crate) use vtop_proto::http::cookie_pairs as parse_cookie_pairs;
 use vtop_proto::http::url_parts;
 
@@ -380,7 +381,7 @@ impl SessionManager {
 
 /// Everything needed to resume a signed-in (or OTP-pending) session in a
 /// fresh process. The server hands this to its caller instead of storing it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionState {
     /// `Cookie` header value for `{base_url}/vtop`.
     pub cookies: String,
@@ -396,6 +397,20 @@ pub struct SessionState {
     /// a fixed session age.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logged_in_at: Option<u64>,
+}
+
+impl std::fmt::Debug for SessionState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Never the cookie values or the CSRF token.
+        formatter
+            .debug_struct("SessionState")
+            .field("cookies", &CookieNames(&self.cookies))
+            .field("csrf_token", &self.csrf_token.is_some())
+            .field("registration_number", &self.registration_number.is_some())
+            .field("otp_issued_at", &self.otp_issued_at)
+            .field("logged_in_at", &self.logged_in_at)
+            .finish()
+    }
 }
 
 impl std::fmt::Display for SessionState {
@@ -415,6 +430,7 @@ impl std::fmt::Display for SessionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::PersistedVtopSession;
 
     #[test]
     fn authentication_requires_a_csrf_token() {
@@ -493,10 +509,11 @@ mod tests {
         );
         // Replaced in place, then deleted by an expired one.
         jar.add_cookie_str("SERVERID=s2; Path=/", "https://vtop.example.in/");
-        assert!(jar
-            .header_for("https://vtop.example.in/")
-            .unwrap()
-            .starts_with("SERVERID=s2"));
+        assert!(
+            jar.header_for("https://vtop.example.in/")
+                .unwrap()
+                .starts_with("SERVERID=s2")
+        );
         jar.add_cookie_str(
             "SERVERID=x; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
             "https://vtop.example.in/",
@@ -559,5 +576,37 @@ mod tests {
         let shown = state.to_string();
         assert!(!shown.contains("secret"));
         assert!(!shown.contains("22BCE0001"));
+    }
+
+    #[test]
+    fn session_debug_shows_cookie_names_and_lengths_only() {
+        let state = SessionState {
+            cookies: "JSESSIONID=secret-1; SERVERID=s9".into(),
+            csrf_token: Some("csrf-secret".into()),
+            registration_number: Some("22BCE0001".into()),
+            otp_issued_at: Some(7),
+            logged_in_at: None,
+        };
+        let shown = format!("{state:?}");
+        assert!(
+            shown.contains(r#"["JSESSIONID(8B)", "SERVERID(2B)"]"#),
+            "{shown}"
+        );
+        for secret in ["secret", "s9", "22BCE0001"] {
+            assert!(!shown.contains(secret), "{secret} in {shown}");
+        }
+        let saved = PersistedVtopSession {
+            username: "22BCE0001".into(),
+            saved_at_epoch_ms: 1,
+            cookies: Some(state.cookies.clone()),
+            csrf_token: state.csrf_token.clone(),
+            registration_number: state.registration_number.clone(),
+            logged_in_at: Some(2),
+        };
+        let shown = format!("{saved:?}");
+        assert!(shown.contains("JSESSIONID(8B)"), "{shown}");
+        for secret in ["secret", "s9", "22BCE0001"] {
+            assert!(!shown.contains(secret), "{secret} in {shown}");
+        }
     }
 }

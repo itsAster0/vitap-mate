@@ -3,7 +3,7 @@
 //! gave it, and the FCM token. All in `device.json`; nothing of it is ever logged. Every call to
 //! the edge goes through [`Core::edge_post`] or [`Core::edge_get`].
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use tracing::{info, warn};
 use vtop_core::client::Hop;
 use vtop_shared::{device_sig, mail_seal, page_dictionary};
 
-use crate::{Core, CoreError, traced, transport, unix_now};
+use crate::{Core, CoreError, Shared, traced, transport, unix_now};
 
 const FILE: &str = "device.json";
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -67,7 +67,7 @@ pub(crate) struct Answer {
     pub body: Value,
     /// A page the engine packed with the page dictionary (`body` is then null).
     pub packed: Option<Vec<u8>>,
-    /// An account token the edge issued, with its end in unix ms ([`crate::account_token`]).
+    /// An account token the edge issued, with its end in unix ms ([`crate::remote::account_token`]).
     pub(crate) account_token: Option<(String, i64)>,
 }
 
@@ -99,12 +99,16 @@ struct Request<'a> {
 }
 
 /// Sends `req` through the app's transport, with the flow as `x-request-id` and `headers`.
-async fn send(req: &Request<'_>, headers: Vec<(String, String)>) -> Result<Answer, EdgeError> {
+async fn send(
+    shared: &Arc<Shared>,
+    req: &Request<'_>,
+    headers: Vec<(String, String)>,
+) -> Result<Answer, EdgeError> {
     let offline = |error: &dyn std::fmt::Display| {
         warn!(path = req.path, error = %error, "edge unreachable");
         EdgeError::Offline
     };
-    let transport = transport::current().map_err(|error| offline(&error))?;
+    let transport = transport::current(shared).map_err(|error| offline(&error))?;
     let mut all = vec![("x-request-id".into(), req.flow.into())];
     if req.method == "POST" {
         all.push(("content-type".into(), "application/json".into()));
@@ -233,7 +237,7 @@ impl Core {
         let mut body = json!({
             "signKey": sign_key,
             "sealKey": device.seal_key,
-            "label": crate::server::label(),
+            "label": crate::remote::server::label(),
             "platform": "android",
         });
         if let Some(token) = &device.push_token {
@@ -348,7 +352,7 @@ impl Core {
             let device = self.device();
             let time = unix_now().saturating_add(device.clock_offset);
             let headers = signed(&device.seed, id, req.method, req.path, time, req.body);
-            let answer = send(req, headers).await?;
+            let answer = send(&self.shared, req, headers).await?;
             if (200..300).contains(&answer.status) {
                 return Ok(answer);
             }
@@ -397,7 +401,6 @@ impl Core {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
 
     use super::*;
 
@@ -410,11 +413,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("vtop-ffi-live-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let core = Core {
-            cache: dir.clone(),
-            dir,
-            slot: Mutex::new(None),
-        };
+        let core = Core::for_test(dir);
         let id = core.device_id(server, "live").await.unwrap();
         assert!(id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()));
         let label = json!({ "label": "vitapmate-live-test" });
@@ -441,7 +440,7 @@ mod tests {
             body: &bytes,
             timeout: TIMEOUT,
         };
-        let unsigned = send(&req, vec![]).await.unwrap();
+        let unsigned = send(&core.shared, &req, vec![]).await.unwrap();
         assert_eq!(unsigned.status, 401);
         assert_eq!(unsigned.text("code").as_deref(), Some("bad_signature"));
         let seed = core.device().seed;
@@ -453,7 +452,7 @@ mod tests {
             unix_now(),
             &bytes,
         );
-        let stranger = send(&req, headers).await.unwrap();
+        let stranger = send(&core.shared, &req, headers).await.unwrap();
         assert_eq!(stranger.status, 404);
         // A phone clock 15 minutes slow: corrected from `serverTime`, then accepted.
         core.update_device(|d| d.clock_offset = -900);

@@ -24,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import vitapmate.core.gmailOtp
 import vitapmate.observability.Log
 
 /**
@@ -245,48 +246,12 @@ object Gmail {
         val list = get("$API/messages?" + query("maxResults" to "3", "q" to "from:$SENDER after:$since"), token, flow)
         val ids = list.optJSONArray("messages").objects().map { it.optString("id") }.filter { it.isNotEmpty() && it !in tried }
         for (id in ids) {
+            // Rust reads it (vtop-proto's gmail): the sender, the date and the code, as the engine does.
             val message = get("$API/messages/$id?format=full", token, flow)
-            if ((message.optString("internalDate").toLongOrNull() ?: 0) < since * 1000 || !fromVtop(message)) continue
-            sixDigits(text(message))?.let { return Otp(it, id) }
+            gmailOtp(message.toString(), since)?.let { return Otp(it, id) }
         }
         return null
     }
-
-    private fun fromVtop(message: JSONObject) = message.optJSONObject("payload")?.optJSONArray("headers").objects()
-        .any { it.optString("name").equals("from", true) && SENDER in it.optString("value").lowercase() }
-
-    /** The snippet and every decoded body part, quoted-printable decoded. */
-    private fun text(message: JSONObject): String {
-        val out = StringBuilder(message.optString("snippet")).append('\n')
-        fun append(part: JSONObject) {
-            part.optJSONObject("body")?.optString("data")?.takeIf { it.isNotEmpty() }?.let { data ->
-                runCatching { Base64.decode(data.trimEnd('='), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP) }
-                    .getOrNull()?.let { out.append(String(it)).append('\n') }
-            }
-            part.optJSONArray("parts").objects().forEach(::append)
-        }
-        message.optJSONObject("payload")?.let(::append)
-        return quotedPrintable(out.toString())
-    }
-
-    private fun quotedPrintable(input: String): String {
-        val text = input.replace("=\r\n", "").replace("=\n", "")
-        val out = java.io.ByteArrayOutputStream()
-        var i = 0
-        while (i < text.length) {
-            val hex = if (text[i] == '=' && i + 2 < text.length) text.substring(i + 1, i + 3).toIntOrNull(16) else null
-            if (hex != null) {
-                out.write(hex)
-                i += 3
-            } else {
-                out.write(text.substring(i, i + 1).toByteArray())
-                i++
-            }
-        }
-        return out.toString(Charsets.UTF_8.name())
-    }
-
-    private fun sixDigits(text: String) = Regex("(?<!\\d)\\d{6}(?!\\d)").find(text)?.value
 
     private fun verifyGmail(token: String, flow: String) {
         try {

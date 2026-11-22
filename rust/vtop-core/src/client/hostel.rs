@@ -10,8 +10,8 @@ use crate::outing::{self, Application, Apply, Cancel};
 use crate::types::{OutingApplyResult, OutingCancelResult};
 
 pub use crate::outing::{
-    check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
-    WeekendOutingApplication,
+    GeneralOutingApplication, OutingKind, WeekendOutingApplication, check_general_outing,
+    check_weekend_outing,
 };
 
 impl VtopClient {
@@ -78,6 +78,10 @@ impl VtopClient {
             .download(context, outing::pass(&signed, kind, id), to)
             .await?;
         if let Err(error) = outing::read_pass(&head) {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "the error is VTOP's answer; a file left behind is only a stray download"
+            )]
             let _ = std::fs::remove_file(to);
             if matches!(error, crate::error::VtopError::SessionExpired) {
                 self.mark_session_expired(context, &format!("VTOP answered: {error}"));

@@ -1,5 +1,5 @@
 //! The in-app VTOP web view's session. The web view shares the app's cookie store
-//! (`CookieManager`, see [`crate::cookies`]), so nothing is copied: this only makes sure the
+//! (`CookieManager`, see [`crate::store::cookies`]), so nothing is copied: this only makes sure the
 //! session is signed in before the view loads VTOP. Port of the Flutter app's
 //! `vtop_webview_cookie_service.dart` (`loadVtopWebviewSession`), less its cookie copying.
 
@@ -52,11 +52,9 @@ mod tests {
     #[tokio::test]
     async fn signed_out_has_no_web_session() {
         // Not `Core::new`: that starts the process-wide log, which another test owns.
-        let core = Core {
-            cache: std::env::temp_dir(),
-            dir: std::env::temp_dir().join(format!("vtop-ffi-web-{}", std::process::id())),
-            slot: std::sync::Mutex::new(None),
-        };
+        let core = Core::for_test(
+            std::env::temp_dir().join(format!("vtop-ffi-web-{}", std::process::id())),
+        );
         assert_eq!(
             core.web_session("f-web".into(), false).await,
             Err(CoreError::NotSignedIn)

@@ -5,11 +5,17 @@
 //! POST) and never signs in. Writes `rust/vtop-proto/tests/captchas/<n>.jpg`
 //! and `answers.json`.
 
+#![expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "a command-line tool: each sample's answer or error is the output"
+)]
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use vtop_core::parser::page;
 
 const BASE: &str = "https://vtop.vitap.ac.in";

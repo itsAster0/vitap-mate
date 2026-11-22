@@ -1,12 +1,12 @@
 //! The demo account, for UI tests, demos and store reviews without a VTOP account. Signing in
 //! with [`USERNAME`] and [`PASSWORD`] asks VTOP nothing: it downloads the sample pages from the
-//! edge (`/guides/demo.json`, see `rust/vtop-convex/API.md`), and every read page comes from them
+//! edge (`/guides/demo.json`, see `edge/API.md`), and every read page comes from them
 //! ([`Core::demo_page`]). Calls that need a real session (outing writes, downloads, the web view,
-//! chat, forwarding) answer [`unavailable`], and nothing goes to the server.
+//! forwarding) answer [`unavailable`], and nothing goes to the server.
 //!
 //! The pages are recorded from a real account in a debuggable build: create `demo_record.json`
 //! in the app's data folder and every page fetched is added to it ([`Core::record_demo`]); then
-//! `bun run demo` in `rust/vtop-edge` swaps out the personal details.
+//! `bun run demo` in `edge/` swaps out the personal details.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -19,14 +19,16 @@ use tracing::{info, warn};
 use vtop_core::client::Hop;
 use vtop_core::sync::RwLock;
 
-use crate::{ACCOUNT, Account, Core, CoreError, SignIn, Slot, dev, obs, traced_sync, transport};
+use crate::{
+    ACCOUNT, Account, Core, CoreError, Shared, SignIn, Slot, dev, obs, traced_sync, transport,
+};
 
 /// Not a VTOP registration number, so no student lands here by mistake.
 pub(crate) const USERNAME: &str = "DEMO2026";
 pub(crate) const PASSWORD: &str = "vitapmate-demo";
 
 /// The downloaded pages, in the data folder.
-const FILE: &str = "demo.json";
+pub(crate) const FILE: &str = "demo.json";
 /// Present (debuggable builds only): every fetched page is added to it.
 const RECORD: &str = "demo_record.json";
 /// The JSON shape this app reads; the edge bumps it only for a change old apps can't read.
@@ -94,7 +96,12 @@ impl Core {
         flow: &str,
         account: Account,
     ) -> Result<SignIn, CoreError> {
-        let bytes = download(&self.forwarding_server(), flow).await?;
+        let bytes = download(&self.shared, &self.forwarding_server(), flow).await?;
+        self.open_demo(account, bytes).await
+    }
+
+    /// Signs in as the demo account on `bytes`, the downloaded sample pages.
+    async fn open_demo(&self, account: Account, bytes: Vec<u8>) -> Result<SignIn, CoreError> {
         let bundle: Bundle = serde_json::from_slice(&bytes).map_err(|error| CoreError::Other {
             reason: format!("unreadable demo: {error}"),
         })?;
@@ -103,10 +110,11 @@ impl Core {
                 reason: "This demo needs a newer app.".into(),
             });
         }
-        self.write_bytes(FILE, &bytes);
-        let slot = Arc::new(RwLock::new(crate::Session::new(account)?));
+        let slot = Arc::new(RwLock::new(crate::Session::new(account, &self.shared)?));
         self.install(Some(slot.clone()));
         self.save(&slot, &*slot.read().await);
+        // After the save, which drops the last account's files (this one among them).
+        self.write_bytes(FILE, &bytes);
         obs::set_regno(Some(USERNAME.into()));
         info!(pages = bundle.pages.len(), "demo signed in");
         Ok(SignIn::Done)
@@ -152,7 +160,7 @@ impl Core {
         data: &impl Serialize,
     ) {
         static LOCK: Mutex<()> = Mutex::new(());
-        if !dev::debuggable() || !self.at(RECORD).is_file() {
+        if !dev::debuggable(&self.shared) || !self.at(RECORD).is_file() {
             return;
         }
         let _lock = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
@@ -168,7 +176,7 @@ impl Core {
     }
 }
 
-async fn download(server: &str, flow: &str) -> Result<Vec<u8>, CoreError> {
+async fn download(shared: &Arc<Shared>, server: &str, flow: &str) -> Result<Vec<u8>, CoreError> {
     let hop = Hop {
         method: "GET".into(),
         url: format!("{}/guides/{FILE}", server.trim_end_matches('/')),
@@ -178,7 +186,7 @@ async fn download(server: &str, flow: &str) -> Result<Vec<u8>, CoreError> {
         connect_timeout: TIMEOUT,
         download_to: None,
     };
-    let response = transport::current()?
+    let response = transport::current(shared)?
         .send(hop)
         .await
         .map_err(|_| CoreError::Offline)?;

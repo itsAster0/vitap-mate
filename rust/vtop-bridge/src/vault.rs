@@ -4,9 +4,9 @@
 
 use aes_gcm::aead::{Aead, Generate, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use serde::de::DeserializeOwned;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 const NONCE_LEN: usize = 12;
 
@@ -89,11 +89,13 @@ mod tests {
         let sealer = Sealer::new([7; 32]);
         let sealed = sealer.seal("accounts/A", b"hunter2");
         assert!(!sealed.contains("hunter2"));
-        assert!(!STANDARD
-            .decode(&sealed)
-            .unwrap()
-            .windows(7)
-            .any(|w| w == b"hunter2"));
+        assert!(
+            !STANDARD
+                .decode(&sealed)
+                .unwrap()
+                .windows(7)
+                .any(|w| w == b"hunter2")
+        );
     }
 
     #[test]

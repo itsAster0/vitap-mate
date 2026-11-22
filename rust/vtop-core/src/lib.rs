@@ -21,6 +21,9 @@ pub mod client;
 pub mod config;
 #[cfg(feature = "reqwest")]
 pub mod gmail;
+/// The OTP mail parser alone; the `reqwest` feature adds the Gmail client.
+#[cfg(not(feature = "reqwest"))]
+pub use vtop_proto::gmail;
 pub mod session;
 pub mod sync;
 
@@ -31,10 +34,10 @@ pub fn solve_captcha(data_url: &str) -> Result<String, String> {
 pub use client::VtopClient;
 pub use config::VtopConfig;
 pub use session::SessionState;
-pub use vtop_proto::{
-    course_pages, error, http, inputs, login, machine, now_unix, otp, outing, pages, parser, spec,
-    types,
-};
 pub use vtop_proto::{VtopError, VtopResult};
+pub use vtop_proto::{
+    course_pages, dates, error, http, inputs, login, machine, now_unix, otp, outing, pages, parser,
+    spec, types,
+};
 pub use vtop_shared::mail_seal;
 pub use vtop_shared::page_dictionary;

@@ -11,9 +11,11 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
     CallToolResult, ContentBlock, ResourceContents, ServerCapabilities, ServerConfig,
 };
-use rmcp::{prompt_handler, schemars, tool, tool_handler, tool_router, ServerHandler};
+use rmcp::{ServerHandler, prompt_handler, schemars, tool, tool_handler, tool_router};
 use serde::{Deserialize, Serialize};
 use vtop_core::client::CourseFile;
+use vtop_core::course_pages::plain_id;
+use vtop_core::dates::{civil_date, day_number};
 use vtop_core::inputs::{BiometricDate, CourseFilePath, CourseId, CourseType, SemesterId};
 use vtop_core::spec::{self, Query};
 use vtop_core::types::StudentProfile;
@@ -129,18 +131,6 @@ pub struct CoursePlanArgs {
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct NoArgs {}
 
-/// Course-page ids are plain alphanumerics, as vtop-core requires; checked
-/// here so a bad id fails before a session is fetched.
-fn plain_id(value: &str, label: &str) -> VtopResult<String> {
-    let value = value.trim();
-    if value.is_empty() || value.len() > 40 || !value.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err(VtopError::ConfigurationError(format!(
-            "{label} is not valid"
-        )));
-    }
-    Ok(value.to_string())
-}
-
 /// The semester list with the current one marked: the semester picked in
 /// the student's app, else the newest (VTOP lists newest first).
 pub fn mark_current(
@@ -222,32 +212,6 @@ const MAX_BIOMETRIC_DAYS: i64 = 14;
 /// Files larger than this are not sent to the agent: base64 makes them a
 /// third bigger, and few agents read more.
 const MAX_FILE_BYTES: usize = 10 * 1024 * 1024;
-
-/// Days since 1970-01-01 of a valid `DD/MM/YYYY` (Howard Hinnant's
-/// days_from_civil).
-pub(crate) fn day_number(day: i64, month: i64, year: i64) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = year.div_euclid(400);
-    let year_of_era = year - era * 400;
-    let day_of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    era * 146_097 + day_of_era - 719_468
-}
-
-/// (year, month, day) of a day number: civil_from_days.
-pub(crate) fn civil_date(days: i64) -> (i64, i64, i64) {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let day_of_era = z - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let mp = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = year_of_era + era * 400 + i64::from(month <= 2);
-    (year, month, day)
-}
 
 fn biometric_day(date: &BiometricDate) -> i64 {
     let mut parts = date
@@ -770,7 +734,7 @@ impl VtopTools {
         let parsed = (|| {
             Ok((
                 SemesterId::parse(&args.semester_id)?,
-                plain_id(&args.course_id, "course id")?,
+                plain_id(&args.course_id, "course id")?.to_string(),
             ))
         })();
         let (semester, course) = match input(parsed) {
@@ -806,8 +770,8 @@ impl VtopTools {
         let parsed = (|| {
             Ok((
                 SemesterId::parse(&args.semester_id)?,
-                plain_id(&args.erp_id, "faculty id")?,
-                plain_id(&args.class_id, "class id")?,
+                plain_id(&args.erp_id, "faculty id")?.to_string(),
+                plain_id(&args.class_id, "class id")?.to_string(),
             ))
         })();
         let (semester, erp, class) = match input(parsed) {
@@ -864,7 +828,7 @@ impl VtopTools {
         let parsed = (|| {
             Ok((
                 SemesterId::parse(&args.semester_id)?,
-                plain_id(&args.class_id, "class id")?,
+                plain_id(&args.class_id, "class id")?.to_string(),
             ))
         })();
         let (semester, class) = match input(parsed) {

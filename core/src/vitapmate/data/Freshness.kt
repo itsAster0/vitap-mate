@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
+import vitapmate.core.batchedPages
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import kotlin.time.Duration.Companion.milliseconds
@@ -196,13 +197,17 @@ object StaleSweep {
         }
         try {
             // One round trip on the Server and UDP routes: (page id, Rust's page name, saved time).
+            // Only pages Rust batches (route/batch.rs); the calendar refreshes on its own below.
+            val batched = batchedPages().toSet()
             val batch = listOf<Triple<String, String, (Core) -> Long?>>(
                 Triple("attendance", "attendance") { it.cachedAttendance(f)?.updatedAt },
                 Triple("timetable", "timetable") { it.cachedTimetable(f)?.updatedAt },
                 Triple("marks", "marks") { it.cachedMarks(f)?.updatedAt },
                 Triple("exams", "exam_schedule") { it.cachedExams(f)?.updatedAt },
                 Triple("semesters", "semesters") { it.cachedSemesters(f)?.updatedAt },
-            ).mapNotNull { (id, name, updatedAt) -> due(id, updatedAt)?.let { Triple(id, name, it) } }
+            ).filter { (id, name) ->
+                (name in batched).also { if (!it) Log.warn("sync.batch", "$name is not batched in Rust", f, mapOf("page" to id)) }
+            }.mapNotNull { (id, name, updatedAt) -> due(id, updatedAt)?.let { Triple(id, name, it) } }
             if (batch.isNotEmpty()) {
                 val ids = batch.joinToString("+") { it.first }
                 run(ids, "Refreshing ${batch.joinToString(", ") { it.first }}", batch.map { it.third }) { c ->

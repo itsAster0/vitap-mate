@@ -34,6 +34,17 @@ pub fn solve_data_url(data_url: &str) -> Result<String, String> {
 
 /// Standard alphabet; the trailing `=` padding is optional.
 fn base64(input: &[u8]) -> Option<Vec<u8>> {
+    decode_base64(input, b'+', b'/')
+}
+
+/// URL-safe alphabet (`-` and `_`), as Gmail's API sends bodies; the
+/// trailing `=` padding is optional.
+pub(crate) fn base64_url(input: &[u8]) -> Option<Vec<u8>> {
+    decode_base64(input, b'-', b'_')
+}
+
+/// Base64 whose last two symbols are `sym62` and `sym63`.
+fn decode_base64(input: &[u8], sym62: u8, sym63: u8) -> Option<Vec<u8>> {
     let input = input
         .strip_suffix(b"==")
         .or(input.strip_suffix(b"="))
@@ -45,8 +56,8 @@ fn base64(input: &[u8]) -> Option<Vec<u8>> {
             b'A'..=b'Z' => byte - b'A',
             b'a'..=b'z' => byte - b'a' + 26,
             b'0'..=b'9' => byte - b'0' + 52,
-            b'+' => 62,
-            b'/' => 63,
+            _ if byte == sym62 => 62,
+            _ if byte == sym63 => 63,
             _ => return None,
         };
         acc = (acc << 6) | u32::from(value);
@@ -394,7 +405,10 @@ mod jpeg {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the decoder's state for one scan"
+    )]
     fn scan(
         components: &mut [Component],
         quant: &[[i32; 64]; 4],

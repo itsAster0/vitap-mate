@@ -1,0 +1,309 @@
+use std::collections::VecDeque;
+use std::fmt::Write as _;
+use std::future::Future;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+use tracing::field::{Field, Visit};
+use tracing::span::Attributes;
+use tracing::{Event, Id, Subscriber};
+use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
+use vtop_core::sync::RwLock;
+
+use super::*;
+use crate::{ACCOUNT, Account, Session};
+
+/// Runs `future` on this thread.
+fn block_on<F: Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
+
+/// Every log field, one per line.
+#[derive(Clone, Default)]
+struct Captured(Arc<Mutex<String>>);
+
+impl Visit for Captured {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        let _ = writeln!(self.0.lock().unwrap(), "{}={value:?}", field.name());
+    }
+}
+
+impl<S: Subscriber> Layer<S> for Captured {
+    fn on_new_span(&self, attrs: &Attributes<'_>, _id: &Id, _ctx: Context<'_, S>) {
+        attrs.record(&mut self.clone());
+    }
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        event.record(&mut self.clone());
+    }
+}
+
+/// Scripted answers (yes once the script runs out, or no with `deny`), whether flows are
+/// attended, and how often it asked.
+pub(crate) struct TestGate {
+    pub(crate) attended: bool,
+    pub(crate) deny: bool,
+    pub(crate) answers: Mutex<VecDeque<CookieAnswer>>,
+    pub(crate) asks: AtomicU32,
+}
+
+impl TestGate {
+    pub(crate) fn asks(&self) -> u32 {
+        self.asks.load(Ordering::SeqCst)
+    }
+}
+
+#[async_trait::async_trait]
+impl CookieGate for TestGate {
+    fn attended(&self, _flow: String) -> bool {
+        self.attended
+    }
+    async fn ask(
+        &self,
+        _flow: String,
+        _kind: CookieKind,
+        _action: String,
+        _server: String,
+    ) -> Result<CookieAnswer, CoreError> {
+        self.asks.fetch_add(1, Ordering::SeqCst);
+        let next = self.answers.lock().unwrap().pop_front();
+        Ok(next.unwrap_or(CookieAnswer {
+            send: !self.deny,
+            remember: false,
+        }))
+    }
+}
+
+/// Gives `core` a fresh gate (and no remembered kinds).
+pub(crate) fn install(core: &Core, attended: bool, deny: bool) -> Arc<TestGate> {
+    let gate = Arc::new(TestGate {
+        attended,
+        deny,
+        answers: Mutex::default(),
+        asks: AtomicU32::new(0),
+    });
+    *core.shared.consent() = State {
+        gate: Some(gate.clone()),
+        ..State::default()
+    };
+    gate
+}
+
+/// An attended gate that says yes to everything.
+pub(crate) fn yes(core: &Core) -> Arc<TestGate> {
+    install(core, true, false)
+}
+
+/// An attended gate that says no to everything.
+pub(crate) fn no(core: &Core) -> Arc<TestGate> {
+    install(core, true, true)
+}
+
+/// Gives `core` a session (never used against VTOP before the gate).
+pub(crate) fn signed_in(core: &Core) {
+    let account = Account {
+        username: "22BCE0001".into(),
+        password: "pw".into(),
+        rejected: false,
+        registration_number: None,
+    };
+    let session = Session::new(account, &core.shared).unwrap();
+    core.install(Some(Arc::new(RwLock::new(session))));
+}
+
+pub(crate) fn remember(core: &Core, kind: CookieKind) {
+    core.shared.consent().remembered.insert(kind);
+}
+
+fn core(name: &str) -> Core {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-consent-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let core = Core::for_test(dir);
+    load(&core);
+    core
+}
+
+/// A core with no files: nothing it remembers is saved.
+fn fresh() -> Core {
+    Core::for_test(std::env::temp_dir())
+}
+
+fn check(core: &Core, flow: &str, kind: CookieKind, ask: bool) -> bool {
+    let shared = &core.shared;
+    block_on(allowed(shared, flow, kind, "Test", "vmate.aster0.dev", ask))
+}
+
+const YES_REMEMBER: CookieAnswer = CookieAnswer {
+    send: true,
+    remember: true,
+};
+
+#[test]
+fn no_gate_denies() {
+    let core = fresh();
+    assert!(!check(&core, "f", CookieKind::Route, true));
+}
+
+#[test]
+fn empty_flow_denies() {
+    let core = fresh();
+    let gate = yes(&core);
+    assert!(!check(&core, "", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 0);
+}
+
+#[test]
+fn unattended_denies_unless_route_remembered() {
+    let core = fresh();
+    let gate = install(&core, false, false);
+    assert!(!check(&core, "f", CookieKind::Route, true));
+    remember(&core, CookieKind::Account);
+    remember(&core, CookieKind::Handover);
+    assert!(!check(&core, "f", CookieKind::Account, true));
+    assert!(!check(&core, "f", CookieKind::Handover, true));
+    remember(&core, CookieKind::Route);
+    assert!(check(&core, "f", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 0);
+}
+
+#[test]
+fn remembered_kind_sends_without_asking() {
+    let core = fresh();
+    let gate = no(&core);
+    remember(&core, CookieKind::Account);
+    assert!(check(&core, "f", CookieKind::Account, true));
+    assert!(check(&core, "f", CookieKind::Account, false));
+    assert_eq!(gate.asks(), 0);
+}
+
+#[test]
+fn remember_saves_only_that_kind() {
+    let core = core("remember");
+    let gate = yes(&core);
+    load(&core);
+    gate.answers.lock().unwrap().push_back(YES_REMEMBER);
+    assert!(check(&core, "f1", CookieKind::Handover, true));
+    assert_eq!(
+        core.cookie_consent_remembered("f".into()),
+        [CookieKind::Handover]
+    );
+    // Saved: a new start reads it back.
+    core.shared.consent().remembered.clear();
+    load(&core);
+    assert!(check(&core, "f2", CookieKind::Handover, false));
+    // Another kind still asks.
+    assert!(check(&core, "f2", CookieKind::Account, true));
+    assert_eq!(gate.asks(), 2);
+    let _ = fs::remove_dir_all(&core.dir);
+}
+
+#[test]
+fn yes_without_remember_covers_the_flow_only() {
+    let core = fresh();
+    let gate = yes(&core);
+    assert!(check(&core, "f1", CookieKind::Route, true));
+    assert!(check(&core, "f1", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 1);
+    assert!(check(&core, "f2", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 2);
+    // A no covers the flow too, and isn't kept past it.
+    let gate = no(&core);
+    assert!(!check(&core, "f3", CookieKind::Route, true));
+    assert!(!check(&core, "f3", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 1);
+    assert!(!check(&core, "f4", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 2);
+}
+
+#[test]
+fn quiet_never_asks() {
+    let core = fresh();
+    let gate = yes(&core);
+    assert!(!check(&core, "f", CookieKind::Handover, false));
+    assert_eq!(gate.asks(), 0);
+}
+
+#[test]
+fn reset_forgets_remembered_kinds() {
+    let core = core("reset");
+    let gate = yes(&core);
+    load(&core);
+    gate.answers.lock().unwrap().push_back(YES_REMEMBER);
+    assert!(check(&core, "f1", CookieKind::Route, true));
+    assert!(core.at(FILE).exists());
+    core.reset_cookie_consent("f".into()).unwrap();
+    assert!(core.cookie_consent_remembered("f".into()).is_empty());
+    assert!(!core.at(FILE).exists());
+    // The flow's yes went too.
+    assert!(!check(&core, "f1", CookieKind::Route, false));
+    let _ = fs::remove_dir_all(&core.dir);
+}
+
+#[test]
+fn another_student_forgets_remembered_kinds() {
+    let core = core("switch");
+    let gate = yes(&core);
+    load(&core);
+    gate.answers.lock().unwrap().push_back(YES_REMEMBER);
+    assert!(check(&core, "f", CookieKind::Handover, true));
+    fs::write(
+        core.at(ACCOUNT),
+        r#"{"username":"21BCE0001","password":"x"}"#,
+    )
+    .unwrap();
+    let account = Account {
+        username: "21BCE0002".into(),
+        password: "pw".into(),
+        rejected: false,
+        registration_number: None,
+    };
+    let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));
+    core.install(Some(slot.clone()));
+    core.save(&slot, &block_on(slot.read()));
+    assert!(core.cookie_consent_remembered("f".into()).is_empty());
+    assert!(!core.at(FILE).exists());
+    // Signing out forgets them too.
+    gate.answers.lock().unwrap().push_back(YES_REMEMBER);
+    assert!(check(&core, "f2", CookieKind::Route, true));
+    core.sign_out("f".into());
+    assert!(core.cookie_consent_remembered("f".into()).is_empty());
+    let _ = fs::remove_dir_all(&core.dir);
+}
+
+#[test]
+fn consent_lines_carry_kind_and_decision_and_no_secret() {
+    let captured = Captured::default();
+    let _second = tracing::Dispatch::new(tracing_subscriber::registry());
+    let subscriber = tracing_subscriber::registry().with(captured.clone());
+    tracing::subscriber::with_default(subscriber, || {
+        let core = fresh();
+        let _gate = install(&core, false, false);
+        block_on(allowed(
+            &core.shared,
+            "f",
+            CookieKind::Route,
+            "Fetch JSESSIONID=secret-cookie",
+            "vmate.aster0.dev/?token=secret-query",
+            true,
+        ));
+    });
+    let logs = captured.0.lock().unwrap();
+    assert!(logs.contains("kind=\"route\""), "{logs}");
+    assert!(logs.contains("decision=\"denied_unattended\""), "{logs}");
+    assert!(logs.contains("message=cookie consent"), "{logs}");
+    for secret in ["secret-cookie", "secret-query"] {
+        assert!(!logs.contains(secret), "{secret}: {logs}");
+    }
+}
+
+#[test]
+fn hosts_drop_the_scheme_and_path() {
+    assert_eq!(host("https://vmate.aster0.dev/"), "vmate.aster0.dev");
+    assert_eq!(
+        host("https://convex-site.aster0.dev/auth?x=1"),
+        "convex-site.aster0.dev"
+    );
+    assert_eq!(host("vmate.aster0.dev"), "vmate.aster0.dev");
+}

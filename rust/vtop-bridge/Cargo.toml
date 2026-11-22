@@ -1,7 +1,9 @@
 [package]
 name = "vtop-bridge"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+license = "MIT"
+publish = false
 description = "The engine: VTOP sessions, sign-in and the MCP tools for the Cloudflare edge"
 
 [dependencies]
@@ -29,3 +31,6 @@ tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 wiremock = "0.6"
 url = "2"
+
+[lints]
+workspace = true

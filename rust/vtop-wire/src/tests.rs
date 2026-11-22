@@ -1,3 +1,8 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the fake peers send to sockets and channels that may already be gone"
+)]
+
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -8,7 +13,7 @@ use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
-use crate::client::{fetch, fetch_over, ClientConfig, WireError};
+use crate::client::{ClientConfig, WireError, fetch, fetch_over};
 use crate::fec;
 use crate::frame::{Keys, ReplayWindow, T_DATA};
 use crate::gateway::{Gateway, Token};
@@ -335,7 +340,7 @@ async fn nothing_listening_is_unreachable() {
     let (_, public) = crate::generate_keypair();
     let dir = state_dir("unreachable");
     // A long timeout: a gateway that never answers is given up on after `SILENT`.
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let got = fetch(
         &config(port, public, &dir),
         &ask(10),
@@ -355,7 +360,7 @@ async fn a_wrong_key_is_told_at_once() {
     let gw = spawn_gateway(None, 0, Duration::ZERO).await;
     let (_, other) = crate::generate_keypair();
     let dir = state_dir("wrong-key");
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     let got = fetch(
         &config(gw.port, other, &dir),
         &ask(10),
@@ -429,7 +434,7 @@ async fn a_new_gateway_key_starts_a_new_session() {
     // Another gateway (another key) on the same port: the saved session is
     // not offered to it, so no resets it cannot prove are waited out.
     let other = spawn_gateway(None, gw.port, Duration::ZERO).await;
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     let got = fetch(
         &config(other.port, other.public, &dir),
         &ask(100),
@@ -522,16 +527,17 @@ async fn a_replayed_message_1_runs_nothing() {
     let first = gw2.receive(&hs1, 0, from, now).unwrap();
     gw2.respond(first.token, answer(100), now);
     let _ = gw2.poll(now + Duration::from_secs(10)); // all of the genuine answer
-                                                     // The same message 1 again is a known ephemeral key: no new request.
+    // The same message 1 again is a known ephemeral key: no new request.
     assert!(gw2.receive(&hs1, 0, from, now).is_none());
     let later = now + Duration::from_secs(12);
     assert!(gw2.receive(&hs1, 0, from, later).is_none());
     // Only the cached HS2 goes back (smaller than message 1), never data.
     let out = gw2.poll(later);
     assert!(!out.is_empty());
-    assert!(out
-        .iter()
-        .all(|o| o.packet[0] == crate::frame::T_HS2 && o.packet.len() < hs1.len()));
+    assert!(
+        out.iter()
+            .all(|o| o.packet[0] == crate::frame::T_HS2 && o.packet.len() < hs1.len())
+    );
     // A gateway that forgot the ephemeral key still refuses the repeated timestamp.
     let mut gw3 = Gateway::new(vec![gw.private]);
     gw3.receive(&hs1, 0, from, now);
@@ -655,7 +661,7 @@ impl crate::client::Socket for std::net::UdpSocket {
 }
 
 /// Polls `work` on this thread until done: no runtime.
-fn block_on<F: std::future::Future>(work: F) -> F::Output {
+fn block_on<F: Future>(work: F) -> F::Output {
     struct Unpark(std::thread::Thread);
     impl std::task::Wake for Unpark {
         fn wake(self: Arc<Self>) {
@@ -709,8 +715,8 @@ async fn fetches_on_a_runtime_free_net() {
 /// keys. Phones on older builds and the gateway must keep agreeing on these.
 #[test]
 fn known_answers() {
-    use chacha20poly1305::aead::{Aead, KeyInit, Payload};
     use chacha20poly1305::ChaCha20Poly1305;
+    use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 
     let key: [u8; 32] = std::array::from_fn(|i| 0x80 + i as u8);
     let nonce: [u8; 12] = crate::unhex("070000004041424344454647")
@@ -758,7 +764,10 @@ fn known_answers() {
         .unwrap();
     let mut hs1 = [0u8; 256];
     let len = initiator.write_message(b"vm1", &mut hs1).unwrap();
-    assert_eq!(crate::hex(&hs1[..len]), "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22ceee0eda7cefc5af950f648062adf3c29edc2a5ac7c1ab4297f72530bb40de0b35a883bc2ba2be8abed7c0881a175cdb40195db3067eb9bc601995f9c74a8e16ea3997");
+    assert_eq!(
+        crate::hex(&hs1[..len]),
+        "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22ceee0eda7cefc5af950f648062adf3c29edc2a5ac7c1ab4297f72530bb40de0b35a883bc2ba2be8abed7c0881a175cdb40195db3067eb9bc601995f9c74a8e16ea3997"
+    );
     let mut responder = snow::Builder::new(crate::NOISE.parse().unwrap())
         .local_private_key(&gateway_private)
         .unwrap()

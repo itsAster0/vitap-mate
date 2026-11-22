@@ -9,23 +9,23 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::rejection::JsonRejection;
-use axum::extract::State;
-use axum::http::{header, HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
 use axum::Json;
+use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use futures::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use vtop_core::{SessionState, VtopClient, VtopError};
 use vtop_shared::engine::{PageBatch, PageFetch};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::BATCH;
 
+use crate::AppState;
 use crate::engine::require_secret;
 use crate::error::ApiError;
 use crate::page_pack;
 use crate::pages::{self, Args};
-use crate::AppState;
 
 /// How long VTOP gets for one page. Under the app's own 30 s limit, so the
 /// phone hears "VTOP is slow" from here instead of giving up.
@@ -46,14 +46,14 @@ pub async fn fetch(
     let client = client(&state, &session)?;
     let semester = request.semester.unwrap_or_default();
     let data = page(&client, &request.name, &semester, &request.args).await?;
-    if request.dictionary.as_deref() == Some(page_dictionary::id()) {
-        if let Some(packed) = page_pack::pack(&request.name, &data) {
-            return Ok((
-                [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
-                packed,
-            )
-                .into_response());
-        }
+    if request.dictionary.as_deref() == Some(page_dictionary::id())
+        && let Some(packed) = page_pack::pack(&request.name, &data)
+    {
+        return Ok((
+            [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
+            packed,
+        )
+            .into_response());
     }
     Ok(Json(serde_json::json!({ "data": data })).into_response())
 }
@@ -111,14 +111,14 @@ pub async fn fetch_batch(
         .collect();
     tracing::info!(pages = data.len(), "batch");
     let data = json!({ "data": data });
-    if request.dictionary.as_deref() == Some(page_dictionary::id()) {
-        if let Some(packed) = page_pack::pack(BATCH, &data["data"]) {
-            return Ok((
-                [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
-                packed,
-            )
-                .into_response());
-        }
+    if request.dictionary.as_deref() == Some(page_dictionary::id())
+        && let Some(packed) = page_pack::pack(BATCH, &data["data"])
+    {
+        return Ok((
+            [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
+            packed,
+        )
+            .into_response());
     }
     Ok(Json(data).into_response())
 }

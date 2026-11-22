@@ -1,0 +1,1126 @@
+//! Ready-to-draw records built from vtop-core's raw tables.
+
+use std::collections::{HashMap, HashSet};
+
+use vtop_core::dates;
+use vtop_core::types::{self as raw, AttendanceData, FullAttendanceData, TimetableData};
+
+use crate::pages::calendar::SemesterCalendar;
+
+/// Minimum attendance VIT requires, in percent.
+const THRESHOLD: f64 = 75.0;
+
+/// VTOP's day names, Monday first.
+const DAYS: [&str; 7] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum ClassKind {
+    Theory,
+    Lab,
+}
+
+impl From<raw::ClassKind> for ClassKind {
+    fn from(kind: raw::ClassKind) -> Self {
+        match kind {
+            raw::ClassKind::Theory => Self::Theory,
+            raw::ClassKind::Lab => Self::Lab,
+        }
+    }
+}
+
+/// One semester as VTOP names it, with the name split for display:
+/// "Winter Semester 2024-25 Freshers" is season "Winter", year "2024-25",
+/// note "Freshers". A name that does not follow that shape is all `season`.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Semester {
+    pub id: String,
+    pub name: String,
+    pub season: String,
+    pub year: String,
+    pub note: String,
+}
+
+impl Semester {
+    pub(crate) fn new(id: String, name: String) -> Self {
+        let words: Vec<&str> = name.split_whitespace().collect();
+        let (season, year, note) = match words.as_slice() {
+            [season, kind, year, note @ ..]
+                if kind.eq_ignore_ascii_case("semester")
+                    && year.len() >= 7
+                    && year.chars().take(4).all(|c| c.is_ascii_digit())
+                    && year.as_bytes().get(4) == Some(&b'-') =>
+            {
+                let mut season = season.to_lowercase();
+                if let Some(first) = season.get_mut(0..1) {
+                    first.make_ascii_uppercase();
+                }
+                (season, year.to_string(), note.join(" "))
+            }
+            _ => (name.trim().to_string(), String::new(), String::new()),
+        };
+        Self {
+            id,
+            name,
+            season,
+            year,
+            note,
+        }
+    }
+}
+
+/// VTOP's semesters, newest first, and the one pages are shown for: the
+/// student's pick, none until they pick one (pages fail with
+/// [`crate::CoreError::SemesterNeeded`] meanwhile).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Semesters {
+    pub items: Vec<Semester>,
+    pub selected: Option<String>,
+    /// Unix seconds.
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Attendance {
+    pub semester_id: String,
+    /// Unix seconds.
+    pub updated_at: i64,
+    pub courses: Vec<AttendanceCourse>,
+}
+
+/// One course. `attended`, `total` and `percent` are VTOP's; the standing
+/// (`safe`, `can_skip`, `must_attend`, `advice`) follows VTOP's percentage
+/// and counts labs in two-period sessions, like the Flutter card.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct AttendanceCourse {
+    /// `<code>.theory` or `<code>.lab`: the course's key in the app and in
+    /// [`AttendanceDetail`] calls.
+    pub key: String,
+    /// VTOP's ids for the per-class history page.
+    pub course_id: String,
+    pub course_type: String,
+    pub code: String,
+    pub name: String,
+    pub kind: ClassKind,
+    pub category: String,
+    pub faculty: String,
+    pub attended: i32,
+    pub total: i32,
+    /// The classes VTOP's percentage is over: `total` less the classes held
+    /// but not posted yet, which VTOP's total counts and its percentage does
+    /// not.
+    pub counted: i32,
+    /// VTOP's rounded figure when it sends one, else computed.
+    pub percent: f64,
+    pub safe: bool,
+    pub can_skip: i32,
+    pub must_attend: i32,
+    /// "Can skip 3", "Attend 2 labs", "Don't skip" or "No classes yet".
+    pub advice: String,
+    pub debarred: bool,
+    /// What VTOP's debar status says, when it debars.
+    pub debar: Option<Debar>,
+    /// The debarment in one line: "Debarred for CAT-II · Permitted · Clear
+    /// for FAT", or "… · Clear for FAT at 3 more" while below 75%.
+    pub debar_line: Option<String>,
+}
+
+/// A debarment, which holds for one exam: attendance is checked again
+/// before the next.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Debar {
+    /// "CAT-I", "CAT-II", "FAT" (the calendar's names), or VTOP's text;
+    /// empty when VTOP names none.
+    pub exam: String,
+    /// VTOP's "Debarred & Permitted": let in after all.
+    pub permitted: bool,
+    /// The exam attendance is checked for next ("FAT" after "CAT-II").
+    pub next_exam: Option<String>,
+}
+
+impl Debar {
+    /// "CAT - II : Debarred & Permitted" → CAT-II, permitted, next FAT.
+    fn parse(raw: &str) -> Option<Self> {
+        let lower = raw.to_lowercase();
+        if !lower.contains("debar") {
+            return None;
+        }
+        let exam = raw.split_once(':').map_or(String::new(), |(exam, _)| {
+            crate::pages::calendar::exam_name(exam)
+        });
+        let next_exam = match exam.as_str() {
+            "CAT-I" => Some("CAT-II".to_string()),
+            "CAT-II" => Some("FAT".to_string()),
+            _ => None,
+        };
+        Some(Self {
+            exam,
+            permitted: lower.contains("permit"),
+            next_exam,
+        })
+    }
+
+    /// [`AttendanceCourse::debar_line`] for a course standing at `plan`.
+    fn line(&self, plan: &Standing, lab: bool) -> String {
+        let mut parts = vec![if self.exam.trim().is_empty() {
+            "Debarred".to_string()
+        } else {
+            format!("Debarred for {}", self.exam)
+        }];
+        if self.permitted {
+            parts.push("Permitted".to_string());
+        }
+        if let Some(next) = &self.next_exam {
+            parts.push(if plan.safe {
+                format!("Clear for {next}")
+            } else {
+                let n = plan.must_attend;
+                format!("Clear for {next} at {n}{} more", labs(lab, n))
+            });
+        }
+        parts.join(" · ")
+    }
+}
+
+/// One course's class-by-class attendance.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct AttendanceDetail {
+    /// The course as the saved attendance has it.
+    pub course: AttendanceCourse,
+    /// Unix seconds.
+    pub updated_at: i64,
+    /// Newest first; a lab session is one class.
+    pub classes: Vec<AttendedClass>,
+    /// Posted classes by status.
+    pub present: i32,
+    pub on_duty: i32,
+    pub absent: i32,
+    /// Present or on duty in a row, back from the newest posted class;
+    /// only an absence breaks it, and a cancelled class is skipped.
+    pub streak: i32,
+    /// The day of the newest absence.
+    pub last_missed: Option<i32>,
+    /// Until the next exam (when one comes before the last class day), then
+    /// until the semester's end; none without a saved academic calendar.
+    pub plans: Vec<AttendancePlan>,
+}
+
+/// One course's [`AttendancePlan`] for the list, by [`AttendanceCourse::key`].
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct CourseOutlook {
+    pub key: String,
+    pub plan: AttendancePlan,
+}
+
+/// What the rest of the semester, or the time until an exam, holds for a
+/// course; labs in sessions. From the saved timetable and academic calendar.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct AttendancePlan {
+    /// The exam's name ("CAT-II", "FAT"), or empty for the semester's end.
+    pub until: String,
+    /// The day counting stops before (the exam's first day, or the day after
+    /// the last class day).
+    pub until_day: i32,
+    /// Attended and held as VTOP's percentage counts them.
+    pub attended: i32,
+    pub held: i32,
+    /// Classes still to come from now, by the timetable and calendar.
+    pub upcoming: i32,
+    /// Held but not posted yet (VTOP's total less what its percentage counts).
+    pub unposted: i32,
+    /// Of `upcoming + unposted`, how many can be missed to finish at 75%.
+    pub can_miss: i32,
+    /// How many must be attended to finish at 75%; none when even all of
+    /// them are not enough.
+    pub must_attend: Option<i32>,
+    /// The percentage when every one left is attended.
+    pub best_percent: f64,
+    /// The days of `upcoming`, oldest first, with how many classes each holds.
+    pub days: Vec<PlanDay>,
+}
+
+/// A day still to come with classes of the course (sessions for labs).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct PlanDay {
+    /// Days since 1970-01-01.
+    pub day: i32,
+    pub classes: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct AttendedClass {
+    /// Days since 1970-01-01.
+    pub day: i32,
+    /// 0 = Monday.
+    pub weekday: i32,
+    /// "A1", or "L10+L11" for a lab.
+    pub slot: String,
+    /// Minutes since midnight, when VTOP gives the time.
+    pub start: Option<i32>,
+    pub end: Option<i32>,
+    /// None until VTOP posts it.
+    pub status: Option<ClassStatus>,
+    /// VTOP's remark ("Medical", "No punch found ...").
+    pub remark: String,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Timetable {
+    pub semester_id: String,
+    /// Unix seconds.
+    pub updated_at: i64,
+    /// By day, then start; back-to-back periods of a lab are one slot.
+    pub slots: Vec<ClassSlot>,
+    pub courses: Vec<Course>,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ClassSlot {
+    /// 0 = Monday.
+    pub day: i32,
+    /// Minutes since midnight.
+    pub start: i32,
+    pub end: i32,
+    pub code: String,
+    pub name: String,
+    pub kind: ClassKind,
+    pub room: String,
+    pub block: String,
+    /// "A1", or "L1+L2" for a merged lab.
+    pub slot: String,
+    pub faculty: String,
+    pub credits: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Course {
+    pub code: String,
+    pub name: String,
+    pub kind: ClassKind,
+    pub credits: Option<f64>,
+}
+
+/// One day of the agenda.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct TimetableDay {
+    /// Days since 1970-01-01, local.
+    pub day: i32,
+    pub classes: Vec<DayClass>,
+    pub mark: Option<CalendarMark>,
+    /// The calendar's name for the day ("Deepavali", "CAT - I").
+    pub title: Option<String>,
+    pub holds_theory: bool,
+    pub last_class_day: bool,
+    pub papers: Vec<ExamPaper>,
+    pub class_days_left: i32,
+    pub upcoming_exam: Option<ExamStart>,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct DayClass {
+    pub slot: ClassSlot,
+    pub state: ClassDay,
+    /// The course's last class of the semester.
+    pub last_class: bool,
+    /// What the attendance history says, once posted.
+    pub posted: Option<ClassStatus>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ClassDay {
+    Held,
+    LabFat,
+    Off,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum CalendarMark {
+    Exam,
+    LabFat,
+    Holiday,
+    NoClasses,
+    Special,
+    Classes,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ClassStatus {
+    Present,
+    OnDuty,
+    Absent,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ExamPaper {
+    pub name: String,
+    pub course: String,
+    pub day: i32,
+    /// Minutes since midnight.
+    pub start: Option<i32>,
+}
+
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ExamStart {
+    pub name: String,
+    pub day: i32,
+}
+
+/// `count` days of the weekly timetable from epoch day `from_day`, shaped by
+/// the academic calendar when there is one (holidays and exams have no
+/// classes, labs on Lab FAT days are the lab exam, working days follow the
+/// weekday they name), like the Flutter agenda.
+pub(crate) fn timetable_days(
+    slots: &[ClassSlot],
+    from_day: i32,
+    count: i32,
+    calendar: Option<&SemesterCalendar>,
+) -> Vec<TimetableDay> {
+    let calendar = calendar.filter(|calendar| !calendar.is_empty());
+    // The weekdays each course has labs on, for its Lab FAT day.
+    let lab_days = |code: &str| -> Vec<i32> {
+        slots
+            .iter()
+            .filter(|slot| slot.kind == ClassKind::Lab && slot.code == code)
+            .map(|slot| slot.day)
+            .collect()
+    };
+    let state = |slot: &ClassSlot, day: i32| match calendar {
+        Some(calendar) => {
+            let lab = slot.kind == ClassKind::Lab;
+            calendar.class_day(
+                day,
+                lab,
+                &if lab {
+                    lab_days(&slot.code)
+                } else {
+                    Vec::new()
+                },
+            )
+        }
+        None => ClassDay::Held,
+    };
+    let schedule = |day: i32| -> Vec<&ClassSlot> {
+        let weekday = calendar.map_or_else(|| weekday(day), |calendar| calendar.weekday_of(day));
+        slots.iter().filter(|slot| slot.day == weekday).collect()
+    };
+    let last_day = calendar.and_then(SemesterCalendar::last_class_day);
+    // Days from `from_day` to the last class day on which a class meets.
+    let class_days: Vec<i32> = last_day.map_or_else(Vec::new, |last| {
+        (from_day..=last)
+            .filter(|&day| {
+                schedule(day)
+                    .iter()
+                    .any(|slot| state(slot, day) != ClassDay::Off)
+            })
+            .collect()
+    });
+    // The day each course (code, kind) meets for the last time, looking back
+    // from the last class day.
+    let mut last_class: HashMap<(&str, ClassKind), i32> = HashMap::new();
+    if let (Some(last), Some(first)) = (
+        last_day,
+        calendar.and_then(SemesterCalendar::first_class_day),
+    ) {
+        let courses = slots
+            .iter()
+            .map(|slot| (slot.code.as_str(), slot.kind))
+            .collect::<HashSet<_>>()
+            .len();
+        let mut day = last;
+        while day >= first && last_class.len() < courses {
+            for slot in schedule(day) {
+                if state(slot, day) == ClassDay::Held {
+                    last_class
+                        .entry((slot.code.as_str(), slot.kind))
+                        .or_insert(day);
+                }
+            }
+            day -= 1;
+        }
+    }
+    (from_day..from_day + count.max(0))
+        .map(|day| {
+            let classes: Vec<DayClass> = schedule(day)
+                .into_iter()
+                .map(|slot| {
+                    let state = state(slot, day);
+                    DayClass {
+                        slot: slot.clone(),
+                        state,
+                        last_class: state == ClassDay::Held
+                            && last_class.get(&(slot.code.as_str(), slot.kind)) == Some(&day),
+                        posted: None,
+                    }
+                })
+                .collect();
+            let (mark, title) = calendar
+                .and_then(|calendar| calendar.mark_on(day))
+                .map_or((None, None), |(mark, title)| (Some(mark), Some(title)));
+            TimetableDay {
+                day,
+                holds_theory: match calendar {
+                    Some(calendar) if calendar.covers(day) => calendar.holds_classes(day, false),
+                    _ => !classes.is_empty(),
+                },
+                classes,
+                mark,
+                title,
+                last_class_day: last_day == Some(day),
+                papers: Vec::new(),
+                class_days_left: (class_days.len() - class_days.partition_point(|&d| d <= day))
+                    as i32,
+                upcoming_exam: calendar
+                    .and_then(|calendar| calendar.upcoming_exam(day))
+                    .map(|(day, name)| ExamStart { name, day }),
+            }
+        })
+        .collect()
+}
+
+/// When a course (code and kind) meets next.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct NextClass {
+    pub code: String,
+    pub kind: ClassKind,
+    /// 0 = today, 7 = the same weekday next week.
+    pub days_ahead: i32,
+    /// Minutes since midnight.
+    pub start: i32,
+}
+
+/// The next class of each course from `now_unix` (local time at
+/// `utc_offset_minutes`), soonest first; a class today counts once it has
+/// not started yet. Without a calendar, the weekly timetable a week ahead.
+/// With one, four weeks ahead by its rules, as in [`timetable_days`]:
+/// holidays, exams and no-class days skipped, working days following
+/// another day's order, labs stopping at the Lab FAT.
+pub(crate) fn next_classes(
+    slots: &[ClassSlot],
+    now_unix: i64,
+    utc_offset_minutes: i32,
+    calendar: Option<&SemesterCalendar>,
+) -> Vec<NextClass> {
+    let calendar = calendar.filter(|calendar| !calendar.is_empty());
+    let local = now_unix + i64::from(utc_offset_minutes) * 60;
+    let today = local.div_euclid(86_400) as i32;
+    let minute = (local.rem_euclid(86_400) / 60) as i32;
+    let lab_days = |code: &str| -> Vec<i32> {
+        slots
+            .iter()
+            .filter(|slot| slot.kind == ClassKind::Lab && slot.code == code)
+            .map(|slot| slot.day)
+            .collect()
+    };
+    let mut next: Vec<NextClass> = Vec::new();
+    for days_ahead in 0..=if calendar.is_some() { 28 } else { 7 } {
+        let day = today + days_ahead;
+        let order = calendar.map_or_else(|| weekday(day), |calendar| calendar.weekday_of(day));
+        let mut meeting: Vec<&ClassSlot> = slots
+            .iter()
+            .filter(|slot| slot.day == order && (days_ahead > 0 || slot.start > minute))
+            .collect();
+        meeting.sort_by_key(|slot| slot.start);
+        for slot in meeting {
+            if next
+                .iter()
+                .any(|known| known.code == slot.code && known.kind == slot.kind)
+            {
+                continue;
+            }
+            let lab = slot.kind == ClassKind::Lab;
+            let held = calendar.is_none_or(|calendar| {
+                calendar.class_day(
+                    day,
+                    lab,
+                    &if lab {
+                        lab_days(&slot.code)
+                    } else {
+                        Vec::new()
+                    },
+                ) == ClassDay::Held
+            });
+            if held {
+                next.push(NextClass {
+                    code: slot.code.clone(),
+                    kind: slot.kind,
+                    days_ahead,
+                    start: slot.start,
+                });
+            }
+        }
+    }
+    next.sort_by_key(|class| (class.days_ahead, class.start));
+    next
+}
+
+/// Puts each held class's status from `histories` (by course code and
+/// kind, as [`AttendanceDetail::classes`]) on `days`: the history row of
+/// that date with the same slot, else the same start, else the next unused
+/// one. Not posted stays none.
+pub(crate) fn fill_posted(
+    days: &mut [TimetableDay],
+    histories: &HashMap<(String, ClassKind), Vec<AttendedClass>>,
+) {
+    for day in days {
+        let mut used: HashMap<(String, ClassKind), Vec<usize>> = HashMap::new();
+        for class in &mut day.classes {
+            if class.state != ClassDay::Held {
+                continue;
+            }
+            let key = (class.slot.code.clone(), class.slot.kind);
+            let Some(rows) = histories.get(&key) else {
+                continue;
+            };
+            let used = used.entry(key).or_default();
+            let free: Vec<(usize, &AttendedClass)> = rows
+                .iter()
+                .enumerate()
+                .filter(|(i, row)| row.day == day.day && !used.contains(i))
+                .collect();
+            let pick = free
+                .iter()
+                .find(|(_, row)| row.slot == class.slot.slot)
+                .or_else(|| {
+                    free.iter()
+                        .find(|(_, row)| row.start == Some(class.slot.start))
+                })
+                .or_else(|| free.first());
+            if let Some((i, row)) = pick {
+                used.push(*i);
+                class.posted = row.status;
+            }
+        }
+    }
+}
+
+/// Whether a saved history matches `course`'s summary: as many classes
+/// attended (present or on duty) and listed (posted or not) as VTOP counts,
+/// labs twice. A history behind the summary is fetched again.
+pub(crate) fn history_in_sync(course: &AttendanceCourse, classes: &[AttendedClass]) -> bool {
+    let factor = if course.kind == ClassKind::Lab { 2 } else { 1 };
+    let attended = classes
+        .iter()
+        .filter(|class| {
+            matches!(
+                class.status,
+                Some(ClassStatus::Present | ClassStatus::OnDuty)
+            )
+        })
+        .count() as i32;
+    attended * factor == course.attended && classes.len() as i32 * factor == course.total
+}
+
+/// The last day VTOP's summary covers: the latest class in a history that
+/// matches it (Flutter's `countedThrough`).
+pub(crate) fn counted_through(course: &AttendanceCourse, classes: &[AttendedClass]) -> Option<i32> {
+    history_in_sync(course, classes)
+        .then(|| classes.iter().map(|class| class.day).max())
+        .flatten()
+}
+
+/// Where a course stands against 75%, with the strict arithmetic of the
+/// attendance calculator.
+#[derive(Debug, PartialEq)]
+struct Standing {
+    safe: bool,
+    can_skip: i32,
+    must_attend: i32,
+    advice: String,
+}
+
+/// The standing for `attended` of `total` classes. VTOP's `reported`
+/// percentage decides safe or not (it is what debars); the counts only say
+/// by how much, and never contradict it.
+/// `lab` names the unit in the advice ("Attend 2 labs").
+fn standing(attended: i32, total: i32, reported: Option<f64>, lab: bool) -> Standing {
+    let (a, t) = (i64::from(attended), i64::from(total));
+    let by_counts = t == 0 || a as f64 / t as f64 * 100.0 >= THRESHOLD;
+    let safe = match reported {
+        Some(percent) if t > 0 => percent >= THRESHOLD,
+        _ => by_counts,
+    };
+    let (can_skip, must_attend) = if safe {
+        let skip = if t == 0 {
+            0
+        } else {
+            (4 * a - 3 * t).div_euclid(3)
+        };
+        (skip.max(0) as i32, 0)
+    } else {
+        (0, (3 * t - 4 * a).max(1) as i32)
+    };
+    let advice = match () {
+        _ if t == 0 => "No classes yet".to_string(),
+        _ if !safe => format!("Attend {must_attend}{}", labs(lab, must_attend)),
+        _ if can_skip == 0 => "Don't skip".to_string(),
+        _ => format!("Can skip {can_skip}{}", labs(lab, can_skip)),
+    };
+    Standing {
+        safe,
+        can_skip,
+        must_attend,
+        advice,
+    }
+}
+
+/// " lab" / " labs" after a count for labs, which count in sessions;
+/// nothing for theory.
+fn labs(lab: bool, n: i32) -> &'static str {
+    match (lab, n) {
+        (false, _) => "",
+        (true, 1) => " lab",
+        (true, _) => " labs",
+    }
+}
+
+/// The longest run of present or on duty in `classes` (day, start, status),
+/// by time; only an absence breaks it, and classes not posted yet or
+/// cancelled neither extend nor break it. Its length, first day and last day.
+pub(crate) fn longest_run(
+    classes: &[(i32, Option<i32>, Option<ClassStatus>)],
+) -> Option<(i32, i32, i32)> {
+    let mut classes = classes.to_vec();
+    classes.sort_by_key(|&(day, start, _)| (day, start));
+    let (mut best, mut run) = (None, None);
+    for (day, _, status) in classes {
+        match status {
+            None | Some(ClassStatus::Other) => {}
+            Some(ClassStatus::Present | ClassStatus::OnDuty) => {
+                let (length, first, _) = run.unwrap_or((0, day, day));
+                let next = (length + 1, first, day);
+                run = Some(next);
+                if best.is_none_or(|(most, _, _)| next.0 > most) {
+                    best = Some(next);
+                }
+            }
+            Some(ClassStatus::Absent) => run = None,
+        }
+    }
+    best
+}
+
+/// The total VTOP's whole-number `reported` percentage of `attended` is
+/// over: the largest from `attended` to `total` that gives it, rounded up as
+/// VTOP rounds (31 of 34 is 92%). VTOP's total counts classes not posted
+/// yet, its percentage does not. `total` when nothing matches.
+fn counted_total(attended: i32, total: i32, reported: Option<f64>) -> i32 {
+    let Some(percent) = reported.filter(|percent| percent.fract() == 0.0) else {
+        return total;
+    };
+    let a = i64::from(attended) * 100;
+    (attended.max(1)..=total)
+        .rev()
+        .find(|&t| {
+            let t = i64::from(t);
+            ((a + t - 1) / t) as f64 == percent
+        })
+        .unwrap_or(total)
+}
+
+/// The course's plans from `today` at `minute` (local, India): classes of
+/// its kind in `slots` on each day `calendar` holds them (a lab session is
+/// one slot), today's only when not started; until the next exam and until
+/// the last class day. Not posted: what VTOP lists as such, plus the classes
+/// held after `counted_through` (the last day VTOP's summary covers) up to
+/// now. Strict 75% arithmetic, like the calculator.
+pub(crate) fn attendance_plans(
+    course: &AttendanceCourse,
+    slots: &[ClassSlot],
+    calendar: &SemesterCalendar,
+    today: i32,
+    minute: i32,
+    counted_through: Option<i32>,
+) -> Vec<AttendancePlan> {
+    let Some(last) = calendar.last_class_day() else {
+        return Vec::new();
+    };
+    let lab = course.kind == ClassKind::Lab;
+    let (attended, held, unposted) = if lab {
+        (
+            course.attended / 2,
+            (course.counted + 1) / 2,
+            (course.total - course.counted + 1) / 2,
+        )
+    } else {
+        (
+            course.attended,
+            course.counted,
+            course.total - course.counted,
+        )
+    };
+    let mine: Vec<&ClassSlot> = slots
+        .iter()
+        .filter(|slot| slot.code == course.code && slot.kind == course.kind)
+        .collect();
+    let meetings = |day: i32| -> Vec<&&ClassSlot> {
+        let weekday = calendar.weekday_of(day);
+        mine.iter().filter(|slot| slot.day == weekday).collect()
+    };
+    // Held since the summary's last day, not on VTOP yet.
+    let unposted = unposted
+        + counted_through
+            .filter(|&through| through < today)
+            .map_or(0, |through| {
+                (through + 1..=today.min(last))
+                    .filter(|&day| calendar.holds_classes(day, lab))
+                    .map(|day| {
+                        meetings(day)
+                            .into_iter()
+                            .filter(|slot| day < today || slot.start <= minute)
+                            .count() as i32
+                    })
+                    .sum()
+            });
+    let upcoming = |until_day: i32| -> Vec<PlanDay> {
+        (today..until_day.min(last + 1))
+            .filter(|&day| calendar.holds_classes(day, lab))
+            .map(|day| {
+                let weekday = calendar.weekday_of(day);
+                let classes = mine
+                    .iter()
+                    .filter(|slot| slot.day == weekday && (day > today || slot.start > minute))
+                    .count() as i32;
+                PlanDay { day, classes }
+            })
+            .filter(|day| day.classes > 0)
+            .collect()
+    };
+    let plan = |until: String, until_day: i32| {
+        let days = upcoming(until_day);
+        let upcoming = days.iter().map(|day| day.classes).sum();
+        let left = i64::from(upcoming + unposted);
+        let (a, t) = (i64::from(attended), i64::from(held));
+        let total = t + left;
+        let must = (3 * total - 4 * a + 3).div_euclid(4).max(0);
+        AttendancePlan {
+            until,
+            until_day,
+            attended,
+            held,
+            upcoming,
+            unposted,
+            can_miss: (4 * (a + left) - 3 * total).div_euclid(4).clamp(0, left) as i32,
+            must_attend: (must <= left).then_some(must as i32),
+            best_percent: if total == 0 {
+                0.0
+            } else {
+                (a + left) as f64 / total as f64 * 100.0
+            },
+            days,
+        }
+    };
+    let mut plans = Vec::new();
+    if let Some((day, name)) = calendar
+        .upcoming_exam(today)
+        .filter(|(day, _)| *day <= last)
+    {
+        plans.push(plan(name, day));
+    }
+    plans.push(plan(String::new(), last + 1));
+    plans
+}
+
+/// Now in India (VIT-AP's time zone): days since 1970-01-01 and minutes
+/// since midnight.
+pub(crate) fn ist_now() -> (i32, i32) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs() as i64)
+        + 19_800;
+    (
+        now.div_euclid(86_400) as i32,
+        (now.rem_euclid(86_400) / 60) as i32,
+    )
+}
+
+/// "CSE2001 - Data Structures - Embedded Theory" → ("CSE2001", "Data
+/// Structures"). Without separators the name is kept and `code` used.
+fn split_course_name(full: &str, code: &str) -> (String, String) {
+    let parts: Vec<&str> = full.split(" - ").map(str::trim).collect();
+    match parts.as_slice() {
+        [code, name] => (code.to_string(), name.to_string()),
+        [code, name @ .., _kind] => (code.to_string(), name.join(" - ")),
+        _ => (code.trim().to_string(), full.trim().to_string()),
+    }
+}
+
+/// "PRASHANTH KUMAR - SCOPE" → "Prashanth Kumar". Mixed-case names are
+/// kept so initials like "Md" survive.
+fn person_name(raw: &str) -> String {
+    let name = raw
+        .rfind('-')
+        .filter(|&i| i > 0)
+        .and_then(|i| raw.get(..i))
+        .unwrap_or(raw)
+        .trim();
+    if name != name.to_uppercase() {
+        return name.to_string();
+    }
+    let word = |w: &str| match w.chars().next() {
+        Some(first) if w.chars().count() > 1 && !w.contains('.') => {
+            format!(
+                "{first}{}",
+                w.get(first.len_utf8()..).unwrap_or_default().to_lowercase()
+            )
+        }
+        _ => w.to_string(),
+    };
+    name.split_whitespace()
+        .map(word)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// "08:00", "2:05 PM" → minutes since midnight.
+pub(crate) fn minutes(raw: &str) -> Option<i32> {
+    let upper = raw.trim().to_ascii_uppercase();
+    let (clock, pm) = match (upper.strip_suffix("PM"), upper.strip_suffix("AM")) {
+        (Some(clock), _) => (clock, Some(true)),
+        (_, Some(clock)) => (clock, Some(false)),
+        _ => (upper.as_str(), None),
+    };
+    let (hour, minute) = clock.trim().split_once(':')?;
+    let (mut hour, minute): (i32, i32) = (hour.trim().parse().ok()?, minute.trim().parse().ok()?);
+    match pm {
+        Some(true) if hour != 12 => hour += 12,
+        Some(false) if hour == 12 => hour = 0,
+        _ => {}
+    }
+    ((0..24).contains(&hour) && (0..60).contains(&minute)).then_some(hour * 60 + minute)
+}
+
+fn credits(raw: &str) -> Option<f64> {
+    raw.trim().parse().ok()
+}
+
+impl From<AttendanceData> for Attendance {
+    fn from(data: AttendanceData) -> Self {
+        let course = |record: raw::AttendanceRecord| {
+            let attended = record.classes_attended.trim().parse().unwrap_or(0);
+            let total: i32 = record.total_classes.trim().parse().unwrap_or(0);
+            let lab = record.course_type.ends_with("LA") || record.course_type.ends_with("LO");
+            let reported: Option<f64> = record
+                .attendance_percentage
+                .replace('%', "")
+                .trim()
+                .parse()
+                .ok();
+            let counted = counted_total(attended, total, reported);
+            // Labs meet in two-period sessions VTOP counts twice; an odd total
+            // rounds up and an odd attended count down.
+            let plan = if lab {
+                standing(attended / 2, (counted + 1) / 2, reported, true)
+            } else {
+                standing(attended, counted, reported, false)
+            };
+            let computed = if counted == 0 {
+                0.0
+            } else {
+                f64::from(attended) / f64::from(counted) * 100.0
+            };
+            let (code, name) = split_course_name(&record.course_name, &record.course_code);
+            let debar = Debar::parse(&record.debar_status);
+            let debar_line = debar.as_ref().map(|debar| debar.line(&plan, lab));
+            AttendanceCourse {
+                key: format!("{code}.{}", if lab { "lab" } else { "theory" }),
+                code,
+                name,
+                kind: if lab {
+                    ClassKind::Lab
+                } else {
+                    ClassKind::Theory
+                },
+                category: record.category,
+                faculty: person_name(&record.faculty_detail),
+                attended,
+                total,
+                counted,
+                percent: reported.unwrap_or(computed),
+                safe: plan.safe,
+                can_skip: plan.can_skip,
+                must_attend: plan.must_attend,
+                advice: plan.advice,
+                debarred: debar.is_some(),
+                debar,
+                debar_line,
+                course_id: record.course_id,
+                course_type: record.course_type,
+            }
+        };
+        Self {
+            semester_id: data.semester_id,
+            updated_at: data.update_time as i64,
+            courses: data.records.into_iter().map(course).collect(),
+        }
+    }
+}
+
+impl AttendanceDetail {
+    pub(crate) fn new(
+        course: AttendanceCourse,
+        data: FullAttendanceData,
+        plans: Vec<AttendancePlan>,
+    ) -> Self {
+        let mut classes: Vec<AttendedClass> = data
+            .records
+            .into_iter()
+            .filter_map(|record| {
+                let day = history_day(&record.date)?;
+                // "WED / 11:00-12:40"
+                let time = record.day_time.rsplit('/').next().unwrap_or_default();
+                let (start, end) = time.split_once('-').unzip();
+                Some(AttendedClass {
+                    day,
+                    weekday: (day + 3).rem_euclid(7),
+                    slot: record.slot,
+                    start: start.and_then(minutes),
+                    end: end.and_then(minutes),
+                    status: match record.status.to_lowercase().replace(' ', "").as_str() {
+                        "present" => Some(ClassStatus::Present),
+                        "onduty" => Some(ClassStatus::OnDuty),
+                        "absent" => Some(ClassStatus::Absent),
+                        "notposted" | "" => None,
+                        _ => Some(ClassStatus::Other),
+                    },
+                    remark: record.remark,
+                })
+            })
+            .collect();
+        classes.sort_by_key(|class| (std::cmp::Reverse(class.day), std::cmp::Reverse(class.start)));
+        let posted = || classes.iter().filter_map(|class| class.status);
+        let count = |status| posted().filter(|&posted| posted == status).count() as i32;
+        Self {
+            course,
+            updated_at: data.update_time as i64,
+            present: count(ClassStatus::Present),
+            on_duty: count(ClassStatus::OnDuty),
+            absent: count(ClassStatus::Absent),
+            streak: posted()
+                .filter(|&status| status != ClassStatus::Other)
+                .take_while(|status| matches!(status, ClassStatus::Present | ClassStatus::OnDuty))
+                .count() as i32,
+            last_missed: classes
+                .iter()
+                .find(|class| class.status == Some(ClassStatus::Absent))
+                .map(|class| class.day),
+            classes,
+            plans,
+        }
+    }
+}
+
+/// A history date, "19-11-2025" or "01-Jul-2026", as days since 1970-01-01.
+pub(crate) fn history_day(raw: &str) -> Option<i32> {
+    const MONTHS: [&str; 12] = [
+        "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+    ];
+    let mut parts = raw.trim().split('-').map(str::trim);
+    let day: u32 = parts.next()?.parse().ok()?;
+    let month = parts.next()?.to_lowercase();
+    let month = match month.parse::<u32>() {
+        Ok(month) => month,
+        Err(_) => MONTHS.iter().position(|name| month.starts_with(name))? as u32 + 1,
+    };
+    let year: u32 = parts.next()?.parse().ok()?;
+    epoch_day(&format!("{year:04}-{month:02}-{day:02}"))
+}
+
+impl From<TimetableData> for Timetable {
+    fn from(data: TimetableData) -> Self {
+        let mut slots: Vec<ClassSlot> = data
+            .slots
+            .into_iter()
+            .filter_map(|slot| {
+                Some(ClassSlot {
+                    day: DAYS
+                        .iter()
+                        .position(|day| slot.day.trim().eq_ignore_ascii_case(day))?
+                        as i32,
+                    start: minutes(&slot.start_time)?,
+                    end: minutes(&slot.end_time)?,
+                    code: slot.course_code,
+                    name: slot.name,
+                    kind: slot.kind.into(),
+                    room: slot.room_no,
+                    block: slot.block,
+                    slot: slot.slot,
+                    faculty: person_name(&slot.faculty),
+                    credits: credits(&slot.credits),
+                })
+            })
+            .collect();
+        slots.sort_by_key(|slot| (slot.day, slot.start));
+        // Join back-to-back periods of the same lab into one session.
+        let mut merged: Vec<ClassSlot> = Vec::with_capacity(slots.len());
+        for slot in slots {
+            match merged.last_mut() {
+                Some(prev)
+                    if prev.day == slot.day
+                        && prev.kind == ClassKind::Lab
+                        && slot.kind == ClassKind::Lab
+                        && prev.code == slot.code =>
+                {
+                    prev.end = slot.end;
+                    prev.slot = format!("{}+{}", prev.slot, slot.slot);
+                }
+                _ => merged.push(slot),
+            }
+        }
+        let courses = data
+            .courses
+            .into_iter()
+            .map(|course| Course {
+                kind: if course.course_type.to_lowercase().contains("lab") {
+                    ClassKind::Lab
+                } else {
+                    ClassKind::Theory
+                },
+                credits: credits(&course.credits),
+                code: course.course_code,
+                name: course.name,
+            })
+            .collect();
+        Self {
+            semester_id: data.semester_id,
+            updated_at: data.update_time as i64,
+            slots: merged,
+            courses,
+        }
+    }
+}
+
+/// Today in India, days since 1970-01-01.
+pub(crate) fn today_ist_day() -> i32 {
+    dates::today_in_india() as i32
+}
+
+/// 0 = Monday, for days since 1970-01-01 (a Thursday).
+pub(crate) fn weekday(day: i32) -> i32 {
+    (day + 3).rem_euclid(7)
+}
+
+/// Days since 1970-01-01 for a `YYYY-MM-DD`.
+pub(crate) fn epoch_day(date: &str) -> Option<i32> {
+    let mut parts = date.trim().splitn(3, '-');
+    let year: i64 = parts.next()?.parse().ok()?;
+    let month: i64 = parts.next()?.parse().ok()?;
+    let day: String = parts
+        .next()?
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    let day: i64 = day.parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    Some(dates::day_number(day, month, year) as i32)
+}
+
+/// `YYYY-MM-DD` for days since 1970-01-01.
+pub(crate) fn civil_date(days: i64) -> String {
+    let (year, month, day) = dates::civil_date(days);
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+#[cfg(test)]
+mod tests;

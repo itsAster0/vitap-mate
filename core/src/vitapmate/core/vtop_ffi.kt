@@ -665,21 +665,6 @@ internal interface UniffiCallbackInterfaceCookieGateMethod0 : com.sun.jna.Callba
 internal interface UniffiCallbackInterfaceCookieGateMethod1 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
-internal interface UniffiCallbackInterfaceSharedCookiesMethod0 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
-}
-internal interface UniffiCallbackInterfaceSharedCookiesMethod1 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`setCookies`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
-}
-internal interface UniffiCallbackInterfaceSharedCookiesMethod2 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
-}
-internal interface UniffiCallbackInterfaceSharedCookiesMethod3 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
-}
-internal interface UniffiCallbackInterfaceHttpTransportMethod0 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`request`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
-}
 internal interface UniffiCallbackInterfaceUdpNetworkMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: LongByReference,uniffiCallStatus: UniffiRustCallStatus,)
 }
@@ -694,6 +679,21 @@ internal interface UniffiCallbackInterfaceUdpSocketMethod1 : com.sun.jna.Callbac
 }
 internal interface UniffiCallbackInterfaceUdpSocketMethod2 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceSharedCookiesMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceSharedCookiesMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`setCookies`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceSharedCookiesMethod2 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceSharedCookiesMethod3 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceHttpTransportMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`request`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
 @Structure.FieldOrder("uniffiFree", "uniffiClone", "attended", "ask")
 internal open class UniffiVTableCallbackInterfaceCookieGate(
@@ -714,53 +714,6 @@ internal open class UniffiVTableCallbackInterfaceCookieGate(
         `uniffiClone` = other.`uniffiClone`
         `attended` = other.`attended`
         `ask` = other.`ask`
-    }
-
-}
-@Structure.FieldOrder("uniffiFree", "uniffiClone", "cookie", "setCookies", "clear", "flush")
-internal open class UniffiVTableCallbackInterfaceSharedCookies(
-    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
-    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
-    @JvmField internal var `cookie`: UniffiCallbackInterfaceSharedCookiesMethod0? = null,
-    @JvmField internal var `setCookies`: UniffiCallbackInterfaceSharedCookiesMethod1? = null,
-    @JvmField internal var `clear`: UniffiCallbackInterfaceSharedCookiesMethod2? = null,
-    @JvmField internal var `flush`: UniffiCallbackInterfaceSharedCookiesMethod3? = null,
-) : Structure() {
-    class UniffiByValue(
-        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
-        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
-        `cookie`: UniffiCallbackInterfaceSharedCookiesMethod0? = null,
-        `setCookies`: UniffiCallbackInterfaceSharedCookiesMethod1? = null,
-        `clear`: UniffiCallbackInterfaceSharedCookiesMethod2? = null,
-        `flush`: UniffiCallbackInterfaceSharedCookiesMethod3? = null,
-    ): UniffiVTableCallbackInterfaceSharedCookies(`uniffiFree`,`uniffiClone`,`cookie`,`setCookies`,`clear`,`flush`,), Structure.ByValue
-
-   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceSharedCookies) {
-        `uniffiFree` = other.`uniffiFree`
-        `uniffiClone` = other.`uniffiClone`
-        `cookie` = other.`cookie`
-        `setCookies` = other.`setCookies`
-        `clear` = other.`clear`
-        `flush` = other.`flush`
-    }
-
-}
-@Structure.FieldOrder("uniffiFree", "uniffiClone", "send")
-internal open class UniffiVTableCallbackInterfaceHttpTransport(
-    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
-    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
-    @JvmField internal var `send`: UniffiCallbackInterfaceHttpTransportMethod0? = null,
-) : Structure() {
-    class UniffiByValue(
-        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
-        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
-        `send`: UniffiCallbackInterfaceHttpTransportMethod0? = null,
-    ): UniffiVTableCallbackInterfaceHttpTransport(`uniffiFree`,`uniffiClone`,`send`,), Structure.ByValue
-
-   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceHttpTransport) {
-        `uniffiFree` = other.`uniffiFree`
-        `uniffiClone` = other.`uniffiClone`
-        `send` = other.`send`
     }
 
 }
@@ -811,6 +764,53 @@ internal open class UniffiVTableCallbackInterfaceUdpSocket(
     }
 
 }
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "cookie", "setCookies", "clear", "flush")
+internal open class UniffiVTableCallbackInterfaceSharedCookies(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `cookie`: UniffiCallbackInterfaceSharedCookiesMethod0? = null,
+    @JvmField internal var `setCookies`: UniffiCallbackInterfaceSharedCookiesMethod1? = null,
+    @JvmField internal var `clear`: UniffiCallbackInterfaceSharedCookiesMethod2? = null,
+    @JvmField internal var `flush`: UniffiCallbackInterfaceSharedCookiesMethod3? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `cookie`: UniffiCallbackInterfaceSharedCookiesMethod0? = null,
+        `setCookies`: UniffiCallbackInterfaceSharedCookiesMethod1? = null,
+        `clear`: UniffiCallbackInterfaceSharedCookiesMethod2? = null,
+        `flush`: UniffiCallbackInterfaceSharedCookiesMethod3? = null,
+    ): UniffiVTableCallbackInterfaceSharedCookies(`uniffiFree`,`uniffiClone`,`cookie`,`setCookies`,`clear`,`flush`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceSharedCookies) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `cookie` = other.`cookie`
+        `setCookies` = other.`setCookies`
+        `clear` = other.`clear`
+        `flush` = other.`flush`
+    }
+
+}
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "send")
+internal open class UniffiVTableCallbackInterfaceHttpTransport(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `send`: UniffiCallbackInterfaceHttpTransportMethod0? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `send`: UniffiCallbackInterfaceHttpTransportMethod0? = null,
+    ): UniffiVTableCallbackInterfaceHttpTransport(`uniffiFree`,`uniffiClone`,`send`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceHttpTransport) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `send` = other.`send`
+    }
+
+}
 
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
@@ -836,21 +836,17 @@ internal object IntegrityCheckingUniffiLib {
     }
 
     internal fun ensureInitialized() = Unit
-    external fun uniffi_vtop_ffi_checksum_func_set_cookie_gate(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_shared_cookies(
-    ): Int
     external fun uniffi_vtop_ffi_checksum_func_dev_configure(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_plan_gpa(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_semester_summary(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_pair_code(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_log_event(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_obs_init(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_gmail_otp(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_plan_gpa(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_semester_summary(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_check_general_outing(
     ): Int
@@ -860,101 +856,27 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_general_return_last_day(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_func_set_cookie_gate(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_pair_code(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_batched_pages(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_func_set_device_label(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_set_udp_network(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_set_shared_cookies(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_set_http_transport(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_vtop_intermediate_ca(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_udp_network(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_attendance_outlook(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_attendance(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_attendance_detail(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_calendar(
-    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_semesters(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_timetable(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cancel_otp(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_ensure_fresh_session(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_attendance(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_attendance_detail(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_calendar(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_semesters(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_timetable(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_mismatched_attendance_details(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_next_classes(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_resend_otp(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_saved_account(
-    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_select_semester(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_sign_in(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_sign_out(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_signed_in_user(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_stale_attendance_details(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_submit_otp(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_timetable_days(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_biometric(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_biometric_range(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_biometric(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_biometric_range(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_changes(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_changes_bytes(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_clear_changes(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_mark_changes_seen(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_mark_page_seen(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_trim_changes(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_unseen_change_ids(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_unseen_changes(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_course_page(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_course_view(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_course_file_link(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_course_plan_link(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_course_page(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_course_view(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_is_demo(
     ): Int
@@ -980,19 +902,63 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_push_token(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_attendance_outlook(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_attendance(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_attendance_detail(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_attendance(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_attendance_detail(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_mismatched_attendance_details(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_stale_attendance_details(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_biometric(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_biometric_range(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_biometric(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_biometric_range(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_calendar(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_calendar(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_changes_bytes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_clear_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_mark_changes_seen(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_mark_page_seen(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_trim_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_unseen_change_ids(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_unseen_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_course_page(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_course_view(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_course_file_link(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_course_plan_link(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_course_page(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_course_view(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_exams(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_exams(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_check_forwarding(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_forwarding_status(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_set_up_forwarding(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_grade_details(
     ): Int
@@ -1007,22 +973,6 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_grades(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_planner_courses(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_answer_session_request(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_connected_apps(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_create_key(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_link_phone(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_move_keys(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_pair_app(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_revoke_key(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_set_key_outings(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_marks(
     ): Int
@@ -1047,6 +997,50 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_cached_profile(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_profile(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_timetable(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_timetable(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_next_classes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_timetable_days(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cached_wrapped(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_wrapped_previous(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_wrapped_missing_days(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_check_forwarding(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_forwarding_status(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_up_forwarding(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_answer_session_request(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_connected_apps(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_create_key(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_link_phone(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_move_keys(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_pair_app(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_revoke_key(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_key_outings(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_route_status(
     ): Int
@@ -1080,27 +1074,27 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_server_options(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cancel_otp(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_ensure_fresh_session(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_resend_otp(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_saved_account(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_sign_in(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_sign_out(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_signed_in_user(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_submit_otp(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_web_session(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_cached_wrapped(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_fetch_wrapped_previous(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_wrapped_missing_days(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_cookiegate_attended(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_cookiegate_ask(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_cookie(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_set_cookies(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_clear(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_flush(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_httptransport_send(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_udpnetwork_open(
     ): Int
@@ -1111,6 +1105,16 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_udpsocket_receive(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_udpsocket_shutdown(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_cookie(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_set_cookies(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_clear(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_sharedcookies_flush(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_httptransport_send(
     ): Int
     external fun uniffi_vtop_ffi_checksum_constructor_core_new(
     ): Int
@@ -1145,94 +1149,12 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_constructor_core_new(`flow`: RustBuffer.ByValue,`dataDir`: RustBuffer.ByValue,`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_attendance_outlook(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_attendance_detail(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_calendar(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_cached_semesters(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_timetable(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cancel_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_ensure_fresh_session(`ptr`: Long,`flow`: RustBuffer.ByValue,`maxAgeSecs`: Long,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_attendance_detail(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseKey`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_calendar(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_fetch_semesters(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_timetable(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_mismatched_attendance_details(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_next_classes(`ptr`: Long,`flow`: RustBuffer.ByValue,`nowUnix`: Long,`utcOffsetMinutes`: Int,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_resend_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_saved_account(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_select_semester(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_sign_in(`ptr`: Long,`flow`: RustBuffer.ByValue,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_sign_out(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_signed_in_user(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_stale_attendance_details(`ptr`: Long,`flow`: RustBuffer.ByValue,`fromDay`: Int,`count`: Int,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_submit_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_timetable_days(`ptr`: Long,`flow`: RustBuffer.ByValue,`fromDay`: Int,`count`: Int,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_biometric(`ptr`: Long,`flow`: RustBuffer.ByValue,`day`: Int,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_biometric_range(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: Int,`to`: Int,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_biometric(`ptr`: Long,`flow`: RustBuffer.ByValue,`day`: Int,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_biometric_range(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: Int,`to`: Int,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_changes_bytes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_clear_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_mark_changes_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_mark_page_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,`page`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_trim_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,`maxBytes`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_unseen_change_ids(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_unseen_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    external fun uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_cached_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_course_file_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_course_plan_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
-    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_is_demo(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_vtop_ffi_fn_method_core_dev_clear_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1257,19 +1179,63 @@ internal object UniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_fn_method_core_set_push_token(`ptr`: Long,`flow`: RustBuffer.ByValue,`token`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_attendance_outlook(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cached_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cached_attendance_detail(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_attendance_detail(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseKey`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_mismatched_attendance_details(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_stale_attendance_details(`ptr`: Long,`flow`: RustBuffer.ByValue,`fromDay`: Int,`count`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cached_biometric(`ptr`: Long,`flow`: RustBuffer.ByValue,`day`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cached_biometric_range(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: Int,`to`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_biometric(`ptr`: Long,`flow`: RustBuffer.ByValue,`day`: Int,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_biometric_range(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: Int,`to`: Int,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_cached_calendar(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_calendar(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_changes_bytes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_clear_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_mark_changes_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_mark_page_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,`page`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_trim_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,`maxBytes`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_unseen_change_ids(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_unseen_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Int
+    external fun uniffi_vtop_ffi_fn_method_core_cached_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_course_file_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_course_plan_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_check_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_forwarded_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`since`: Long,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_forwarding_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_set_up_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_grade_details(`ptr`: Long,`flow`: RustBuffer.ByValue,`semesterId`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1285,22 +1251,6 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_planner_courses(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_answer_session_request(`ptr`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`callbackUrl`: RustBuffer.ByValue,`error`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_connected_apps(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_link_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_move_keys(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_pair_app(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_revoke_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_set_key_outings(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`outings`: Byte,
-    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_marks(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_marks(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -1324,6 +1274,50 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_cached_profile(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_profile(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_cached_timetable(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_timetable(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_next_classes(`ptr`: Long,`flow`: RustBuffer.ByValue,`nowUnix`: Long,`utcOffsetMinutes`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_timetable_days(`ptr`: Long,`flow`: RustBuffer.ByValue,`fromDay`: Int,`count`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cached_wrapped(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_wrapped_previous(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_wrapped_missing_days(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_check_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_forwarded_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`since`: Long,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_forwarding_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_set_up_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_answer_session_request(`ptr`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`callbackUrl`: RustBuffer.ByValue,`error`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_connected_apps(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_link_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_move_keys(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_pair_app(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_revoke_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_set_key_outings(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`outings`: Byte,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_route_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1357,14 +1351,24 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_set_server_options(`ptr`: Long,`flow`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_cancel_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_ensure_fresh_session(`ptr`: Long,`flow`: RustBuffer.ByValue,`maxAgeSecs`: Long,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_resend_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_saved_account(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_sign_in(`ptr`: Long,`flow`: RustBuffer.ByValue,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_sign_out(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_signed_in_user(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_submit_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_web_session(`ptr`: Long,`flow`: RustBuffer.ByValue,`force`: Byte,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_cached_wrapped(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_wrapped_previous(`ptr`: Long,`flow`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_wrapped_missing_days(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_clone_cookiegate(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_vtop_ffi_fn_free_cookiegate(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1374,28 +1378,6 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_cookiegate_attended(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_vtop_ffi_fn_method_cookiegate_ask(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,
-    ): Long
-    external fun uniffi_vtop_ffi_fn_clone_sharedcookies(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    external fun uniffi_vtop_ffi_fn_free_sharedcookies(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_init_callback_vtable_sharedcookies(`vtable`: UniffiVTableCallbackInterfaceSharedCookies,
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_sharedcookies_cookie(`ptr`: Long,`url`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_sharedcookies_set_cookies(`ptr`: Long,`url`: RustBuffer.ByValue,`setCookies`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_sharedcookies_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_sharedcookies_flush(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_clone_httptransport(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    external fun uniffi_vtop_ffi_fn_free_httptransport(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_init_callback_vtable_httptransport(`vtable`: UniffiVTableCallbackInterfaceHttpTransport,
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_method_httptransport_send(`ptr`: Long,`request`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_clone_udpnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -1419,22 +1401,40 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_udpsocket_shutdown(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_cookie_gate(`gate`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_clone_sharedcookies(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_sharedcookies(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_shared_cookies(`cookies`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_sharedcookies(`vtable`: UniffiVTableCallbackInterfaceSharedCookies,
     ): Unit
+    external fun uniffi_vtop_ffi_fn_method_sharedcookies_cookie(`ptr`: Long,`url`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_sharedcookies_set_cookies(`ptr`: Long,`url`: RustBuffer.ByValue,`setCookies`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_sharedcookies_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_sharedcookies_flush(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_clone_httptransport(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_httptransport(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_httptransport(`vtable`: UniffiVTableCallbackInterfaceHttpTransport,
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_httptransport_send(`ptr`: Long,`request`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_func_dev_configure(`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_func_plan_gpa(`courses`: RustBuffer.ByValue,`cgpa`: RustBuffer.ByValue,`completedCredits`: RustBuffer.ByValue,`target`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_func_semester_summary(`courses`: RustBuffer.ByValue,`history`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_func_pair_code(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_log_event(`level`: RustBuffer.ByValue,`src`: RustBuffer.ByValue,`flow`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,`fields`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_obs_init(`dataDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_vtop_ffi_fn_func_gmail_otp(`messageJson`: RustBuffer.ByValue,`since`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_plan_gpa(`courses`: RustBuffer.ByValue,`cgpa`: RustBuffer.ByValue,`completedCredits`: RustBuffer.ByValue,`target`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_semester_summary(`courses`: RustBuffer.ByValue,`history`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_check_general_outing(`rules`: RustBuffer.ByValue,`place`: RustBuffer.ByValue,`purpose`: RustBuffer.ByValue,`leaving`: RustBuffer.ByValue,`returning`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_check_weekend_outing(`rules`: RustBuffer.ByValue,`purpose`: RustBuffer.ByValue,`day`: RustBuffer.ByValue,`contact`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1443,14 +1443,22 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_general_return_last_day(`day`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_vtop_ffi_fn_func_set_cookie_gate(`gate`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_func_pair_code(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_batched_pages(uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_set_device_label(`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_func_set_udp_network(`network`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_func_set_shared_cookies(`cookies`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_set_http_transport(`transport`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_vtop_intermediate_ca(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_func_set_udp_network(`network`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     external fun ffi_vtop_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun ffi_vtop_ffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1570,22 +1578,7 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_cookie_gate() and 0xFFFF) != 18921) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_shared_cookies() and 0xFFFF) != 39215) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_vtop_ffi_checksum_func_dev_configure() and 0xFFFF) != 30902) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_plan_gpa() and 0xFFFF) != 10389) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_semester_summary() and 0xFFFF) != 39778) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_pair_code() and 0xFFFF) != 61274) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_log_event() and 0xFFFF) != 39318) {
@@ -1594,19 +1587,43 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_obs_init() and 0xFFFF) != 51801) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_check_general_outing() and 0xFFFF) != 4785) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_gmail_otp() and 0xFFFF) != 37942) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_check_weekend_outing() and 0xFFFF) != 61481) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_plan_gpa() and 0xFFFF) != 3052) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_general_outing_times() and 0xFFFF) != 7578) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_semester_summary() and 0xFFFF) != 44107) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_general_return_last_day() and 0xFFFF) != 34529) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_check_general_outing() and 0xFFFF) != 13709) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_device_label() and 0xFFFF) != 17918) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_check_weekend_outing() and 0xFFFF) != 26010) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_general_outing_times() and 0xFFFF) != 40461) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_general_return_last_day() and 0xFFFF) != 52181) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_cookie_gate() and 0xFFFF) != 6109) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_pair_code() and 0xFFFF) != 62867) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_batched_pages() and 0xFFFF) != 25254) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_device_label() and 0xFFFF) != 51682) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_udp_network() and 0xFFFF) != 13460) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_shared_cookies() and 0xFFFF) != 13447) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_set_http_transport() and 0xFFFF) != 30478) {
@@ -1615,139 +1632,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_vtop_intermediate_ca() and 0xFFFF) != 39519) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_udp_network() and 0xFFFF) != 36254) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_semesters() and 0xFFFF) != 51331) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_attendance_outlook() and 0xFFFF) != 27067) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_attendance() and 0xFFFF) != 51609) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_attendance_detail() and 0xFFFF) != 24548) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_calendar() and 0xFFFF) != 6600) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_semesters() and 0xFFFF) != 3947) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_timetable() and 0xFFFF) != 49173) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 47603) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_ensure_fresh_session() and 0xFFFF) != 64512) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_attendance() and 0xFFFF) != 51251) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_attendance_detail() and 0xFFFF) != 9860) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_calendar() and 0xFFFF) != 20320) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_semesters() and 0xFFFF) != 41037) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_timetable() and 0xFFFF) != 25672) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_mismatched_attendance_details() and 0xFFFF) != 59075) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_next_classes() and 0xFFFF) != 47118) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_otp() and 0xFFFF) != 19357) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 41712) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_semesters() and 0xFFFF) != 35717) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_select_semester() and 0xFFFF) != 14628) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_in() and 0xFFFF) != 54732) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 4824) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 31526) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_stale_attendance_details() and 0xFFFF) != 31637) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_submit_otp() and 0xFFFF) != 49312) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_timetable_days() and 0xFFFF) != 9089) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_biometric() and 0xFFFF) != 13088) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_biometric_range() and 0xFFFF) != 53832) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_biometric() and 0xFFFF) != 14486) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_biometric_range() and 0xFFFF) != 21062) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_changes() and 0xFFFF) != 35120) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_changes_bytes() and 0xFFFF) != 10020) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_changes() and 0xFFFF) != 20128) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_changes_seen() and 0xFFFF) != 9920) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_page_seen() and 0xFFFF) != 2861) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_trim_changes() and 0xFFFF) != 28537) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_unseen_change_ids() and 0xFFFF) != 8894) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_unseen_changes() and 0xFFFF) != 6086) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 46212) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent() and 0xFFFF) != 35319) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_page() and 0xFFFF) != 62516) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_view() and 0xFFFF) != 13487) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_course_file_link() and 0xFFFF) != 11870) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_course_plan_link() and 0xFFFF) != 35574) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_page() and 0xFFFF) != 6702) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_view() and 0xFFFF) != 52961) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_is_demo() and 0xFFFF) != 25598) {
@@ -1786,202 +1677,325 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_push_token() and 0xFFFF) != 39948) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_exams() and 0xFFFF) != 29991) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_attendance_outlook() and 0xFFFF) != 38857) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_exams() and 0xFFFF) != 17126) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_attendance() and 0xFFFF) != 50616) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 46282) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_attendance_detail() and 0xFFFF) != 63) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 52947) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_attendance() and 0xFFFF) != 5600) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 52114) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_attendance_detail() and 0xFFFF) != 61812) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 14228) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mismatched_attendance_details() and 0xFFFF) != 51993) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding() and 0xFFFF) != 55475) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_stale_attendance_details() and 0xFFFF) != 42879) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_grade_details() and 0xFFFF) != 29370) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_biometric() and 0xFFFF) != 34213) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_grade_history() and 0xFFFF) != 18633) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_biometric_range() and 0xFFFF) != 64532) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_grades() and 0xFFFF) != 26159) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_biometric() and 0xFFFF) != 52011) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_grade_details() and 0xFFFF) != 59786) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_biometric_range() and 0xFFFF) != 37601) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_grade_history() and 0xFFFF) != 44502) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_calendar() and 0xFFFF) != 10719) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_grades() and 0xFFFF) != 24748) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_calendar() and 0xFFFF) != 647) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_planner_courses() and 0xFFFF) != 6197) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_changes() and 0xFFFF) != 36752) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_session_request() and 0xFFFF) != 35015) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_changes_bytes() and 0xFFFF) != 34191) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 26142) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_changes() and 0xFFFF) != 48990) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 2814) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_changes_seen() and 0xFFFF) != 40073) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_link_phone() and 0xFFFF) != 49712) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_page_seen() and 0xFFFF) != 6101) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_move_keys() and 0xFFFF) != 63121) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_trim_changes() and 0xFFFF) != 34611) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_pair_app() and 0xFFFF) != 31779) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_unseen_change_ids() and 0xFFFF) != 14555) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_revoke_key() and 0xFFFF) != 35772) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_unseen_changes() and 0xFFFF) != 26768) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_key_outings() and 0xFFFF) != 32559) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_page() and 0xFFFF) != 21026) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_marks() and 0xFFFF) != 11752) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_view() and 0xFFFF) != 16878) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_marks() and 0xFFFF) != 23034) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_course_file_link() and 0xFFFF) != 62912) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_apply_general_outing() and 0xFFFF) != 59161) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_course_plan_link() and 0xFFFF) != 40505) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_apply_weekend_outing() and 0xFFFF) != 26757) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_page() and 0xFFFF) != 49034) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_general_outing() and 0xFFFF) != 25890) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_view() and 0xFFFF) != 58860) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_weekend_outing() and 0xFFFF) != 5521) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_exams() and 0xFFFF) != 7261) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_outing() and 0xFFFF) != 33043) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_exams() and 0xFFFF) != 13351) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_general_outing() and 0xFFFF) != 12640) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_grade_details() and 0xFFFF) != 20750) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_weekend_outing() and 0xFFFF) != 40883) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_grade_history() and 0xFFFF) != 21830) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_outing_pass_link() and 0xFFFF) != 1262) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_grades() and 0xFFFF) != 57584) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_profile() and 0xFFFF) != 48897) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_grade_details() and 0xFFFF) != 23674) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_profile() and 0xFFFF) != 12020) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_grade_history() and 0xFFFF) != 6709) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_route_status() and 0xFFFF) != 65047) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_grades() and 0xFFFF) != 13057) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_route() and 0xFFFF) != 35705) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_planner_courses() and 0xFFFF) != 52202) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_pages() and 0xFFFF) != 51510) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_marks() and 0xFFFF) != 6897) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_session() and 0xFFFF) != 4581) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_marks() and 0xFFFF) != 32464) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_sign_ins() and 0xFFFF) != 28357) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_apply_general_outing() and 0xFFFF) != 33423) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_forwarding_everywhere() and 0xFFFF) != 10845) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_apply_weekend_outing() and 0xFFFF) != 50330) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_account() and 0xFFFF) != 391) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_general_outing() and 0xFFFF) != 52648) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_device() and 0xFFFF) != 32346) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_weekend_outing() and 0xFFFF) != 23116) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_forget_server_password() and 0xFFFF) != 4153) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_outing() and 0xFFFF) != 46951) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone() and 0xFFFF) != 28579) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_general_outing() and 0xFFFF) != 36154) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 19137) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_weekend_outing() and 0xFFFF) != 58813) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_server_password() and 0xFFFF) != 12038) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_outing_pass_link() and 0xFFFF) != 7645) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 55780) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_profile() and 0xFFFF) != 26532) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 64971) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_profile() and 0xFFFF) != 14842) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_status() and 0xFFFF) != 63686) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_timetable() and 0xFFFF) != 25928) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_server_options() and 0xFFFF) != 10688) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_timetable() and 0xFFFF) != 8216) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_next_classes() and 0xFFFF) != 44215) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_timetable_days() and 0xFFFF) != 23697) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_wrapped() and 0xFFFF) != 20301) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_wrapped_previous() and 0xFFFF) != 43985) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_wrapped_missing_days() and 0xFFFF) != 15264) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 55337) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent() and 0xFFFF) != 23504) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 7015) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 44213) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 61987) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 16094) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding() and 0xFFFF) != 9462) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_session_request() and 0xFFFF) != 39500) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 1093) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 61621) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_link_phone() and 0xFFFF) != 12987) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_move_keys() and 0xFFFF) != 30018) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_pair_app() and 0xFFFF) != 7171) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_revoke_key() and 0xFFFF) != 40996) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_key_outings() and 0xFFFF) != 13580) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_route_status() and 0xFFFF) != 46716) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_route() and 0xFFFF) != 31885) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_pages() and 0xFFFF) != 30500) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_session() and 0xFFFF) != 64191) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_sign_ins() and 0xFFFF) != 50806) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_forwarding_everywhere() and 0xFFFF) != 19767) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_account() and 0xFFFF) != 61809) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_device() and 0xFFFF) != 37749) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_forget_server_password() and 0xFFFF) != 59531) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone() and 0xFFFF) != 48663) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 38742) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_server_password() and 0xFFFF) != 31545) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 64941) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 61811) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_status() and 0xFFFF) != 47612) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_server_options() and 0xFFFF) != 51426) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 59215) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_ensure_fresh_session() and 0xFFFF) != 19372) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_otp() and 0xFFFF) != 42733) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 52526) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_in() and 0xFFFF) != 30202) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 42865) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 45517) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_submit_otp() and 0xFFFF) != 18234) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_web_session() and 0xFFFF) != 60390) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_wrapped() and 0xFFFF) != 63529) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_attended() and 0xFFFF) != 63750) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_wrapped_previous() and 0xFFFF) != 33822) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 19058) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_wrapped_missing_days() and 0xFFFF) != 63940) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_open() and 0xFFFF) != 17439) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_attended() and 0xFFFF) != 55580) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_resolve() and 0xFFFF) != 13144) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 53295) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_send() and 0xFFFF) != 47778) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_cookie() and 0xFFFF) != 56315) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_receive() and 0xFFFF) != 13744) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_set_cookies() and 0xFFFF) != 51629) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_shutdown() and 0xFFFF) != 36603) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_clear() and 0xFFFF) != 1132) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_cookie() and 0xFFFF) != 36757) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_flush() and 0xFFFF) != 56222) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_set_cookies() and 0xFFFF) != 16622) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_clear() and 0xFFFF) != 14566) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_flush() and 0xFFFF) != 61965) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_httptransport_send() and 0xFFFF) != 72) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_open() and 0xFFFF) != 34948) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_resolve() and 0xFFFF) != 50492) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_send() and 0xFFFF) != 42276) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_receive() and 0xFFFF) != 38987) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_shutdown() and 0xFFFF) != 52948) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_constructor_core_new() and 0xFFFF) != 5238) {
@@ -3041,234 +3055,20 @@ public object FfiConverterTypeCookieGate: FfiConverter<CookieGate, Long> {
 public interface CoreInterface {
     
     /**
-     * Each saved course's plan, until the next exam when one comes before
-     * the last class day, else until the semester's end; from the saved
-     * attendance, timetable and academic calendar (empty without a
-     * calendar). No network.
-     */
-    fun `attendanceOutlook`(`flow`: kotlin.String): List<CourseOutlook>
-    
-    fun `cachedAttendance`(`flow`: kotlin.String): Attendance?
-    
-    /**
-     * The saved class-by-class history of `course_key` (an
-     * [`AttendanceCourse::key`] in the saved attendance).
-     */
-    fun `cachedAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String): AttendanceDetail?
-    
-    /**
-     * The selected semester's cached academic calendar as months, as of
-     * today in India.
-     */
-    fun `cachedCalendar`(`flow`: kotlin.String): AcademicCalendar?
-    
-    /**
      * The cached semester list with the selected one, if a list was fetched.
      */
     fun `cachedSemesters`(`flow`: kotlin.String): Semesters?
-    
-    fun `cachedTimetable`(`flow`: kotlin.String): Timetable?
-    
-    /**
-     * Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
-     * fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
-     * a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
-     */
-    suspend fun `cancelOtp`(`flow`: kotlin.String)
-    
-    /**
-     * Signs in again when the session signed in over `max_age_secs` ago (or when that is
-     * unknown), so a long fetch starts on a fresh one; a newer session asks VTOP nothing.
-     * `OtpRequired` when VTOP wants the emailed code.
-     */
-    suspend fun `ensureFreshSession`(`flow`: kotlin.String, `maxAgeSecs`: kotlin.ULong)
-    
-    suspend fun `fetchAttendance`(`flow`: kotlin.String): Attendance
-    
-    /**
-     * Fetches `course_key`'s class-by-class history and saves it. The course
-     * comes from the saved attendance, fetched first when it lacks the course.
-     */
-    suspend fun `fetchAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String): AttendanceDetail
-    
-    /**
-     * Fetches the selected semester's academic calendar (one request for
-     * the month list, then one per month) and caches it.
-     */
-    suspend fun `fetchCalendar`(`flow`: kotlin.String): AcademicCalendar
     
     /**
      * Fetches the semester list from VTOP (newest first) and caches it.
      */
     suspend fun `fetchSemesters`(`flow`: kotlin.String): Semesters
     
-    suspend fun `fetchTimetable`(`flow`: kotlin.String): Timetable
-    
-    /**
-     * Keys of the courses whose saved history is missing or no longer
-     * matches the summary (VTOP says 10/11, the history 9/10), for the list
-     * to fetch after each refresh (like Flutter's `pullMismatchedHistory`,
-     * which skips missing ones; here they are fetched too). Courses without
-     * classes yet are left out. No network.
-     */
-    fun `mismatchedAttendanceDetails`(`flow`: kotlin.String): List<kotlin.String>
-    
-    /**
-     * The next class of each course in the cached timetable, within a week
-     * of `now_unix` at the device's `utc_offset_minutes`.
-     */
-    fun `nextClasses`(`flow`: kotlin.String, `nowUnix`: kotlin.Long, `utcOffsetMinutes`: kotlin.Int): List<NextClass>
-    
-    suspend fun `resendOtp`(`flow`: kotlin.String)
-    
-    /**
-     * The saved username and password, and whether VTOP rejected the password, for the
-     * Account page (opened behind the phone's screen lock) and Settings' "Needs attention".
-     * Never logged.
-     */
-    fun `savedAccount`(`flow`: kotlin.String): SavedAccount?
-    
     /**
      * Picks the semester every page is fetched and cached for, until the
      * student picks another. It must be in the cached list.
      */
     fun `selectSemester`(`flow`: kotlin.String, `id`: kotlin.String)
-    
-    suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): SignIn
-    
-    /**
-     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
-     * address again through the edge). Logs stay.
-     */
-    fun `signOut`(`flow`: kotlin.String)
-    
-    /**
-     * The saved account's registration number.
-     */
-    fun `signedInUser`(`flow`: kotlin.String): kotlin.String?
-    
-    /**
-     * Keys of the saved courses with a class held in `count` days from
-     * `from_day` (up to today) whose saved history is missing or behind
-     * the summary, for the timetable to fetch in the background. No network.
-     */
-    fun `staleAttendanceDetails`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<kotlin.String>
-    
-    suspend fun `submitOtp`(`flow`: kotlin.String, `code`: kotlin.String)
-    
-    /**
-     * `count` agenda days from epoch day `from_day` (local), from the
-     * cached timetable and academic calendar (without a calendar every
-     * class is held).
-     */
-    fun `timetableDays`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<TimetableDay>
-    
-    /**
-     * `day`'s cached punches (days since 1970-01-01, in India).
-     */
-    fun `cachedBiometric`(`flow`: kotlin.String, `day`: kotlin.Int): BiometricDay?
-    
-    /**
-     * The cached days from `from` to `to` (both included), oldest first;
-     * days never fetched are left out.
-     */
-    fun `cachedBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay>
-    
-    /**
-     * Fetches `day`'s punches and caches them.
-     */
-    suspend fun `fetchBiometric`(`flow`: kotlin.String, `day`: kotlin.Int): BiometricDay
-    
-    /**
-     * Every day from `from` to `to` (both included, at most 14), oldest
-     * first: complete days from the cache, the others fetched one at a
-     * time and cached.
-     */
-    suspend fun `fetchBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay>
-    
-    /**
-     * The recorded changes, newest first.
-     */
-    fun `changes`(`flow`: kotlin.String): List<Change>
-    
-    /**
-     * The inbox file's size, for the app's storage cap.
-     */
-    fun `changesBytes`(`flow`: kotlin.String): kotlin.ULong
-    
-    /**
-     * Empties the inbox (what is compared stays primed).
-     */
-    fun `clearChanges`(`flow`: kotlin.String)
-    
-    /**
-     * Every change so far counts as seen.
-     */
-    fun `markChangesSeen`(`flow`: kotlin.String)
-    
-    /**
-     * The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
-     * changes so far count as seen. Other pages do nothing.
-     */
-    fun `markPageSeen`(`flow`: kotlin.String, `page`: kotlin.String)
-    
-    /**
-     * Drops the oldest changes until the file is at most `max_bytes`.
-     */
-    fun `trimChanges`(`flow`: kotlin.String, `maxBytes`: kotlin.ULong)
-    
-    /**
-     * The ids of the changes [`Self::unseen_changes`] counts.
-     */
-    fun `unseenChangeIds`(`flow`: kotlin.String): List<kotlin.String>
-    
-    /**
-     * How many changes came after the inbox (or their page) was last seen.
-     */
-    fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt
-    
-    /**
-     * The kinds the student ticked "don't ask again" for.
-     */
-    fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind>
-    
-    /**
-     * Asks every time again.
-     */
-    fun `resetCookieConsent`(`flow`: kotlin.String)
-    
-    /**
-     * The selected semester's cached course list.
-     */
-    fun `cachedCoursePage`(`flow`: kotlin.String): CoursePage?
-    
-    /**
-     * `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
-     * none until both are saved.
-     */
-    fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView?
-    
-    /**
-     * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
-     * [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
-     */
-    suspend fun `courseFileLink`(`flow`: kotlin.String, `path`: kotlin.String): FileLink
-    
-    /**
-     * `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
-     */
-    suspend fun `coursePlanLink`(`flow`: kotlin.String, `classId`: kotlin.String): FileLink
-    
-    /**
-     * Fetches the selected semester's course list and caches it.
-     */
-    suspend fun `fetchCoursePage`(`flow`: kotlin.String): CoursePage
-    
-    /**
-     * Fetches `course_id`'s sections, then the plan of `class_id` (else the
-     * student's section, else the only one), and caches both.
-     */
-    suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView
     
     /**
      * Signed in as the demo account: the app hides what needs a real session or the server.
@@ -3347,6 +3147,155 @@ public interface CoreInterface {
     suspend fun `setPushToken`(`flow`: kotlin.String, `token`: kotlin.String)
     
     /**
+     * Each saved course's plan, until the next exam when one comes before
+     * the last class day, else until the semester's end; from the saved
+     * attendance, timetable and academic calendar (empty without a
+     * calendar). No network.
+     */
+    fun `attendanceOutlook`(`flow`: kotlin.String): List<CourseOutlook>
+    
+    fun `cachedAttendance`(`flow`: kotlin.String): Attendance?
+    
+    /**
+     * The saved class-by-class history of `course_key` (an
+     * [`AttendanceCourse::key`] in the saved attendance).
+     */
+    fun `cachedAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String): AttendanceDetail?
+    
+    suspend fun `fetchAttendance`(`flow`: kotlin.String): Attendance
+    
+    /**
+     * Fetches `course_key`'s class-by-class history and saves it. The course
+     * comes from the saved attendance, fetched first when it lacks the course.
+     */
+    suspend fun `fetchAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String): AttendanceDetail
+    
+    /**
+     * Keys of the courses whose saved history is missing or no longer
+     * matches the summary (VTOP says 10/11, the history 9/10), for the list
+     * to fetch after each refresh (like Flutter's `pullMismatchedHistory`,
+     * which skips missing ones; here they are fetched too). Courses without
+     * classes yet are left out. No network.
+     */
+    fun `mismatchedAttendanceDetails`(`flow`: kotlin.String): List<kotlin.String>
+    
+    /**
+     * Keys of the saved courses with a class held in `count` days from
+     * `from_day` (up to today) whose saved history is missing or behind
+     * the summary, for the timetable to fetch in the background. No network.
+     */
+    fun `staleAttendanceDetails`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<kotlin.String>
+    
+    /**
+     * `day`'s cached punches (days since 1970-01-01, in India).
+     */
+    fun `cachedBiometric`(`flow`: kotlin.String, `day`: kotlin.Int): BiometricDay?
+    
+    /**
+     * The cached days from `from` to `to` (both included), oldest first;
+     * days never fetched are left out.
+     */
+    fun `cachedBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay>
+    
+    /**
+     * Fetches `day`'s punches and caches them.
+     */
+    suspend fun `fetchBiometric`(`flow`: kotlin.String, `day`: kotlin.Int): BiometricDay
+    
+    /**
+     * Every day from `from` to `to` (both included, at most 14), oldest
+     * first: complete days from the cache, the others fetched one at a
+     * time and cached.
+     */
+    suspend fun `fetchBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay>
+    
+    /**
+     * The selected semester's cached academic calendar as months, as of
+     * today in India.
+     */
+    fun `cachedCalendar`(`flow`: kotlin.String): AcademicCalendar?
+    
+    /**
+     * Fetches the selected semester's academic calendar (one request for
+     * the month list, then one per month) and caches it.
+     */
+    suspend fun `fetchCalendar`(`flow`: kotlin.String): AcademicCalendar
+    
+    /**
+     * The recorded changes, newest first.
+     */
+    fun `changes`(`flow`: kotlin.String): List<Change>
+    
+    /**
+     * The inbox file's size, for the app's storage cap.
+     */
+    fun `changesBytes`(`flow`: kotlin.String): kotlin.ULong
+    
+    /**
+     * Empties the inbox (what is compared stays primed).
+     */
+    fun `clearChanges`(`flow`: kotlin.String)
+    
+    /**
+     * Every change so far counts as seen.
+     */
+    fun `markChangesSeen`(`flow`: kotlin.String)
+    
+    /**
+     * The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
+     * changes so far count as seen. Other pages do nothing.
+     */
+    fun `markPageSeen`(`flow`: kotlin.String, `page`: kotlin.String)
+    
+    /**
+     * Drops the oldest changes until the file is at most `max_bytes`.
+     */
+    fun `trimChanges`(`flow`: kotlin.String, `maxBytes`: kotlin.ULong)
+    
+    /**
+     * The ids of the changes [`Self::unseen_changes`] counts.
+     */
+    fun `unseenChangeIds`(`flow`: kotlin.String): List<kotlin.String>
+    
+    /**
+     * How many changes came after the inbox (or their page) was last seen.
+     */
+    fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt
+    
+    /**
+     * The selected semester's cached course list.
+     */
+    fun `cachedCoursePage`(`flow`: kotlin.String): CoursePage?
+    
+    /**
+     * `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
+     * none until both are saved.
+     */
+    fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView?
+    
+    /**
+     * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
+     * [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
+     */
+    suspend fun `courseFileLink`(`flow`: kotlin.String, `path`: kotlin.String): FileLink
+    
+    /**
+     * `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
+     */
+    suspend fun `coursePlanLink`(`flow`: kotlin.String, `classId`: kotlin.String): FileLink
+    
+    /**
+     * Fetches the selected semester's course list and caches it.
+     */
+    suspend fun `fetchCoursePage`(`flow`: kotlin.String): CoursePage
+    
+    /**
+     * Fetches `course_id`'s sections, then the plan of `class_id` (else the
+     * student's section, else the only one), and caches both.
+     */
+    suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView
+    
+    /**
      * The selected semester's cached exam schedule.
      */
     fun `cachedExams`(`flow`: kotlin.String): Exams?
@@ -3356,38 +3305,6 @@ public interface CoreInterface {
      * timetable's days read their papers from that copy.
      */
     suspend fun `fetchExams`(`flow`: kotlin.String): Exams
-    
-    /**
-     * Pulls the latest forwarded mail (the edge keeps it 5 minutes): Gmail's confirmation while
-     * setting up, or an OTP. Either one proves the address works.
-     */
-    suspend fun `checkForwarding`(`flow`: kotlin.String): Forwarding
-    
-    /**
-     * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
-     * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
-     * prompt, which calls it every few seconds. Never logs the code.
-     */
-    suspend fun `fetchForwardedOtp`(`flow`: kotlin.String, `since`: kotlin.Long): kotlin.String?
-    
-    /**
-     * This phone's forwarding address and how far its setup got. No network.
-     */
-    fun `forwardingStatus`(`flow`: kotlin.String): Forwarding
-    
-    /**
-     * Gives this phone a forwarding address. A student who already has one (made on another
-     * phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
-     * working; otherwise a new address is made and tied to them. Does nothing when this phone
-     * already has one.
-     */
-    suspend fun `setUpForwarding`(`flow`: kotlin.String): Forwarding
-    
-    /**
-     * Takes this phone off its address and forgets it. The edge deletes the address when no
-     * other phone uses it; mail forwarded to it is rejected from then on.
-     */
-    suspend fun `turnOffForwarding`(`flow`: kotlin.String)
     
     /**
      * The cached breakdown of `course_id` in `semester_id`'s grades.
@@ -3429,46 +3346,6 @@ public interface CoreInterface {
      * planner; empty without one. No network.
      */
     fun `plannerCourses`(`flow`: kotlin.String): List<PlanCourse>
-    
-    /**
-     * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
-     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
-     * the student on screen saying yes: from the background it is always the error.
-     */
-    suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?)
-    
-    /**
-     * The account's access keys and whether this phone is linked to it.
-     */
-    suspend fun `connectedApps`(`flow`: kotlin.String): ConnectedApps
-    
-    /**
-     * Makes a key: for the extension that shows `pair_code` (it collects the key from the edge),
-     * else for an MCP client. Links this phone first when it is not yet.
-     */
-    suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?): NewKey
-    
-    /**
-     * Links this phone to the account without making a key (after a reinstall, so the keys
-     * made before show again).
-     */
-    suspend fun `linkPhone`(`flow`: kotlin.String)
-    
-    /**
-     * Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
-     * phones no longer linked; without `from`, only the latter. The number of keys moved.
-     */
-    suspend fun `moveKeys`(`flow`: kotlin.String, `from`: kotlin.String?): kotlin.UInt
-    
-    /**
-     * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
-     */
-    suspend fun `pairApp`(`flow`: kotlin.String, `code`: kotlin.String): PairApp?
-    
-    suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String)
-    
-    suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean)
     
     /**
      * The selected semester's cached marks.
@@ -3531,6 +3408,123 @@ public interface CoreInterface {
      * fails), and caches both.
      */
     suspend fun `fetchProfile`(`flow`: kotlin.String): Profile
+    
+    fun `cachedTimetable`(`flow`: kotlin.String): Timetable?
+    
+    suspend fun `fetchTimetable`(`flow`: kotlin.String): Timetable
+    
+    /**
+     * The next class of each course in the cached timetable, within a week
+     * of `now_unix` at the device's `utc_offset_minutes`.
+     */
+    fun `nextClasses`(`flow`: kotlin.String, `nowUnix`: kotlin.Long, `utcOffsetMinutes`: kotlin.Int): List<NextClass>
+    
+    /**
+     * `count` agenda days from epoch day `from_day` (local), from the
+     * cached timetable and academic calendar (without a calendar every
+     * class is held).
+     */
+    fun `timetableDays`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<TimetableDay>
+    
+    /**
+     * The selected semester's story; none until its classes are over (today after the last
+     * instructional day) or without a calendar. No network.
+     */
+    fun `cachedWrapped`(`flow`: kotlin.String): WrappedReport?
+    
+    /**
+     * Fetches the next older semester's attendance into its own pages folder when it isn't
+     * cached: one VTOP request, none without an older semester.
+     */
+    suspend fun `fetchWrappedPrevious`(`flow`: kotlin.String)
+    
+    /**
+     * The selected semester's class days up to today without a complete cached biometric
+     * copy. No network.
+     */
+    fun `wrappedMissingDays`(`flow`: kotlin.String): List<kotlin.Int>
+    
+    /**
+     * The kinds the student ticked "don't ask again" for.
+     */
+    fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind>
+    
+    /**
+     * Asks every time again.
+     */
+    fun `resetCookieConsent`(`flow`: kotlin.String)
+    
+    /**
+     * Pulls the latest forwarded mail (the edge keeps it 5 minutes): Gmail's confirmation while
+     * setting up, or an OTP. Either one proves the address works.
+     */
+    suspend fun `checkForwarding`(`flow`: kotlin.String): Forwarding
+    
+    /**
+     * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
+     * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
+     * prompt, which calls it every few seconds. Never logs the code.
+     */
+    suspend fun `fetchForwardedOtp`(`flow`: kotlin.String, `since`: kotlin.Long): kotlin.String?
+    
+    /**
+     * This phone's forwarding address and how far its setup got. No network.
+     */
+    fun `forwardingStatus`(`flow`: kotlin.String): Forwarding
+    
+    /**
+     * Gives this phone a forwarding address. A student who already has one (made on another
+     * phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
+     * working; otherwise a new address is made and tied to them. Does nothing when this phone
+     * already has one.
+     */
+    suspend fun `setUpForwarding`(`flow`: kotlin.String): Forwarding
+    
+    /**
+     * Takes this phone off its address and forgets it. The edge deletes the address when no
+     * other phone uses it; mail forwarded to it is rejected from then on.
+     */
+    suspend fun `turnOffForwarding`(`flow`: kotlin.String)
+    
+    /**
+     * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
+     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
+     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
+     * the student on screen saying yes: from the background it is always the error.
+     */
+    suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?)
+    
+    /**
+     * The account's access keys and whether this phone is linked to it.
+     */
+    suspend fun `connectedApps`(`flow`: kotlin.String): ConnectedApps
+    
+    /**
+     * Makes a key: for the extension that shows `pair_code` (it collects the key from the edge),
+     * else for an MCP client. Links this phone first when it is not yet.
+     */
+    suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?): NewKey
+    
+    /**
+     * Links this phone to the account without making a key (after a reinstall, so the keys
+     * made before show again).
+     */
+    suspend fun `linkPhone`(`flow`: kotlin.String)
+    
+    /**
+     * Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
+     * phones no longer linked; without `from`, only the latter. The number of keys moved.
+     */
+    suspend fun `moveKeys`(`flow`: kotlin.String, `from`: kotlin.String?): kotlin.UInt
+    
+    /**
+     * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
+     */
+    suspend fun `pairApp`(`flow`: kotlin.String, `code`: kotlin.String): PairApp?
+    
+    suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean)
     
     fun `routeStatus`(`flow`: kotlin.String): RouteStatus
     
@@ -3622,30 +3616,50 @@ public interface CoreInterface {
     suspend fun `setServerOptions`(`flow`: kotlin.String, `options`: ServerOptions)
     
     /**
+     * Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
+     * fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
+     * a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
+     */
+    suspend fun `cancelOtp`(`flow`: kotlin.String)
+    
+    /**
+     * Signs in again when the session signed in over `max_age_secs` ago (or when that is
+     * unknown), so a long fetch starts on a fresh one; a newer session asks VTOP nothing.
+     * `OtpRequired` when VTOP wants the emailed code.
+     */
+    suspend fun `ensureFreshSession`(`flow`: kotlin.String, `maxAgeSecs`: kotlin.ULong)
+    
+    suspend fun `resendOtp`(`flow`: kotlin.String)
+    
+    /**
+     * The saved username and password, and whether VTOP rejected the password, for the
+     * Account page (opened behind the phone's screen lock) and Settings' "Needs attention".
+     * Never logged.
+     */
+    fun `savedAccount`(`flow`: kotlin.String): SavedAccount?
+    
+    suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): SignIn
+    
+    /**
+     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
+     * address again through the edge). Logs stay.
+     */
+    fun `signOut`(`flow`: kotlin.String)
+    
+    /**
+     * The saved account's registration number.
+     */
+    fun `signedInUser`(`flow`: kotlin.String): kotlin.String?
+    
+    suspend fun `submitOtp`(`flow`: kotlin.String, `code`: kotlin.String)
+    
+    /**
      * The signed-in session for the web view, after VTOP confirmed it (signing in again with
      * the saved password when it had expired). With `force`, signs in again first (the web
      * view landed on VTOP's login page, or the student asked). Fails like a fetch: OTP
      * pending, password rejected, offline.
      */
     suspend fun `webSession`(`flow`: kotlin.String, `force`: kotlin.Boolean): WebSession
-    
-    /**
-     * The selected semester's story; none until its classes are over (today after the last
-     * instructional day) or without a calendar. No network.
-     */
-    fun `cachedWrapped`(`flow`: kotlin.String): WrappedReport?
-    
-    /**
-     * Fetches the next older semester's attendance into its own pages folder when it isn't
-     * cached: one VTOP request, none without an older semester.
-     */
-    suspend fun `fetchWrappedPrevious`(`flow`: kotlin.String)
-    
-    /**
-     * The selected semester's class days up to today without a complete cached biometric
-     * copy. No network.
-     */
-    fun `wrappedMissingDays`(`flow`: kotlin.String): List<kotlin.Int>
     
     companion object
 }
@@ -3768,77 +3782,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Each saved course's plan, until the next exam when one comes before
-     * the last class day, else until the semester's end; from the saved
-     * attendance, timetable and academic calendar (empty without a
-     * calendar). No network.
-     */override fun `attendanceOutlook`(`flow`: kotlin.String): List<CourseOutlook> {
-            return FfiConverterSequenceTypeCourseOutlook.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_attendance_outlook(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    override fun `cachedAttendance`(`flow`: kotlin.String): Attendance? {
-            return FfiConverterOptionalTypeAttendance.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_attendance(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The saved class-by-class history of `course_key` (an
-     * [`AttendanceCourse::key`] in the saved attendance).
-     */override fun `cachedAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String): AttendanceDetail? {
-            return FfiConverterOptionalTypeAttendanceDetail.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_attendance_detail(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`courseKey`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The selected semester's cached academic calendar as months, as of
-     * today in India.
-     */override fun `cachedCalendar`(`flow`: kotlin.String): AcademicCalendar? {
-            return FfiConverterOptionalTypeAcademicCalendar.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_calendar(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
      * The cached semester list with the selected one, if a list was fetched.
      */override fun `cachedSemesters`(`flow`: kotlin.String): Semesters? {
             return FfiConverterOptionalTypeSemesters.lift(
@@ -3853,152 +3796,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     )
     }
     
-
-    override fun `cachedTimetable`(`flow`: kotlin.String): Timetable? {
-            return FfiConverterOptionalTypeTimetable.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_timetable(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
-     * fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
-     * a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `cancelOtp`(`flow`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_cancel_otp(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Signs in again when the session signed in over `max_age_secs` ago (or when that is
-     * unknown), so a long fetch starts on a fresh one; a newer session asks VTOP nothing.
-     * `OtpRequired` when VTOP wants the emailed code.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `ensureFreshSession`(`flow`: kotlin.String, `maxAgeSecs`: kotlin.ULong) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_ensure_fresh_session(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterULong.lower(`maxAgeSecs`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchAttendance`(`flow`: kotlin.String) : Attendance {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_attendance(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeAttendance.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Fetches `course_key`'s class-by-class history and saves it. The course
-     * comes from the saved attendance, fetched first when it lacks the course.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String) : AttendanceDetail {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_attendance_detail(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`courseKey`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeAttendanceDetail.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Fetches the selected semester's academic calendar (one request for
-     * the month list, then one per month) and caches it.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchCalendar`(`flow`: kotlin.String) : AcademicCalendar {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_calendar(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeAcademicCalendar.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
 
     
     /**
@@ -4026,111 +3823,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     }
 
     
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchTimetable`(`flow`: kotlin.String) : Timetable {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_timetable(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeTimetable.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Keys of the courses whose saved history is missing or no longer
-     * matches the summary (VTOP says 10/11, the history 9/10), for the list
-     * to fetch after each refresh (like Flutter's `pullMismatchedHistory`,
-     * which skips missing ones; here they are fetched too). Courses without
-     * classes yet are left out. No network.
-     */override fun `mismatchedAttendanceDetails`(`flow`: kotlin.String): List<kotlin.String> {
-            return FfiConverterSequenceString.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_mismatched_attendance_details(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The next class of each course in the cached timetable, within a week
-     * of `now_unix` at the device's `utc_offset_minutes`.
-     */override fun `nextClasses`(`flow`: kotlin.String, `nowUnix`: kotlin.Long, `utcOffsetMinutes`: kotlin.Int): List<NextClass> {
-            return FfiConverterSequenceTypeNextClass.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_next_classes(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterLong.lower(`nowUnix`),
-        FfiConverterInt.lower(`utcOffsetMinutes`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `resendOtp`(`flow`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_resend_otp(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * The saved username and password, and whether VTOP rejected the password, for the
-     * Account page (opened behind the phone's screen lock) and Settings' "Needs attention".
-     * Never logged.
-     */override fun `savedAccount`(`flow`: kotlin.String): SavedAccount? {
-            return FfiConverterOptionalTypeSavedAccount.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_saved_account(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
     /**
      * Picks the semester every page is fetched and cached for, until the
      * student picks another. It must be in the cached list.
@@ -4148,535 +3840,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     }
     
     
-
-    
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String) : SignIn {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_sign_in(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`username`),
-        FfiConverterString.lower(`password`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeSignIn.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
-     * address again through the edge). Logs stay.
-     */override fun `signOut`(`flow`: kotlin.String)
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_sign_out(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * The saved account's registration number.
-     */override fun `signedInUser`(`flow`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_signed_in_user(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Keys of the saved courses with a class held in `count` days from
-     * `from_day` (up to today) whose saved history is missing or behind
-     * the summary, for the timetable to fetch in the background. No network.
-     */override fun `staleAttendanceDetails`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<kotlin.String> {
-            return FfiConverterSequenceString.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_stale_attendance_details(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterInt.lower(`fromDay`),
-        FfiConverterInt.lower(`count`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `submitOtp`(`flow`: kotlin.String, `code`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_submit_otp(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`code`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * `count` agenda days from epoch day `from_day` (local), from the
-     * cached timetable and academic calendar (without a calendar every
-     * class is held).
-     */override fun `timetableDays`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<TimetableDay> {
-            return FfiConverterSequenceTypeTimetableDay.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_timetable_days(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterInt.lower(`fromDay`),
-        FfiConverterInt.lower(`count`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * `day`'s cached punches (days since 1970-01-01, in India).
-     */override fun `cachedBiometric`(`flow`: kotlin.String, `day`: kotlin.Int): BiometricDay? {
-            return FfiConverterOptionalTypeBiometricDay.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_biometric(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterInt.lower(`day`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The cached days from `from` to `to` (both included), oldest first;
-     * days never fetched are left out.
-     */override fun `cachedBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay> {
-            return FfiConverterSequenceTypeBiometricDay.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_biometric_range(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterInt.lower(`from`),
-        FfiConverterInt.lower(`to`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Fetches `day`'s punches and caches them.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchBiometric`(`flow`: kotlin.String, `day`: kotlin.Int) : BiometricDay {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_biometric(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterInt.lower(`day`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeBiometricDay.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Every day from `from` to `to` (both included, at most 14), oldest
-     * first: complete days from the cache, the others fetched one at a
-     * time and cached.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int) : List<BiometricDay> {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_biometric_range(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterInt.lower(`from`),
-        FfiConverterInt.lower(`to`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterSequenceTypeBiometricDay.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * The recorded changes, newest first.
-     */override fun `changes`(`flow`: kotlin.String): List<Change> {
-            return FfiConverterSequenceTypeChange.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_changes(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The inbox file's size, for the app's storage cap.
-     */override fun `changesBytes`(`flow`: kotlin.String): kotlin.ULong {
-            return FfiConverterULong.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_changes_bytes(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Empties the inbox (what is compared stays primed).
-     */override fun `clearChanges`(`flow`: kotlin.String)
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_clear_changes(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * Every change so far counts as seen.
-     */override fun `markChangesSeen`(`flow`: kotlin.String)
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_changes_seen(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
-     * changes so far count as seen. Other pages do nothing.
-     */override fun `markPageSeen`(`flow`: kotlin.String, `page`: kotlin.String)
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_page_seen(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`page`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * Drops the oldest changes until the file is at most `max_bytes`.
-     */override fun `trimChanges`(`flow`: kotlin.String, `maxBytes`: kotlin.ULong)
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_trim_changes(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterULong.lower(`maxBytes`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * The ids of the changes [`Self::unseen_changes`] counts.
-     */override fun `unseenChangeIds`(`flow`: kotlin.String): List<kotlin.String> {
-            return FfiConverterSequenceString.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_unseen_change_ids(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * How many changes came after the inbox (or their page) was last seen.
-     */override fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt {
-            return FfiConverterUInt.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_unseen_changes(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * The kinds the student ticked "don't ask again" for.
-     */override fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind> {
-            return FfiConverterSequenceTypeCookieKind.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Asks every time again.
-     */
-    @Throws(CoreException::class)override fun `resetCookieConsent`(`flow`: kotlin.String)
-        = 
-    callWithHandle {
-    uniffiRustCallWithError(CoreException) { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * The selected semester's cached course list.
-     */override fun `cachedCoursePage`(`flow`: kotlin.String): CoursePage? {
-            return FfiConverterOptionalTypeCoursePage.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_course_page(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
-     * none until both are saved.
-     */override fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView? {
-            return FfiConverterOptionalTypeCourseView.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_course_view(
-        it,
-        
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`courseId`),
-        FfiConverterOptionalString.lower(`classId`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
-     * [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `courseFileLink`(`flow`: kotlin.String, `path`: kotlin.String) : FileLink {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_course_file_link(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`path`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeFileLink.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `coursePlanLink`(`flow`: kotlin.String, `classId`: kotlin.String) : FileLink {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_course_plan_link(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`classId`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeFileLink.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Fetches the selected semester's course list and caches it.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchCoursePage`(`flow`: kotlin.String) : CoursePage {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_course_page(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeCoursePage.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Fetches `course_id`'s sections, then the plan of `class_id` (else the
-     * student's section, else the only one), and caches both.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?) : CourseView {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_course_view(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`courseId`),
-        FfiConverterOptionalString.lower(`classId`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeCourseView.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
 
     
     /**
@@ -4943,6 +4106,565 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Each saved course's plan, until the next exam when one comes before
+     * the last class day, else until the semester's end; from the saved
+     * attendance, timetable and academic calendar (empty without a
+     * calendar). No network.
+     */override fun `attendanceOutlook`(`flow`: kotlin.String): List<CourseOutlook> {
+            return FfiConverterSequenceTypeCourseOutlook.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_attendance_outlook(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    override fun `cachedAttendance`(`flow`: kotlin.String): Attendance? {
+            return FfiConverterOptionalTypeAttendance.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_attendance(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The saved class-by-class history of `course_key` (an
+     * [`AttendanceCourse::key`] in the saved attendance).
+     */override fun `cachedAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String): AttendanceDetail? {
+            return FfiConverterOptionalTypeAttendanceDetail.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_attendance_detail(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`courseKey`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchAttendance`(`flow`: kotlin.String) : Attendance {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_attendance(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAttendance.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Fetches `course_key`'s class-by-class history and saves it. The course
+     * comes from the saved attendance, fetched first when it lacks the course.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchAttendanceDetail`(`flow`: kotlin.String, `courseKey`: kotlin.String) : AttendanceDetail {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_attendance_detail(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`courseKey`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAttendanceDetail.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Keys of the courses whose saved history is missing or no longer
+     * matches the summary (VTOP says 10/11, the history 9/10), for the list
+     * to fetch after each refresh (like Flutter's `pullMismatchedHistory`,
+     * which skips missing ones; here they are fetched too). Courses without
+     * classes yet are left out. No network.
+     */override fun `mismatchedAttendanceDetails`(`flow`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_mismatched_attendance_details(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Keys of the saved courses with a class held in `count` days from
+     * `from_day` (up to today) whose saved history is missing or behind
+     * the summary, for the timetable to fetch in the background. No network.
+     */override fun `staleAttendanceDetails`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_stale_attendance_details(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterInt.lower(`fromDay`),
+        FfiConverterInt.lower(`count`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * `day`'s cached punches (days since 1970-01-01, in India).
+     */override fun `cachedBiometric`(`flow`: kotlin.String, `day`: kotlin.Int): BiometricDay? {
+            return FfiConverterOptionalTypeBiometricDay.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_biometric(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterInt.lower(`day`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The cached days from `from` to `to` (both included), oldest first;
+     * days never fetched are left out.
+     */override fun `cachedBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay> {
+            return FfiConverterSequenceTypeBiometricDay.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_biometric_range(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterInt.lower(`from`),
+        FfiConverterInt.lower(`to`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Fetches `day`'s punches and caches them.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchBiometric`(`flow`: kotlin.String, `day`: kotlin.Int) : BiometricDay {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_biometric(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterInt.lower(`day`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeBiometricDay.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Every day from `from` to `to` (both included, at most 14), oldest
+     * first: complete days from the cache, the others fetched one at a
+     * time and cached.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int) : List<BiometricDay> {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_biometric_range(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterInt.lower(`from`),
+        FfiConverterInt.lower(`to`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceTypeBiometricDay.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The selected semester's cached academic calendar as months, as of
+     * today in India.
+     */override fun `cachedCalendar`(`flow`: kotlin.String): AcademicCalendar? {
+            return FfiConverterOptionalTypeAcademicCalendar.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_calendar(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Fetches the selected semester's academic calendar (one request for
+     * the month list, then one per month) and caches it.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchCalendar`(`flow`: kotlin.String) : AcademicCalendar {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_calendar(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeAcademicCalendar.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The recorded changes, newest first.
+     */override fun `changes`(`flow`: kotlin.String): List<Change> {
+            return FfiConverterSequenceTypeChange.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The inbox file's size, for the app's storage cap.
+     */override fun `changesBytes`(`flow`: kotlin.String): kotlin.ULong {
+            return FfiConverterULong.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_changes_bytes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Empties the inbox (what is compared stays primed).
+     */override fun `clearChanges`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_clear_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Every change so far counts as seen.
+     */override fun `markChangesSeen`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_changes_seen(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
+     * changes so far count as seen. Other pages do nothing.
+     */override fun `markPageSeen`(`flow`: kotlin.String, `page`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_page_seen(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`page`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Drops the oldest changes until the file is at most `max_bytes`.
+     */override fun `trimChanges`(`flow`: kotlin.String, `maxBytes`: kotlin.ULong)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_trim_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterULong.lower(`maxBytes`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * The ids of the changes [`Self::unseen_changes`] counts.
+     */override fun `unseenChangeIds`(`flow`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_unseen_change_ids(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * How many changes came after the inbox (or their page) was last seen.
+     */override fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt {
+            return FfiConverterUInt.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_unseen_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The selected semester's cached course list.
+     */override fun `cachedCoursePage`(`flow`: kotlin.String): CoursePage? {
+            return FfiConverterOptionalTypeCoursePage.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_course_page(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
+     * none until both are saved.
+     */override fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView? {
+            return FfiConverterOptionalTypeCourseView.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_course_view(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`courseId`),
+        FfiConverterOptionalString.lower(`classId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
+     * [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `courseFileLink`(`flow`: kotlin.String, `path`: kotlin.String) : FileLink {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_course_file_link(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`path`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeFileLink.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `coursePlanLink`(`flow`: kotlin.String, `classId`: kotlin.String) : FileLink {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_course_plan_link(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`classId`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeFileLink.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Fetches the selected semester's course list and caches it.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchCoursePage`(`flow`: kotlin.String) : CoursePage {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_course_page(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeCoursePage.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Fetches `course_id`'s sections, then the plan of `class_id` (else the
+     * student's section, else the only one), and caches both.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?) : CourseView {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_course_view(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`courseId`),
+        FfiConverterOptionalString.lower(`classId`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeCourseView.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * The selected semester's cached exam schedule.
      */override fun `cachedExams`(`flow`: kotlin.String): Exams? {
             return FfiConverterOptionalTypeExams.lift(
@@ -4979,132 +4701,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeExams.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Pulls the latest forwarded mail (the edge keeps it 5 minutes): Gmail's confirmation while
-     * setting up, or an OTP. Either one proves the address works.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `checkForwarding`(`flow`: kotlin.String) : Forwarding {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_check_forwarding(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeForwarding.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
-     * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
-     * prompt, which calls it every few seconds. Never logs the code.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchForwardedOtp`(`flow`: kotlin.String, `since`: kotlin.Long) : kotlin.String? {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_forwarded_otp(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterLong.lower(`since`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterOptionalString.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * This phone's forwarding address and how far its setup got. No network.
-     */override fun `forwardingStatus`(`flow`: kotlin.String): Forwarding {
-            return FfiConverterTypeForwarding.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_forwarding_status(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Gives this phone a forwarding address. A student who already has one (made on another
-     * phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
-     * working; otherwise a new address is made and tied to them. Does nothing when this phone
-     * already has one.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `setUpForwarding`(`flow`: kotlin.String) : Forwarding {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_up_forwarding(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeForwarding.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Takes this phone off its address and forgets it. The edge deletes the address when no
-     * other phone uses it; mail forwarded to it is rejected from then on.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `turnOffForwarding`(`flow`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -5264,220 +4860,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     )
     }
     
-
-    
-    /**
-     * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
-     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
-     * the student on screen saying yes: from the background it is always the error.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_answer_session_request(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`requestId`),
-        FfiConverterString.lower(`callbackUrl`),
-        FfiConverterOptionalString.lower(`error`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * The account's access keys and whether this phone is linked to it.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `connectedApps`(`flow`: kotlin.String) : ConnectedApps {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_connected_apps(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeConnectedApps.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Makes a key: for the extension that shows `pair_code` (it collects the key from the edge),
-     * else for an MCP client. Links this phone first when it is not yet.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?) : NewKey {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_create_key(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterBoolean.lower(`outings`),
-        FfiConverterOptionalString.lower(`pairCode`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterTypeNewKey.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Links this phone to the account without making a key (after a reinstall, so the keys
-     * made before show again).
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `linkPhone`(`flow`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_link_phone(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
-     * phones no longer linked; without `from`, only the latter. The number of keys moved.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `moveKeys`(`flow`: kotlin.String, `from`: kotlin.String?) : kotlin.UInt {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_move_keys(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterOptionalString.lower(`from`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_u32(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_u32(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_u32(future) },
-        // lift function
-        { FfiConverterUInt.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `pairApp`(`flow`: kotlin.String, `code`: kotlin.String) : PairApp? {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_pair_app(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`code`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterOptionalTypePairApp.lift(it) },
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_revoke_key(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`id`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_key_outings(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`id`),
-        FfiConverterBoolean.lower(`outings`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
 
     
     /**
@@ -5750,6 +5132,520 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeProfile.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    override fun `cachedTimetable`(`flow`: kotlin.String): Timetable? {
+            return FfiConverterOptionalTypeTimetable.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_timetable(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchTimetable`(`flow`: kotlin.String) : Timetable {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_timetable(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeTimetable.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The next class of each course in the cached timetable, within a week
+     * of `now_unix` at the device's `utc_offset_minutes`.
+     */override fun `nextClasses`(`flow`: kotlin.String, `nowUnix`: kotlin.Long, `utcOffsetMinutes`: kotlin.Int): List<NextClass> {
+            return FfiConverterSequenceTypeNextClass.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_next_classes(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterLong.lower(`nowUnix`),
+        FfiConverterInt.lower(`utcOffsetMinutes`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * `count` agenda days from epoch day `from_day` (local), from the
+     * cached timetable and academic calendar (without a calendar every
+     * class is held).
+     */override fun `timetableDays`(`flow`: kotlin.String, `fromDay`: kotlin.Int, `count`: kotlin.Int): List<TimetableDay> {
+            return FfiConverterSequenceTypeTimetableDay.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_timetable_days(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterInt.lower(`fromDay`),
+        FfiConverterInt.lower(`count`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The selected semester's story; none until its classes are over (today after the last
+     * instructional day) or without a calendar. No network.
+     */override fun `cachedWrapped`(`flow`: kotlin.String): WrappedReport? {
+            return FfiConverterOptionalTypeWrappedReport.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_wrapped(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Fetches the next older semester's attendance into its own pages folder when it isn't
+     * cached: one VTOP request, none without an older semester.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchWrappedPrevious`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_wrapped_previous(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The selected semester's class days up to today without a complete cached biometric
+     * copy. No network.
+     */override fun `wrappedMissingDays`(`flow`: kotlin.String): List<kotlin.Int> {
+            return FfiConverterSequenceInt.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_wrapped_missing_days(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The kinds the student ticked "don't ask again" for.
+     */override fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind> {
+            return FfiConverterSequenceTypeCookieKind.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Asks every time again.
+     */
+    @Throws(CoreException::class)override fun `resetCookieConsent`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Pulls the latest forwarded mail (the edge keeps it 5 minutes): Gmail's confirmation while
+     * setting up, or an OTP. Either one proves the address works.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `checkForwarding`(`flow`: kotlin.String) : Forwarding {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_check_forwarding(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeForwarding.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
+     * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
+     * prompt, which calls it every few seconds. Never logs the code.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `fetchForwardedOtp`(`flow`: kotlin.String, `since`: kotlin.Long) : kotlin.String? {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_forwarded_otp(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterLong.lower(`since`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterOptionalString.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * This phone's forwarding address and how far its setup got. No network.
+     */override fun `forwardingStatus`(`flow`: kotlin.String): Forwarding {
+            return FfiConverterTypeForwarding.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_forwarding_status(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Gives this phone a forwarding address. A student who already has one (made on another
+     * phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
+     * working; otherwise a new address is made and tied to them. Does nothing when this phone
+     * already has one.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setUpForwarding`(`flow`: kotlin.String) : Forwarding {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_up_forwarding(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeForwarding.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Takes this phone off its address and forgets it. The edge deletes the address when no
+     * other phone uses it; mail forwarded to it is rejected from then on.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `turnOffForwarding`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
+     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
+     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
+     * the student on screen saying yes: from the background it is always the error.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_answer_session_request(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`requestId`),
+        FfiConverterString.lower(`callbackUrl`),
+        FfiConverterOptionalString.lower(`error`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The account's access keys and whether this phone is linked to it.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `connectedApps`(`flow`: kotlin.String) : ConnectedApps {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_connected_apps(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeConnectedApps.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Makes a key: for the extension that shows `pair_code` (it collects the key from the edge),
+     * else for an MCP client. Links this phone first when it is not yet.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?) : NewKey {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_create_key(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterBoolean.lower(`outings`),
+        FfiConverterOptionalString.lower(`pairCode`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeNewKey.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Links this phone to the account without making a key (after a reinstall, so the keys
+     * made before show again).
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `linkPhone`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_link_phone(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
+     * phones no longer linked; without `from`, only the latter. The number of keys moved.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `moveKeys`(`flow`: kotlin.String, `from`: kotlin.String?) : kotlin.UInt {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_move_keys(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterOptionalString.lower(`from`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_u32(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_u32(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_u32(future) },
+        // lift function
+        { FfiConverterUInt.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `pairApp`(`flow`: kotlin.String, `code`: kotlin.String) : PairApp? {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_pair_app(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`code`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterOptionalTypePairApp.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_revoke_key(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_key_outings(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+        FfiConverterBoolean.lower(`outings`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -6166,6 +6062,187 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
+     * fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
+     * a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `cancelOtp`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_cancel_otp(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Signs in again when the session signed in over `max_age_secs` ago (or when that is
+     * unknown), so a long fetch starts on a fresh one; a newer session asks VTOP nothing.
+     * `OtpRequired` when VTOP wants the emailed code.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `ensureFreshSession`(`flow`: kotlin.String, `maxAgeSecs`: kotlin.ULong) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_ensure_fresh_session(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterULong.lower(`maxAgeSecs`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `resendOtp`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_resend_otp(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The saved username and password, and whether VTOP rejected the password, for the
+     * Account page (opened behind the phone's screen lock) and Settings' "Needs attention".
+     * Never logged.
+     */override fun `savedAccount`(`flow`: kotlin.String): SavedAccount? {
+            return FfiConverterOptionalTypeSavedAccount.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_saved_account(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String) : SignIn {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_sign_in(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`username`),
+        FfiConverterString.lower(`password`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeSignIn.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
+     * address again through the edge). Logs stay.
+     */override fun `signOut`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_sign_out(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * The saved account's registration number.
+     */override fun `signedInUser`(`flow`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_signed_in_user(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `submitOtp`(`flow`: kotlin.String, `code`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_submit_otp(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`code`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * The signed-in session for the web view, after VTOP confirmed it (signing in again with
      * the saved password when it had expired). With `force`, signs in again first (the web
      * view landed on VTOP's login page, or the student asked). Fails like a fetch: OTP
@@ -6192,69 +6269,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         CoreException.ErrorHandler,
     )
     }
-
-    
-    /**
-     * The selected semester's story; none until its classes are over (today after the last
-     * instructional day) or without a calendar. No network.
-     */override fun `cachedWrapped`(`flow`: kotlin.String): WrappedReport? {
-            return FfiConverterOptionalTypeWrappedReport.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_cached_wrapped(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    /**
-     * Fetches the next older semester's attendance into its own pages folder when it isn't
-     * cached: one VTOP request, none without an older semester.
-     */
-    @Throws(CoreException::class)
-    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchWrappedPrevious`(`flow`: kotlin.String) {
-        return uniffiRustCallAsync(
-        callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_wrapped_previous(
-                uniffiHandle,
-                
-        FfiConverterString.lower(`flow`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
-        // lift function
-        { },
-        
-        // Error FFI converter
-        CoreException.ErrorHandler,
-    )
-    }
-
-    
-    /**
-     * The selected semester's class days up to today without a complete cached biometric
-     * copy. No network.
-     */override fun `wrappedMissingDays`(`flow`: kotlin.String): List<kotlin.Int> {
-            return FfiConverterSequenceInt.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_wrapped_missing_days(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
-    
 
     
 
@@ -9978,8 +9992,9 @@ data class DevConfig (
     var `requestTimeoutS`: kotlin.UInt
     , 
     /**
-     * The app is debuggable (`FLAG_DEBUGGABLE`): Developer → Chat's servers may apply. The
-     * .so is always a release build, so this comes from the app, not `debug_assertions`.
+     * The app is debuggable (`FLAG_DEBUGGABLE`): demo pages may be recorded
+     * (`demo_record.json`). The .so is always a release build, so this comes from the app, not
+     * `debug_assertions`.
      */
     var `debuggable`: kotlin.Boolean
     
@@ -21347,32 +21362,6 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 
 
         /**
-         * Asks `gate` before any VTOP session leaves the phone; call before [`crate::Core::new`].
-         */ fun `setCookieGate`(`gate`: CookieGate)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_cookie_gate(
-    
-        
-        FfiConverterTypeCookieGate.lower(`gate`),_status)
-}
-    
-    
-
-        /**
-         * Keeps VTOP cookies in `cookies` (the web view's store); call before [`crate::Core::new`].
-         */ fun `setSharedCookies`(`cookies`: SharedCookies)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_shared_cookies(
-    
-        
-        FfiConverterTypeSharedCookies.lower(`cookies`),_status)
-}
-    
-    
-
-        /**
          * Sets [`DevConfig`]; call before the core is made. (Developer → Inspect Traffic is the app's
          * HTTP stack's: Rust sends nothing itself.)
          */ fun `devConfigure`(`config`: DevConfig)
@@ -21384,6 +21373,55 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
         FfiConverterTypeDevConfig.lower(`config`),_status)
 }
     
+    
+
+        /**
+         * Writes one line from Kotlin into the same file and logcat, in order.
+         */ fun `logEvent`(`level`: kotlin.String, `src`: kotlin.String, `flow`: kotlin.String?, `msg`: kotlin.String, `fields`: Map<kotlin.String, kotlin.String>)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_log_event(
+    
+        
+        FfiConverterString.lower(`level`),
+        FfiConverterString.lower(`src`),
+        FfiConverterOptionalString.lower(`flow`),
+        FfiConverterString.lower(`msg`),
+        FfiConverterMapStringString.lower(`fields`),_status)
+}
+    
+    
+
+        /**
+         * Starts the pipeline, writing to `data_dir/logs/app.jsonl` (the app
+         * passes its cache folder). Safe to call
+         * more than once.
+         */ fun `obsInit`(`dataDir`: kotlin.String)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_obs_init(
+    
+        
+        FfiConverterString.lower(`dataDir`),_status)
+}
+    
+    
+
+        /**
+         * The OTP in a Gmail API message (`users.messages.get`, `format=full`, as
+         * JSON) when VTOP sent it at or after `since` (unix seconds); None for an
+         * older mail, another sender, no code or JSON that is not a message.
+         */ fun `gmailOtp`(`messageJson`: kotlin.String, `since`: kotlin.Long): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_gmail_otp(
+    
+        
+        FfiConverterString.lower(`messageJson`),
+        FfiConverterLong.lower(`since`),_status)
+}
+    )
+    }
     
 
         /**
@@ -21419,54 +21457,6 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 }
     )
     }
-    
-
-        /**
-         * A pairing code as typed or scanned (`ABCDE-12345`, or a link ending in `#ABCDE-12345`), the
-         * way the edge reads it: case, dashes and spaces ignored, `O` as `0`, `I`/`L` as `1`. None when
-         * it is not one.
-         */ fun `pairCode`(`text`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_pair_code(
-    
-        
-        FfiConverterString.lower(`text`),_status)
-}
-    )
-    }
-    
-
-        /**
-         * Writes one line from Kotlin into the same file and logcat, in order.
-         */ fun `logEvent`(`level`: kotlin.String, `src`: kotlin.String, `flow`: kotlin.String?, `msg`: kotlin.String, `fields`: Map<kotlin.String, kotlin.String>)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_log_event(
-    
-        
-        FfiConverterString.lower(`level`),
-        FfiConverterString.lower(`src`),
-        FfiConverterOptionalString.lower(`flow`),
-        FfiConverterString.lower(`msg`),
-        FfiConverterMapStringString.lower(`fields`),_status)
-}
-    
-    
-
-        /**
-         * Starts the pipeline, writing to `data_dir/logs/app.jsonl` (the app
-         * passes its cache folder). Safe to call
-         * more than once.
-         */ fun `obsInit`(`dataDir`: kotlin.String)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_obs_init(
-    
-        
-        FfiConverterString.lower(`dataDir`),_status)
-}
-    
     
 
         /**
@@ -21533,6 +21523,49 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
 
         /**
+         * Asks `gate` before any VTOP session leaves the phone; call before [`crate::Core::new`].
+         */ fun `setCookieGate`(`gate`: CookieGate)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_set_cookie_gate(
+    
+        
+        FfiConverterTypeCookieGate.lower(`gate`),_status)
+}
+    
+    
+
+        /**
+         * A pairing code as typed or scanned (`ABCDE-12345`, or a link ending in `#ABCDE-12345`), the
+         * way the edge reads it: case, dashes and spaces ignored, `O` as `0`, `I`/`L` as `1`. None when
+         * it is not one.
+         */ fun `pairCode`(`text`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_pair_code(
+    
+        
+        FfiConverterString.lower(`text`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The engine names of the pages [`Core::fetch_pages`] takes ([`BATCHED`]), for the app's
+         * open-app sweep.
+         */ fun `batchedPages`(): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_batched_pages(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
          * Sets the name the server shows for this phone ("OnePlus CPH2573"); the first call wins.
          */ fun `setDeviceLabel`(`label`: kotlin.String)
         = 
@@ -21541,6 +21574,32 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
         
         FfiConverterString.lower(`label`),_status)
+}
+    
+    
+
+        /**
+         * Sends the UDP route through `network`; without one the route fails and falls back to HTTPS.
+         */ fun `setUdpNetwork`(`network`: UdpNetwork)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_set_udp_network(
+    
+        
+        FfiConverterTypeUdpNetwork.lower(`network`),_status)
+}
+    
+    
+
+        /**
+         * Keeps VTOP cookies in `cookies` (the web view's store); call before [`crate::Core::new`].
+         */ fun `setSharedCookies`(`cookies`: SharedCookies)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_set_shared_cookies(
+    
+        
+        FfiConverterTypeSharedCookies.lower(`cookies`),_status)
 }
     
     
@@ -21569,19 +21628,6 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 }
     )
     }
-    
-
-        /**
-         * Sends the UDP route through `network`; without one the route fails and falls back to HTTPS.
-         */ fun `setUdpNetwork`(`network`: UdpNetwork)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_udp_network(
-    
-        
-        FfiConverterTypeUdpNetwork.lower(`network`),_status)
-}
-    
     
 
 

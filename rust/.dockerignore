@@ -4,7 +4,6 @@ target
 **/build
 **/node_modules
 **/.wrangler
-# The TypeScript projects (not Cargo members) and Alchemy deploy caches: no Rust build reads them
+# The local TypeScript leftover (not a Cargo member) and Alchemy deploy caches: no Rust build reads them
 vtop-convex
-vtop-edge
 **/.alchemy

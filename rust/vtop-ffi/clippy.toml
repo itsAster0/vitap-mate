@@ -1,0 +1,13 @@
+# These hand out the VTOP session (cookies, CSRF token). A call that sends it off the phone
+# goes through consent::allowed first; each allowed call site says why in an
+# #[expect(clippy::disallowed_methods, reason = "...")].
+disallowed-methods = [
+    { path = "vtop_core::client::VtopClient::session_state", reason = "exports the VTOP session: gate a send on consent::allowed" },
+    { path = "vtop_core::client::VtopClient::export_persisted_session", reason = "exports the VTOP session: gate a send on consent::allowed" },
+    { path = "vtop_core::client::VtopClient::cookie_header", reason = "exports the VTOP cookies: gate a send on consent::allowed" },
+    { path = "vtop_core::client::VtopClient::cookie_bytes", reason = "exports the VTOP cookies: gate a send on consent::allowed" },
+]
+
+# Same as ../clippy.toml (clippy reads only the nearest file).
+allow-print-in-tests = true
+allow-dbg-in-tests = true

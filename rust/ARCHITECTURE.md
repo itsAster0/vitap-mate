@@ -9,8 +9,8 @@ rust/                    Cargo workspace
 ├── vtop-bridge/         the Engine: axum service over vtop-core, Railway service engine-v2
 ├── vtop-mcp/            MCP tools served by the Engine behind the edge's /mcp
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
-├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out; makes its own weekly keys (on a Linode in Chennai)
-└── vtop-edge/           the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript)
+└── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out; makes its own weekly keys (on a Linode in Chennai)
+edge/                    the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript, at the repo root)
 ```
 
 ## vtop-core
@@ -54,11 +54,19 @@ A few design points:
 
 ## The app's crate (vtop-ffi)
 
-`vtop-ffi` wraps `vtop-core` for the app with UniFFI proc macros.
-Each feature has its own file (sign-in, attendance and timetable in
-`lib.rs`; `marks.rs`, `exams.rs`, `outing.rs`, ...) with its own
-`#[uniffi::export] impl Core` block and ready-to-draw records. Every call
-takes the caller's flow id first. `mise run rust-android` builds
+`vtop-ffi` wraps `vtop-core` for the app with UniFFI proc macros. Its
+`src/` is grouped by what a module is about:
+
+| Place | Holds |
+| --- | --- |
+| `lib.rs` | `Core`, `CoreError`, the shared types and the session slot |
+| `session.rs` | sign-in, the OTP prompt, signing in again, sign-out |
+| `pages/` | one file per feature (`attendance.rs`, `timetable.rs`, `marks.rs`, `exams.rs`, `outing.rs`, ...) with its own `#[uniffi::export] impl Core` block and ready-to-draw records (`records.rs`), the change inbox (`changes.rs`) and Gmail's OTP (`gmail.rs`) |
+| `remote/` | everything that talks to our servers: `edge.rs` (the edge's URL and the session cookies sent to it), `route.rs` (+ `route/`), `udp.rs`, `consent.rs`, `account_token.rs`, `keys.rs` (Connected apps), `forwarding.rs` and `server.rs` (the Server page) |
+| `store.rs` (+ `store/`) | the file reads and writes; `decoded.rs` (decoded copies) and `cookies.rs` (the shared cookie store) |
+| top level | `transport.rs` (Kotlin's HTTP hop), `device.rs` (this install's keys), `dev.rs` (Developer), `demo.rs`, `web.rs`, `obs.rs` (logs), `macros.rs` (`signed_in!`) |
+
+Every call takes the caller's flow id first. `mise run rust-android` builds
 `libvtop_ffi.so` into `app/jniLibs/` and generates the Kotlin bindings
 (`core/src/vitapmate/core/vtop_ffi.kt`).
 
@@ -68,7 +76,7 @@ takes the caller's flow id first. `mise run rust-android` builds
   Both ask the route first (the server or UDP) and fall back to
   `VtopClient::fetch` on the phone. `cached_x` reads the saved copy with
   `read_page`.
-- **Decoded copies** (`decoded.rs`). The semester list, the pick and every
+- **Decoded copies** (`store/decoded.rs`). The semester list, the pick and every
   page stay decoded in memory after the first read, keyed by path and
   type, so screens that read the same page many times parse it once. A
   copy is used only while the file's length, modified time and inode are
@@ -76,10 +84,16 @@ takes the caller's flow id first. `mise run rust-android` builds
   another student, Developer's clears and a forgotten pick drop what they
   remove. At most 4 MB of JSON is kept, the least recently used going
   first.
-- **Route policy** (`route/plan.rs`). Which route to try, the 5-minute
+- **Route policy** (`remote/route/plan.rs`). Which route to try, the 5-minute
   skips and the steps of a server fetch (consent, the fetch, one sign-in
   again) are pure: no I/O and no clock, the caller passes `now`.
-  `route.rs` keeps the one plan and runs its steps.
+  `remote/route.rs` runs its steps on the core's plan.
+- **Per-core state** (`Shared` in `lib.rs`). The route plan, cookie consent
+  and the Developer config live on `Core`, and every VTOP client's transport
+  (`Routed`) holds the same `Arc`. Kotlin calls `set_cookie_gate` and
+  `dev_configure` before it makes the one `Core`, which copies them in. The
+  HTTP and UDP transports, the shared cookie store, decoded copies and the log
+  pipeline stay process-wide: each is the app's one of its kind.
 
 ## VTOP from the phone
 
@@ -97,19 +111,19 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
 - **Cookies.** Rust's `CookieStore` reads and writes Android's `CookieManager`
   through the foreign trait `SharedCookies` (`VtopCookies.kt`), so the web view
   and Rust share one session.
-- **Routes** (`vtop-ffi/src/route.rs`, Settings → Connection). Direct sends to
+- **Routes** (`vtop-ffi/src/remote/route.rs`, Settings → Connection). Direct sends to
   VTOP. Proxy swaps VTOP's origin for the edge's `/vtop/` on each hop
   (`Routed`), so cookies, redirects and the parsers never see the edge. Server
   sends read pages to the edge's `/v1/vtop/fetch` with the phone's session and,
   when it expired, signs in through `/v1/vtop/login`; writes, downloads and the
   web view stay on the phone. Udp sends the same request to the gateway first
-  (`udp.rs`, a Kotlin `DatagramSocket` in `VtopUdp.kt`). A route that fails is
+  (`remote/udp.rs`, a Kotlin `DatagramSocket` in `VtopUdp.kt`). A route that fails is
   skipped for 5 minutes and the request goes on to Direct. The log line
   `route used` names the route each call took. The open-app sweep sends its
-  pages as one batch (`Core::fetch_pages`, `route/batch.rs`,
+  pages as one batch (`Core::fetch_pages`, `remote/route/batch.rs`,
   `/v1/vtop/fetch-batch`), asked about once; on Direct, or a server without
   batches, they are fetched a few at a time on the phone.
-- **Cookie consent** (`vtop-ffi/src/consent.rs`). Every path that sends the
+- **Cookie consent** (`vtop-ffi/src/remote/consent.rs`). Every path that sends the
   VTOP session (or the saved password) to our servers calls `consent::allowed`
   first: Proxy, Server and Udp, the server OTP, Connected apps, the Server page,
   mail forwarding and a connected app's session request. Kotlin's
@@ -124,7 +138,7 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   `ConsentDenied`. Calls nobody started (the semester push)
   never ask and send only with the tick. A session request while the
   app is away only posts a notification; tapping it opens the app and asks.
-- **Account token** (`vtop-ffi/src/account_token.rs`, API.md "Account
+- **Account token** (`vtop-ffi/src/remote/account_token.rs`, API.md "Account
   tokens"). After the edge checks the session for an account call
   (Connected apps, the Server page, mail forwarding), linked phone or not, it
   answers with a 14-day token naming the student and this install; the
@@ -143,10 +157,10 @@ registration number, no VTOP cookies): the sealed session's and password's ages,
 when VTOP last rejected the password, the forwarding address, the phone count,
 the last 10 sign-ins and each key's last 10 uses (extension or MCP, from the
 `x-vtop-client` header). Settings → Server shows these and the account's other
-records, with a delete for each (`vtop-ffi/src/server.rs`). `/healthz` reports
+records, with a delete for each (`vtop-ffi/src/remote/server.rs`). `/healthz` reports
 `version` and `colo`.
 
-MCP clients (Claude and others) connect to `/mcp` with OAuth (`vtop-edge/src/
+MCP clients (Claude and others) connect to `/mcp` with OAuth (`edge/src/
 oauth.ts`): `/mcp` answers 401 with the metadata URL, the client registers and
 opens `/authorize`, which shows a pairing code and QR. The student scans it in
 Connected apps → Pair a browser; the app makes an access key with that
@@ -204,7 +218,7 @@ Internal calls (edge → engine, engine → edge `/internal/*`, gateway →
 engine, gateway → edge) all carry `Authorization: Bearer $INTERNAL_TOKEN`.
 
 Deploy: the edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway
-`engine-v2`) and the gateway with `bun run deploy` in `rust/vtop-edge`
+`engine-v2`) and the gateway with `bun run deploy` in `edge/`
 (`alchemy.run.ts`), from a laptop; CI deploys nothing.
 The gateway image is built for x86, pushed to GHCR and run on the Linode
 `fedora-in-maa` (172.232.115.40, UDP 3478-3481) over SSH, with host networking, `rust/vps/resolv.conf` as its resolvers
@@ -220,6 +234,7 @@ and `~/vitapmate-gateway/data` for the keys.
 - `vtop-wire`: framing, Reed-Solomon, the loss estimate, and client ↔
   gateway over localhost UDP (30% loss, restarts, replays, two processes).
 - `vtop-gateway`: the client through the gateway to a mock engine.
-- `vtop-edge` (`bun run test`): accounts, devices, mail OTP, the `/vtop/` proxy.
-- `vtop-ffi/src/tests.rs`, `outing/tests.rs` and next to each module: the app's crate.
+- `edge/` (`bun run test`): accounts, devices, mail OTP, the `/vtop/` proxy.
+- `vtop-ffi/src/tests.rs`, `<module>/tests.rs` (`pages/outing/`, `remote/forwarding/`, ...) and next to
+  each module: the app's crate; `test_edge.rs` is the mock edge they share.
 - `vtop-core/examples/parse_bench.rs`: parser timings on fixtures or raw pages.

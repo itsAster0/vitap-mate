@@ -4,6 +4,8 @@
 //! cargo run --release -p vtop-core --example parse_bench [dir-with-html]
 //! ```
 
+#![expect(clippy::print_stdout, reason = "the timings are the output")]
+
 use std::path::PathBuf;
 use std::time::Instant;
 

@@ -17,30 +17,22 @@ use rmcp::{schemars, tool, tool_router};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use vtop_core::client::{
-    check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
-    WeekendOutingApplication,
+    GeneralOutingApplication, OutingKind, WeekendOutingApplication, check_weekend_outing,
 };
+use vtop_core::dates::{self, WEEKDAYS, civil_date, minutes_in_india, today_in_india};
 use vtop_core::inputs::{ContactNumber, OutingDate, OutingPassId, OutingTime};
+use vtop_core::outing::{
+    DayProblem, LeavingProblem, ReturningProblem, TextProblem, check_general, check_weekend, tidy,
+    weekend_dates,
+};
 use vtop_core::spec::{self, Query};
 use vtop_core::types::{GeneralOutingData, OutingStudent, WeekendOutingData};
-use vtop_core::{now_unix, VtopError, VtopResult};
+use vtop_core::{VtopError, VtopResult, now_unix};
 
-use crate::tools::{
-    civil_date, file_result, input, json_result, tool_error, with_retry, Caller, VtopTools,
-};
+use crate::tools::{Caller, VtopTools, file_result, input, json_result, tool_error, with_retry};
 
 /// How long a confirmation code stays good.
 const CONFIRM_SECONDS: u64 = 600;
-
-const WEEKDAYS: [&str; 7] = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-];
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct GeneralOutingArgs {
@@ -127,13 +119,8 @@ fn outing_time(raw: &str) -> VtopResult<OutingTime> {
     OutingTime::new(hour, minute)
 }
 
-/// Today's day number in India (UTC+5:30), where VTOP's dates are.
-fn today_in_india() -> i64 {
-    (now_unix() as i64 + 19_800).div_euclid(86_400)
-}
-
 fn weekday(days: i64) -> &'static str {
-    WEEKDAYS[(days + 4).rem_euclid(7) as usize]
+    WEEKDAYS[usize::from(dates::weekday(days))]
 }
 
 /// `YYYY-MM-DD`, as the outing records show dates.
@@ -142,8 +129,126 @@ fn iso_date(days: i64) -> String {
     format!("{year:04}-{month:02}-{day:02}")
 }
 
-fn tidy(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
+/// `Sunday 11-Oct-2026`, the form the tools take dates in, with the
+/// weekday.
+fn date_label(day: i64) -> String {
+    let (year, month, date) = civil_date(day);
+    let month = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ][(month - 1).clamp(0, 11) as usize];
+    format!("{} {date:02}-{month}-{year:04}", weekday(day))
+}
+
+/// `Sunday 11-Oct-2026 09:30`, for minutes since 1970 in India.
+fn moment_label(at: i64) -> String {
+    let minute = at.rem_euclid(1440);
+    format!(
+        "{} {:02}:{:02}",
+        date_label(at.div_euclid(1440)),
+        minute / 60,
+        minute % 60
+    )
+}
+
+fn text_message(label: &str, problem: TextProblem) -> String {
+    match problem {
+        TextProblem::Missing => format!("{label} must not be empty"),
+        TextProblem::TooLong { max_length } => {
+            format!("{label} must be at most {max_length} characters")
+        }
+    }
+}
+
+/// Why the app's rules refuse this general outing as of `now` (minutes
+/// since 1970 in India), the first problem only.
+fn general_problem(
+    form: &GeneralOutingData,
+    application: &GeneralOutingApplication,
+    now: i64,
+) -> Option<String> {
+    let at = |date: &OutingDate, time: OutingTime| {
+        date.day_number() * 1440 + i64::from(time.hour) * 60 + i64::from(time.minute)
+    };
+    let problems = check_general(
+        &form.rules(),
+        &application.place,
+        &application.purpose,
+        at(&application.out_date, application.out_time),
+        at(&application.in_date, application.in_time),
+        now,
+    );
+    let leaving = problems.leaving.map(|problem| match problem {
+        LeavingProblem::TooFarAhead { last_day } => format!(
+            "leaving date can be at most {} days ahead, so {} at the latest",
+            form.max_days_ahead,
+            date_label(last_day)
+        ),
+        LeavingProblem::OutsideHours => "leaving time is outside the allowed hours".into(),
+        LeavingProblem::TooSoon { earliest } => format!(
+            "VTOP needs 24 hours' notice: leave at or after {}",
+            moment_label(earliest)
+        ),
+    });
+    let returning = problems.returning.map(|problem| match problem {
+        ReturningProblem::OutsideHours => "return time is outside the allowed hours".into(),
+        ReturningProblem::NotAfterLeaving => "return must be after leaving".into(),
+    });
+    [
+        problems.place.map(|problem| text_message("place", problem)),
+        problems
+            .purpose
+            .map(|problem| text_message("purpose", problem)),
+        leaving,
+        returning,
+    ]
+    .into_iter()
+    .flatten()
+    .next()
+}
+
+/// Why the app's rules refuse this weekend outing as of `today` (a day
+/// number in India), the first problem only.
+fn weekend_problem(
+    form: &WeekendOutingData,
+    application: &WeekendOutingApplication,
+    today: i64,
+) -> Option<String> {
+    let problems = check_weekend(
+        &form.rules(),
+        &application.purpose,
+        Some(application.date.day_number()),
+        application.contact_number.as_str(),
+        today,
+    );
+    let day = problems.day.map(|problem| match problem {
+        DayProblem::Missing => "pick a date".to_string(),
+        DayProblem::NotOffered => {
+            let offered: Vec<String> = weekend_dates(&form.rules(), today)
+                .into_iter()
+                .map(date_label)
+                .collect();
+            if offered.is_empty() {
+                "VTOP offers no weekend outing day right now".into()
+            } else {
+                format!(
+                    "date is not one VTOP offers; it offers {}",
+                    offered.join(", ")
+                )
+            }
+        }
+    });
+    [
+        problems
+            .purpose
+            .map(|problem| text_message("purpose", problem)),
+        day,
+        problems
+            .contact
+            .map(|_| "contact number must be 10 digits".to_string()),
+    ]
+    .into_iter()
+    .flatten()
+    .next()
 }
 
 /// The code for `key` making exactly this request, good until `expires`.
@@ -209,61 +314,6 @@ fn closed(notice: &str) -> String {
     } else {
         format!("VTOP is not taking outing applications: {notice}")
     }
-}
-
-/// The dates the general outing form would accept, which the app's date
-/// pickers enforce. A limit of 0 is taken as no limit.
-fn check_general_dates(
-    form: &GeneralOutingData,
-    application: &GeneralOutingApplication,
-) -> VtopResult<()> {
-    let (today, out, back) = (
-        today_in_india(),
-        application.out_date.day_number(),
-        application.in_date.day_number(),
-    );
-    if out < today {
-        return Err(invalid("leaving date is in the past"));
-    }
-    if form.max_days_ahead > 0 && out > today + i64::from(form.max_days_ahead) {
-        return Err(invalid(format!(
-            "leaving date can be at most {} days ahead",
-            form.max_days_ahead
-        )));
-    }
-    let leaves = (out, application.out_time.hour, application.out_time.minute);
-    let returns = (back, application.in_time.hour, application.in_time.minute);
-    if returns <= leaves {
-        return Err(invalid("return must be after leaving"));
-    }
-    Ok(())
-}
-
-/// [`check_general_dates`] for a weekend outing.
-fn check_weekend_date(
-    form: &WeekendOutingData,
-    application: &WeekendOutingApplication,
-) -> VtopResult<()> {
-    let date = application.date.day_number();
-    if form.max_days_ahead > 0 && date > today_in_india() + i64::from(form.max_days_ahead) {
-        return Err(invalid(format!(
-            "outing date can be at most {} days ahead",
-            form.max_days_ahead
-        )));
-    }
-    let day = (date + 4).rem_euclid(7) as u8;
-    if !form.weekdays.is_empty() && !form.weekdays.contains(&day) {
-        let allowed: Vec<_> = form
-            .weekdays
-            .iter()
-            .map(|day| WEEKDAYS[usize::from(*day) % 7])
-            .collect();
-        return Err(invalid(format!(
-            "weekend outings can only be on {}",
-            allowed.join(", ")
-        )));
-    }
-    Ok(())
 }
 
 fn hhmm(time: OutingTime) -> String {
@@ -353,10 +403,8 @@ impl VtopTools {
             let Some(student) = form.student.as_ref() else {
                 return tool_error(closed(&form.notice));
             };
-            if let Err(error) = check_general_outing(&form, &application)
-                .and_then(|_| check_general_dates(&form, &application))
-            {
-                return tool_error(format!("VTOP would not take this request: {error}"));
+            if let Some(problem) = general_problem(&form, &application, minutes_in_india()) {
+                return tool_error(format!("VTOP would not take this request: {problem}"));
             }
             let (out, back) = (
                 application.out_date.day_number(),
@@ -455,10 +503,12 @@ impl VtopTools {
             let Some(student) = form.student.as_ref() else {
                 return tool_error(closed(&form.notice));
             };
-            if let Err(error) = check_weekend_outing(&form, &application)
-                .and_then(|_| check_weekend_date(&form, &application))
+            if let Some(problem) = check_weekend_outing(&form, &application)
+                .err()
+                .map(|error| error.to_string())
+                .or_else(|| weekend_problem(&form, &application, today_in_india()))
             {
-                return tool_error(format!("VTOP would not take this request: {error}"));
+                return tool_error(format!("VTOP would not take this request: {problem}"));
             }
             let label = |options: &[vtop_core::types::OutingOption], value: &str| {
                 options
@@ -633,5 +683,132 @@ impl VtopTools {
             ),
             Err(message) => tool_error(message),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn general_form() -> GeneralOutingData {
+        GeneralOutingData {
+            student: None,
+            notice: String::new(),
+            records: Vec::new(),
+            out_hours: (6..=22).collect(),
+            in_hours: (6..=20).collect(),
+            place_max_length: 50,
+            purpose_max_length: 50,
+            max_days_ahead: 30,
+            max_days_away: 0,
+            update_time: 0,
+        }
+    }
+
+    fn trip(out: &str, out_time: &str, back: &str, in_time: &str) -> GeneralOutingApplication {
+        GeneralOutingApplication {
+            place: "Guntur".into(),
+            purpose: "Visit".into(),
+            out_date: OutingDate::parse(out).unwrap(),
+            out_time: outing_time(out_time).unwrap(),
+            in_date: OutingDate::parse(back).unwrap(),
+            in_time: outing_time(in_time).unwrap(),
+        }
+    }
+
+    #[test]
+    fn general_outing_needs_24_hours_notice() {
+        // Friday 06-Nov-2026, 10:00 in India.
+        let now = 20_763 * 1440 + 600;
+        let form = general_form();
+        let check = |application| general_problem(&form, &application, now);
+        assert_eq!(
+            check(trip("07-Nov-2026", "10:00", "07-Nov-2026", "18:00")),
+            None
+        );
+        let soon = check(trip("07-Nov-2026", "09:59", "07-Nov-2026", "18:00")).unwrap();
+        assert_eq!(
+            soon,
+            "VTOP needs 24 hours' notice: leave at or after Saturday 07-Nov-2026 10:00"
+        );
+        // Later today was fine before ("not in the past"); now it is not.
+        assert!(
+            check(trip("06-Nov-2026", "18:00", "06-Nov-2026", "20:00"))
+                .unwrap()
+                .contains("24 hours' notice")
+        );
+        assert!(
+            check(trip("07-Dec-2026", "10:00", "07-Dec-2026", "18:00"))
+                .unwrap()
+                .contains("at most 30 days ahead")
+        );
+        // No days ahead allows no day, where 0 used to mean no limit.
+        let none_ahead = GeneralOutingData {
+            max_days_ahead: 0,
+            ..general_form()
+        };
+        assert!(
+            general_problem(
+                &none_ahead,
+                &trip("08-Nov-2026", "10:00", "08-Nov-2026", "18:00"),
+                now
+            )
+            .unwrap()
+            .contains("at most 0 days ahead")
+        );
+    }
+
+    fn weekend_form(weekdays: Vec<u8>) -> WeekendOutingData {
+        WeekendOutingData {
+            student: None,
+            notice: String::new(),
+            records: Vec::new(),
+            places: Vec::new(),
+            time_slots: Vec::new(),
+            purpose_max_length: 50,
+            max_days_ahead: 6,
+            weekdays,
+            update_time: 0,
+        }
+    }
+
+    fn outing_on(date: &str) -> WeekendOutingApplication {
+        WeekendOutingApplication {
+            place: "P".into(),
+            purpose: "Movie".into(),
+            date: OutingDate::parse(date).unwrap(),
+            time_slot: "S".into(),
+            contact_number: ContactNumber::parse("9876543210").unwrap(),
+        }
+    }
+
+    #[test]
+    fn empty_weekdays_allow_no_day() {
+        // Tuesday 03-Nov-2026: tomorrow is not a usual outing day either.
+        let tuesday = 20_760;
+        let none = weekend_form(vec![]);
+        assert_eq!(
+            weekend_problem(&none, &outing_on("08-Nov-2026"), tuesday).as_deref(),
+            Some("VTOP offers no weekend outing day right now")
+        );
+        let sundays = weekend_form(vec![0]);
+        assert_eq!(
+            weekend_problem(&sundays, &outing_on("08-Nov-2026"), tuesday),
+            None
+        );
+        assert_eq!(
+            weekend_problem(&sundays, &outing_on("07-Nov-2026"), tuesday).as_deref(),
+            Some("date is not one VTOP offers; it offers Sunday 08-Nov-2026")
+        );
+    }
+
+    #[test]
+    fn weekend_tomorrow_counts_when_it_is_a_usual_day() {
+        // Saturday 07-Nov-2026: VTOP's picker blocks Sunday, the app adds it.
+        let saturday = 20_764;
+        assert_eq!(
+            weekend_problem(&weekend_form(vec![1]), &outing_on("08-Nov-2026"), saturday),
+            None
+        );
     }
 }

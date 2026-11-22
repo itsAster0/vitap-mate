@@ -1,0 +1,7 @@
+# Clippy settings for the workspace's crates. Clippy reads the nearest clippy.toml, so
+# vtop-ffi keeps its own (vtop-ffi/clippy.toml, with disallowed-methods); when it opts in to
+# the workspace lints, copy these two lines there:
+#   allow-print-in-tests = true
+#   allow-dbg-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true

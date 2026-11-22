@@ -5,7 +5,7 @@
 
 use std::io::{Error, ErrorKind};
 
-use brotli::enc::{interface, BrotliEncoderParams, StandardAlloc};
+use brotli::enc::{BrotliEncoderParams, StandardAlloc, interface};
 use brotli::{InputReferenceMut, IoReaderWrapper, IoWriterWrapper};
 use serde_json::Value;
 use vtop_shared::page_dictionary;
@@ -43,14 +43,14 @@ mod tests {
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 
-    use serde::de::DeserializeOwned;
     use serde::Serialize;
+    use serde::de::DeserializeOwned;
     use serde_json::json;
     use vtop_core::types::{
         CoursePageClasses, CoursePageCourses, CoursePageDetail, GeneralOutingData,
         WeekendOutingData,
     };
-    use vtop_shared::page_dictionary::{unpack, Source, SOURCE};
+    use vtop_shared::page_dictionary::{SOURCE, Source, unpack};
 
     use super::*;
     use crate::pages;

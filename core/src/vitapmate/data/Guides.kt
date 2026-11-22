@@ -10,8 +10,8 @@ import kotlinx.coroutines.withContext
 import vitapmate.observability.Log
 
 /**
- * Help pages the app reads from the edge instead of shipping them (`rust/vtop-edge/guides`, see
- * `/guides/` in `rust/vtop-edge/API.md`): JSON and its images, fetched when a page first opens and
+ * Help pages the app reads from the edge instead of shipping them (`edge/guides`, see
+ * `/guides/` in `edge/API.md`): JSON and its images, fetched when a page first opens and
  * kept in the cache folder. Each open shows the kept copy and checks it with its ETag, so a fixed
  * guide needs only an edge deploy, not a release.
  */

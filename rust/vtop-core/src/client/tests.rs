@@ -8,7 +8,7 @@ use tokio::net::TcpListener;
 
 use super::*;
 use crate::inputs::OutingPassId;
-use crate::spec::{Query, ATTENDANCE};
+use crate::spec::{ATTENDANCE, Query};
 
 const CONTENT_PAGE: &str = r#"<html><input name="_csrf" value="csrf-1">
 <input type="hidden" name="authorizedIDX" value="22BCE0001"></html>"#;
@@ -842,5 +842,9 @@ async fn a_pass_goes_to_its_file_whichever_transport_writes_it() {
             assert!(!to.exists(), "an error page is not kept");
         }
     }
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "removing a temporary folder"
+    )]
     let _ = std::fs::remove_dir_all(&dir);
 }

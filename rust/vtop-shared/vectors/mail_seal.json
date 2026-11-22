@@ -1,0 +1,10 @@
+{
+  "comment": "mail_seal: a box sealed with a fixed ephemeral key and nonce. vtop-shared's mail_seal tests and the edge's src/shared/mail-seal.test.ts must both produce `box` byte for byte. Bytes are hex.",
+  "secret": "0707070707070707070707070707070707070707070707070707070707070707",
+  "ephemeral": "0909090909090909090909090909090909090909090909090909090909090909",
+  "nonce": "030303030303030303030303",
+  "mailboxId": "k3f9x2ab7q",
+  "plaintext": "{\"kind\":\"otp\",\"code\":\"401295\",\"sentAt\":1760000000}",
+  "public": "E75P6uryBMf9M1j8nAByGIHRdCeBKCJ-xnTzf3_pe20",
+  "box": "AVfbSzWfI65eFG5OJRIFZwRyJQY0jBUMFHU9DJM9BNQhAwMDAwMDAwMDAwMDnR9M8IRFhOh0oPy3nhcTWiVq8Xs8ocPlv23PRQgSBmfqtiQ3PzC4XkT7cks8QLqiNiJ4346hVr5T_nZryOFoQRCE"
+}

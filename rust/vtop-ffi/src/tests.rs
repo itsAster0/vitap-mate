@@ -1,8 +1,25 @@
+#![expect(
+    clippy::disallowed_methods,
+    reason = "tests read the session back to check it"
+)]
+
 use std::collections::HashMap;
 
 use serde_json::Value;
+use vtop_core::types::AttendanceData;
 
 use super::*;
+use crate::pages::{changes, records};
+use crate::remote::{account_token, consent, edge, forwarding, route};
+use crate::store::{cookies, decoded};
+
+/// The cache folder of every test that opens a real [`Core::new`]. The log pipeline is
+/// process-wide ([`obs::obs_init`]): the first core's cache folder gets the one log file, so
+/// these tests share it, and never remove it.
+pub(crate) fn shared_cache() -> String {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-cache-{}", std::process::id()));
+    dir.to_string_lossy().into()
+}
 
 #[tokio::test]
 async fn calls_log_ms_and_outcome_without_secrets() {
@@ -15,12 +32,7 @@ async fn calls_log_ms_and_outcome_without_secrets() {
     fs::write(dir.join(SESSION), session).unwrap();
     fs::create_dir_all(dir.join(PAGES).join("AP1")).unwrap();
     fs::write(dir.join(SELECTED), r#""AP1""#).unwrap();
-    let core = Core::new(
-        "f-new".into(),
-        dir.to_string_lossy().into(),
-        dir.to_string_lossy().into(),
-    )
-    .unwrap();
+    let core = Core::new("f-new".into(), dir.to_string_lossy().into(), shared_cache()).unwrap();
 
     // Both fail before any network call.
     let signed_in = core
@@ -41,7 +53,7 @@ async fn calls_log_ms_and_outcome_without_secrets() {
         HashMap::from([("count".into(), "3".into())]),
     );
 
-    let log = fs::read_to_string(dir.join("logs/app.jsonl")).unwrap();
+    let log = fs::read_to_string(PathBuf::from(shared_cache()).join("logs/app.jsonl")).unwrap();
     for secret in ["hunter2-secret", "493817", "pw-secret-1", "cookie-secret"] {
         assert!(!log.contains(secret), "{secret} logged");
     }
@@ -55,7 +67,7 @@ async fn calls_log_ms_and_outcome_without_secrets() {
     // vtop-core's `log` lines carry the flow and the registration number (not the username).
     let restore = lines
         .iter()
-        .find(|line| line["src"] == "rust.auth")
+        .find(|line| line["src"] == "rust.auth" && line["flow"] == "f-new")
         .unwrap();
     assert_eq!(
         (&restore["flow"], &restore["regno"]),
@@ -85,11 +97,7 @@ fn pages_follow_the_selected_semester() {
         fs::write(dir.join(PAGES).join(id).join(ATTENDANCE), page).unwrap();
     }
     // Not Core::new: logging is process-wide and the other test reads its own log file.
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     let code = |core: &Core| {
         core.cached_attendance("f".into()).unwrap().courses[0]
             .code
@@ -134,11 +142,9 @@ async fn pages_wait_for_a_picked_semester() {
         rejected: false,
         registration_number: None,
     };
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(Some(Arc::new(RwLock::new(Session::new(account).unwrap())))),
-    };
+    let core = Core::for_test(&dir);
+    let session = Session::new(account, &core.shared).unwrap();
+    core.install(Some(Arc::new(RwLock::new(session))));
     // Before any network call: no pick, no request.
     assert_eq!(
         core.fetch_attendance("f".into()).await,
@@ -177,11 +183,7 @@ fn attendance_detail_reads_the_course_history() {
         r#"{"records":[{"serial":"5","category":"","course_name":"SWE1002 - Principles of Software Engineering - Embedded Lab","course_code":"AP2025262000671 - L10+L11 - 409","course_type":"ELA","faculty_detail":"","classes_attended":"22","total_classes":"32","attendance_percentage":"79%","attendence_fat_cat":"-","debar_status":"-","course_id":"AM_SWE1002_00200"}],"semester_id":"AP2025262","update_time":1}"#,
     )
     .unwrap();
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     // Course known, history not fetched yet.
     assert_eq!(
         core.cached_attendance_detail("f".into(), "SWE1002.lab".into()),
@@ -228,11 +230,7 @@ fn the_cached_calendar_shapes_the_agenda() {
     fs::write(dir.join(SELECTED), r#""AP1""#).unwrap();
     let timetable = r#"{"slots":[{"serial":"1","day":"SAT","slot":"A1","course_code":"MAT1001","course_type":"ETH","room_no":"1","block":"AB1","start_time":"08:00","end_time":"08:50","name":"Calculus","kind":"Theory","faculty":"","credits":"3"}],"courses":[],"semester_id":"AP1","update_time":1}"#;
     fs::write(dir.join(PAGES).join("AP1").join(TIMETABLE), timetable).unwrap();
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     // Sat 2026-11-07 (epoch day 20 764): a plain class day without a calendar.
     let saturday = 20_764;
     let plain = core.timetable_days("f".into(), saturday, 1);
@@ -268,11 +266,7 @@ fn outlook_plans_every_saved_course() {
         r#"{"records":[{"serial":"1","category":"","course_name":"MAT1001 - Calculus - Theory Only","course_code":"","course_type":"TH","faculty_detail":"","classes_attended":"30","total_classes":"40","attendance_percentage":"75%","attendence_fat_cat":"-","debar_status":"-","course_id":"AM_MAT1001"}],"semester_id":"AP1","update_time":1}"#,
     )
     .unwrap();
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     // No calendar yet: no outlook.
     assert!(core.attendance_outlook("f".into()).is_empty());
     fs::write(
@@ -346,11 +340,7 @@ fn missing_or_behind_histories_are_mismatched() {
         history(two),
     )
     .unwrap();
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     assert_eq!(
         core.mismatched_attendance_details("f".into()),
         ["BEHIND1.theory", "NEVER1.theory"]
@@ -401,12 +391,11 @@ async fn another_student_signing_in_drops_the_last_ones_pages() {
         rejected: false,
         registration_number: None,
     };
-    let slot = Arc::new(RwLock::new(Session::new(account("21BCE0002")).unwrap()));
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(Some(slot.clone())),
-    };
+    let core = Core::for_test(&dir);
+    let slot = Arc::new(RwLock::new(
+        Session::new(account("21BCE0002"), &core.shared).unwrap(),
+    ));
+    core.install(Some(slot.clone()));
 
     // "Sign in again" with another account: the last one's semesters, pick, pages and
     // forwarding address go.
@@ -444,12 +433,10 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
         rejected: false,
         registration_number: None,
     };
-    let slot = Arc::new(RwLock::new(Session::new(account).unwrap()));
-    let core = Core {
-        cache: std::env::temp_dir(),
-        dir: std::env::temp_dir().join(format!("vtop-ffi-otp-{}", std::process::id())),
-        slot: Mutex::new(Some(slot.clone())),
-    };
+    let core =
+        Core::for_test(std::env::temp_dir().join(format!("vtop-ffi-otp-{}", std::process::id())));
+    let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));
+    core.install(Some(slot.clone()));
     let waiting = |cookies: &str, otp: Option<u64>| SessionState {
         cookies: cookies.into(),
         csrf_token: Some("csrf".into()),
@@ -483,7 +470,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     }
     // Calls that need VTOP's session (Connected apps) answer with the open challenge too,
     // without checking the session with VTOP, which would wipe the challenge.
-    let _gate = consent::tests::yes();
+    let _gate = consent::tests::yes(&core);
     assert_eq!(
         core.session_cookies("f", consent::CookieKind::Account, "Test", true)
             .await,
@@ -540,13 +527,9 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
         rejected: false,
         registration_number: None,
     };
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     let launch = || {
-        let session = Session::new(account.clone()).unwrap();
+        let session = Session::new(account.clone(), &core.shared).unwrap();
         core.restore(&session, core.read(SESSION));
         session
     };
@@ -599,14 +582,11 @@ async fn clearing_the_session_empties_the_shared_store() {
         rejected: false,
         registration_number: None,
     };
-    let session = Session::new(account).unwrap();
+    let core = Core::for_test(&dir);
+    let session = Session::new(account, &core.shared).unwrap();
     session.cookies.activate(false);
     memory.set_cookies(vtop.clone(), vec!["JSESSIONID=live; Path=/vtop".into()]);
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(Some(Arc::new(RwLock::new(session)))),
-    };
+    core.install(Some(Arc::new(RwLock::new(session))));
     assert_eq!(
         core.dev_cookie_editor_json("f".into())
             .await
@@ -746,11 +726,8 @@ fn core_signed_in_ago(base: String, name: &str, age: u64) -> (Core, Arc<Slot>, P
         otp: None,
         server_otp: false,
     }));
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(Some(slot.clone())),
-    };
+    let core = Core::for_test(&dir);
+    core.install(Some(slot.clone()));
     (core, slot, dir)
 }
 
@@ -797,12 +774,12 @@ fn sign_out_forgets_the_connection_choice() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-route-out-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
-    // Not Core::new: its log setup is global (see calls_log_ms_and_outcome_without_secrets).
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::new(
+        "route-new".into(),
+        dir.to_string_lossy().into(),
+        shared_cache(),
+    )
+    .unwrap();
     core.set_route("route-set".into(), route::Route::Proxy)
         .unwrap();
     assert!(dir.join(route::FILE).exists());
@@ -812,6 +789,49 @@ fn sign_out_forgets_the_connection_choice() {
         core.route_status("route-status".into()).chosen,
         route::Route::Direct
     );
+}
+
+#[test]
+fn sign_out_leaves_only_the_phone_files() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-sign-out-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join(PAGES).join("AP1")).unwrap();
+    fs::write(dir.join(PAGES).join("AP1").join(ATTENDANCE), "{}").unwrap();
+    // The phone's, not the student's: they stay.
+    let kept = [
+        "device.json",
+        "udp-gateway.json",
+        "demo_record.json",
+        edge::SERVER_FILE,
+    ];
+    // Listed here, not taken from STUDENT_FILES, so a file left out of it fails.
+    let student = [
+        ACCOUNT,
+        SESSION,
+        route::FILE,
+        SEMESTERS,
+        SELECTED,
+        forwarding::FILE,
+        changes::FILE,
+        consent::FILE,
+        account_token::FILE,
+        demo::FILE,
+    ];
+    for file in student.iter().chain(&kept) {
+        fs::write(dir.join(file), "{}").unwrap();
+    }
+    // Not Core::new: its log setup is global (see calls_log_ms_and_outcome_without_secrets).
+    let core = Core::for_test(&dir);
+    core.sign_out("sign-out".into());
+    let mut left: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    left.sort_unstable();
+    let mut kept = kept.map(str::to_string).to_vec();
+    kept.sort_unstable();
+    assert_eq!(left, kept);
+    let _ = fs::remove_dir_all(&dir);
 }
 
 /// A core on `name`'s folder with semesters AP1 (picked) and AP0, each with `courses`
@@ -834,11 +854,7 @@ fn kept_fixture(name: &str, courses: usize) -> (Core, PathBuf) {
         )
         .unwrap();
     }
-    let core = Core {
-        dir: dir.clone(),
-        cache: dir.clone(),
-        slot: Mutex::new(None),
-    };
+    let core = Core::for_test(&dir);
     (core, dir)
 }
 
@@ -891,7 +907,7 @@ fn kept_pages_follow_writes() {
             .courses
             .is_empty()
     );
-    let raw = core.read_kept::<serde_json::Value>(&format!("{PAGES}/AP1/{ATTENDANCE}"));
+    let raw = core.read_kept::<Value>(&format!("{PAGES}/AP1/{ATTENDANCE}"));
     assert_eq!(raw.unwrap()["records"], serde_json::json!([]));
     assert_eq!(decoded::kept(&page), 2);
     let _ = fs::remove_dir_all(&dir);

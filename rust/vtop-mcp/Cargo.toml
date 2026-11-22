@@ -1,7 +1,9 @@
 [package]
 name = "vtop-mcp"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+license = "MIT"
+publish = false
 description = "VTOP MCP tools, served by the engine (vtop-bridge) behind the edge's /mcp"
 
 [dependencies]
@@ -21,3 +23,6 @@ rmcp = { version = "3", features = ["server", "macros", "transport-streamable-ht
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 wiremock = "0.6"
+
+[lints]
+workspace = true

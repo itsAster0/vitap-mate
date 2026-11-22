@@ -3,8 +3,8 @@
 //! two messages, then the raw split keys. BLAKE2s (RFC 7693) is written out
 //! here so the app's library carries one copy of each crypto crate.
 
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::ChaCha20Poly1305;
+use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroize;
 
@@ -497,7 +497,10 @@ mod tests {
             "13be4feaeaf204c7fd3358fc9c00721881d174278128227ec674f37f7fe97b6d"
         );
         let (ours, msg1) = Initiator::start(&[1; 32], &gateway_pub, [3; 32], b"vm1").unwrap();
-        assert_eq!(hex(&msg1), "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22ceee0eda7cefc5af950f648062adf3c29edc2a5ac7c1ab4297f72530bb40de0b35a883bc2ba2be8abed7c0881a175cdb40195db3067eb9bc601995f9c74a8e16ea3997");
+        assert_eq!(
+            hex(&msg1),
+            "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22ceee0eda7cefc5af950f648062adf3c29edc2a5ac7c1ab4297f72530bb40de0b35a883bc2ba2be8abed7c0881a175cdb40195db3067eb9bc601995f9c74a8e16ea3997"
+        );
 
         let mut snow_resp = snow_builder()
             .local_private_key(&gateway)

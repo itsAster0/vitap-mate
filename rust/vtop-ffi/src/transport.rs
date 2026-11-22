@@ -1,6 +1,6 @@
 //! VTOP traffic through the app's HTTP stack (OkHttp): Kotlin implements
 //! [`HttpTransport`] for one hop; vtop-core follows redirects, decides retries and reads and
-//! writes the cookies (in the app's `CookieManager`, see [`crate::cookies`]). Mail forwarding sends its edge calls through it too. Without one set (host tests),
+//! writes the cookies (in the app's `CookieManager`, see [`crate::store::cookies`]). Mail forwarding sends its edge calls through it too. Without one set (host tests),
 //! vtop-core's default transport.
 
 use std::cell::RefCell;
@@ -9,6 +9,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use tracing::info;
 use vtop_core::client::{Hop, HopFuture, HopResponse, Transport};
+
+use crate::Shared;
 
 thread_local! {
     /// The flow of the [`crate::traced`] call being polled on this thread, sent as
@@ -177,18 +179,21 @@ pub fn set_http_transport(transport: Arc<dyn HttpTransport>) {
     *TRANSPORT.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::new(Foreign(transport)));
 }
 
-/// The transport set by [`set_http_transport`], else vtop-core's default (none in the app
-/// build: vtop-core comes without reqwest), behind the route switch ([`crate::route::Routed`]).
-pub(crate) fn current() -> vtop_core::VtopResult<Arc<dyn Transport>> {
+/// The transport set by [`set_http_transport`] (process-wide: the app's one HTTP stack), else vtop-core's default (none in the app
+/// build: vtop-core comes without reqwest), behind the route switch ([`crate::remote::route::Routed`]).
+pub(crate) fn current(shared: &Arc<Shared>) -> vtop_core::VtopResult<Arc<dyn Transport>> {
     let set = TRANSPORT
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clone();
     let inner = match set {
         Some(transport) => transport,
-        None => vtop_core::client::default_transport(&crate::dev::vtop_config())?,
+        None => vtop_core::client::default_transport(&crate::dev::vtop_config(shared))?,
     };
-    Ok(Arc::new(crate::route::Routed(inner)))
+    Ok(Arc::new(crate::remote::route::Routed(
+        inner,
+        shared.clone(),
+    )))
 }
 
 /// The intermediate CA VTOP leaves out of its chain (PEM), for the app's TLS to trust too.

@@ -1,7 +1,9 @@
 [package]
 name = "vtop-core"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+license = "MIT"
+publish = false
 description = "VTOP client, session handling and HTML parsers, with no FFI dependencies"
 
 [dependencies]
@@ -30,3 +32,6 @@ required-features = ["reqwest"]
 serde_json = { workspace = true }
 httpdate = "1"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util", "time"] }
+
+[lints]
+workspace = true

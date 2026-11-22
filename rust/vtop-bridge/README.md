@@ -1,6 +1,6 @@
 # vtop-bridge (the engine)
 
-The VTOP work behind the Cloudflare edge (`vtop-edge`), run on Railway as the
+The VTOP work behind the Cloudflare edge (`edge/`), run on Railway as the
 `engine-v2` service from `../Dockerfile.engine`; the edge reaches it at its
 `ENGINE_URL` (https://engine-v2-production.up.railway.app). It stores nothing: accounts,
 keys, devices, mailboxes and pending requests live in the edge's Durable
@@ -11,6 +11,11 @@ Objects. The engine only:
 - signs in with saved credentials, reading the OTP from the student's
   forwarded mail or, without a forwarding address, from their Gmail
   (`/engine/login`);
+- fetches and parses pages on a phone's own session for "Fetch on the
+  server", one (`/engine/fetch`) or several in one round trip
+  (`/engine/fetch-batch`), keeping nothing;
+- signs a phone in for that mode with the password it sends each time
+  (`/engine/vtop-login`, `/engine/vtop-login/otp`, `/engine/vtop-login/resend`);
 - checks a mailbox owner for the edge (`/internal/mail-otp/owner`);
 - serves the MCP tools (`/mcp`, from `vtop-mcp`).
 
@@ -32,8 +37,10 @@ sign-in and the server can read the OTP: OTP forwarding is set up, or
 (without forwarding) Gmail is connected, in which case the phone sends its
 Gmail refresh token and the OAuth client it was issued to (the app's own,
 or the student's own key with its secret) along with them. They are sealed
-together, so the engine needs no Google settings of its own. Forwarding
-comes first; Gmail is only used without a forwarding address. When Google
+together, so the engine needs no Google settings of its own. When the
+phone's OTP auto-fill is Gmail (`otp: "gmail"`), the engine reads Gmail even
+with a forwarding address; otherwise forwarding comes first and Gmail is only
+used without one. When Google
 refuses the token, only the Gmail access is dropped (`gmail_revoked`); the
 password stays. Credentials are dropped when VTOP rejects them, when the
 account's `vaultTtlSecs` runs out, or when the student forgets them from
@@ -64,5 +71,5 @@ VAULT_KEY="$(openssl rand -base64 32)" EDGE_URL=http://localhost:8787 \
   INTERNAL_TOKEN="$(openssl rand -hex 32)" cargo run -p vtop-bridge
 ```
 
-Deployed with the edge: `bun run deploy` in `rust/vtop-edge` (`alchemy.run.ts`)
+Deployed with the edge: `bun run deploy` in `edge/` (`alchemy.run.ts`)
 builds `rust/Dockerfile.engine` into the Railway service `engine-v2`.

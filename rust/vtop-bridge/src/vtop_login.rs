@@ -11,20 +11,20 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::rejection::JsonRejection;
+use axum::Json;
 use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 use vtop_core::inputs::{Password, Username};
 use vtop_core::{SessionState, VtopClient, VtopError, VtopResult};
 
+use crate::AppState;
 use crate::engine::require_secret;
 use crate::error::ApiError;
 use crate::fetch::vtop_error;
-use crate::AppState;
 
 /// A sign-in solves a CAPTCHA and may take VTOP a while; still under the
 /// app's own limit.
@@ -116,7 +116,7 @@ fn pending(state: &AppState, session: &SessionState) -> Result<VtopClient, ApiEr
         .map_err(|error| login_error(&error))
 }
 
-async fn timed(sign_in: impl std::future::Future<Output = VtopResult<()>>) -> VtopResult<()> {
+async fn timed(sign_in: impl Future<Output = VtopResult<()>>) -> VtopResult<()> {
     tokio::time::timeout(LOGIN_TIMEOUT, sign_in)
         .await
         .unwrap_or_else(|_| {

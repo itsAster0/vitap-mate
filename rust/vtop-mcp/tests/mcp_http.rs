@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 use vtop_core::SessionState;
 use vtop_mcp::bridge::{Identity, SessionSource};
@@ -199,10 +199,12 @@ async fn tools_use_the_callers_account_and_report_bridge_errors() {
     )
     .await;
     assert_eq!(body["result"]["isError"], true, "{body}");
-    assert!(body["result"]["content"][0]["text"]
-        .as_str()
-        .unwrap()
-        .contains("phone_unreachable"));
+    assert!(
+        body["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("phone_unreachable")
+    );
     assert_eq!(*source.usernames.lock().unwrap(), vec![KEY.to_string()]);
 }
 
@@ -471,10 +473,12 @@ async fn outing_actions_need_the_students_permission_on_the_key() {
         ),
     )
     .await;
-    assert!(!body["result"]["content"][0]["text"]
-        .as_str()
-        .unwrap()
-        .starts_with("outings_off"));
+    assert!(
+        !body["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("outings_off")
+    );
 
     // Allowed: the check goes on to VTOP (here, an unreachable phone).
     *source.outings.lock().unwrap() = true;

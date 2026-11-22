@@ -1,9 +1,9 @@
 //! JSON error responses, in the Go bridge's shape: `{"code", "error"}`.
 //! Messages never echo cookies, passwords or tokens.
 
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApiError {

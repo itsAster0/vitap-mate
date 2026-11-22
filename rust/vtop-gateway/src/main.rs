@@ -8,7 +8,7 @@
 //! and `GATEWAY_DATA_DIR` (where its keys are kept, default `./data`).
 
 use tracing_subscriber::EnvFilter;
-use vtop_gateway::{bind, run, Config};
+use vtop_gateway::{Config, bind, run};
 
 #[tokio::main]
 async fn main() {
@@ -50,7 +50,13 @@ async fn main() {
     match bound.await {
         Ok((config, sockets)) => run(config, sockets).await,
         Err(e) => {
-            eprintln!("vtop-gateway: {e}");
+            #[expect(
+                clippy::print_stderr,
+                reason = "the configuration error, before tracing can say it"
+            )]
+            {
+                eprintln!("vtop-gateway: {e}");
+            }
             std::process::exit(2);
         }
     }

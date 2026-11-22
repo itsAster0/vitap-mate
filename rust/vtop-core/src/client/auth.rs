@@ -2,7 +2,7 @@
 
 use log::Level;
 
-use super::{network_error, send_error, AuthStage, VtopClient};
+use super::{AuthStage, VtopClient, network_error, send_error};
 use crate::error::{VtopError, VtopResult};
 use crate::login::{self, Login, SignIn};
 

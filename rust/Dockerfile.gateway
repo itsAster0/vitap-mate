@@ -1,4 +1,4 @@
-# The UDP gateway alone (vtop-gateway), for the VPS (deployed by vtop-edge/alchemy.run.ts),
+# The UDP gateway alone (vtop-gateway), for the VPS (deployed by edge/alchemy.run.ts),
 # with this folder as context. The engine runs elsewhere (Railway); the
 # gateway reaches it at ENGINE_URL. alchemy.run.ts builds it on nest, an
 # x86_64 machine, so rustc runs natively.

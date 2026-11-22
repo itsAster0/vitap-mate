@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "reqwest")]
 use reqwest::{Client, ClientBuilder};
 #[cfg(feature = "reqwest")]
-use rustls::pki_types::{pem::PemObject, CertificateDer};
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 
 #[cfg(feature = "reqwest")]
 use crate::config::VtopConfig;

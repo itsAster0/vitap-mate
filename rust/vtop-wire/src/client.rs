@@ -27,12 +27,12 @@ use std::time::{Duration, Instant};
 
 use crate::fec::{self, DATA_WIRE};
 use crate::frame::{
-    same_token, Keys, IP_UDP, RESET_TOKEN, T_DATA, T_DONE, T_HS1, T_HS2, T_REQ, T_RESET, T_WORKING,
-    T_WRONG_KEY,
+    IP_UDP, Keys, RESET_TOKEN, T_DATA, T_DONE, T_HS1, T_HS2, T_REQ, T_RESET, T_WORKING,
+    T_WRONG_KEY, same_token,
 };
 use crate::link::Link;
-use crate::msg::{now_ms, now_us, Data, Req, MAX_REQUEST};
-use crate::noise::{random_key, Initiator};
+use crate::msg::{Data, MAX_REQUEST, Req, now_ms, now_us};
+use crate::noise::{Initiator, random_key};
 use crate::{hex, unhex};
 
 pub const COUNTER_BLOCK: u32 = 1024;
@@ -247,6 +247,10 @@ pub async fn fetch_over<N: Net>(
         // The gateway forgot the session (it restarted): handshake now.
         result = run.fresh(body, in_handshake, slot.as_mut()).await;
     }
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "the saved link profile is a hint: without it the next run learns again"
+    )]
     let _ = write_atomic(&profile, run.link.format().as_bytes());
     match result {
         Ok((body, saved, handshake)) => {
@@ -452,15 +456,15 @@ impl<N: Net> Run<'_, N> {
 
         let (keys, mut saved, mut ctr, reserved_end) = if let Some(s) = saved {
             let end = s.next_ctr + COUNTER_BLOCK;
-            if let Some(slot) = slot {
-                if !slot.write(&Saved {
+            if let Some(slot) = slot
+                && !slot.write(&Saved {
                     next_ctr: end,
                     ..s.clone()
-                }) {
-                    return Err(Outcome::Failed(WireError::Io(
-                        "cannot save the session".into(),
-                    )));
-                }
+                })
+            {
+                return Err(Outcome::Failed(WireError::Io(
+                    "cannot save the session".into(),
+                )));
             }
             let keys = Keys::new(&s.send, &s.recv);
             let packet = keys.seal(
@@ -571,13 +575,15 @@ impl<N: Net> Run<'_, N> {
                 // gap includes the engine's time on VTOP), and not across a
                 // short packet (it waits on the pacing of the one before).
                 let full = wire as f64 >= 0.9 * DATA_WIRE;
-                if let Some((t0, r0, p0)) = last_full {
-                    if full && r0 == d.round && d.pos as i32 == p0 + 1 {
-                        let per = t.duration_since(t0).as_secs_f64();
-                        if per > 0.002 {
-                            self.link.sample_rate(wire, per, rate_samples == 0);
-                            rate_samples += 1;
-                        }
+                if let Some((t0, r0, p0)) = last_full
+                    && full
+                    && r0 == d.round
+                    && d.pos as i32 == p0 + 1
+                {
+                    let per = t.duration_since(t0).as_secs_f64();
+                    if per > 0.002 {
+                        self.link.sample_rate(wire, per, rate_samples == 0);
+                        rate_samples += 1;
                     }
                 }
                 last_full = full.then_some((t, d.round, d.pos as i32));
@@ -661,10 +667,10 @@ impl<N: Net> Run<'_, N> {
                 last_ctr,
             );
             first_wire = rq.encode().len() + 25 + IP_UDP;
-            if last.is_none() {
-                if let Some(r0) = rounds.get_mut(&0) {
-                    r0.sent_at = Instant::now();
-                }
+            if last.is_none()
+                && let Some(r0) = rounds.get_mut(&0)
+            {
+                r0.sent_at = Instant::now();
             }
             if working.is_some() {
                 working = Some(Instant::now());
@@ -876,7 +882,10 @@ impl<N: Net> Run<'_, N> {
         now + Duration::from_secs_f64(secs.max(0.01))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one round of the transfer's state"
+    )]
     async fn ask(
         &mut self,
         keys: &Keys,
@@ -976,10 +985,10 @@ async fn resolve(
             _ => None,
         }
     });
-    if let Some((ip, at)) = cached {
-        if now_ms().saturating_sub(at) < DNS_KEEP_MS {
-            return Ok(ip);
-        }
+    if let Some((ip, at)) = cached
+        && now_ms().saturating_sub(at) < DNS_KEEP_MS
+    {
+        return Ok(ip);
     }
     let all = net
         .resolve(
@@ -991,6 +1000,10 @@ async fn resolve(
     let found = all.iter().find(|a| a.is_ipv4()).or(all.first()).copied();
     match (found, cached) {
         (Some(ip), _) => {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "the cached address is a fallback: without it the next run resolves again"
+            )]
             let _ = write_atomic(
                 &path,
                 format!("{} {ip} {}\n", cfg.host, now_ms()).as_bytes(),

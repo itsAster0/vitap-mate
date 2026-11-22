@@ -44,8 +44,24 @@ impl Req {
     }
 
     pub fn decode(b: &[u8]) -> Option<Self> {
-        let (&[r0, r1, round, want, loss_pct, a0, a1, t0, t1, c0, c1, c2, c3], body) =
-            b.split_first_chunk::<13>()?;
+        let (
+            &[
+                r0,
+                r1,
+                round,
+                want,
+                loss_pct,
+                a0,
+                a1,
+                t0,
+                t1,
+                c0,
+                c1,
+                c2,
+                c3,
+            ],
+            body,
+        ) = b.split_first_chunk::<13>()?;
         Some(Self {
             req_id: u16::from_be_bytes([r0, r1]),
             round,

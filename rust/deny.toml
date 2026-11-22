@@ -1,0 +1,54 @@
+# cargo-deny: `cargo deny check` in rust/ (CI's Rust Check and `mise run check-rust` run it).
+
+[graph]
+# The targets we build for: phones (64-bit and 32-bit Android), the servers and CI
+# (x86_64 Linux) and macOS laptops. Windows-only crates stay out of the checks.
+targets = [
+  "aarch64-linux-android",
+  "armv7-linux-androideabi",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+]
+all-features = true
+
+[advisories]
+# RustSec advisories, unmaintained and yanked crates. Ignore one only with a reason:
+# ignore = [{ id = "RUSTSEC-0000-0000", reason = "..." }]
+yanked = "deny"
+ignore = []
+
+[licenses]
+# What the dependency tree uses today, all permissive (MPL-2.0 is file-level copyleft:
+# fine for using unchanged crates such as uniffi and cssparser). A new licence fails the
+# check, so it gets a look before it lands.
+allow = [
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-1-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+confidence-threshold = 0.9
+unused-allowed-license = "allow"
+
+# The workspace's own crates are MIT (../LICENSE) with `publish = false`.
+
+[bans]
+multiple-versions = "warn"
+# Path dependencies between the workspace's own (unpublished) crates are fine.
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

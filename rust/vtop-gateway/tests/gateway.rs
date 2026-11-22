@@ -1,16 +1,16 @@
 use std::time::Duration;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use tokio::net::UdpSocket;
-use vtop_gateway::{run, Config};
-use vtop_shared::engine::{BatchPage, UDP_KEYS_INTERNAL};
+use vtop_gateway::{Config, run};
+use vtop_shared::engine::{BatchPage, FETCH, FETCH_BATCH, UDP_KEYS_INTERNAL, VTOP_LOGIN};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    batch_args, session_hash, WirePageRequest, WirePageResponse, BATCH, NEED_SESSION, SIGN_IN_BODY,
-    UNSUPPORTED, VERSION,
+    BATCH, NEED_SESSION, SIGN_IN_BODY, UNSUPPORTED, VERSION, WirePageRequest, WirePageResponse,
+    batch_args, session_hash,
 };
-use vtop_wire::client::{fetch, ClientConfig};
+use vtop_wire::client::{ClientConfig, fetch};
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -74,7 +74,7 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
     let engine = MockServer::start().await;
     let packed = vec![7u8; 1500];
     Mock::given(method("POST"))
-        .and(path("/engine/fetch"))
+        .and(path(FETCH))
         .and(header("authorization", "Bearer internal-token"))
         .and(header("x-request-id", "0f10d00e"))
         .and(body_partial_json(serde_json::json!({
@@ -141,7 +141,7 @@ async fn a_batch_goes_to_the_engines_batch_route() {
     let answer =
         serde_json::json!({ "data": [{ "data": {} }, { "code": "unknown_page", "error": "x" }] });
     Mock::given(method("POST"))
-        .and(path("/engine/fetch-batch"))
+        .and(path(FETCH_BATCH))
         .and(header("authorization", "Bearer internal-token"))
         .and(body_partial_json(serde_json::json!({
             "semester": "AP2026275",
@@ -254,7 +254,7 @@ async fn sign_ins_go_where_the_edge_would_send_them() {
     let server = MockServer::start().await;
     let ok = r#"{"status":"ok","session":{"cookies":"JSESSIONID=s"}}"#;
     Mock::given(method("POST"))
-        .and(path("/engine/vtop-login"))
+        .and(path(VTOP_LOGIN))
         .and(header("authorization", "Bearer internal-token"))
         .and(body_partial_json(
             serde_json::json!({ "username": "U", "password": "P" }),
@@ -301,7 +301,7 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
     let server = MockServer::start().await;
     let page = r#"{"data":{"ok":true}}"#;
     Mock::given(method("POST"))
-        .and(path("/engine/fetch"))
+        .and(path(FETCH))
         .and(body_partial_json(
             serde_json::json!({ "session": { "cookies": "JSESSIONID=old" } }),
         ))
@@ -310,7 +310,7 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
         .mount(&server)
         .await;
     Mock::given(method("POST"))
-        .and(path("/engine/fetch"))
+        .and(path(FETCH))
         .and(body_partial_json(
             serde_json::json!({ "session": { "cookies": "JSESSIONID=new" } }),
         ))

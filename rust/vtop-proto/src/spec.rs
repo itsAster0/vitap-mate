@@ -423,6 +423,20 @@ mod tests {
         }
     }
 
+    /// One `name args file` line per spec, args comma-joined (`-` for none).
+    struct Contract(Vec<String>);
+
+    impl Visit for Contract {
+        fn page<T: Serialize + Send + 'static>(&mut self, spec: &'static PageSpec<T>) {
+            let args = if spec.args.is_empty() {
+                "-".to_string()
+            } else {
+                spec.args.join(",")
+            };
+            self.0.push(format!("{} {args} {}", spec.name, spec.file));
+        }
+    }
+
     fn signed() -> Signed {
         Signed {
             base_url: "https://vtop.example".into(),
@@ -448,6 +462,35 @@ mod tests {
         names.0.sort_unstable();
         names.0.dedup();
         assert_eq!(names.0.len(), count);
+    }
+
+    /// Old apps and the deployed engine use each spec's name, args and file, so the checked-in
+    /// list only grows at its end.
+    #[test]
+    fn specs_keep_their_contract() {
+        let mut contract = Contract(Vec::new());
+        each(&mut contract);
+        let snapshot: Vec<&str> = include_str!("../tests/spec_contract.txt")
+            .lines()
+            .filter(|line| !line.is_empty())
+            .collect();
+        for (at, line) in snapshot.iter().enumerate() {
+            assert_eq!(
+                contract.0.get(at).map(String::as_str),
+                Some(*line),
+                "spec line {} changed or removed: never rename or drop a spec's name, args or \
+                 file (old apps and the deployed engine use them); new specs go at the end of \
+                 spec::each",
+                at + 1,
+            );
+        }
+        let added = contract.0.get(snapshot.len()..).unwrap_or_default();
+        assert!(
+            added.is_empty(),
+            "new specs: append these lines to vtop-proto/tests/spec_contract.txt in the same \
+             change:\n{}",
+            added.join("\n"),
+        );
     }
 
     #[test]

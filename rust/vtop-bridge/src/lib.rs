@@ -25,8 +25,8 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use tower_http::compression::predicate::{DefaultPredicate, NotForContentType, Predicate};
 use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::{DefaultPredicate, NotForContentType, Predicate};
 
 use config::Config;
 use engine::EdgeLink;
@@ -83,7 +83,7 @@ impl AppState {
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
-        .route("/internal/mail-otp/owner", post(engine::owner_check))
+        .route(vtop_shared::engine::MAIL_OWNER, post(engine::owner_check))
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))

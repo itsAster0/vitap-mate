@@ -1,7 +1,12 @@
 //! Hostel outings: the lists, apply and cancel, and the pass. Apply and
 //! cancel first read the list (VTOP's form fields and what it still lets
 //! be cancelled), then send the action once, never retried.
+//!
+//! Also the app's rules for a request, as pure functions of the form and
+//! the time in India: one copy that the app's sheets and the MCP tools both
+//! check against, each with its own messages.
 
+use crate::dates::{today_in_india, weekday};
 use crate::error::{VtopError, VtopResult};
 use crate::http::{Request, Response, form_encode, http_date};
 use crate::inputs::{ContactNumber, OutingDate, OutingPassId, OutingTime};
@@ -320,6 +325,225 @@ pub fn check_weekend_outing(
     Ok(purpose)
 }
 
+/// How long before leaving a general outing has to be applied for
+/// (minutes); VTOP's page refuses less.
+pub const NOTICE_MINUTES: i64 = 24 * 60;
+/// The days weekend outings are usually on (0 = Sunday).
+pub const USUAL_WEEKEND_DAYS: [u8; 2] = [0, 1];
+
+/// Collapses runs of whitespace, as VTOP's own form effectively does.
+pub fn tidy(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// A place or purpose the form would refuse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextProblem {
+    Missing,
+    TooLong { max_length: u32 },
+}
+
+/// What is wrong with `value` once [`tidy`]: empty, or over `max_length`
+/// characters.
+pub fn text_problem(value: &str, max_length: u32) -> Option<TextProblem> {
+    let value = tidy(value);
+    if value.is_empty() {
+        Some(TextProblem::Missing)
+    } else if value.chars().count() > max_length as usize {
+        Some(TextProblem::TooLong { max_length })
+    } else {
+        None
+    }
+}
+
+/// Whether the form offers `minute` (since midnight) for `hours`: its hour
+/// is listed, and the last hour only at :00. No hours: any time.
+pub fn offered(hours: &[u8], minute: i32) -> bool {
+    let Some(last) = hours.last() else {
+        return true;
+    };
+    let hour = minute / 60;
+    hours.iter().any(|h| i32::from(*h) == hour) && (hour != i32::from(*last) || minute % 60 == 0)
+}
+
+/// What the general outing form allows.
+#[derive(Debug, Clone, Copy)]
+pub struct GeneralRules<'a> {
+    pub out_hours: &'a [u8],
+    pub in_hours: &'a [u8],
+    pub place_max_length: u32,
+    pub purpose_max_length: u32,
+    /// The leaving day is at most this many days after today (0: today).
+    pub max_days_ahead: u32,
+}
+
+impl GeneralOutingData {
+    pub fn rules(&self) -> GeneralRules<'_> {
+        GeneralRules {
+            out_hours: &self.out_hours,
+            in_hours: &self.in_hours,
+            place_max_length: self.place_max_length,
+            purpose_max_length: self.purpose_max_length,
+            max_days_ahead: self.max_days_ahead,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeavingProblem {
+    /// After `last_day` (a day number).
+    TooFarAhead {
+        last_day: i64,
+    },
+    OutsideHours,
+    /// Less than [`NOTICE_MINUTES`] from now; `earliest` is the first
+    /// moment that is not.
+    TooSoon {
+        earliest: i64,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReturningProblem {
+    OutsideHours,
+    NotAfterLeaving,
+}
+
+/// The problems with a general outing, by field; none when all are `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GeneralProblems {
+    pub place: Option<TextProblem>,
+    pub purpose: Option<TextProblem>,
+    pub leaving: Option<LeavingProblem>,
+    pub returning: Option<ReturningProblem>,
+}
+
+/// Checks a general outing. `leaving`, `returning` and `now` are minutes
+/// since 1970-01-01 00:00 in India.
+pub fn check_general(
+    rules: &GeneralRules,
+    place: &str,
+    purpose: &str,
+    leaving: i64,
+    returning: i64,
+    now: i64,
+) -> GeneralProblems {
+    let last_day = now.div_euclid(1440) + i64::from(rules.max_days_ahead);
+    let minute = |at: i64| at.rem_euclid(1440) as i32;
+    let leaving_problem = if leaving.div_euclid(1440) > last_day {
+        Some(LeavingProblem::TooFarAhead { last_day })
+    } else if !offered(rules.out_hours, minute(leaving)) {
+        Some(LeavingProblem::OutsideHours)
+    } else if leaving - now < NOTICE_MINUTES {
+        Some(LeavingProblem::TooSoon {
+            earliest: now + NOTICE_MINUTES,
+        })
+    } else {
+        None
+    };
+    let returning_problem = if !offered(rules.in_hours, minute(returning)) {
+        Some(ReturningProblem::OutsideHours)
+    } else if returning <= leaving {
+        Some(ReturningProblem::NotAfterLeaving)
+    } else {
+        None
+    };
+    GeneralProblems {
+        place: text_problem(place, rules.place_max_length),
+        purpose: text_problem(purpose, rules.purpose_max_length),
+        leaving: leaving_problem,
+        returning: returning_problem,
+    }
+}
+
+/// What the weekend outing form allows.
+#[derive(Debug, Clone, Copy)]
+pub struct WeekendRules<'a> {
+    pub purpose_max_length: u32,
+    /// The outing day is at most this many days after today (0: none).
+    pub max_days_ahead: u32,
+    /// 0 = Sunday … 6 = Saturday.
+    pub weekdays: &'a [u8],
+}
+
+impl WeekendOutingData {
+    pub fn rules(&self) -> WeekendRules<'_> {
+        WeekendRules {
+            purpose_max_length: self.purpose_max_length,
+            max_days_ahead: self.max_days_ahead,
+            weekdays: &self.weekdays,
+        }
+    }
+}
+
+/// The weekdays a weekend outing can be on: the form's, none when it lists
+/// none. VTOP's picker also blocks the day before an outing day, so on
+/// Saturday it leaves only Monday; tomorrow is added back when it is one of
+/// [`USUAL_WEEKEND_DAYS`].
+pub fn weekend_days(weekdays: &[u8], today: i64) -> Vec<u8> {
+    let tomorrow = weekday(today + 1);
+    let mut days = weekdays.to_vec();
+    if USUAL_WEEKEND_DAYS.contains(&tomorrow) {
+        days.push(tomorrow);
+    }
+    days.sort_unstable();
+    days.dedup();
+    days
+}
+
+/// Days a weekend outing can be applied for: tomorrow up to
+/// `max_days_ahead`, on [`weekend_days`]. Never today (VTOP's picker allows
+/// it).
+pub fn weekend_dates(rules: &WeekendRules, today: i64) -> Vec<i64> {
+    let days = weekend_days(rules.weekdays, today);
+    (1..=i64::from(rules.max_days_ahead))
+        .map(|i| today + i)
+        .filter(|day| days.contains(&weekday(*day)))
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DayProblem {
+    Missing,
+    /// Not one of [`weekend_dates`].
+    NotOffered,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContactProblem {
+    /// Not 10 digits once trimmed.
+    NotTenDigits,
+}
+
+/// The problems with a weekend outing, by field; none when all are `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WeekendProblems {
+    pub purpose: Option<TextProblem>,
+    pub day: Option<DayProblem>,
+    pub contact: Option<ContactProblem>,
+}
+
+/// Checks a weekend outing on `day` (a day number) as of `today` in India.
+pub fn check_weekend(
+    rules: &WeekendRules,
+    purpose: &str,
+    day: Option<i64>,
+    contact: &str,
+    today: i64,
+) -> WeekendProblems {
+    WeekendProblems {
+        purpose: text_problem(purpose, rules.purpose_max_length),
+        day: match day {
+            None => Some(DayProblem::Missing),
+            Some(day) if weekend_dates(rules, today).contains(&day) => None,
+            Some(_) => Some(DayProblem::NotOffered),
+        },
+        contact: ContactNumber::parse(contact)
+            .is_err()
+            .then_some(ContactProblem::NotTenDigits),
+    }
+}
+
 fn student_fields(
     authorized_id: &str,
     student: &OutingStudent,
@@ -349,32 +573,22 @@ fn form_closed(notice: &str) -> OutingApplyResult {
     }
 }
 
-fn today_in_india() -> i64 {
-    (now_unix() as i64 + 19_800).div_euclid(86_400)
-}
-
 fn invalid(message: &str) -> VtopError {
     VtopError::ConfigurationError(message.to_string())
 }
 
 fn limited_text(value: &str, label: &str, max_length: u32) -> VtopResult<String> {
-    let value = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    if value.is_empty() {
-        return Err(invalid(&format!("{label} must not be empty")));
-    }
-    if value.chars().count() > max_length as usize {
-        return Err(invalid(&format!(
+    match text_problem(value, max_length) {
+        Some(TextProblem::Missing) => Err(invalid(&format!("{label} must not be empty"))),
+        Some(TextProblem::TooLong { max_length }) => Err(invalid(&format!(
             "{label} must be at most {max_length} characters"
-        )));
+        ))),
+        None => Ok(tidy(value)),
     }
-    Ok(value)
 }
 
 fn offered_time(time: OutingTime, hours: &[u8], label: &str) -> VtopResult<()> {
-    let Some(last) = hours.last() else {
-        return Ok(());
-    };
-    if !hours.contains(&time.hour) || (time.hour == *last && time.minute != 0) {
+    if !offered(hours, i32::from(time.hour) * 60 + i32::from(time.minute)) {
         return Err(invalid(&format!(
             "{label} time is outside the allowed hours"
         )));
@@ -401,6 +615,121 @@ mod tests {
         assert_eq!(limited_text("  a   b ", "x", 3).unwrap(), "a b");
         assert!(limited_text("   ", "x", 3).is_err());
         assert!(limited_text("abcd", "x", 3).is_err());
+    }
+
+    fn general_form() -> GeneralOutingData {
+        GeneralOutingData {
+            student: None,
+            notice: String::new(),
+            records: Vec::new(),
+            out_hours: (6..=22).collect(),
+            in_hours: (6..=20).collect(),
+            place_max_length: 50,
+            purpose_max_length: 50,
+            max_days_ahead: 7,
+            max_days_away: 0,
+            update_time: 0,
+        }
+    }
+
+    #[test]
+    fn general_rules() {
+        let form = general_form();
+        // 11-Oct-2026 is day 20737; now is 10:00 that day.
+        let day = 20_737_i64 * 1440;
+        let now = day + 600;
+        let check = |leaving: i64, returning: i64| {
+            check_general(&form.rules(), "Home", "Visit", leaving, returning, now)
+        };
+        let ok = check(now + NOTICE_MINUTES, now + NOTICE_MINUTES + 60);
+        assert_eq!((ok.leaving, ok.returning), (None, None));
+        assert_eq!(
+            check(now + NOTICE_MINUTES - 1, now + NOTICE_MINUTES + 60).leaving,
+            Some(LeavingProblem::TooSoon {
+                earliest: now + NOTICE_MINUTES
+            })
+        );
+        assert_eq!(
+            check(now - 1440, now).leaving,
+            Some(LeavingProblem::TooSoon {
+                earliest: now + NOTICE_MINUTES
+            })
+        );
+        assert_eq!(
+            check(day + 8 * 1440 + 600, day + 8 * 1440 + 700).leaving,
+            Some(LeavingProblem::TooFarAhead { last_day: 20_744 })
+        );
+        assert_eq!(
+            check(day + 2 * 1440 + 22 * 60 + 1, day + 3 * 1440 + 600).leaving,
+            Some(LeavingProblem::OutsideHours)
+        );
+        let back = |leaving, returning| check(leaving, returning).returning;
+        let leaving = day + 2 * 1440 + 600;
+        assert_eq!(
+            back(leaving, leaving + 11 * 60),
+            Some(ReturningProblem::OutsideHours)
+        );
+        assert_eq!(
+            back(leaving, leaving),
+            Some(ReturningProblem::NotAfterLeaving)
+        );
+        let none_ahead = GeneralOutingData {
+            max_days_ahead: 0,
+            ..form.clone()
+        };
+        assert!(matches!(
+            check_general(&none_ahead.rules(), "a", "b", leaving, leaving + 60, now).leaving,
+            Some(LeavingProblem::TooFarAhead { last_day: 20_737 })
+        ));
+        let texts = check_general(
+            &form.rules(),
+            "  ",
+            &"x".repeat(51),
+            leaving,
+            leaving + 60,
+            now,
+        );
+        assert_eq!(texts.place, Some(TextProblem::Missing));
+        assert_eq!(texts.purpose, Some(TextProblem::TooLong { max_length: 50 }));
+    }
+
+    #[test]
+    fn weekend_rules() {
+        let form = |weekdays: Vec<u8>| WeekendOutingData {
+            student: None,
+            notice: String::new(),
+            records: Vec::new(),
+            places: Vec::new(),
+            time_slots: Vec::new(),
+            purpose_max_length: 50,
+            max_days_ahead: 14,
+            weekdays,
+            update_time: 0,
+        };
+        // Sunday 11-Oct-2026.
+        let sunday = 20_737;
+        let sundays = form(vec![0]);
+        assert_eq!(
+            weekend_dates(&sundays.rules(), sunday),
+            [sunday + 1, sunday + 7, sunday + 8, sunday + 14]
+        );
+        // An empty list allows no day, but tomorrow's weekday when it is a
+        // usual one.
+        assert_eq!(
+            weekend_dates(&form(vec![]).rules(), sunday),
+            [sunday + 1, sunday + 8]
+        );
+        assert!(weekend_dates(&form(vec![]).rules(), sunday + 1).is_empty());
+        let check = |day| check_weekend(&sundays.rules(), "Movie", day, " 9876543210 ", sunday);
+        assert_eq!(check(Some(sunday + 7)).day, None);
+        assert_eq!(check(Some(sunday)).day, Some(DayProblem::NotOffered));
+        assert_eq!(check(Some(sunday + 21)).day, Some(DayProblem::NotOffered));
+        assert_eq!(check(None).day, Some(DayProblem::Missing));
+        assert_eq!(check(None).contact, None);
+        assert_eq!(
+            check_weekend(&sundays.rules(), "", None, "98765", sunday).contact,
+            Some(ContactProblem::NotTenDigits)
+        );
     }
 
     fn signed() -> Signed {

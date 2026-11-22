@@ -2,7 +2,7 @@
 //! no tokio; its futures run on whatever polls them (Kotlin coroutines through UniFFI).
 
 use std::cell::UnsafeCell;
-use std::future::{poll_fn, Future};
+use std::future::{Future, poll_fn};
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::task::{Poll, Waker};
@@ -26,8 +26,10 @@ struct State {
 }
 
 // SAFETY: `state` hands out shared access to readers or exclusive access to one writer, as
-// std's RwLock does.
+// std's RwLock does; moving the lock moves the `T` it owns, so `T: Send` is enough.
 unsafe impl<T: Send> Send for RwLock<T> {}
+// SAFETY: as std's RwLock: readers on several threads share `&T` (so `T: Sync`), and a
+// writer on any thread gets `&mut T` (so `T: Send`).
 unsafe impl<T: Send + Sync> Sync for RwLock<T> {}
 
 impl<T: Default> Default for RwLock<T> {

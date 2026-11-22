@@ -13,7 +13,7 @@ pub trait OtpCodes: Send + Sync {
     /// A code from mail sent after `issued_at` that is not in `tried`, or
     /// `None` when none comes within `remaining`.
     async fn next(&self, issued_at: u64, remaining: Duration, tried: Vec<String>)
-        -> Option<String>;
+    -> Option<String>;
 }
 
 /// Signs in with saved credentials, the OTP from `codes`.

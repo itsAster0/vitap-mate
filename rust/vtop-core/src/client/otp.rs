@@ -3,7 +3,7 @@
 
 use log::Level;
 
-use super::{missing_csrf_error, AuthStage, VtopClient};
+use super::{AuthStage, VtopClient, missing_csrf_error};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::OtpCode;
 use crate::login::SignIn;

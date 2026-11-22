@@ -263,7 +263,7 @@ pub struct PersistedCookie {
     pub persistent: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PersistedVtopSession {
     pub username: String,
     pub saved_at_epoch_ms: u64,
@@ -276,6 +276,42 @@ pub struct PersistedVtopSession {
     /// Unix seconds of the last real login (not of the save).
     #[serde(default)]
     pub logged_in_at: Option<u64>,
+}
+
+impl std::fmt::Debug for PersistedVtopSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Never the cookie values or the CSRF token.
+        formatter
+            .debug_struct("PersistedVtopSession")
+            .field("username_len", &self.username.len())
+            .field("saved_at_epoch_ms", &self.saved_at_epoch_ms)
+            .field("cookies", &self.cookies.as_deref().map(CookieNames))
+            .field("csrf_token", &self.csrf_token.is_some())
+            .field("registration_number", &self.registration_number.is_some())
+            .field("logged_in_at", &self.logged_in_at)
+            .finish()
+    }
+}
+
+/// A `Cookie` header as its cookie names and value lengths, for `Debug`: never the values.
+pub struct CookieNames<'a>(pub &'a str);
+
+impl std::fmt::Debug for CookieNames<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cookies = self
+            .0
+            .split(';')
+            .map(str::trim)
+            .filter(|pair| !pair.is_empty());
+        formatter
+            .debug_list()
+            .entries(cookies.map(|pair| match pair.split_once('=') {
+                Some((name, value)) => format!("{name}({}B)", value.len()),
+                // Not a pair: it might be a bare value.
+                None => format!("?({}B)", pair.len()),
+            }))
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

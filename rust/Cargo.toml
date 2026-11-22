@@ -3,6 +3,8 @@
 # stay out of the app build.
 resolver = "2"
 members = ["vtop-shared", "vtop-proto", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway", "vtop-ffi"]
+# The parser fuzzer builds on nightly with its own workspace (`mise run fuzz`).
+exclude = ["vtop-proto/fuzz"]
 
 [workspace.dependencies]
 # 0.13's `rustls` feature means aws-lc-rs and the system's certificates, which the server
@@ -15,6 +17,24 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.43.0" }
 log = "0.4"
+
+# Every crate but vtop-ffi opts in with `[lints] workspace = true`. Clippy's settings for
+# these are in clippy.toml. unwrap_used, expect_used, indexing_slicing, panic and string_slice
+# stay in the `#![cfg_attr(not(test), deny(...))]` header of the crates that ship to phones
+# (vtop-shared, vtop-proto, vtop-core, vtop-wire), since the server crates differ.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+# Logs go through `log`/`tracing`. A binary's last-resort error line says why in an #[expect].
+print_stdout = "deny"
+print_stderr = "deny"
+undocumented_unsafe_blocks = "deny"
+allow_attributes_without_reason = "deny"
+let_underscore_must_use = "deny"
 
 # The app library is size-optimised. The server builds with `--profile server`.
 [profile.release]
@@ -30,3 +50,7 @@ opt-level = 3
 lto = "thin"
 codegen-units = 16
 strip = true
+
+# Line tables only: backtraces keep file:line, and dev builds and target/ stay smaller.
+[profile.dev]
+debug = "line-tables-only"

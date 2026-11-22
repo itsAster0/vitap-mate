@@ -1,0 +1,191 @@
+{
+  "comment": "Sample bodies of the edge <-> engine calls (vtop_shared::engine, edge/src/shared/engine-api.ts), by type. Each is in the form serde writes it, so vtop-shared round-trips them unchanged; the edge checks them against its types. Values are made up.",
+  "SessionCheck": [
+    {
+      "cookies": "JSESSIONID=abc; SERVERID=s1"
+    },
+    {
+      "sealedSession": "sealed-session",
+      "account": "23ABC4567"
+    }
+  ],
+  "SessionChecked": [
+    {
+      "status": "valid",
+      "registrationNumber": "23ABC4567",
+      "cookies": "JSESSIONID=abc",
+      "csrfToken": "csrf",
+      "sealedSession": "sealed-session",
+      "ownerHash": "owner-hash"
+    },
+    {
+      "status": "expired"
+    },
+    {
+      "status": "unknown",
+      "cookies": "JSESSIONID=abc"
+    }
+  ],
+  "SealVault": [
+    {
+      "account": "23ABC4567",
+      "username": "23ABC4567",
+      "password": "password"
+    },
+    {
+      "account": "23ABC4567",
+      "username": "23ABC4567",
+      "password": "password",
+      "gmail": {
+        "refreshToken": "refresh-token",
+        "clientId": "client-id",
+        "clientSecret": "client-secret",
+        "deleteAfterReading": true
+      },
+      "otp": "gmail"
+    },
+    {
+      "account": "23ABC4567",
+      "username": "23ABC4567",
+      "password": "password",
+      "gmail": {
+        "refreshToken": "refresh-token",
+        "clientId": "client-id",
+        "deleteAfterReading": false
+      },
+      "otp": "forwarding"
+    }
+  ],
+  "SealedVault": [
+    {
+      "sealedVault": "sealed-vault"
+    }
+  ],
+  "LoginStart": [
+    {
+      "account": "23ABC4567",
+      "sealedVault": "sealed-vault",
+      "requestId": "request-1"
+    }
+  ],
+  "LoginDone": [
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "ok",
+        "cookies": "JSESSIONID=abc",
+        "sealedSession": "sealed-session",
+        "csrfToken": "csrf"
+      }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "ok",
+        "cookies": "JSESSIONID=abc",
+        "sealedSession": "sealed-session"
+      }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "invalid_credentials"
+      }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "vault_unusable"
+      }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "forwarding_required"
+      }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "gmail_revoked",
+        "sealedVault": "sealed-vault"
+      }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "failed",
+        "reason": "vtop_unavailable"
+      }
+    }
+  ],
+  "OtpAwait": [
+    {
+      "ownerHash": "owner-hash",
+      "publicKey": "E75P6uryBMf9M1j8nAByGIHRdCeBKCJ-xnTzf3_pe20",
+      "since": 1800000000,
+      "waitSecs": 45
+    }
+  ],
+  "OtpAwaited": [
+    {
+      "sealed": "sealed-box"
+    },
+    {
+      "sealed": null
+    }
+  ],
+  "PageFetch": [
+    {
+      "session": {
+        "cookies": "JSESSIONID=abc",
+        "csrf_token": "csrf",
+        "registration_number": "23ABC4567"
+      },
+      "name": "semesters",
+      "args": {}
+    },
+    {
+      "session": {
+        "cookies": "JSESSIONID=abc",
+        "csrf_token": "csrf",
+        "registration_number": "23ABC4567"
+      },
+      "name": "biometric",
+      "semester": "AP2026275",
+      "args": {
+        "date": "28/10/2026"
+      },
+      "dictionary": "dictionary-id"
+    }
+  ],
+  "PageBatch": [
+    {
+      "session": {
+        "cookies": "JSESSIONID=abc",
+        "csrf_token": "csrf",
+        "registration_number": "23ABC4567"
+      },
+      "semester": "AP2026275",
+      "pages": [
+        {
+          "name": "attendance"
+        },
+        {
+          "name": "biometric",
+          "args": {
+            "date": "28/10/2026"
+          }
+        }
+      ],
+      "dictionary": "dictionary-id"
+    }
+  ]
+}

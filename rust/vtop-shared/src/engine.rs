@@ -27,6 +27,10 @@ pub const VTOP_LOGIN: &str = "/engine/vtop-login";
 pub const VTOP_LOGIN_OTP: &str = "/engine/vtop-login/otp";
 /// Engine: asks VTOP to mail a new OTP for a pending [`VTOP_LOGIN`].
 pub const VTOP_LOGIN_RESEND: &str = "/engine/vtop-login/resend";
+/// Engine: the mailbox owner hash of a live session, for the edge's
+/// mail-otp routes: `{cookies}` answers `{ownerHash, registrationNumber}`,
+/// `401` when VTOP refuses it.
+pub const MAIL_OWNER: &str = "/internal/mail-otp/owner";
 /// Edge: the outcome of a [`LOGIN`].
 pub const LOGIN_DONE: &str = "/internal/accounts/login-done";
 /// Edge: waits for the next forwarded OTP of a student, sealed to a key.
@@ -317,6 +321,43 @@ mod tests {
         assert!(grant("r", None).usable().is_some());
         assert!(grant(" ", None).usable().is_none());
         assert_eq!(grant("r", Some(" ")).usable().unwrap().client_secret, None);
+    }
+
+    /// Every sample of `name` in `vectors/engine.json` reads as `T` and
+    /// writes back unchanged. The edge checks the same samples against its
+    /// types (`engine-api.test.ts`).
+    fn round_trips<T: serde::de::DeserializeOwned + Serialize>(
+        samples: &serde_json::Value,
+        name: &str,
+    ) {
+        let list = samples[name].as_array().unwrap();
+        assert!(!list.is_empty(), "{name}");
+        for sample in list {
+            let value: T = serde_json::from_value(sample.clone()).unwrap();
+            assert_eq!(&serde_json::to_value(&value).unwrap(), sample, "{name}");
+        }
+    }
+
+    #[test]
+    fn samples_round_trip() {
+        let samples: serde_json::Value =
+            serde_json::from_str(include_str!("../vectors/engine.json")).unwrap();
+        round_trips::<SessionCheck>(&samples, "SessionCheck");
+        round_trips::<SessionChecked>(&samples, "SessionChecked");
+        round_trips::<SealVault>(&samples, "SealVault");
+        round_trips::<SealedVault>(&samples, "SealedVault");
+        round_trips::<LoginStart>(&samples, "LoginStart");
+        round_trips::<LoginDone>(&samples, "LoginDone");
+        round_trips::<OtpAwait>(&samples, "OtpAwait");
+        round_trips::<OtpAwaited>(&samples, "OtpAwaited");
+        round_trips::<PageFetch>(&samples, "PageFetch");
+        round_trips::<PageBatch>(&samples, "PageBatch");
+        let names = samples
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|k| *k != "comment");
+        assert_eq!(names.count(), 10);
     }
 
     #[test]

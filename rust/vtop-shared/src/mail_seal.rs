@@ -8,12 +8,12 @@
 //! ephemeral and recipient public keys, info [`INFO`]. The mailbox id is the
 //! associated data, so a box cannot be replayed to another mailbox.
 //! The app and the engine open boxes through this module; the edge seals
-//! with its TypeScript copy (`vtop-edge/src/shared/mail-seal.ts`), checked
-//! against [`tests::VECTOR_BOX`].
+//! with its TypeScript copy (`edge/src/shared/mail-seal.ts`), checked
+//! against the vector in `vectors/mail_seal.json`.
 
 use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hkdf::Hkdf;
 use sha2::Sha256;
 use x25519_dalek::{PublicKey, StaticSecret};
@@ -34,7 +34,10 @@ pub enum SealError {
 /// phone's secure storage; the public key to the bridge.
 // No key is better than a weak one: without the OS random source this
 // aborts. Making it fallible changes the callers in vtop-ffi and vtop-bridge.
-#[allow(clippy::expect_used)]
+#[allow(
+    clippy::expect_used,
+    reason = "no key is better than a weak one: abort without the OS random source"
+)]
 pub fn generate_keypair() -> (String, String) {
     let mut secret = [0u8; 32];
     getrandom::fill(&mut secret).expect("the OS random source");
@@ -149,17 +152,40 @@ mod tests {
     use super::*;
 
     /// Fixed inputs shared with the edge's test (`mail-seal.test.ts`),
-    /// which must produce [`VECTOR_BOX`] byte for byte.
-    pub const VECTOR_SECRET: [u8; 32] = [7; 32];
-    pub const VECTOR_EPHEMERAL: [u8; 32] = [9; 32];
-    pub const VECTOR_NONCE: [u8; 12] = [3; 12];
-    pub const VECTOR_ID: &str = "k3f9x2ab7q";
-    pub const VECTOR_PLAINTEXT: &str = r#"{"kind":"otp","code":"401295","sentAt":1760000000}"#;
-    pub const VECTOR_PUBLIC: &str = "E75P6uryBMf9M1j8nAByGIHRdCeBKCJ-xnTzf3_pe20";
-    pub const VECTOR_BOX: &str = "AVfbSzWfI65eFG5OJRIFZwRyJQY0jBUMFHU9DJM9BNQhAwMDAwMDAwMDAwMDnR9M8IRFhOh0oPy3nhcTWiVq8Xs8ocPlv23PRQgSBmfqtiQ3PzC4XkT7cks8QLqiNiJ4346hVr5T_nZryOFoQRCE";
+    /// which must produce the same box byte for byte. Bytes are hex.
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Vector {
+        secret: String,
+        ephemeral: String,
+        nonce: String,
+        mailbox_id: String,
+        plaintext: String,
+        public: String,
+        #[serde(rename = "box")]
+        sealed: String,
+    }
 
-    fn vector_public() -> String {
-        URL_SAFE_NO_PAD.encode(PublicKey::from(&StaticSecret::from(VECTOR_SECRET)).as_bytes())
+    impl Vector {
+        fn load() -> Self {
+            serde_json::from_str(include_str!("../vectors/mail_seal.json")).unwrap()
+        }
+
+        fn secret(&self) -> [u8; 32] {
+            hex::decode(&self.secret).unwrap().try_into().unwrap()
+        }
+
+        fn ephemeral(&self) -> [u8; 32] {
+            hex::decode(&self.ephemeral).unwrap().try_into().unwrap()
+        }
+
+        fn nonce(&self) -> [u8; 12] {
+            hex::decode(&self.nonce).unwrap().try_into().unwrap()
+        }
+
+        fn public_of_secret(&self) -> String {
+            URL_SAFE_NO_PAD.encode(PublicKey::from(&StaticSecret::from(self.secret())).as_bytes())
+        }
     }
 
     #[test]
@@ -199,20 +225,21 @@ mod tests {
 
     #[test]
     fn vector_matches_the_worker() {
+        let v = Vector::load();
         let sealed = seal_with(
-            &vector_public(),
-            VECTOR_ID,
-            VECTOR_PLAINTEXT.as_bytes(),
-            VECTOR_EPHEMERAL,
-            VECTOR_NONCE,
+            &v.public_of_secret(),
+            &v.mailbox_id,
+            v.plaintext.as_bytes(),
+            v.ephemeral(),
+            v.nonce(),
         )
         .unwrap();
-        assert_eq!(vector_public(), VECTOR_PUBLIC);
-        assert_eq!(sealed, VECTOR_BOX);
-        let secret = URL_SAFE_NO_PAD.encode(VECTOR_SECRET);
+        assert_eq!(v.public_of_secret(), v.public);
+        assert_eq!(sealed, v.sealed);
+        let secret = URL_SAFE_NO_PAD.encode(v.secret());
         assert_eq!(
-            open(&secret, VECTOR_ID, &sealed).unwrap(),
-            VECTOR_PLAINTEXT.as_bytes()
+            open(&secret, &v.mailbox_id, &sealed).unwrap(),
+            v.plaintext.as_bytes()
         );
     }
 
@@ -221,6 +248,7 @@ mod tests {
     /// the edge's box opened as given.
     #[test]
     fn known_answers() {
+        let v = Vector::load();
         let key = |h: &str| <[u8; 32]>::try_from(hex::decode(h).unwrap()).unwrap();
         let alice = StaticSecret::from(key(
             "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a",
@@ -234,8 +262,8 @@ mod tests {
             hex::encode(alice.diffie_hellman(&PublicKey::from(bob)).as_bytes()),
             "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742"
         );
-        let vector = StaticSecret::from(VECTOR_EPHEMERAL)
-            .diffie_hellman(&PublicKey::from(&StaticSecret::from(VECTOR_SECRET)));
+        let vector = StaticSecret::from(v.ephemeral())
+            .diffie_hellman(&PublicKey::from(&StaticSecret::from(v.secret())));
         assert_eq!(
             hex::encode(vector.as_bytes()),
             "2ffe325b2a26611bf1911325d4a62b33749b8f350d0e88ba91e316acaae66554"
@@ -253,10 +281,10 @@ mod tests {
             "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865"
         );
 
-        let secret = URL_SAFE_NO_PAD.encode(VECTOR_SECRET);
+        let secret = URL_SAFE_NO_PAD.encode(v.secret());
         assert_eq!(
-            open(&secret, VECTOR_ID, VECTOR_BOX).unwrap(),
-            VECTOR_PLAINTEXT.as_bytes()
+            open(&secret, &v.mailbox_id, &v.sealed).unwrap(),
+            v.plaintext.as_bytes()
         );
         let (secret, public) = generate_keypair();
         assert_eq!(

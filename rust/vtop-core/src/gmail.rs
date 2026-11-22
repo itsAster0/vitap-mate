@@ -1,5 +1,5 @@
 //! Reads VTOP's security OTP from the user's Gmail. Shared by the app (the
-//! OTP prompt's email auto-fetch, over FFI) and vtop-server (finishing a
+//! OTP prompt's email auto-fetch, over FFI) and the engine (finishing a
 //! login in one request), so both find and parse the email the same way:
 //! the newest mail from `noreply.sdc@vitap.ac.in` after the OTP was issued,
 //! the first standalone 6-digit number in it, then trash it or mark it read.
@@ -11,11 +11,11 @@ use std::collections::HashSet;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Deserialize;
 use serde_json::Value;
+/// The parser, as `vtop_core::gmail` has without the `reqwest` feature too.
+pub use vtop_proto::gmail::{Body, Header, Message, Part, SENDER, otp};
 
-const SENDER: &str = "noreply.sdc@vitap.ac.in";
 const API: &str = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
 const POLL_EVERY: Duration = Duration::from_secs(3);
 /// Tolerance for clock differences between VTOP, Gmail and this server.
@@ -136,7 +136,7 @@ async fn get_json(
     url: &str,
     query: &[(&str, String)],
 ) -> Result<Value, GmailOtpError> {
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     let response = http
         .get(url)
         .bearer_auth(access.access_token.trim())
@@ -199,15 +199,8 @@ async fn newest_otp(
             &[("format", "full".to_string())],
         )
         .await?;
-        let received_ms = message
-            .get("internalDate")
-            .and_then(Value::as_str)
-            .and_then(|value| value.parse::<u64>().ok())
-            .unwrap_or(0);
-        if received_ms < since * 1000 || !from_vtop(&message) {
-            continue;
-        }
-        if let Some(code) = first_six_digit_code(&message_text(&message)) {
+        let message = serde_json::from_value::<Message>(message).unwrap_or_default();
+        if let Some(code) = otp(&message, since) {
             return Ok(Some(GmailOtp {
                 code,
                 message_id: id,
@@ -238,122 +231,9 @@ pub async fn tidy_up(access: &GmailAccess, id: &str) {
     );
 }
 
-fn from_vtop(message: &Value) -> bool {
-    message
-        .pointer("/payload/headers")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .any(|header| {
-            header
-                .get("name")
-                .and_then(Value::as_str)
-                .map(str::to_lowercase)
-                == Some("from".to_string())
-                && header
-                    .get("value")
-                    .and_then(Value::as_str)
-                    .is_some_and(|value| value.to_lowercase().contains(SENDER))
-        })
-}
-
-/// Snippet plus every decoded body part, quoted-printable decoded.
-fn message_text(message: &Value) -> String {
-    fn append(part: &Value, out: &mut String) {
-        if let Some(data) = part.pointer("/body/data").and_then(Value::as_str) {
-            let data = data.trim_end_matches('=');
-            if let Ok(bytes) = URL_SAFE_NO_PAD.decode(data) {
-                out.push_str(&String::from_utf8_lossy(&bytes));
-                out.push('\n');
-            }
-        }
-        if let Some(parts) = part.get("parts").and_then(Value::as_array) {
-            for child in parts {
-                append(child, out);
-            }
-        }
-    }
-    let mut text = String::new();
-    if let Some(snippet) = message.get("snippet").and_then(Value::as_str) {
-        text.push_str(snippet);
-        text.push('\n');
-    }
-    if let Some(payload) = message.get("payload") {
-        append(payload, &mut text);
-    }
-    decode_quoted_printable(&text)
-}
-
-fn decode_quoted_printable(input: &str) -> String {
-    let joined = input.replace("=\r\n", "").replace("=\n", "");
-    let mut rest = joined.as_bytes();
-    let mut out = Vec::with_capacity(rest.len());
-    while let Some((&byte, tail)) = rest.split_first() {
-        let escaped = (byte == b'=')
-            .then(|| tail.split_at_checked(2))
-            .flatten()
-            .and_then(|(hex, after)| {
-                let hex = std::str::from_utf8(hex).ok()?;
-                Some((u8::from_str_radix(hex, 16).ok()?, after))
-            });
-        if let Some((value, after)) = escaped {
-            out.push(value);
-            rest = after;
-            continue;
-        }
-        out.push(byte);
-        rest = tail;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-/// The first run of exactly six ASCII digits.
-fn first_six_digit_code(text: &str) -> Option<String> {
-    text.split(|c: char| !c.is_ascii_digit())
-        .find(|run| run.len() == 6)
-        .map(str::to_string)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn finds_a_standalone_six_digit_code() {
-        assert_eq!(
-            first_six_digit_code("Your OTP is 401295. Valid 5 min").as_deref(),
-            Some("401295")
-        );
-        assert_eq!(
-            first_six_digit_code("ref 12345678 then 654321").as_deref(),
-            Some("654321")
-        );
-        assert_eq!(first_six_digit_code("no code 12345"), None);
-    }
-
-    #[test]
-    fn reads_snippet_and_encoded_parts() {
-        let body = URL_SAFE_NO_PAD.encode("OTP: 7=3D 112233\n");
-        let message = serde_json::json!({
-            "snippet": "Security OTP",
-            "payload": {
-                "headers": [{"name": "From", "value": "VTOP <noreply.sdc@vitap.ac.in>"}],
-                "parts": [{"body": {"data": body}}]
-            }
-        });
-        assert!(from_vtop(&message));
-        let text = message_text(&message);
-        assert!(text.contains("7= 112233"), "{text}");
-        assert_eq!(first_six_digit_code(&text).as_deref(), Some("112233"));
-    }
-
-    #[test]
-    fn other_senders_do_not_count() {
-        let message = serde_json::json!({
-            "payload": {"headers": [{"name": "From", "value": "someone@example.com"}]}
-        });
-        assert!(!from_vtop(&message));
-    }
 
     #[test]
     fn expiring_tokens_are_refused_up_front() {
@@ -374,10 +254,5 @@ mod tests {
             ..access
         };
         assert!(!fresh.expires_within(Duration::from_secs(60)));
-    }
-
-    #[test]
-    fn quoted_printable_is_decoded() {
-        assert_eq!(decode_quoted_printable("a=3Db=\nc"), "a=bc");
     }
 }

@@ -5,8 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
 
 pub const WEEK_SECS: u64 = 7 * 24 * 3600;
@@ -139,6 +139,10 @@ impl Announce {
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::let_underscore_must_use,
+    reason = "removing a temporary folder that may not exist"
+)]
 mod tests {
     use super::*;
 
@@ -195,9 +199,11 @@ mod tests {
             .decode(key["publicKey"].as_str().unwrap())
             .unwrap();
         assert_eq!(public, keys[0].public());
-        assert!(!body
-            .to_string()
-            .contains(&vtop_wire::hex(&keys[0].private())));
+        assert!(
+            !body
+                .to_string()
+                .contains(&vtop_wire::hex(&keys[0].private()))
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

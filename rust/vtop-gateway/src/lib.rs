@@ -28,13 +28,13 @@ use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use vtop_shared::engine::{
-    PageBatch, PageFetch, FETCH, FETCH_BATCH, UDP_KEYS_INTERNAL, VTOP_LOGIN, VTOP_LOGIN_OTP,
+    FETCH, FETCH_BATCH, PageBatch, PageFetch, UDP_KEYS_INTERNAL, VTOP_LOGIN, VTOP_LOGIN_OTP,
     VTOP_LOGIN_RESEND,
 };
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    batch_pages, session_hash, WirePageRequest, WirePageResponse, BATCH, BUSY, NEED_SESSION,
-    SIGN_IN_BODY, TOO_LARGE, UNSUPPORTED, VERSION,
+    BATCH, BUSY, NEED_SESSION, SIGN_IN_BODY, TOO_LARGE, UNSUPPORTED, VERSION, WirePageRequest,
+    WirePageResponse, batch_pages, session_hash,
 };
 use vtop_wire::fec::MAX_RESPONSE;
 use vtop_wire::gateway::{Gateway, NewRequest, Token};
@@ -195,6 +195,10 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
             loop {
                 match sock.recv_from(&mut buf).await {
                     Ok((n, from)) => {
+                        #[expect(
+                            clippy::let_underscore_must_use,
+                            reason = "a full queue drops the packet, as the network would; the client repairs it"
+                        )]
                         let _ = tx.try_send((i, from, buf[..n].to_vec()));
                     }
                     Err(e) => tracing::debug!("udp receive: {e}"),
@@ -224,6 +228,10 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
                                 error(BUSY, "busy", "The server is busy.").encode()
                             }
                         };
+                        #[expect(
+                            clippy::let_underscore_must_use,
+                            reason = "the loop holds the receiver; it is gone only at shutdown"
+                        )]
                         let _ = tx.send((token, body));
                     });
                 }
@@ -368,7 +376,7 @@ impl Engine {
         let answer = match sent {
             Ok(answer) => answer,
             Err(e) if e.is_timeout() => {
-                return error(504, "vtop_timeout", "VTOP took too long to answer.")
+                return error(504, "vtop_timeout", "VTOP took too long to answer.");
             }
             Err(e) => {
                 tracing::warn!("engine: {e}");
@@ -453,7 +461,7 @@ impl Engine {
         let answer = match sent {
             Ok(answer) => answer,
             Err(e) if e.is_timeout() => {
-                return error(504, "vtop_timeout", "VTOP took too long to answer.")
+                return error(504, "vtop_timeout", "VTOP took too long to answer.");
             }
             Err(e) => {
                 tracing::warn!("sign-in {path}: {e}");
@@ -553,7 +561,7 @@ fn engine_http() -> reqwest::Client {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
-    let mut tls = rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
+    let mut tls = rustls::ClientConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
     .with_safe_default_protocol_versions()
