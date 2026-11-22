@@ -76,6 +76,8 @@ jobs:
         with:
           tool: cargo-fuzz
 
+      # taiki-e/install-action ships a musl cargo-fuzz binary, whose baked-in default target is
+      # x86_64-unknown-linux-musl (not installed, and incompatible with ASan's dynamic libc).
       - name: Build the parser fuzzer
         working-directory: rust/vtop-proto/fuzz
-        run: cargo +nightly fuzz build parsers
+        run: cargo +nightly fuzz build --target x86_64-unknown-linux-gnu parsers
