@@ -215,11 +215,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
             val shown = target.coerceIn(0, plans.lastIndex)
             val plan = plans[shown]
             val left = plan.upcoming + plan.unposted
-            // Strict arithmetic at the chosen goal, like Rust's 75% plan.
-            val total = plan.held + left
-            val need = ((goal * total - 100 * plan.attended + 99).floorDiv(100)).coerceAtLeast(0)
-            val must = need.takeIf { it <= left }
-            val canMiss = (left - need).coerceIn(0, left)
+            val (must, canMiss) = goalSplit(goal, plan.attended, plan.held, left)
             SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calc.plan"), title = "To finish at $goal%", shape = MaterialTheme.shapes.extraLargeIncreased) {
                 ConnectedChoice(
                     GOALS,
@@ -288,6 +284,17 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
 
 /** The finishing targets on offer; VTOP's line is 75%. */
 private val GOALS = listOf(75, 80, 85, 90)
+
+/**
+ * To finish at [goal]% with [attended] of [held] and [left] still to come: the classes that must
+ * be attended (null when attending all of them still falls short) and the ones that can be
+ * missed. Strict arithmetic at the chosen goal, like Rust's 75% plan.
+ */
+internal fun goalSplit(goal: Int, attended: Int, held: Int, left: Int): Pair<Int?, Int> {
+    val total = held + left
+    val need = ((goal * total - 100 * attended + 99).floorDiv(100)).coerceAtLeast(0)
+    return need.takeIf { it <= left } to (left - need).coerceIn(0, left)
+}
 
 /**
  * The classes left as a strip of cells: the first [must] filled in [tone] (to attend), the rest

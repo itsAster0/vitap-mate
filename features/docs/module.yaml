@@ -3,6 +3,9 @@ product:
   type: lib
   platforms: [android]
 
+apply:
+  - ../../android-lib.module-template.yaml
+
 dependencies:
   - //design
   # Already the app's: the file picker (Storage Access Framework).
@@ -11,10 +14,3 @@ dependencies:
 settings:
   android:
     namespace: vitapmate.features.docs
-    minSdk: 28
-  compose:
-    enabled: true
-    version: 1.13.0-rc01
-  jvm:
-    jdk:
-      version: 26

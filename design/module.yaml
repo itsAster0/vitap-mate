@@ -3,6 +3,9 @@ product:
   type: lib
   platforms: [android]
 
+apply:
+  - ../android-lib.module-template.yaml
+
 dependencies:
   - //core: exported
   - $compose.foundation: exported
@@ -22,10 +25,3 @@ test-dependencies:
 settings:
   android:
     namespace: vitapmate.ui
-    minSdk: 28
-  compose:
-    enabled: true
-    version: 1.13.0-rc01
-  jvm:
-    jdk:
-      version: 26

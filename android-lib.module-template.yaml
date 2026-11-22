@@ -1,0 +1,11 @@
+# Settings every library module shares (core, design, features/*). Each module
+# applies it and keeps only its own namespace and dependencies.
+settings:
+  android:
+    minSdk: 28
+  compose:
+    enabled: true
+    version: 1.13.0-rc01
+  jvm:
+    jdk:
+      version: 26
