@@ -1,42 +1,18 @@
 package vitapmate.features.docs
 
-import vitapmate.ui.rememberHaptics
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.border
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
-import com.composables.icons.lucide.CheckCheck
-import com.composables.icons.lucide.EllipsisVertical
-import com.composables.icons.lucide.Share2
-import com.composables.icons.lucide.SquareCheckBig
 import com.composables.icons.lucide.Trash2
 import vitapmate.ui.AppDialog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.toShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,20 +21,11 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,31 +36,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ArrowUpDown
-import com.composables.icons.lucide.Check
-import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.File
-import com.composables.icons.lucide.FileCode
 import com.composables.icons.lucide.FilePlus
-import com.composables.icons.lucide.FileSpreadsheet
-import com.composables.icons.lucide.FileText
 import com.composables.icons.lucide.Files
-import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
-import com.composables.icons.lucide.Utensils
-import com.composables.icons.lucide.X
 import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vitapmate.data.Doc
 import vitapmate.data.DocKind
@@ -105,15 +56,10 @@ import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
 import vitapmate.observability.logAction
-import vitapmate.ui.AppTheme
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.LocalOpenDetail
-import vitapmate.ui.Radii
 import vitapmate.ui.Space
-import vitapmate.ui.Tone
-import vitapmate.ui.ToneBadge
-import vitapmate.ui.neutralTone
 import vitapmate.ui.showToast
 
 /** What the picker offers: the kinds Docs can show (Flutter's `docExtensions`). */
@@ -298,213 +244,5 @@ internal fun DocsScreen() {
             danger = true,
             confirmTag = "docs.delete.confirm",
         ) { Text("Their files are removed from the download folder too.") }
-    }
-}
-
-/** Selection mode's bar in place of the count: how many, select all, share, delete, and the actions for one. */
-@Composable
-private fun SelectionBar(count: Int, allShown: Boolean, onClear: () -> Unit, onAll: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit, onMore: (() -> Unit)?) {
-    val danger = AppTheme.tones.danger
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(Radii.pill)).background(MaterialTheme.colorScheme.secondaryContainer).padding(4.dp).testTag("docs.selection"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClear, Modifier.testTag("docs.selection.clear")) { Icon(Lucide.X, "Stop selecting") }
-        Text("$count selected", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-        IconButton(onAll, Modifier.testTag("docs.selection.all")) { Icon(if (allShown) Lucide.SquareCheckBig else Lucide.CheckCheck, if (allShown) "Select none" else "Select all") }
-        IconButton(onShare, Modifier.testTag("docs.selection.share")) { Icon(Lucide.Share2, "Share") }
-        IconButton(onDelete, Modifier.testTag("docs.selection.delete")) { Icon(Lucide.Trash2, "Delete", tint = danger.base) }
-        if (onMore != null) IconButton(onMore, Modifier.testTag("docs.selection.more")) { Icon(Lucide.EllipsisVertical, "More") }
-    }
-}
-
-/** One chip per kind in Docs, with All; picking one shows only that kind. */
-@Composable
-private fun KindChips(kinds: List<DocKind>, picked: DocKind?, onPick: (DocKind?) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = Space.xs).testTag("docs.kinds")) {
-        item { FilterChip(picked == null, { onPick(null) }, { Text("All") }, Modifier.testTag("docs.kind.all")) }
-        items(kinds) { k ->
-            FilterChip(picked == k, { onPick(if (picked == k) null else k) }, { Text(kindsLabel(k)) }, Modifier.testTag("docs.kind.${k.name.lowercase()}"))
-        }
-    }
-}
-
-private fun kindsLabel(kind: DocKind) = when (kind) {
-    DocKind.Pdf -> "PDFs"
-    DocKind.Image -> "Images"
-    DocKind.Spreadsheet -> "Sheets"
-    DocKind.Text -> "Text"
-    DocKind.File -> "Other"
-}
-
-@Composable
-private fun SearchRow(query: String, onQuery: (String) -> Unit, sort: DocSort) {
-    var menu by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    Row(Modifier.padding(bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
-        TextField(
-            vitapmate.ui.rememberSyncedTextFieldState(query, onQuery),
-            Modifier.weight(1f).testTag("docs.search"),
-            placeholder = { Text("Search documents") },
-            leadingIcon = { Icon(Lucide.Search, null, Modifier.size(18.dp)) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton({ onQuery("") }) { Icon(Lucide.X, "Clear search", Modifier.size(18.dp)) } },
-            lineLimits = TextFieldLineLimits.SingleLine,
-            shape = RoundedCornerShape(Radii.pill),
-            colors = TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
-        )
-        Box {
-            IconButton({ menu = true }, Modifier.testTag("docs.sort")) { Icon(Lucide.ArrowUpDown, "Sort") }
-            DropdownMenu(menu, { menu = false }, Modifier.testTag("docs.sort.menu")) {
-                DocSort.entries.forEach { option ->
-                    val picked = option == sort
-                    DropdownMenuItem(
-                        text = { Text(option.label, fontWeight = if (picked) FontWeight.SemiBold else null) },
-                        onClick = {
-                            menu = false
-                            Docs.sort = option
-                            scope.logAction("docs.sort", SRC, "sort ${option.name}")
-                        },
-                        leadingIcon = { Icon(if (picked) Lucide.Check else Lucide.ArrowUpDown, null, Modifier.size(18.dp)) },
-                        modifier = Modifier.padding(horizontal = 6.dp).clip(RoundedCornerShape(14.dp))
-                            .background(if (picked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                            .testTag("docs.sort.${option.name.lowercase()}"),
-                        colors = if (picked) MenuDefaults.itemColors(
-                            textColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            leadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ) else MenuDefaults.itemColors(),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** Icon and tone for [doc]'s kind (the Flutter app's `visualFor`). */
-@Composable
-private fun visualOf(doc: Doc): Pair<Tone, ImageVector> {
-    val t = AppTheme.tones
-    if (doc.asMessMenu) return t.warning to Lucide.Utensils
-    return when (doc.kind) {
-        DocKind.Pdf -> t.danger to Lucide.FileText
-        DocKind.Image -> t.accentTone to Lucide.Image
-        DocKind.Spreadsheet -> t.success to Lucide.FileSpreadsheet
-        DocKind.Text -> t.lab to Lucide.FileCode
-        DocKind.File -> neutralTone to Lucide.File
-    }
-}
-
-private fun kindLabel(doc: Doc) = if (doc.asMessMenu) "Menu" else when (doc.kind) {
-    DocKind.Pdf -> "PDF"
-    DocKind.Image -> "Image"
-    DocKind.Spreadsheet -> "Sheet"
-    DocKind.Text -> "Text"
-    DocKind.File -> "File"
-}
-
-private fun openedLabel(ms: Long?): String {
-    if (ms == null || ms == 0L) return "never opened"
-    val mins = (System.currentTimeMillis() - ms) / 60_000
-    return when {
-        mins < 1 -> "opened just now"
-        mins < 60 -> "opened ${mins}m ago"
-        mins < 60 * 24 -> "opened ${mins / 60}h ago"
-        else -> "opened ${mins / 60 / 24}d ago"
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun DocCard(doc: Doc, index: Int, modifier: Modifier, selected: Boolean, onOpen: () -> Unit, onLongPress: () -> Unit) {
-    val (tone, icon) = visualOf(doc)
-    val haptics = rememberHaptics()
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val press by androidx.compose.animation.core.animateFloatAsState(if (pressed || selected) 0.94f else 1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
-    val ring by animateColorAsState(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-    // Cards rise in one after another the first time the grid shows.
-    val enter = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        delay((index.coerceAtMost(10) * 40).toLong())
-        enter.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMediumLow))
-    }
-    Column(
-        modifier.height(152.dp).fillMaxWidth()
-            .graphicsLayer {
-                alpha = enter.value.coerceIn(0f, 1f)
-                translationY = (1 - enter.value) * 40f
-                scaleX = press
-                scaleY = press
-            }
-            .clip(RoundedCornerShape(26.dp))
-            .background(AppTheme.colors.card)
-            .border(3.dp, ring, RoundedCornerShape(26.dp))
-            .combinedClickable(interaction, null, onClick = onOpen, onLongClick = {
-                haptics.longPress()
-                onLongPress()
-            })
-            .testTag("docs.card.${doc.id}"),
-    ) {
-        // A band in the kind's tone, so kinds tell apart across the grid; the icon in a shape
-        // (its own for the mess menu and for images).
-        Row(Modifier.fillMaxWidth().height(66.dp).background(tone.subtle).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            val shape = when {
-                doc.asMessMenu -> MaterialShapes.Cookie9Sided.toShape()
-                doc.kind == DocKind.Image -> MaterialShapes.Cookie7Sided.toShape()
-                else -> CircleShape
-            }
-            Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), shape), Alignment.Center) {
-                Icon(icon, null, Modifier.size(22.dp), tint = tone.base)
-            }
-            Spacer(Modifier.weight(1f))
-            if (selected) {
-                Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.primary, CircleShape), Alignment.Center) {
-                    Icon(Lucide.Check, "Selected", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimary)
-                }
-            } else {
-                ToneBadge(kindLabel(doc), tone = Tone(tone.base, MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), tone.onSubtle))
-            }
-        }
-        Column(Modifier.weight(1f).padding(start = 14.dp, top = 10.dp, end = 14.dp, bottom = 14.dp)) {
-            Text(doc.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(Space.xs))
-            Text(openedLabel(doc.lastOpenedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        }
-    }
-}
-
-/**
- * "Continue viewing": the last opened document in its kind's tone, live in a short window, with
- * Full screen under it; header and window are one stack.
- */
-@Composable
-private fun Recent(doc: Doc, onOpen: () -> Unit) {
-    val (tone, icon) = visualOf(doc)
-    val inner = RoundedCornerShape(6.dp)
-    Column(
-        Modifier.fillMaxWidth().padding(bottom = Space.xs).clip(MaterialTheme.shapes.extraLarge).testTag("docs.recent"),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().background(tone.subtle, inner).padding(horizontal = Space.lg, vertical = Space.md), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(46.dp).background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), RoundedCornerShape(15.dp)), Alignment.Center) {
-                Icon(icon, null, Modifier.size(22.dp), tint = tone.base)
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Continue viewing", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = tone.onSubtle)
-                Text(doc.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        Column(Modifier.fillMaxWidth().background(AppTheme.colors.card, inner)) {
-            Box(Modifier.fillMaxWidth().height(210.dp)) { DocContent(doc, embedded = true) }
-            Button(
-                onOpen,
-                Modifier.fillMaxWidth().padding(start = Space.md, end = Space.md, bottom = Space.md).height(46.dp).testTag("docs.recent.open"),
-                colors = ButtonDefaults.buttonColors(containerColor = tone.base, contentColor = AppTheme.colors.background),
-            ) {
-                Icon(Lucide.ExternalLink, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(Space.sm))
-                Text("Full screen")
-            }
-        }
     }
 }

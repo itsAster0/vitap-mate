@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,19 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.toShape
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CalendarRange
 import com.composables.icons.lucide.CalendarX
@@ -61,7 +53,6 @@ import com.composables.icons.lucide.FlaskConical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Radio
 import com.composables.icons.lucide.RefreshCw
-import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Server
@@ -86,7 +77,6 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
-import vitapmate.ui.PasswordField
 import vitapmate.ui.StatusChip
 import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
@@ -362,23 +352,7 @@ fun DeveloperScreen() {
             Log.info("ui.dev", "tunable set", fields = mapOf("key" to t.key, "value" to it))
         }
     }
-    if (previewUpdate) AlertDialog(
-        onDismissRequest = { previewUpdate = false },
-        title = { Text("Preview an update") },
-        text = {
-            Column {
-                Text("Levels 3 and 4 are Google Play's own dialogs and show only for a real update.")
-                listOf(
-                    "Level 2: Update runs a fake download" to { PlayUpdate.preview(UpdatePill.Available) },
-                    "Update ready (end of levels 2 and 3)" to { PlayUpdate.preview(UpdatePill.Ready) },
-                    "Level 5: update required" to { PlayUpdate.preview(null, blocked = true) },
-                ).forEachIndexed { i, (label, run) ->
-                    TextButton({ previewUpdate = false; run() }, Modifier.fillMaxWidth().padding(top = if (i == 0) 12.dp else 0.dp).testTag("dev.update_preview.$i")) { Text(label) }
-                }
-            }
-        },
-        confirmButton = { TextButton({ previewUpdate = false }) { Text("Close") } },
-    )
+    if (previewUpdate) UpdatePreviewDialog { previewUpdate = false }
     if (setAccount) CredentialsDialog({ setAccount = false }) { username, password ->
         scope.launch {
             dev("dev.set_account") { c, f -> c.devSetAccount(f, username, password) }?.let {
@@ -422,68 +396,4 @@ private suspend fun <T : Any> dev(name: String, work: suspend (Core, String) -> 
 } catch (e: Exception) {
     Log.warn("ui.dev", "$name failed: ${e::class.simpleName}")
     null
-}
-
-/** Username and password for [Core.devSetAccount]; the password is never saved in instance state. */
-@Composable
-private fun CredentialsDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
-    val username = rememberTextFieldState()
-    var password by remember { mutableStateOf("") }
-    val ok = username.text.isNotBlank() && password.isNotEmpty()
-    AppDialog(
-        onDismiss,
-        "Set credentials",
-        "Save",
-        {
-            onSave(username.text.toString().trim(), password)
-            onDismiss()
-        },
-        confirmEnabled = ok,
-        confirmTag = "dev.account.save",
-    ) {
-        OutlinedTextField(username, Modifier.testTag("dev.account.username"), label = { Text("Username") }, lineLimits = TextFieldLineLimits.SingleLine)
-        PasswordField(password, { password = it }, "Password", "dev.account.password", Modifier.padding(top = 12.dp))
-    }
-}
-
-/** An M3 dialog editing one value: Save (when [check] passes), Default, Cancel. */
-@Composable
-private fun TextDialog(
-    title: String,
-    note: String,
-    current: String,
-    number: Boolean,
-    check: (String) -> Boolean,
-    onDismiss: () -> Unit,
-    onDefault: () -> Unit,
-    onSave: (String) -> Unit,
-) {
-    val text = rememberTextFieldState(current)
-    val value = text.text.toString()
-    AppDialog(
-        onDismiss,
-        title,
-        "Save",
-        {
-            onSave(value.trim())
-            onDismiss()
-        },
-        confirmEnabled = check(value),
-        confirmTag = "dev.edit.save",
-        extra = {
-            TextButton({
-                onDefault()
-                onDismiss()
-            }, Modifier.testTag("dev.edit.default")) { Text("Default") }
-        },
-    ) {
-        Text(note)
-        OutlinedTextField(
-            text,
-            Modifier.padding(top = 12.dp).testTag("dev.edit.field"),
-            isError = !check(value),
-            keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Uri),
-            lineLimits = TextFieldLineLimits.SingleLine,
-        )
-    }
 }
