@@ -5,7 +5,7 @@ on:
     # Parts of the repo the app is not built from: the edge Worker, the
     # engine's crates, the gateway, the browser extension and docs.
     paths-ignore:
-      - "rust/vtop-edge/**"
+      - "edge/**"
       - "rust/vtop-bridge/**"
       - "rust/vtop-mcp/**"
       - "rust/vtop-gateway/**"
@@ -16,10 +16,12 @@ on:
       - ".github/workflows/extension-build.yml"
       - ".github/workflows/rust-check.yml"
       - ".github/workflows/edge-check.yml"
+      - ".github/workflows/actions-check.yml"
+      - ".github/ISSUE_TEMPLATE/**"
       - "**/*.md"
   pull_request:
     paths-ignore:
-      - "rust/vtop-edge/**"
+      - "edge/**"
       - "rust/vtop-bridge/**"
       - "rust/vtop-mcp/**"
       - "rust/vtop-gateway/**"
@@ -30,11 +32,12 @@ on:
       - ".github/workflows/extension-build.yml"
       - ".github/workflows/rust-check.yml"
       - ".github/workflows/edge-check.yml"
+      - ".github/workflows/actions-check.yml"
+      - ".github/ISSUE_TEMPLATE/**"
       - "**/*.md"
   workflow_dispatch:
 permissions:
-  # `contents: write` only to replace the `nightly` release on a push to main.
-  contents: write
+  contents: read
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
@@ -50,9 +53,11 @@ jobs:
       DETEKT: "1.23.8"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Set up mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
         with:
           install_args: java
           cache: true
@@ -65,37 +70,44 @@ jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
+    permissions:
+      # `contents: write` only to replace the `nightly` release on a push to main.
+      contents: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       # Java and the Kotlin Toolchain at the versions pinned in mise.toml.
       - name: Set up mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
         with:
           install_args: java kotlin-toolchain
           cache: true
       # Pinned nightly for Android .so (-Zbuild-std needs rust-src); stable
       # stays the default for the host uniffi-bindgen build.
       - name: Set up Rust nightly (Android)
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: nightly-2026-11-01
           components: rust-src
           targets: aarch64-linux-android,armv7-linux-androideabi
       - name: Set up Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
       - name: Install cargo-ndk
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
         with:
           tool: cargo-ndk
       - name: Set up Android NDK
         id: ndk
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@2817442ee7c3346c1eb7d2ec60263c93206ba14f # v1
         with:
           ndk-version: r28c
           add-to-path: false
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
         with:
           workspaces: rust
           cache-on-failure: true
@@ -104,6 +116,13 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: mise run rust-android
+      # The committed bindings must match the Rust API the build just generated them from.
+      - name: Check Kotlin bindings are committed
+        run: |
+          git diff --exit-code -- core/src/vitapmate/core/vtop_ffi.kt || {
+            echo "::error file=core/src/vitapmate/core/vtop_ffi.kt::The Kotlin bindings are out of date. Run \`mise run rust-android\` and commit core/src/vitapmate/core/vtop_ffi.kt."
+            exit 1
+          }
       # Firebase values (push), as in the release; skipped where ENV_JSON isn't set (forks).
       - name: Write Firebase resources
         env:
@@ -137,7 +156,7 @@ jobs:
       # The Kotlin Toolchain's downloads (its runtime, JDKs, Android tools, Gradle
       # and Maven libraries), so a run doesn't fetch them again.
       - name: Cache Kotlin Toolchain downloads
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/JetBrains/Kotlin
@@ -149,7 +168,7 @@ jobs:
           restore-keys: kotlin-deps-${{ runner.os }}-
       # Incremental build state from the last run, so only changed modules compile.
       - name: Cache Kotlin build
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             build
@@ -164,10 +183,8 @@ jobs:
       - name: Build app
         if: steps.signing.outputs.signed != 'true'
         run: ./kotlin build
-      - name: Test core
-        run: ./kotlin test -m core
-      - name: Test design
-        run: ./kotlin test -m design
+      - name: Test
+        run: ./kotlin test
       - name: Build signed release APK
         if: steps.signing.outputs.signed == 'true'
         run: mise run release --both
@@ -176,7 +193,7 @@ jobs:
         run: rm -rf keystore app/keystore.properties .env.json app/res/values/firebase.xml
       - name: Upload release APK
         if: steps.signing.outputs.signed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vitapmate-release-apk
           path: |
@@ -206,9 +223,24 @@ jobs:
             --title "Nightly ${GITHUB_SHA::7}" --notes-file nightly-notes.md
       - name: Upload debug APK
         if: steps.signing.outputs.signed != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vitapmate-debug-apk
           path: build/tasks/_app_buildAndroidDebug/gradle-project-debug.apk
           if-no-files-found: error
           retention-days: 30
+  # One check for branch protection to require, whichever of the jobs above ran.
+  required:
+    name: Required checks
+    if: always()
+    needs: [detekt, build-apk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the jobs passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done

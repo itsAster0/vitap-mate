@@ -42,7 +42,7 @@ platform :android do
 
   desc 'Promote the latest internal build to the closed (friends), alpha and beta tracks'
   lane :promote_all_testing do
-    %w[friends alpha beta production].each do |track|
+    %w[friends alpha beta].each do |track|
       upload_to_play_store(
         track: 'internal',
         track_promote_to: track,

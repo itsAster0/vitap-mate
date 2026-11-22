@@ -37,6 +37,69 @@ run = [
   "rm -rf ../build/tasks/_app_buildAndroidDebug ../build/tasks/_app_buildAndroidRelease ../build/tasks/_app_bundleAndroid",
 ]
 
+[tasks.rust-android-dev]
+description = "Faster rust-android for iterating: arm64-v8a only, no full LTO, prebuilt std (bigger .so); same bindings"
+dir = "rust"
+run = [
+  # Tradeoff: a bigger, slightly slower .so for a much faster build. It skips armeabi-v7a, full
+  # LTO with one codegen unit, -Zbuild-std (std prebuilt, still panic=unwind) and ICF. It keeps
+  # the pinned nightly for -Zfmt-debug=shallow, so derived Debug fields stay out of the logs as
+  # in release. A leftover armeabi-v7a .so in app/jniLibs is stale against the new bindings:
+  # run `mise run rust-android` before testing on 32-bit Android or building a release.
+  "rustup run nightly-2026-11-01 rustc --version >/dev/null 2>&1 || rustup toolchain install nightly-2026-11-01 --profile minimal --component rust-src --target aarch64-linux-android,armv7-linux-androideabi",
+  '''
+  CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
+  CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="-Zfmt-debug=shallow" \
+    cargo +nightly-2026-11-01 ndk -t arm64-v8a -P 28 -o ../app/jniLibs build --release -p vtop-ffi
+  ''',
+  "cargo build -q -p vtop-ffi --lib",
+  'cargo run -q -p vtop-ffi --features cli --bin uniffi-bindgen -- generate "target/debug/libvtop_ffi.$([ "$(uname)" = Darwin ] && echo dylib || echo so)" --language kotlin --out-dir ../core/src --no-format',
+  "rm -rf ../build/tasks/_app_buildAndroidDebug ../build/tasks/_app_buildAndroidRelease ../build/tasks/_app_bundleAndroid",
+]
+
+[tasks.check]
+description = "Run what CI runs: check-rust, check-kotlin, check-edge and check-ext"
+depends = ["check-rust", "check-kotlin", "check-edge", "check-ext"]
+
+[tasks.check-changed]
+description = "Only the checks for what the working copy changes (jj diff, else git diff): per-crate fmt, clippy and test, cargo deny, Kotlin tests and detekt, edge, extension (-n: list them)"
+usage = 'flag "-n" help="Print the checks without running them"'
+run = 'scripts/check-changed.sh ${usage_n:+-n}'
+
+[tasks.check-rust]
+description = "Rust as Rust Check runs it: cargo fmt --check, clippy -D warnings, cargo test, cargo deny (brew install cargo-deny)"
+dir = "rust"
+run = [
+  "cargo fmt --check",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo test --workspace",
+  "cargo deny check",
+]
+
+[tasks.fuzz]
+description = "Fuzz the VTOP parsers for a minute (nightly, cargo-fuzz): no input may panic; a crash lands in rust/vtop-proto/fuzz/artifacts"
+dir = "rust/vtop-proto/fuzz"
+run = [
+  "cargo fuzz --version >/dev/null 2>&1 || cargo install cargo-fuzz --locked",
+  "rustup run nightly rustc --version >/dev/null 2>&1 || rustup toolchain install nightly --profile minimal",
+  "./seed.sh",
+  "cargo +nightly fuzz run parsers -- -max_total_time=60",
+]
+
+[tasks.check-kotlin]
+description = "Kotlin as App Build runs it: core and design tests, then detekt"
+run = ["./kotlin test", "mise run detekt"]
+
+[tasks.check-edge]
+description = "The edge Worker as Edge Check runs it: type checks and tests"
+dir = "edge"
+run = ["[ -d node_modules ] || bun install --frozen-lockfile", "bun run check", "bun run test"]
+
+[tasks.check-ext]
+description = "The browser extension as Extension Build runs it: checks, tests and the Chrome build"
+dir = "extension"
+run = ["[ -d node_modules ] || bun install --frozen-lockfile", "bun run check", "bun run test", "bun run build"]
+
 [tasks.firebase]
 description = "Write app/res/values/firebase.xml (gitignored) from .env.json, the resources Firebase starts from; prints no secrets"
 run = '''
@@ -133,19 +196,21 @@ run = 'bun fastlane/notes.ts "${usage_since:-}"'
 description = "Lint the Kotlin with detekt (brew install detekt): detekt.yml on top of the defaults, as CI runs it"
 run = "detekt --input app/src,core/src,design/src,features --excludes '**/vtop_ffi.kt' --config detekt.yml --build-upon-default-config"
 
+# The adb tasks below use the SDK's adb ($ANDROID_HOME, else ~/Library/Android/sdk), which
+# talks to the device in $ANDROID_SERIAL when it is set.
 [tasks.logs]
 description = "Follow the app's log (Kotlin and Rust) in logcat"
-run = "$HOME/Library/Android/sdk/platform-tools/adb logcat -v time -s vitapmate"
+run = "${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb logcat -v time -s vitapmate"
 
 [tasks.logs-pull]
 description = "Print the app's JSON-lines log file (cache/logs/app.jsonl)"
-run = "$HOME/Library/Android/sdk/platform-tools/adb exec-out run-as com.vitap_pal.app cat cache/logs/app.jsonl"
+run = "${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb exec-out run-as com.vitap_pal.app cat cache/logs/app.jsonl"
 
 [tasks.trace]
 description = "Capture 10 s of Perfetto (app + Rust spans, gfx, view) to traces/"
 run = '''
 set -e
-adb="$HOME/Library/Android/sdk/platform-tools/adb"
+adb="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 out="traces/vitapmate-$(date +%Y%m%d-%H%M%S).perfetto-trace"
 mkdir -p traces
 "$adb" shell perfetto -o /data/misc/perfetto-traces/vitapmate.perfetto-trace -t 10s -a com.vitap_pal.app gfx view sched freq
@@ -157,7 +222,7 @@ echo "  trace_processor $out -q <(echo \"select name, dur/1e6 as ms from slice w
 [tasks.ui-dump]
 description = "Dump the on-screen UI tree (test tags show as resource-id, e.g. tab.attendance, screen.timetable)"
 run = '''
-adb="$HOME/Library/Android/sdk/platform-tools/adb"
+adb="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 "$adb" shell uiautomator dump /sdcard/ui.xml >/dev/null
 "$adb" exec-out cat /sdcard/ui.xml
 '''
@@ -165,7 +230,7 @@ adb="$HOME/Library/Android/sdk/platform-tools/adb"
 [tasks.state]
 description = "Dump the running debug app's state (route, settings, pages, last 20 flows) to files/state.json and print it"
 run = '''
-adb="$HOME/Library/Android/sdk/platform-tools/adb ${ANDROID_SERIAL:+-s $ANDROID_SERIAL}"
+adb="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb ${ANDROID_SERIAL:+-s $ANDROID_SERIAL}"
 $adb shell run-as com.vitap_pal.app rm -f files/state.json
 $adb shell am broadcast -a vitapmate.DUMP -p com.vitap_pal.app >/dev/null
 for _ in 1 2 3 4 5 6 7 8 9 10; do

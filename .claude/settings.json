@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(./kotlin build:*)",
+      "Bash(./kotlin test:*)",
+      "Bash(./kotlin run:*)",
+      "Bash(mise run check:*)",
+      "Bash(mise run rust-android:*)",
+      "Bash(mise run detekt:*)",
+      "Bash(mise run notes:*)",
+      "Bash(mise run logs:*)",
+      "Bash(mise run state:*)",
+      "Bash(mise run ui-dump:*)",
+      "Bash(mise run trace:*)",
+      "Bash(mise tasks:*)",
+      "Bash(bun run test:*)",
+      "Bash(bun run check:*)",
+      "Bash(bun run build:*)",
+      "Bash(jj status:*)",
+      "Bash(jj diff:*)",
+      "Bash(jj log:*)",
+      "Bash(jj show:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb shell:*)"
+    ],
+    "deny": [
+      "Read(./.env.json)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.prod*)",
+      "Read(**/.env.dev*)",
+      "Read(**/.env.staging)",
+      "Read(**/.env.test)",
+      "Read(./edge/.env)",
+      "Read(./keystore/**)",
+      "Read(./app/keystore.properties)",
+      "Read(./fastlane/key.json)",
+      "Read(./fastlane/*.json)",
+      "Read(./rust/vtop-convex/**)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); case \"$f\" in */rust/vtop-convex/*) ;; *.rs) [ -f \"$f\" ] && t=$(mktemp) && { rustfmt --edition 2024 < \"$f\" > \"$t\" 2>/dev/null && ! cmp -s \"$t\" \"$f\" && cat \"$t\" > \"$f\"; rm -f \"$t\"; } ;; esac; exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

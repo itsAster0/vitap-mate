@@ -46,7 +46,7 @@ The app keeps your VTOP password and the cached pages on the phone. By default i
 
 ## Development
 
-The UI is Kotlin with Compose Multiplatform, built with the Kotlin Toolchain (`./kotlin`, no Gradle). Rust (`rust/vtop-ffi`, through UniFFI) does the VTOP sign-in, CAPTCHA, parsing and the local cache. The server is a Cloudflare Worker (`rust/vtop-edge`), an engine on Railway and a UDP gateway; `rust/ARCHITECTURE.md` describes them.
+The UI is Kotlin with Compose Multiplatform, built with the Kotlin Toolchain (`./kotlin`, no Gradle). Rust (`rust/vtop-ffi`, through UniFFI) does the VTOP sign-in, CAPTCHA, parsing and the local cache. The server is a Cloudflare Worker (`edge/`), an engine on Railway and a UDP gateway; `rust/ARCHITECTURE.md` describes them.
 
 You need:
 
@@ -60,10 +60,10 @@ Build the Rust library and its Kotlin bindings, then build the app and run the t
 mise install
 mise run rust-android
 ./kotlin build
-./kotlin test -m core
+./kotlin test
 ```
 
-Run `mise run rust-android` again after you change `rust/vtop-ffi`. To run the app on an emulator or a connected phone:
+Run `mise run rust-android` again after you change `rust/vtop-ffi` (`mise run rust-android-dev` builds arm64 only, faster, for an arm64 emulator or phone). `mise run check` runs what CI runs (`check-rust`, `check-kotlin`, `check-edge`, `check-ext`); `mise tasks` lists the rest. To run the app on an emulator or a connected phone:
 
 ```bash
 ./kotlin run -d emulator-5554
@@ -77,7 +77,7 @@ The debug key signs debug builds, so you need no keys to build and run the app.
 |---|---|---|
 | App Build | push to `main`, PRs | builds and tests the app (`core` and `design`), then replaces the `nightly` release |
 | Rust Check | push to `main`, PRs touching `rust/` | runs `cargo fmt --check`, `cargo clippy`, and `cargo test --workspace` |
-| Edge Check | push to `main`, PRs touching `rust/vtop-edge/` | runs type checks and tests for the Cloudflare Worker |
+| Edge Check | push to `main`, PRs touching `edge/` | runs type checks and tests for the Cloudflare Worker |
 | Extension Build | push to `main`, PRs touching `extension/` | checks, tests and builds the Chrome zip and Firefox `.xpi`; signs and replaces `extension-latest` on `main` |
 
 ## Troubleshooting

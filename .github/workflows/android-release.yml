@@ -26,7 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Check tag matches versionName
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -35,36 +37,35 @@ jobs:
           [ "v$name" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME, versionName $name" >&2; exit 1; }
           echo "versionName $name, versionCode $code"
       # Java, the Kotlin Toolchain and Ruby (fastlane) at the versions in mise.toml.
+      # No caches in the release: the signed AAB is built only from fresh downloads,
+      # so a poisoned cache from another run can't reach Play.
       - name: Set up mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
         with:
           install_args: java kotlin-toolchain ruby
-          cache: true
+          cache: false
       # Pinned nightly for Android .so (-Zbuild-std needs rust-src); stable
       # stays the default for the host uniffi-bindgen build.
       - name: Set up Rust nightly (Android)
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: nightly-2026-11-01
           components: rust-src
           targets: aarch64-linux-android,armv7-linux-androideabi
       - name: Set up Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
       - name: Install cargo-ndk
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
         with:
           tool: cargo-ndk
       - name: Set up Android NDK
         id: ndk
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@2817442ee7c3346c1eb7d2ec60263c93206ba14f # v1
         with:
           ndk-version: r28c
           add-to-path: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
-          cache-on-failure: true
       - name: Build Rust library
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}

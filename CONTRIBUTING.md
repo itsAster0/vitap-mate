@@ -8,13 +8,13 @@ Pull requests for new features, bug fixes, security fixes and docs are welcome. 
 2. Run `mise install`.
 3. Run `mise run rust-android`.
 4. Run `./kotlin build`.
-5. Run `./kotlin test -m core`.
+5. Run `./kotlin test -m core` and `./kotlin test -m design`, or `mise run check` for everything CI runs. `mise run check-changed` runs only the checks for the parts you changed.
 
 The Development section of the [README](README.md) shows how to run the app on an emulator or a phone.
 
 ## Where code goes
 
-Each screen is its own module in `features/<name>/` and depends only on `design`. A feature never imports another one; shared UI goes in `design/`, shared data in `core/`. A new VTOP page needs a parser in `rust/vtop-proto`, a call in `rust/vtop-core` and an export in `rust/vtop-ffi`. `AGENTS.md` has the full table, and `rust/ARCHITECTURE.md` explains the Rust crates and the server.
+Each screen is its own module in `features/<name>/` and depends only on `design`. A feature never imports another one; shared UI goes in `design/`, shared data in `core/`. A new VTOP page needs a parser and a `PageSpec` in `rust/vtop-proto` (`src/spec.rs`) and an export in `rust/vtop-ffi`; vtop-core and the engine run every spec, so a read page needs nothing there. `AGENTS.md` has the full table, and `rust/ARCHITECTURE.md` explains the Rust crates and the server.
 
 ## Pull requests
 

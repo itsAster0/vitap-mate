@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in the app doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report a security problem privately as SECURITY.md describes, not here.
+        Leave out your registration number, password, OTPs and anything else personal.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: At the bottom of More, for example 3.1.1 (3001100).
+    validations:
+      required: true
+  - type: dropdown
+    id: route
+    attributes:
+      label: Route
+      description: Settings → Connection.
+      options:
+        - Direct
+        - Compressing proxy
+        - Server fetch
+        - Server fetch over UDP
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      placeholder: Redmi Note 12, Android 14
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: What you did, what you expected and what happened instead.
+      placeholder: |
+        1. Open Attendance
+        2. Pull to refresh
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Turn on Developer by tapping the version at the bottom of More 7 times, then
+        Settings → Developer → Share logs, right after the problem happens. Attach the
+        file here. The logs hold no passwords, cookies or OTPs.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, how often it happens, whether it started after an update.

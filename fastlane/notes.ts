@@ -54,7 +54,7 @@ if (existsSync(changelog)) {
 const chars = [...readFileSync(changelog, "utf8").trimEnd()].length;
 if (chars > 500) console.log(`  ${chars} characters: Play takes at most 500`);
 
-const updatesPath = `${root}rust/vtop-edge/guides/updates.json`;
+const updatesPath = `${root}edge/guides/updates.json`;
 const updates = JSON.parse(readFileSync(updatesPath, "utf8"));
 if (updates.releases.some((r: { code: number }) => r.code === code)) {
   console.log(`kept ${code} in ${updatesPath}`);

@@ -36,10 +36,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up bun
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
         with:
           install_args: bun
 
@@ -71,7 +73,7 @@ jobs:
           zip -qr extension.zip dist
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vitapmate-extension
           path: extension/extension.zip
@@ -103,7 +105,7 @@ jobs:
 
       - name: Upload Firefox artifact
         if: env.AMO_JWT_ISSUER != '' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vitapmate-extension-firefox
           path: extension/extension.xpi

@@ -1,0 +1,35 @@
+name: Actions Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actions-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: Audit workflows (zizmor)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # Prints the findings and fails on any; nothing is uploaded to code scanning.
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          inputs: .github/workflows
+          advanced-security: false

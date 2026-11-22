@@ -214,7 +214,7 @@ export function normalizeBridgeUrl(input: string): string | null {
   }
 }
 
-// ---- pairing with the app (`POST /v1/pair`, see vtop-edge's pair.ts) ---------
+// ---- pairing with the app (`POST /v1/pair`, see edge/src/pair.ts) ------------
 
 /** Crockford base32: no I, L, O or U, so a code reads back as typed. */
 const PAIR_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";

@@ -5,13 +5,11 @@ on:
     branches: [main]
     paths:
       - "rust/**"
-      - "!rust/vtop-edge/**"
       - "!**/*.md"
       - ".github/workflows/rust-check.yml"
   pull_request:
     paths:
       - "rust/**"
-      - "!rust/vtop-edge/**"
       - "!**/*.md"
       - ".github/workflows/rust-check.yml"
   workflow_dispatch:
@@ -33,15 +31,18 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
         with:
           workspaces: rust
 
@@ -53,3 +54,28 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+      # Advisories, licences, duplicate crates and sources, as rust/deny.toml sets them.
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
+        with:
+          tool: cargo-deny
+
+      - name: Dependencies (cargo deny)
+        run: cargo deny check
+
+      # Builds the parser fuzzer (rust/vtop-proto/fuzz, nightly) so it keeps compiling; it
+      # runs locally with `mise run fuzz`.
+      - name: Set up nightly Rust for the fuzzer
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: nightly
+
+      - name: Install cargo-fuzz
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
+        with:
+          tool: cargo-fuzz
+
+      - name: Build the parser fuzzer
+        working-directory: rust/vtop-proto/fuzz
+        run: cargo +nightly fuzz build parsers

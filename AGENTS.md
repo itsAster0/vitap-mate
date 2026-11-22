@@ -7,8 +7,22 @@ Toolchain (no Gradle), over a Rust core through UniFFI. It runs on Android only;
 iOS would need other Kotlin bindings for UniFFI.
 
 Read `rust/ARCHITECTURE.md` (the crates, the routes from the phone, UDP mode,
-deploys) and `rust/vtop-edge/API.md` (every edge route) before you change the
+deploys) and `edge/API.md` (every edge route) before you change the
 Rust core or the server.
+
+## Ways to break things
+
+- The connected real phone holds the user's own cache and accounts: never
+  clear its data, uninstall, sign out or roll pages back on it. Use the emulator.
+- Deploying prod (`bun run deploy`, Railway, the gateway) without an explicit OK
+  for that step.
+- Renaming a spec's name, args or file (`rust/vtop-proto/tests/spec_contract.txt`
+  only grows at its end).
+- Sending the VTOP session to our servers without `consent::allowed`.
+- Release lanes: pushing a `v*` tag, `fastlane android deploy_internal` or
+  `promote_all_testing` upload to Play.
+
+Agents never open PRs or issues, push, or deploy unless asked.
 
 ## Repo map
 
@@ -25,8 +39,8 @@ core/                 vitapmate.core: generated UniFFI bindings (vtop_ffi.kt, do
 design/               vitapmate.ui: theme, shared components, PageScaffold, Feature type
 features/<name>/      one feature per module (module.yaml + src/vitapmate/features/<name>/)
 rust/                 Cargo workspace
-  vtop-ffi/           the app's crate: Core, cache, session, records, routes (route.rs),
-                      UDP (udp.rs), server page (server.rs), logs (obs.rs)
+  vtop-ffi/           the app's crate: Core, cache, session, records, routes (remote/route.rs),
+                      UDP (remote/udp.rs), server page (remote/server.rs), logs (obs.rs)
   vtop-proto/         parsers, types and HTTP shapes as page machines, with no I/O
   vtop-core/          VTOP client that runs vtop-proto's machines over a Transport
   vtop-shared/        formats the app, engine and edge share (device_sig, mail_seal, page_dictionary)
@@ -34,7 +48,7 @@ rust/                 Cargo workspace
   vtop-gateway/       UDP gateway on the Linode fedora-in-maa
   vtop-bridge/        the engine: sign-in, CAPTCHA, fetch and parse; Railway service engine-v2
   vtop-mcp/           MCP tools the engine serves behind the edge's /mcp
-  vtop-edge/          Cloudflare Worker and Durable Objects (TypeScript), all server state
+edge/                 Cloudflare Worker and Durable Objects (TypeScript, bun), all server state
 extension/            Chrome and Firefox extension (Svelte, bun)
 fastlane/             Play Store lanes and release notes
 keystore/             release keystore (gitignored; never read or print it)
@@ -44,15 +58,40 @@ keystore/             release keystore (gitignored; never read or print it)
 
 | Change | Place |
 |---|---|
-| New VTOP page | Parser in `rust/vtop-proto/src/parser/`, its machine in `rust/vtop-proto/src/pages.rs`, and a `PageSpec` (name, args, cache file, machine) in `rust/vtop-proto/src/spec.rs`, listed in `spec::each`. vtop-core runs it with `VtopClient::fetch(&spec, &query)` and the engine serves everything in `spec::each`, so a read page needs nothing in vtop-core or vtop-bridge (writes and downloads keep a method in `rust/vtop-core/src/client/`). FFI in the feature's file `rust/vtop-ffi/src/<feature>.rs` (its own `#[uniffi::export] impl Core` block, `cached_x` and `fetch_x`, flow id first): `fetch_x` calls `Core::fetch(&spec::X, ...)`, which caches it under the picked semester (`Core::page` for one not cached), and `cached_x` reads it back with `read_page`. Both go by the chosen route, so the server routes fetch it too. Never rename a spec's name, args or file: old apps and the deployed engine use them. Then run `mise run rust-android`. |
+| New VTOP page | Parser in `rust/vtop-proto/src/parser/`, its machine in `rust/vtop-proto/src/pages.rs`, and a `PageSpec` (name, args, cache file, machine) in `rust/vtop-proto/src/spec.rs`, listed in `spec::each`. vtop-core runs it with `VtopClient::fetch(&spec, &query)` and the engine serves everything in `spec::each`, so a read page needs nothing in vtop-core or vtop-bridge (writes and downloads keep a method in `rust/vtop-core/src/client/`). FFI in the feature's file `rust/vtop-ffi/src/pages/<feature>.rs` (its own `#[uniffi::export] impl Core` block, `cached_x` and `fetch_x`, flow id first): `fetch_x` calls `Core::fetch(&spec::X, ...)`, which caches it under the picked semester (`Core::page` for one not cached), and `cached_x` reads it back with `read_page`. Both go by the chosen route, so the server routes fetch it too. Never rename a spec's name, args or file: old apps and the deployed engine use them. Then run `mise run rust-android`. |
 | Use a VTOP page in a feature | `rememberPage("<id>", { c, f -> c.cachedX(f) }, { c, f -> c.fetchX(f) }, ...)` in the screen, drawn with `PageScaffold` (see `core/src/vitapmate/data/Page.kt`). |
-| New screen | `features/<name>/` with a `module.yaml` that depends on `//design` only, and `src/vitapmate/features/<name>/` exposing `val <name>Feature: Feature`. Add one line to `project.yaml` and one to `app/src/vitapmate/Features.kt`. A feature never imports another; code two features share moves to `design` (UI) or `core` (data). |
+| New screen | `features/<name>/` with a `module.yaml` that depends on `//design` only, and `src/vitapmate/features/<name>/` exposing `val <name>Feature: Feature`. Add one line each to `project.yaml`, `app/module.yaml` (`- //features/<name>` under `dependencies`) and `app/src/vitapmate/Features.kt`. A feature never imports another; code two features share moves to `design` (UI) or `core` (data). |
 | Shared widget | `design/src/vitapmate/ui/`, one widget per file. |
 | Shell, nav, Settings, Developer, Inspector UI | `app/src/vitapmate/`. |
 | Data, settings store, downloads, files | `core/src/vitapmate/data/`. |
-| How the app reaches VTOP | `rust/vtop-ffi/src/route.rs` (Direct, Proxy, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/route/plan.rs`. |
+| How the app reaches VTOP | `rust/vtop-ffi/src/remote/route.rs` (Direct, Proxy, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/remote/route/plan.rs`. |
 | Logging | Kotlin: `core/src/vitapmate/observability/` (`Log`, `flow()`). Rust: `tracing`, with the pipeline in `rust/vtop-ffi/src/obs.rs`. |
-| Server-side state | Durable Objects in `rust/vtop-edge`, never the engine or the gateway. Document each route in `rust/vtop-edge/API.md`. |
+| Server-side state | Durable Objects in `edge/`, never the engine or the gateway. Document each route in `edge/API.md`. |
+
+### Touch every surface
+
+A page or route change reaches more than one place. Check each:
+
+- The four routes: Direct, Proxy, Server and Udp (`rust/vtop-ffi/src/remote/route.rs`).
+- Cached and fresh data: `cached_x` with no cache yet, and `fetch_x` over it.
+- The vtop-mcp tools (`rust/vtop-mcp/src/tools.rs`) for a read page.
+- The extension, when a session or edge route changes (`extension/AGENTS.md`).
+- `"since": <versionCode>` in `edge/guides/updates.json` for a new feature.
+- The demo data in `edge/guides/demo.json`, so the demo account shows it.
+
+### Glossary
+
+- flow: one user action or background run (`flow()`); its id goes first in every `Core` call.
+- route: how the phone reaches VTOP: Direct, Proxy (hops through the edge's
+  `/vtop/`), Server (the engine fetches) or Udp (Server over vm1).
+- spec: a `PageSpec` in `rust/vtop-proto/src/spec.rs`: name, args, cache file, machine.
+- page: one VTOP page, fetched by its spec and cached on the phone per semester.
+- edge: the Cloudflare Worker and Durable Objects at vmate.aster0.dev (`edge/`).
+- engine: `rust/vtop-bridge`, Railway `engine-v2`: signs in and fetches for the server routes.
+- gateway: `rust/vtop-gateway`, the UDP end of vm1 on the Linode.
+- vm1: Noise IK over UDP for slow, lossy links (`rust/vtop-wire`).
+- consent kinds: `CookieKind::Route` (a server route fetching), `Account` (the server
+  checking who the student is) and `Handover` (a connected app asking for a session).
 
 ## Rules
 
@@ -77,10 +116,14 @@ keystore/             release keystore (gitignored; never read or print it)
 - VTOP writes (outing apply and cancel) show a result only after VTOP confirms
   it.
 - A send of the VTOP session to our servers goes through `consent::allowed`
-  (`rust/vtop-ffi/src/consent.rs`); background flows are
+  (`rust/vtop-ffi/src/remote/consent.rs`); background flows are
   `flow(name, unattended = true)` and send it only over the chosen route
   with its "Don't ask again" ticked (else they fetch Direct).
 - Rust follows the Google Rust style guide. New crates use edition 2024.
+- No `let _ =` on a fallible call without a comment saying why the error
+  doesn't matter. `#[expect(lint, reason = "...")]` over `#[allow]`. A
+  `// SAFETY:` comment on every `unsafe` block.
+- Comments say why, not what, and carry no session history ("now", "changed to").
 
 ## Setup
 
@@ -92,18 +135,19 @@ The local `flutter` bookmark keeps the old Flutter app for reference; its server
 `.env.example.json`). `mise run firebase` turns it into
 `app/res/values/firebase.xml`, which the app reads at start. CI writes
 `.env.json` from the `ENV_JSON` secret. The server URL is `DEFAULT_SERVER` in
-`rust/vtop-ffi/src/forwarding.rs` (`https://vmate.aster0.dev`). Phones sign
+`rust/vtop-ffi/src/remote/edge.rs` (`https://vmate.aster0.dev`). Phones sign
 their requests with their own device key, so the app ships no server secret.
 
 ## Commands
 
 mise installs the toolchains in `mise.toml`: Java, the Kotlin Toolchain and
-bun. The edge (`rust/vtop-edge`) and the extension use bun.
+bun. The edge (`edge/`) and the extension use bun.
 
 ```sh
 mise run rust-android        # after changing rust/vtop-ffi: builds the .so into app/jniLibs and the Kotlin bindings
+mise run rust-android-dev    # the same, arm64 only and unoptimised, for quick runs on an arm64 emulator or phone
 ./kotlin build
-./kotlin test -m core
+./kotlin test                # every module's tests (core, design, features)
 ./kotlin run -d emulator-5554
 mise run release             # signed 64-bit APK at build/vitapmate-release.apk (--both: also -32bit.apk)
 mise run logs                # also logs-pull, state, ui-dump and trace for the running app over adb
@@ -111,12 +155,16 @@ mise run detekt              # Kotlin lint (brew install detekt); CI runs the sa
 mise run notes [since]       # draft the release notes from the commits since the last release
 
 cd rust && cargo fmt && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-cd rust/vtop-edge && bun run test && bun run check
+cd edge && bun run test && bun run check
 cd extension && bun run test && bun run build
+mise run check               # all of what CI runs; or check-rust, check-kotlin, check-edge, check-ext
 ```
 
+Run `mise run check` (or the part you touched) before saying you're done.
+`ANDROID_HOME` and `ANDROID_SERIAL` pick the SDK and the device for the adb tasks.
+
 Deploy only when asked, and only from a laptop: CI builds the app and the
-extension but deploys nothing. `bun run deploy` in `rust/vtop-edge/` deploys the
+extension but deploys nothing. `bun run deploy` in `edge/` deploys the
 edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway `engine-v2`,
 `Dockerfile.engine`) and the UDP gateway (pushed to GHCR, run on the Linode as the
 container `vitapmate-gateway`) from `alchemy.run.ts`, with the values in its
@@ -137,17 +185,17 @@ the AAB. To release:
    `M mmm p bb` from 3000000 (3.0.0 is 3000000, 3.0.4 is 3000410, 3.1.0 is 3001000); Play refuses a code it has seen.
 2. Write `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt` (at most
    500 characters) and add the version with its `code` to `releases` (newest
-   first) in `rust/vtop-edge/guides/updates.json`; give features it adds
+   first) in `edge/guides/updates.json`; give features it adds
    `"since": <versionCode>`, so older apps leave them out. Then `bun run
    deploy` there.
 3. Push the tag `v<versionName>`. `android-release.yml` builds the signed AAB
    (64-bit and 32-bit) and uploads it to the internal track.
 4. Promote in the Play Console, or with `bundle exec fastlane android
-   promote_all` (friends, alpha, beta). Production stays manual.
+   promote_all_testing` (friends, alpha, beta). Production stays manual.
 
 How hard the app asks to update is the release's in-app update priority, set
 per versionCode in `UPDATE_PRIORITIES` in `fastlane/Fastfile` (add a line in the
-release commit), `DEFAULT_UPDATE_PRIORITY` (3) when not listed: 0–1 nothing, 2 a pill above the nav bar, 3 Play's flexible
+release commit), `DEFAULT_UPDATE_PRIORITY` (2) when not listed: 0–1 nothing, 2 a pill above the nav bar, 3 Play's flexible
 dialog on start, 4 Play's full-screen update (can be closed), 5 the app's own
 blocking screen (`app/src/vitapmate/PlayUpdate.kt`). Promotions reuse it.
 
@@ -166,5 +214,22 @@ Test on the emulator or a connected phone, not only with a build. Parser tests
 are in `rust/vtop-proto/tests`, client tests in
 `rust/vtop-core/src/client/tests.rs`, the app crate's in
 `rust/vtop-ffi/src/tests.rs` and next to each module, vm1's in
-`rust/vtop-wire/src/tests.rs`, the edge's in `rust/vtop-edge/src/*.test.ts`,
-and Kotlin's in `core/test/`.
+`rust/vtop-wire/src/tests.rs`, the edge's in `edge/src/*.test.ts`,
+and Kotlin's in `core/test/` and `features/<name>/test/`.
+
+- Extend an existing test before adding one, and test at the lowest layer that
+  shows the bug (a parser test over a client test over an app test).
+- Parser snapshots (`fixtures/<name>.expected.json`) are regenerated with
+  `UPDATE_SNAPSHOTS=1 cargo test -p vtop-proto --test parsers`, never edited by hand.
+- No sleeps or wall-clock time in tests: pass the time in.
+- Never assume a failure was already there: check it on the parent change first.
+- `mise run check-changed` runs only the checks for what you changed.
+
+Without a VTOP account, sign in as the demo account (`DEMO2026`, password
+`vitapmate-demo`, `rust/vtop-ffi/src/demo.rs`): it asks VTOP nothing, reads
+every page from the edge's `/guides/demo.json`, and answers outing writes,
+downloads, the web view and forwarding as unavailable. Debuggable builds take
+`adb shell am broadcast -p com.vitap_pal.app -a vitapmate.DUMP` (the state dump
+`mise run state` prints) and `-a vitapmate.SYNC_NOW` (a background sync now;
+`--ez simulate true` rolls the saved pages back first). `rust/vtop-convex/` is
+a local leftover, not part of the app: ignore it.
