@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use tower::ServiceExt;
 
 const RELAY: &str = "relay-secret-relay-secret-relay-secret";
+const GATEWAY: &str = "gateway-secret-gateway-secret-gateway";
 const REG: &str = "22BCE0001";
 
 /// Hands out one forwarded OTP (or says there is no mailbox) and keeps
@@ -68,6 +69,7 @@ fn engine_app_with(
         "VAULT_KEY" => Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()),
         "EDGE_URL" => Some("https://edge.example".into()),
         "INTERNAL_TOKEN" => Some(RELAY.into()),
+        "GATEWAY_TOKEN" => Some(GATEWAY.into()),
         "OTP_WAIT_SECS" => Some("2".into()),
         _ => None,
     })
@@ -591,6 +593,25 @@ async fn phone_routes_need_the_engine_secret() {
         vtop_shared::engine::VTOP_LOGIN_OTP,
     ] {
         let (status, body) = post(&app, uri, "wrong", json!({})).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{uri}");
+        assert_eq!(body["code"], "unauthorized");
+    }
+}
+
+#[tokio::test]
+async fn the_gateway_token_opens_only_the_gateway_routes() {
+    let app = phone_app();
+    let (status, _) = post(&app, vtop_shared::engine::FETCH, GATEWAY, json!({})).await;
+    assert_ne!(status, StatusCode::UNAUTHORIZED);
+    let (status, _) = post(&app, vtop_shared::engine::VTOP_LOGIN, GATEWAY, json!({})).await;
+    assert_ne!(status, StatusCode::UNAUTHORIZED);
+    for uri in [
+        "/internal/mail-otp/owner",
+        "/engine/session",
+        "/engine/seal",
+        "/engine/login",
+    ] {
+        let (status, body) = post(&app, uri, GATEWAY, json!({ "cookies": "JSESSIONID=1" })).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{uri}");
         assert_eq!(body["code"], "unauthorized");
     }

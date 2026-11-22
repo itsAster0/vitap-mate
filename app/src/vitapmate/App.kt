@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlin.concurrent.thread
 import vitapmate.data.AccountBackup
 import vitapmate.data.AccountState
+import vitapmate.data.AppCore
 import vitapmate.data.InspectorOpener
 import vitapmate.data.LocalInspector
 import vitapmate.data.SemesterChoice
@@ -125,6 +126,8 @@ fun App() {
                         val context = LocalContext.current
                         LoginScreen {
                             signedIn = Result.success(true)
+                            // Signed in over another student: leaves their address now, not at the next start.
+                            AppCore.leaveOldForwarding()
                             // Kept across a reinstall from now on (AccountBackup).
                             thread(name = "backup") { AccountBackup.save(context.applicationContext) }
                         }

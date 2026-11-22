@@ -183,8 +183,8 @@ impl Core {
         .await
     }
 
-    /// Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
-    /// address again through the edge). Logs stay.
+    /// Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address, and queues the
+    /// address to be left on the edge (a sign-in can join it again there). Logs stay.
     pub fn sign_out(&self, flow: String) {
         #[expect(
             clippy::let_underscore_must_use,
@@ -192,6 +192,8 @@ impl Core {
         )]
         let _ = traced_sync("sign_out", &flow, || {
             self.install(None);
+            // Left on the edge by `leave_old_forwarding`, which the app calls next.
+            self.queue_leave();
             cookies::sign_out();
             self.forget(&[&STUDENT_FILES[..], &[ACCOUNT, SESSION, route::FILE]].concat());
             route::forget(&self.shared);
@@ -295,6 +297,7 @@ impl Core {
             .is_some_and(|saved| saved.username != session.account.username)
         {
             info!("another account signed in: cached pages and forwarding address dropped");
+            self.queue_leave();
             self.forget(&STUDENT_FILES);
         }
         let saved_at_ms = SystemTime::now()

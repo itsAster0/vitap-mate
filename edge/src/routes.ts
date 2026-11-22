@@ -30,6 +30,7 @@ export const ROUTES: Route[] = [
   // Forwarding addresses (index.ts).
   post("/v1/mail-otp/register", "signed", "Makes a forwarding address for this install."),
   post("/v1/mail-otp/delete", "signed", "Leaves the address, or deletes it."),
+  post("/v1/mail-otp/leave", "signed", "Leaves the address; an owned one stays for the student."),
   post("/v1/mail-otp/inbox", "signed", "The latest sealed OTP and Gmail confirmation."),
   post("/v1/mail-otp/owner", "signed", "Ties the address to the VTOP student."),
   post("/v1/mail-otp/reclaim", "signed", "Joins this install to the student's address."),
@@ -77,7 +78,7 @@ export const ROUTES: Route[] = [
   any("/mcp/{key}", "key", "MCP with the key in the path, passed on to the engine."),
   // The engine and the UDP gateway.
   post("/internal/mail-otp/await", "internal", "The engine waits for a student's next OTP."),
-  post("/internal/udp-keys", "internal", "The UDP gateway reports its keys."),
+  post("/internal/udp-keys", "internal", "The UDP gateway reports its keys (GATEWAY_TOKEN)."),
   post("/internal/accounts/login-done", "internal", "The engine reports a server sign-in."),
 ];
 

@@ -9,7 +9,7 @@ export const VTOP_SENDER = "noreply.sdc@vitap.ac.in";
 export const GMAIL_FORWARDING_SENDER = "forwarding-noreply@google.com";
 // Gmail sends mail-settings.google.com; Workspace accounts (VIT-AP's) send
 // another google.com host and no code, so match any google.com host.
-const CONFIRM_LINK = /https?:\/\/(?:[a-z0-9-]+\.)*google\.com\/mail\/vf-[^\s"'<>]+/i;
+const CONFIRM_LINK = /https:\/\/(?:[a-z0-9-]+\.)*google\.com\/mail\/vf-[A-Za-z0-9%._~-]+(?![^\s"'<>])/i;
 
 /** The plaintext sealed for the phone; the app reads it as JSON. */
 export type Payload =
@@ -76,8 +76,9 @@ function requester(subject: string): string | null {
   return word?.includes("@") ? word : null;
 }
 
-/** The payload for a raw RFC 5322 mail, or null to drop it. `now` is used
- * when the mail has no usable `Date:`. */
+/** The payload for a raw RFC 5322 mail, or null to drop it. `sentAt` is
+ * the mail's `Date:`, never later than `now` (the sender writes it, and a
+ * date ahead would pass every "sent since" check), or `now` without one. */
 export async function payloadFor(raw: RawEmail, now: number): Promise<Payload | null> {
   let message;
   try {
@@ -90,7 +91,7 @@ export async function payloadFor(raw: RawEmail, now: number): Promise<Payload | 
   const subject = message.subject ?? "";
   const text = [subject, message.text ?? "", message.html ? htmlToText(message.html) : ""].join("\n");
   const date = message.date ? Math.floor(Date.parse(message.date) / 1000) : Number.NaN;
-  const sentAt = Number.isFinite(date) && date > 0 ? date : now;
+  const sentAt = Number.isFinite(date) && date > 0 ? Math.min(date, now) : now;
 
   switch (from) {
     case VTOP_SENDER: {
@@ -106,6 +107,39 @@ export async function payloadFor(raw: RawEmail, now: number): Promise<Payload | 
     default:
       return null;
   }
+}
+
+/** TEMPORARY: what the receiving servers said of a relayed mail's sender
+ * (SPF, DKIM, DMARC and ARC results, with signing domains only, never an
+ * address), to learn how VTOP's forwarded mail is signed before the edge
+ * requires a pass. */
+export async function authShape(raw: RawEmail): Promise<string> {
+  try {
+    return authSummary((await PostalMime.parse(raw)).headers);
+  } catch {
+    return "unparsable";
+  }
+}
+
+const AUTH_HEADERS = ["authentication-results", "arc-authentication-results"];
+// `header.d`/`header.i` (DKIM) and `header.from` (DMARC) hold domains;
+// `smtp.mailfrom` holds an address and is not read.
+const AUTH_RESULT = /\b(spf|dkim|dmarc|arc)=([a-z]+)(?:[^;]*?\bheader\.(?:d|i|from)=@?([a-z0-9.-]+))?/gi;
+
+export function authSummary(headers: Array<{ key: string; value: string }>): string {
+  const lines = headers
+    .filter((h) => AUTH_HEADERS.includes(asciiLower(h.key)))
+    .map((h) => {
+      const value = h.value.replace(/\s+/g, " ").trim();
+      const instance = /^i=(\d+);/.exec(value)?.[1];
+      const server = /^(?:i=\d+;\s*)?([a-z0-9.-]+)/i.exec(value)?.[1] ?? "?";
+      const results = [...value.matchAll(AUTH_RESULT)].map(([, check, result, domain]) =>
+        domain ? `${asciiLower(check)}=${asciiLower(result)}(${asciiLower(domain)})` : `${asciiLower(check)}=${asciiLower(result)}`,
+      );
+      const name = asciiLower(h.key).startsWith("arc") ? `arc${instance ?? ""}` : "ar";
+      return `${name}@${asciiLower(server)}: ${results.join(" ")}`;
+    });
+  return lines.length ? lines.join(" | ") : "none";
 }
 
 /** TEMPORARY: the layout of a dropped mail from Gmail's forwarding sender,

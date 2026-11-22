@@ -55,7 +55,8 @@ Set on the Railway service by `alchemy.run.ts` (`VAULT_KEY`, `EDGE_URL`,
 | ------------------- | ------- | -------------------------------------------- |
 | `VAULT_KEY`         | —       | required; base64 of 32 bytes                 |
 | `EDGE_URL`          | —       | required; the edge's public URL              |
-| `INTERNAL_TOKEN`    | —       | required; shared with the edge and the UDP gateway (bearer, both ways), 32+ characters |
+| `INTERNAL_TOKEN`    | —       | required; shared with the edge (bearer, both ways), 32+ characters |
+| `GATEWAY_TOKEN`     | —       | the UDP gateway's own bearer, 32+ characters; taken only on `/engine/fetch*` and `/engine/vtop-login*` |
 | `OTP_WAIT_SECS`     | 45      | wait for the OTP mail (forwarded or Gmail) on sign-in |
 | `PORT`              | 8080    | listens on `[::]`, IPv4 where that fails     |
 

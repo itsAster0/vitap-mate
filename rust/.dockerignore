@@ -1,4 +1,5 @@
 target
+**/target
 **/*.html.local
 **/.env*
 **/build
@@ -7,3 +8,5 @@ target
 # The local TypeScript leftover (not a Cargo member) and Alchemy deploy caches: no Rust build reads them
 vtop-convex
 **/.alchemy
+# The fuzzer is its own nightly workspace, excluded from the Cargo one; its corpus alone is ~50 MB
+vtop-proto/fuzz

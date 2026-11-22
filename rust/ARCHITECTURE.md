@@ -194,7 +194,7 @@ keeps them for 6 hours, or until the gateway says it has another key.
   expected arrival times and asks for fresh symbols. Rate, round trip and
   loss are kept per network.
 - **Gateway** (`vtop-gateway`): no VTOP logic. It calls `/engine/fetch`
-  (`/engine/fetch-batch` for a batch, and the `/engine/vtop-login*` routes) with `INTERNAL_TOKEN`, returning
+  (`/engine/fetch-batch` for a batch, and the `/engine/vtop-login*` routes) with `GATEWAY_TOKEN`, returning
   the answer byte for byte. It keeps each device's VTOP session for six
   hours so requests carry an 8-byte hash instead of the cookies
   (`vtop_shared::wire_page`).
@@ -204,7 +204,7 @@ keeps them for 6 hours, or until the gateway says it has another key.
   and after each rotation it posts
   `{ host, ports, keys: [{ id, publicKey, from, until }] }` (public halves
   only, base64url) to the edge's `POST /internal/udp-keys` with
-  `INTERNAL_TOKEN`, retrying with backoff (5 s doubling to 10 min). A
+  `GATEWAY_TOKEN`, retrying with backoff (5 s doubling to 10 min). A
   handshake under an unknown key gets a 5-byte "wrong key" answer, and the
   app asks the edge again.
 - **Abuse limits** (no rate limits: a campus shares one IP): message 1
@@ -214,8 +214,10 @@ keeps them for 6 hours, or until the gateway says it has another key.
   50,000 sessions (the longest idle makes room) and 256 engine calls at once
   (more get "busy" and use HTTPS); sending stops after 30 s of silence.
 
-Internal calls (edge → engine, engine → edge `/internal/*`, gateway →
-engine, gateway → edge) all carry `Authorization: Bearer $INTERNAL_TOKEN`.
+Internal calls between the edge and the engine carry `Authorization: Bearer
+$INTERNAL_TOKEN`. The gateway, on a public VPS, has its own `GATEWAY_TOKEN`:
+the engine takes it only on the fetch and sign-in routes, the edge only on
+`/internal/udp-keys`, so it can't ask whose a session is or wait for OTPs.
 
 Deploy: the edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway
 `engine-v2`) and the gateway with `bun run deploy` in `edge/`

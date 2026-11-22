@@ -148,6 +148,8 @@ fun AccountScreen() {
                         PageFetches.cancelAll()
                         AvatarPhoto.remove()
                         flow("account.semesters") { SemesterChoice.readCache(it) }
+                        // The last student's Mailbox would keep sending this phone their OTPs.
+                        AppCore.leaveOldForwarding()
                     }
                     accountVersion++
                     haptics.confirm()

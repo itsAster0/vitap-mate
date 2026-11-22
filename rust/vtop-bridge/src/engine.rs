@@ -229,18 +229,36 @@ fn accounts_aad(account: &str) -> String {
     format!("accounts/{account}")
 }
 
-/// Every route needs `INTERNAL_TOKEN`, shared with the edge and the gateway.
+/// Every route needs `INTERNAL_TOKEN`, shared with the edge.
 pub(crate) fn require_secret(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
+    check_token(headers, &[Some(&state.config.internal_token)])
+}
+
+/// The routes the UDP gateway calls (page fetches and the phone's sign-in)
+/// take its own `GATEWAY_TOKEN` too, or `INTERNAL_TOKEN` from the edge.
+pub(crate) fn require_gateway(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
+    check_token(
+        headers,
+        &[
+            Some(&state.config.internal_token),
+            state.config.gateway_token.as_ref(),
+        ],
+    )
+}
+
+fn check_token(headers: &HeaderMap, accepted: &[Option<&String>]) -> Result<(), ApiError> {
     let presented = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .unwrap_or_default()
         .trim();
-    if !tokens::hashes_equal(
-        &tokens::hash(&state.config.internal_token),
-        &tokens::hash(presented),
-    ) {
+    let presented = tokens::hash(presented);
+    if !accepted
+        .iter()
+        .flatten()
+        .any(|token| tokens::hashes_equal(&tokens::hash(token), &presented))
+    {
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "unauthorized",

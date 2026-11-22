@@ -22,7 +22,7 @@ use vtop_core::inputs::{Password, Username};
 use vtop_core::{SessionState, VtopClient, VtopError, VtopResult};
 
 use crate::AppState;
-use crate::engine::require_secret;
+use crate::engine::require_gateway;
 use crate::error::ApiError;
 use crate::fetch::vtop_error;
 
@@ -55,7 +55,7 @@ pub async fn login(
     headers: HeaderMap,
     body: Result<Json<LoginBody>, JsonRejection>,
 ) -> Result<Response, ApiError> {
-    require_secret(&state, &headers)?;
+    require_gateway(&state, &headers)?;
     let Json(body) = body.map_err(|_| bad_request("Invalid JSON body."))?;
     let username = Username::parse(body.username.trim()).map_err(|error| login_error(&error))?;
     let password = Password::parse(&body.password).map_err(|error| login_error(&error))?;
@@ -72,7 +72,7 @@ pub async fn otp(
     headers: HeaderMap,
     body: Result<Json<OtpBody>, JsonRejection>,
 ) -> Result<Response, ApiError> {
-    require_secret(&state, &headers)?;
+    require_gateway(&state, &headers)?;
     let Json(body) = body.map_err(|_| bad_request("Invalid JSON body."))?;
     let mut client = pending(&state, &body.session)?;
     let result = timed(client.submit_security_otp(body.otp.trim())).await;
@@ -84,7 +84,7 @@ pub async fn resend(
     headers: HeaderMap,
     body: Result<Json<ResendBody>, JsonRejection>,
 ) -> Result<Response, ApiError> {
-    require_secret(&state, &headers)?;
+    require_gateway(&state, &headers)?;
     let Json(body) = body.map_err(|_| bad_request("Invalid JSON body."))?;
     let mut client = pending(&state, &body.session)?;
     timed(client.resend_security_otp())

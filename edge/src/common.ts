@@ -28,6 +28,9 @@ export interface Env {
   /** Shared with the engine and the UDP gateway: sent on every call to the
    * engine and required on `/internal/*`. */
   INTERNAL_TOKEN: string;
+  /** The UDP gateway's own token, good for `/internal/udp-keys` only, so a
+   * compromised gateway cannot wait for OTPs or reach accounts. */
+  GATEWAY_TOKEN?: string;
   /** Signs account tokens (account-token.ts); without it none are issued. */
   ACCOUNT_TOKEN_SECRET: string;
 }
@@ -133,10 +136,18 @@ export function bearer(req: Request): string {
   return value.startsWith("Bearer ") ? value.slice("Bearer ".length).trim() : "";
 }
 
-/** The caller (the engine or the UDP gateway) holds `INTERNAL_TOKEN`. */
+/** The caller (the engine) holds `INTERNAL_TOKEN`. */
 export function isInternal(req: Request, env: Env): boolean {
-  const token = env.INTERNAL_TOKEN ?? "";
-  return token !== "" && hashesEqual(hash(token), hash(bearer(req)));
+  return holds(req, env.INTERNAL_TOKEN);
+}
+
+/** The caller is the UDP gateway (`GATEWAY_TOKEN`), or the engine. */
+export function isGateway(req: Request, env: Env): boolean {
+  return holds(req, env.GATEWAY_TOKEN) || isInternal(req, env);
+}
+
+function holds(req: Request, token: string | undefined): boolean {
+  return !!token && hashesEqual(hash(token), hash(bearer(req)));
 }
 
 export function notInternal(): Response {

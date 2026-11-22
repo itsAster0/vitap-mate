@@ -1,6 +1,6 @@
 // UDP mode's gateway: where it is and its public keys.
 //
-// - `POST /internal/udp-keys`, from the gateway (`INTERNAL_TOKEN`): its
+// - `POST /internal/udp-keys`, from the gateway (`GATEWAY_TOKEN`): its
 //   host, ports and current public keys. The gateway makes and keeps its
 //   own keys; the edge only passes the public halves on.
 // - `GET /v1/udp` (signed, for phones): the latest of those, so the app
@@ -9,7 +9,7 @@
 // The latest report is kept in the `Index` object named `udp`.
 
 import { base64Url } from "./auth";
-import { type Env, badRequest, empty, error, isInternal, jsonBody, notInternal } from "./common";
+import { type Env, badRequest, empty, error, isGateway, jsonBody, notInternal } from "./common";
 
 export interface UdpKey {
   id: string;
@@ -56,7 +56,7 @@ export async function udpGateway(env: Env): Promise<Response> {
 }
 
 export async function udpKeys(req: Request, env: Env): Promise<Response> {
-  if (!isInternal(req, env)) return notInternal();
+  if (!isGateway(req, env)) return notInternal();
   const gateway = parseGateway(await jsonBody(req));
   if (!gateway) return badRequest("Expected { host, ports, keys: [{ id, publicKey, from, until }] }.");
   await gatewayStub(env).put(JSON.stringify(gateway));

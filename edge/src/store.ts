@@ -16,9 +16,16 @@ import * as sql from "./sql";
 import { type MailboxDoc, type Waiter, WAITER_TTL_SECS, clearExpired, nextExpiry } from "./state";
 
 /** Storage keys beside the tables (no schema bump): Gmail's latest
- * forwarding confirmation, and when the latest OTP was sent. */
+ * forwarding confirmation and when it came, and when the latest OTP was
+ * sent. */
 const CONFIRMATION = "gmail_confirm";
+const CONFIRMATION_AT = "gmail_confirm_at";
 const LAST_OTP_AT = "last_otp_at";
+
+/** How long Gmail's confirmation is kept readable for phones that join
+ * during setup. It holds the student's Gmail address and a live link, so
+ * not for good. */
+export const CONFIRMATION_TTL_SECS = 24 * 3600;
 
 /** The longest one wait lasts. */
 const MAX_WAIT_SECS = 30;
@@ -108,21 +115,24 @@ export class Mailbox extends DurableObject<Env> {
 
   /** One box per install, each sealed to its own key; false when there is
    * no address. Gmail's confirmation (`plaintext` of a `gmail_confirm`) is
-   * also kept, so a phone that joins later can still show it; an OTP drops
-   * it, as forwarding then works, and is noted. */
+   * kept apart for a day, so a phone that joins later can still show it,
+   * and leaves the installs' boxes alone: anyone can make Gmail send one,
+   * and it must not wipe an OTP not yet collected. An OTP drops it, as
+   * forwarding then works, and is noted. */
   async deliver(
     boxes: Array<{ deviceId: string; sealed: string }>,
     mail: { kind: string; sentAt: number; plaintext: string },
   ): Promise<boolean> {
     const doc = await this.doc();
     if (!doc) return false;
-    if (mail.kind === "gmail_confirm") {
-      await this.ctx.storage.put(CONFIRMATION, mail.plaintext);
-    } else {
-      await this.ctx.storage.put(LAST_OTP_AT, mail.sentAt);
-      await this.ctx.storage.delete(CONFIRMATION);
-    }
     const at = now();
+    if (mail.kind === "gmail_confirm") {
+      await this.ctx.storage.put({ [CONFIRMATION]: mail.plaintext, [CONFIRMATION_AT]: at });
+      await this.armConfirmationExpiry(at);
+      return true;
+    }
+    await this.ctx.storage.put(LAST_OTP_AT, mail.sentAt);
+    await this.ctx.storage.delete([CONFIRMATION, CONFIRMATION_AT]);
     for (const delivered of boxes) {
       const member = doc.members.find((m) => m.deviceId === delivered.deviceId);
       if (member) {
@@ -138,9 +148,28 @@ export class Mailbox extends DurableObject<Env> {
   /** Gmail's latest confirmation (the plaintext payload) until an OTP
    * arrived, and when the latest OTP was sent. */
   async setup(): Promise<{ confirmation: string | null; lastOtpAt: number | null }> {
-    const confirmation = (await this.ctx.storage.get<string>(CONFIRMATION)) ?? null;
+    const confirmation = await this.confirmation();
     const lastOtpAt = (await this.ctx.storage.get<number>(LAST_OTP_AT)) ?? null;
     return { confirmation, lastOtpAt };
+  }
+
+  /** Gmail's confirmation while it is kept; an expired one (or one kept
+   * without its time, from before it had one) is deleted. */
+  private async confirmation(): Promise<string | null> {
+    const plaintext = (await this.ctx.storage.get<string>(CONFIRMATION)) ?? null;
+    if (plaintext === null) return null;
+    const at = await this.ctx.storage.get<number>(CONFIRMATION_AT);
+    if (at !== undefined && now() - at < CONFIRMATION_TTL_SECS) return plaintext;
+    await this.ctx.storage.delete([CONFIRMATION, CONFIRMATION_AT]);
+    return null;
+  }
+
+  /** Makes sure an alarm comes by the time the confirmation kept since
+   * `at` expires; an earlier alarm stays, and sets this one again. */
+  private async armConfirmationExpiry(at: number): Promise<void> {
+    const due = (at + CONFIRMATION_TTL_SECS + 1) * 1000;
+    const alarm = await this.ctx.storage.getAlarm();
+    if (alarm === null || alarm > due) await this.ctx.storage.setAlarm(due);
   }
 
   /** Wipes the address, tables and all. */
@@ -153,6 +182,9 @@ export class Mailbox extends DurableObject<Env> {
     await this.waiters();
     const doc = await this.doc();
     if (doc && clearExpired(doc, now())) this.write(doc);
+    if ((await this.confirmation()) !== null) {
+      await this.armConfirmationExpiry((await this.ctx.storage.get<number>(CONFIRMATION_AT)) ?? now());
+    }
   }
 
   // ---- waiters ------------------------------------------------------------------

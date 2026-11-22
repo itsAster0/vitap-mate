@@ -2,7 +2,9 @@
 //! elsewhere.
 //!
 //! Environment: `ENGINE_URL` (the engine's base URL), `EDGE_URL`,
-//! `INTERNAL_TOKEN` (the bearer token shared with the engine and the edge),
+//! `GATEWAY_TOKEN` (its own bearer token, which the engine takes for fetches
+//! and sign-ins and the edge for `/internal/udp-keys`; `INTERNAL_TOKEN` is
+//! read when it is unset, for a gateway deployed before it had one),
 //! `UDP_HOST` (the public name the app sends UDP to), `UDP_PORTS`
 //! (comma-separated, default 3478,51820,443), `BIND` (default `0.0.0.0`)
 //! and `GATEWAY_DATA_DIR` (where its keys are kept, default `./data`).
@@ -33,7 +35,7 @@ async fn main() {
         let config = Config {
             engine_url: var("ENGINE_URL")?,
             edge_url: var("EDGE_URL")?,
-            token: var("INTERNAL_TOKEN")?,
+            token: var("GATEWAY_TOKEN").or_else(|_| var("INTERNAL_TOKEN"))?,
             host: var("UDP_HOST")?,
             data_dir: var("GATEWAY_DATA_DIR")
                 .unwrap_or_else(|_| "./data".into())

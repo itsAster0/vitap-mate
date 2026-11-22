@@ -22,7 +22,7 @@ use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::BATCH;
 
 use crate::AppState;
-use crate::engine::require_secret;
+use crate::engine::require_gateway;
 use crate::error::ApiError;
 use crate::page_pack;
 use crate::pages::{self, Args};
@@ -36,7 +36,7 @@ pub async fn fetch(
     headers: HeaderMap,
     body: Result<Json<PageFetch>, JsonRejection>,
 ) -> Result<Response, ApiError> {
-    require_secret(&state, &headers)?;
+    require_gateway(&state, &headers)?;
     let Json(request) = body.map_err(|_| bad_arguments("Invalid JSON body."))?;
     let session: SessionState = serde_json::from_value(request.session)
         .map_err(|_| bad_arguments("session is not a VTOP session."))?;
@@ -72,7 +72,7 @@ pub async fn fetch_batch(
     headers: HeaderMap,
     body: Result<Json<PageBatch>, JsonRejection>,
 ) -> Result<Response, ApiError> {
-    require_secret(&state, &headers)?;
+    require_gateway(&state, &headers)?;
     let Json(request) = body.map_err(|_| bad_arguments("Invalid JSON body."))?;
     if request.pages.len() > MAX_BATCH {
         return Err(bad_arguments(format!("At most {MAX_BATCH} pages.")));

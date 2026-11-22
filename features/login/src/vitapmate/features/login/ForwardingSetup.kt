@@ -105,7 +105,17 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
         }
     }
     status.confirmation?.let { confirm ->
-        Callout(Lucide.MailCheck, tones.success, confirm.requester?.let { "Gmail's confirmation for $it arrived." } ?: "Gmail's confirmation arrived.") {
+        // Anyone who knows the address can make Gmail send one: say so when it names a Gmail
+        // address the student's VTOP profile doesn't have.
+        val unknown = confirm.requesterKnown == false
+        val said = when {
+            unknown -> "Gmail's confirmation for ${confirm.requester} arrived, but that address isn't on your VTOP profile. Confirm only if it's your Gmail."
+            confirm.requesterKnown == true -> "Gmail's confirmation for ${confirm.requester} arrived."
+            // No saved profile to check against, or no address in the mail.
+            confirm.requester != null -> "Gmail's confirmation for ${confirm.requester} arrived. Confirm only if it's your Gmail."
+            else -> "Gmail's confirmation arrived. Confirm only if you just added this address in Gmail."
+        }
+        Callout(Lucide.MailCheck, if (unknown) tones.warning else tones.success, said) {
             confirm.code?.let { code ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(code, Modifier.weight(1f).testTag("forwarding.confirm_code"), style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace))

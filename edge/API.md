@@ -17,7 +17,7 @@ error_description }`, and the `/vtop/*` proxy answers `502 vtop_unreachable`
 |---|---|
 | **signed** | A phone: `x-vm-device`, `x-vm-time`, `x-vm-sig` (below). |
 | **key** | An access key (extension, MCP): `Authorization: Bearer vtm_…`. |
-| **internal** | The engine or the UDP gateway: `Authorization: Bearer <INTERNAL_TOKEN>`. |
+| **internal** | The engine: `Authorization: Bearer <INTERNAL_TOKEN>`. `/internal/udp-keys`, from the UDP gateway, takes `GATEWAY_TOKEN` (or `INTERNAL_TOKEN`). |
 | **none** | Public. |
 
 ### Signed requests (vm1)
@@ -76,6 +76,7 @@ Every route, with its auth kind; the sections below give the details.
 | POST | `/v1/app/login` | signed | Has the server sign in with the saved credentials. |
 | POST | `/v1/mail-otp/register` | signed | Makes a forwarding address for this install. |
 | POST | `/v1/mail-otp/delete` | signed | Leaves the address, or deletes it. |
+| POST | `/v1/mail-otp/leave` | signed | Leaves the address; an owned one stays for the student. |
 | POST | `/v1/mail-otp/inbox` | signed | The latest sealed OTP and Gmail confirmation. |
 | POST | `/v1/mail-otp/owner` | signed | Ties the address to the VTOP student. |
 | POST | `/v1/mail-otp/reclaim` | signed | Joins this install to the student's address. |
@@ -117,7 +118,7 @@ Every route, with its auth kind; the sections below give the details.
 | ANY | `/mcp` | key | MCP, passed on to the engine. |
 | ANY | `/mcp/{key}` | key | MCP with the key in the path, passed on to the engine. |
 | POST | `/internal/mail-otp/await` | internal | The engine waits for a student's next OTP. |
-| POST | `/internal/udp-keys` | internal | The UDP gateway reports its keys. |
+| POST | `/internal/udp-keys` | internal | The UDP gateway reports its keys (GATEWAY_TOKEN). |
 | POST | `/internal/accounts/login-done` | internal | The engine reports a server sign-in. |
 
 <!-- routes:end -->
@@ -274,7 +275,7 @@ Each event also goes out by FCM as a data message with the same fields
 | Route | Auth | Request | Response |
 |---|---|---|---|
 | `GET /v1/udp` | signed | — | `{ host, ports: [int], keys: [{ id, publicKey, from, until }] }`; `503 udp_unavailable` before the gateway reports |
-| `POST /internal/udp-keys` | internal | the same shape, from the gateway | `204`; `400` if malformed |
+| `POST /internal/udp-keys` | internal (`GATEWAY_TOKEN`) | the same shape, from the gateway | `204`; `400` if malformed |
 
 `publicKey` is X25519, base64url without padding. The edge keeps only the
 latest report; the gateway should post at start, after each rotation and
@@ -289,12 +290,13 @@ calling device is not on it.
 | Route | Request | Response |
 |---|---|---|
 | `/v1/mail-otp/register` | `{}` | `201 { id, address }` with this device as the only member |
-| `/v1/mail-otp/inbox` | `{ id }` | `{ sealed, receivedAt, confirmation, lastOtpAt }`; `sealed: null` without a box (boxes live 5 min); `confirmation` is Gmail's latest forwarding confirmation sealed to this device (kept until an OTP arrives), else `null`; `lastOtpAt` is when the latest OTP was sent, or `null` |
-| `/v1/mail-otp/owner` | `{ id, session: { cookies } }` or `{ id, accountToken }` | `204`; ties the address to the VTOP student; `409 address_exists`, `401 session_invalid`, `503 vtop_unreachable`; token errors as in [Account tokens](#account-tokens) |
+| `/v1/mail-otp/inbox` | `{ id }` | `{ sealed, receivedAt, confirmation, lastOtpAt }`; `sealed: null` without a box (boxes live 5 min); `confirmation` is Gmail's latest forwarding confirmation sealed to this device (kept for 24 hours or until an OTP arrives), else `null`; `lastOtpAt` is when the latest OTP was sent, or `null` |
+| `/v1/mail-otp/owner` | `{ id, session: { cookies } }` or `{ id, accountToken }` | `204`; ties the address to the VTOP student; `409 address_exists` when the student has another address, `409 owner_mismatch` when this one is another student's, `401 session_invalid`, `503 vtop_unreachable`; token errors as in [Account tokens](#account-tokens) |
 | `/v1/mail-otp/reclaim` | `{ session: { cookies } }` or `{ accountToken }` | `200 { id, address }`: this device joins the student's address |
 | `/v1/mail-otp/devices` | `{ id }` | `{ devices: [{ deviceId, label, addedAt, seenAt, thisDevice }] }` |
 | `/v1/mail-otp/devices/remove` | `{ id, removeDevice }` | `204`; `404 unknown_device`; revokes the removed device's account token |
 | `/v1/mail-otp/delete` | `{ id, everywhere? }` | `204`; leaves the address, or deletes it when last or `everywhere: true`; revokes the account token of this device (with `everywhere`, of every device on the address) |
+| `/v1/mail-otp/leave` | `{ id }` | `204`; this device leaves the address and its account token is revoked. An owned address is kept with no device left, so the student's Gmail filter keeps working and their next sign-in joins it with `reclaim`; an unowned one is deleted with its last device. The app calls it on sign-out and when another student signs in |
 
 `owner` and `reclaim` take an account token in place of the session, and
 after a session check issue one to this device like the account routes do
@@ -508,7 +510,9 @@ requests and codes live in the `OAuth` Durable Object (one, named
 
 ## Internal (engine and gateway)
 
-All need `Authorization: Bearer <INTERNAL_TOKEN>`, else `401 unauthorized`.
+All need `Authorization: Bearer <INTERNAL_TOKEN>`, else `401 unauthorized`;
+`/internal/udp-keys` takes the gateway's own `GATEWAY_TOKEN` too, which opens
+nothing else, so a compromised gateway cannot wait for OTPs or reach accounts.
 
 | Route | Caller | Request | Response |
 |---|---|---|---|
@@ -530,5 +534,6 @@ client's header instead.
 
 Vars: `MAIL_DOMAIN`, `ENGINE_URL`, `FCM_URL`, `PUBLIC_URL`,
 `ALLOWED_ORIGINS`, `FALLBACK_FORWARD`. Secrets: `FIREBASE_CREDENTIALS_JSON`,
-`INTERNAL_TOKEN`, `ACCOUNT_TOKEN_SECRET` (signs account tokens; unset, none
+`INTERNAL_TOKEN`, `GATEWAY_TOKEN` (the UDP gateway's, for `/internal/udp-keys`
+only), `ACCOUNT_TOKEN_SECRET` (signs account tokens; unset, none
 are issued and every token is `token_invalid`; changing it voids them all).

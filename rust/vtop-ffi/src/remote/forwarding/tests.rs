@@ -337,3 +337,96 @@ fn otps_are_six_digits_and_recent() {
     );
     assert!(serde_json::from_str::<Payload>(r#"{"kind":"other","sentAt":1}"#).is_err());
 }
+
+#[tokio::test]
+async fn sign_out_leaves_the_address_on_the_edge() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-leave-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let url = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+    let core = signed_in(&dir, url);
+    let _gate = consent::tests::yes(&core);
+    core.set_up_forwarding("f".into()).await.unwrap();
+
+    core.sign_out("f-out".into());
+    assert!(!dir.join(FILE).exists());
+    assert!(dir.join(LEAVE_FILE).exists());
+    // An edge without `/leave` (or offline): still queued.
+    edge.lock().unwrap().canned.insert(
+        "/v1/mail-otp/leave".into(),
+        [(
+            404,
+            json!({ "code": "not_found", "error": "No such route." }),
+        )]
+        .into(),
+    );
+    core.leave_old_forwarding("f".into()).await.unwrap();
+    assert!(dir.join(LEAVE_FILE).exists());
+
+    core.leave_old_forwarding("f-leave".into()).await.unwrap();
+    {
+        let edge = edge.lock().unwrap();
+        let last = edge.requests.last().unwrap();
+        assert_eq!(
+            (last.path.as_str(), last.flow.as_str()),
+            ("/v1/mail-otp/leave", "f-leave")
+        );
+        assert_eq!(last.body, json!({ "id": ID }));
+    }
+    assert!(!dir.join(LEAVE_FILE).exists());
+    let sent = edge.lock().unwrap().requests.len();
+    core.leave_old_forwarding("f".into()).await.unwrap();
+    assert_eq!(edge.lock().unwrap().requests.len(), sent);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn opens_only_gmail_confirm_links() {
+    let ok = "https://mail-settings.google.com/mail/vf-%5BAN%5D-abc";
+    assert_eq!(gmail_link(ok).as_deref(), Some(ok));
+    assert!(gmail_link("https://google.com/mail/vf-x").is_some());
+    for bad in [
+        "http://mail.google.com/mail/vf-x",
+        "https://mail.google.com.evil.example/mail/vf-x",
+        "https://evilgoogle.com/mail/vf-x",
+        "https://user@mail.google.com/mail/vf-x",
+        "https://mail.google.com/other",
+        "intent://mail.google.com/mail/vf-x",
+        "https://www.google.com/mail/vf-/../../url?q=https://evil.example",
+        "https://www.google.com/mail/vf-x\\..\\..\\url",
+        "https://mail.google.com/mail/vf-",
+    ] {
+        assert_eq!(gmail_link(bad), None, "{bad}");
+    }
+}
+
+#[test]
+fn knows_a_requester_on_the_profile() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-req-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join(PAGES)).unwrap();
+    let core = Core::for_test(&dir);
+    assert_eq!(core.requester_known(Some("me@gmail.com")), None);
+    let profile = json!({
+        "name": "A", "registration_number": "22BCE0001", "vit_email": "a.22bce0001@vitapstudent.ac.in",
+        "program": "", "school": "", "photo": "", "update_time": 0,
+        "sections": [{ "title": "PERSONAL", "groups": [{ "title": "", "fields": [
+            { "label": "Email", "value": "Me@Gmail.com, other@x.in" }
+        ] }] }],
+    });
+    fs::write(
+        dir.join(PAGES).join(spec::PROFILE.file),
+        profile.to_string(),
+    )
+    .unwrap();
+    assert_eq!(core.requester_known(Some("me@gmail.com")), Some(true));
+    assert_eq!(
+        core.requester_known(Some("a.22bce0001@vitapstudent.ac.in")),
+        Some(true)
+    );
+    assert_eq!(core.requester_known(Some("someone@gmail.com")), Some(false));
+    assert_eq!(core.requester_known(None), None);
+    let _ = fs::remove_dir_all(&dir);
+}

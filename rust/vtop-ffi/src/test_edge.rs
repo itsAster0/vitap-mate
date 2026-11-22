@@ -95,7 +95,7 @@ fn answer(edge: &mut Edge, path: &str, body: &Value) -> (u16, Value) {
             Some(sealed) => (200, json!({ "sealed": sealed, "receivedAt": now() })),
             None => (200, json!({ "sealed": null })),
         },
-        "/v1/mail-otp/delete" => (204, Value::Null),
+        "/v1/mail-otp/delete" | "/v1/mail-otp/leave" => (204, Value::Null),
         _ => (
             404,
             json!({ "code": "not_found", "error": "No such route." }),

@@ -28,8 +28,12 @@ const DOMAIN = "vmate.aster0.dev";
 /** Railway's generated domain for `engine-v2`. */
 const ENGINE_URL = "https://engine-v2-production.up.railway.app";
 
-/** Shared by the edge, the engine and the gateway (`authorization: Bearer`). */
+/** Shared by the edge and the engine (`authorization: Bearer`). */
 const internalToken = Config.Redacted("INTERNAL_TOKEN");
+/** The UDP gateway's own: the engine takes it for fetches and sign-ins, the
+ * edge for `/internal/udp-keys`, and nothing else does, so the public VPS
+ * never holds `INTERNAL_TOKEN`. */
+const gatewayToken = Config.Redacted("GATEWAY_TOKEN");
 
 export const Engine = Effect.gen(function* () {
   const project = yield* Railway.Project("Vitapmate", { name: "vitapmate" }).pipe(adopt(true));
@@ -42,6 +46,7 @@ export const Engine = Effect.gen(function* () {
     env: {
       EDGE_URL: `https://${DOMAIN}`,
       INTERNAL_TOKEN: yield* internalToken,
+      GATEWAY_TOKEN: yield* gatewayToken,
       VAULT_KEY: yield* Config.Redacted("VAULT_KEY"),
       RUST_LOG: "warn,vtop_bridge=info",
     },
@@ -81,6 +86,7 @@ export const Edge = Cloudflare.Worker("Edge", {
     ALLOWED_ORIGINS: "",
     FALLBACK_FORWARD: "",
     INTERNAL_TOKEN: internalToken,
+    GATEWAY_TOKEN: gatewayToken,
     ACCOUNT_TOKEN_SECRET: Config.Redacted("ACCOUNT_TOKEN_SECRET"),
     FIREBASE_CREDENTIALS_JSON: Config.Redacted("FIREBASE_CREDENTIALS_JSON"),
   },
@@ -123,7 +129,7 @@ export const Gateway = Effect.gen(function* () {
     environment: {
       ENGINE_URL,
       EDGE_URL: `https://${DOMAIN}`,
-      INTERNAL_TOKEN: yield* internalToken,
+      GATEWAY_TOKEN: yield* gatewayToken,
       UDP_HOST: "172.232.115.40",
       BIND: "0.0.0.0",
       UDP_PORTS: "3478,3479,3480,3481",

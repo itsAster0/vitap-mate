@@ -7,7 +7,7 @@
 //! Page fetches, batches of them ([`BATCH`], to `/engine/fetch-batch`) and sign-ins
 //! ([`SIGN_IN_BODY`]); changes to VTOP stay on
 //! HTTPS. It runs on its own host (UDP needs one) and calls the engine
-//! exactly as the edge does (`Authorization: Bearer $INTERNAL_TOKEN`, the
+//! exactly as the edge does (`Authorization: Bearer $GATEWAY_TOKEN`, the
 //! phone's session in the body) and passes the answer back byte for byte,
 //! so it holds no VTOP logic. It makes its own Noise keys ([`keys`]): a new
 //! one every Monday 00:00 IST, the previous kept a week. At start and after
@@ -64,7 +64,8 @@ pub struct Config {
     pub engine_url: String,
     /// The edge: `/v1/app/login`, and [`UDP_KEYS_INTERNAL`] for the keys.
     pub edge_url: String,
-    /// `INTERNAL_TOKEN`, shared with the engine and the edge.
+    /// `GATEWAY_TOKEN`: the engine takes it for fetches and sign-ins, the
+    /// edge for `/internal/udp-keys`.
     pub token: String,
     /// The public host name or address the app sends UDP to.
     pub host: String,

@@ -55,7 +55,7 @@ import {
   variable,
 } from "./common";
 import type { DeviceChanges } from "./device";
-import { GMAIL_FORWARDING_SENDER, type Payload, dropShape, payloadFor } from "./mail";
+import { GMAIL_FORWARDING_SENDER, type Payload, authShape, dropShape, payloadFor } from "./mail";
 
 const asciiEq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 import { MAIL_OWNER, type OtpAwait } from "./shared/engine-api";
@@ -320,6 +320,28 @@ async function mailDelete(deviceId: string, body: MailBody, env: Env): Promise<R
   return empty();
 }
 
+/** Takes this install off the address, as when its student signs out. An
+ * owned address stays, even with no install left: the student's Gmail
+ * filter still forwards to it, and their next sign-in joins it again with
+ * `/reclaim`. One nobody owns, which no one could join, is deleted with
+ * its last install. */
+async function mailLeave(deviceId: string, body: MailBody, env: Env): Promise<Response> {
+  const mine = await owned(env, deviceId, body);
+  if (!mine) return unknownMailbox();
+  const { doc, index } = mine;
+  if (doc.ownerHash === null && doc.members.length === 1) {
+    await mailboxStub(env, doc.id).remove();
+    console.log("mail-otp: deleted an unowned mailbox its last device left");
+    return empty();
+  }
+  doc.members.splice(index, 1);
+  doc.updatedAt = now();
+  await mailboxStub(env, doc.id).save(doc);
+  if (doc.ownerHash !== null) await account.revokeTokens(env, doc.ownerHash, [deviceId]);
+  console.log("mail-otp: a device left a mailbox");
+  return empty();
+}
+
 /** The installs an address forwards to, for the app's device list. */
 async function mailDevices(deviceId: string, body: MailBody, env: Env): Promise<Response> {
   const mine = await owned(env, deviceId, body);
@@ -373,7 +395,8 @@ async function mailInbox(deviceId: string, body: MailBody, env: Env): Promise<Re
 }
 
 /** Ties the mailbox to the student whose session comes with it, so a new
- * phone of theirs can join it with `/reclaim`. The latest wins. */
+ * phone of theirs can join it with `/reclaim`. An address already tied to
+ * a student stays theirs: their Gmail forwards to it. */
 async function mailOwner(deviceId: string, body: MailBody, env: Env): Promise<Response> {
   const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
@@ -381,13 +404,15 @@ async function mailOwner(deviceId: string, body: MailBody, env: Env): Promise<Re
   const session = await sessionOwner(env, deviceId, body);
   if ("reply" in session) return session.reply;
   const { owner } = session;
+  if (doc.ownerHash !== null && doc.ownerHash !== owner) {
+    return error(409, "owner_mismatch", "This forwarding address belongs to another VTOP account.");
+  }
   // The student already has another live address: that is the one their
   // Gmail filter forwards to, so it keeps the account. The app joins it.
   const existing = await ownerStub(env, owner).get();
   if (existing !== null && existing !== doc.id && (await loadMailbox(env, existing))) {
     return error(409, "address_exists", "This VTOP account already has a forwarding address; use that one.");
   }
-  if (doc.ownerHash !== null && doc.ownerHash !== owner) await ownerStub(env, doc.ownerHash).remove(doc.id);
   doc.ownerHash = owner;
   doc.updatedAt = now();
   await mailboxStub(env, doc.id).save(doc);
@@ -422,6 +447,7 @@ async function mailReclaim(deviceId: string, body: MailBody, env: Env): Promise<
 const MAIL_ROUTES: Record<string, (deviceId: string, body: MailBody, env: Env) => Promise<Response>> = {
   "/v1/mail-otp/register": mailRegister,
   "/v1/mail-otp/delete": mailDelete,
+  "/v1/mail-otp/leave": mailLeave,
   "/v1/mail-otp/inbox": mailInbox,
   "/v1/mail-otp/owner": mailOwner,
   "/v1/mail-otp/reclaim": mailReclaim,
@@ -556,6 +582,7 @@ async function email(message: ForwardableEmailMessage, env: Env): Promise<void> 
     if (asciiEq(message.from, GMAIL_FORWARDING_SENDER)) console.log(`mail-otp: dropped shape ${await dropShape(raw)}`);
     return;
   }
+  console.log(`mail-otp: ${payload.kind} sender checks ${await authShape(raw)}`);
   const json = JSON.stringify(payload);
   const plaintext = new TextEncoder().encode(json);
   // Sealed once per install, each to its own key; an install no longer

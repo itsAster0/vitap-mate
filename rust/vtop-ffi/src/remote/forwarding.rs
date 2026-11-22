@@ -18,9 +18,16 @@ use serde_json::{Value, json};
 use tracing::{debug, info, warn};
 use vtop_shared::mail_seal;
 
-use crate::{Core, CoreError, traced, traced_sync};
+use vtop_core::spec;
+use vtop_core::types::StudentProfile;
+
+use crate::{Core, CoreError, PAGES, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
+/// Addresses this phone still has to leave on the edge, kept past sign-out (not a student
+/// file): signed out, or with another student signed in, it must stop getting the last one's
+/// OTPs. Left by [`Core::leave_old_forwarding`].
+pub(crate) const LEAVE_FILE: &str = "forwarding_leave.json";
 /// VTOP's OTP sender: the Gmail filter's From.
 pub const VTOP_SENDER: &str = "noreply.sdc@vitap.ac.in";
 /// The sign-in's time (VTOP's `Date:` just before it mailed the code) and the mail's `Date:`,
@@ -31,6 +38,8 @@ const CLOCK_SKEW_SECS: i64 = 60;
 
 /// Serialises read-modify-write of [`FILE`].
 pub(crate) static FILE_LOCK: Mutex<()> = Mutex::new(());
+/// Serialises read-modify-write of [`LEAVE_FILE`].
+static LEAVE_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum ForwardingState {
@@ -51,6 +60,37 @@ pub struct GmailConfirmation {
     pub requester: Option<String>,
     /// Unix seconds.
     pub sent_at: i64,
+    /// Whether `requester` is an address on the student's saved VTOP profile; None without a
+    /// requester or a saved profile. Anyone who knows the address can make Gmail send one.
+    #[serde(skip)]
+    pub requester_known: Option<bool>,
+}
+
+/// An address to leave: where it lives and its id.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Leave {
+    server: String,
+    id: String,
+}
+
+/// Gmail's confirm link, if it is one: https, a google.com host and `/mail/vf-`, so the button
+/// opens nothing else whatever the mail held.
+fn gmail_link(link: &str) -> Option<String> {
+    let rest = link.strip_prefix("https://")?;
+    let (host, path) = rest.split_at(rest.find('/')?);
+    let host_ok = host
+        .bytes()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'-')
+        && (host == "google.com" || host.ends_with(".google.com"));
+    // One path segment only: a `/` (or `\`, which browsers read as one) after `vf-` could walk
+    // up with `..` to any page on the host.
+    let token_ok = path.strip_prefix("/mail/vf-").is_some_and(|token| {
+        !token.is_empty()
+            && token
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"%._~-".contains(&b))
+    });
+    (host_ok && token_ok).then(|| link.to_string())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -188,6 +228,8 @@ impl Core {
     /// already has one.
     pub async fn set_up_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("set_up_forwarding", &flow, async {
+            // A signed-out student's address first, as it may be the one this sign-in joins.
+            self.leave_queued(&flow).await;
             if self.read::<Saved>(FILE).is_some() {
                 info!("already set up");
                 return Ok(self.forwarding_view());
@@ -298,9 +340,99 @@ impl Core {
         )
         .await
     }
+
+    /// Takes this phone off the addresses a sign-out (or another student signing in) left
+    /// behind. The edge keeps a student's address with no phone on it, for their next sign-in to
+    /// join. Best effort: an address not left yet stays queued for the next call.
+    pub async fn leave_old_forwarding(&self, flow: String) -> Result<(), CoreError> {
+        traced("leave_old_forwarding", &flow, async {
+            self.leave_queued(&flow).await;
+            Ok(())
+        })
+        .await
+    }
 }
 
 impl Core {
+    /// Queues this phone's address to be left; called before the student's files are forgotten.
+    pub(crate) fn queue_leave(&self) {
+        let Some(saved) = self.read::<Saved>(FILE) else {
+            return;
+        };
+        let _lock = LEAVE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
+        if !queue.iter().any(|leave| leave.id == saved.id) {
+            queue.push(Leave {
+                server: saved.server,
+                id: saved.id,
+            });
+            self.write(LEAVE_FILE, &queue);
+            info!("address queued to leave");
+        }
+    }
+
+    async fn leave_queued(&self, flow: &str) {
+        let queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
+        let current = self.read::<Saved>(FILE).map(|saved| saved.id);
+        let mut done = Vec::new();
+        for leave in queue {
+            // Joined again since: this phone uses it.
+            if current.as_ref() == Some(&leave.id) {
+                done.push(leave);
+                continue;
+            }
+            let body = json!({ "id": leave.id });
+            match self
+                .edge_post(&leave.server, "/v1/mail-otp/leave", flow, &body)
+                .await
+            {
+                Ok(_) => info!("left an old address"),
+                Err(error) if error.code() == GONE => info!("old address already gone"),
+                // Offline, or an edge without `/leave`: tried again later.
+                Err(error) => {
+                    warn!(code = error.code(), "old address not left yet");
+                    continue;
+                }
+            }
+            done.push(leave);
+        }
+        if done.is_empty() {
+            return;
+        }
+        let _lock = LEAVE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
+        queue.retain(|leave| !done.contains(leave));
+        if queue.is_empty() {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "a file already gone is the goal"
+            )]
+            let _ = fs::remove_file(self.at(LEAVE_FILE));
+        } else {
+            self.write(LEAVE_FILE, &queue);
+        }
+    }
+
+    /// Whether `requester` is an address on the student's saved profile (any field, as VTOP
+    /// mails the OTP to the address the student gave it); None without one or the other.
+    fn requester_known(&self, requester: Option<&str>) -> Option<bool> {
+        let requester = requester?.trim();
+        let profile =
+            self.read_kept::<StudentProfile>(&format!("{PAGES}/{}", spec::PROFILE.file))?;
+        let fields = profile
+            .sections
+            .iter()
+            .flat_map(|section| &section.groups)
+            .flat_map(|group| &group.fields)
+            .map(|field| field.value.as_str());
+        Some(
+            std::iter::once(profile.vit_email.as_str())
+                .chain(fields)
+                .flat_map(|value| value.split(|c: char| c.is_whitespace() || c == ',' || c == ';'))
+                .any(|word| word.eq_ignore_ascii_case(requester)),
+        )
+    }
+
     /// This phone's address as `(server, mailbox id, address)`, if it has one.
     pub(crate) fn saved_mailbox(&self) -> Option<(String, String, String)> {
         self.read::<Saved>(FILE)
@@ -331,7 +463,11 @@ impl Core {
     }
 
     fn forwarding_view(&self) -> Forwarding {
-        view(self.read::<Saved>(FILE).as_ref())
+        let mut forwarding = view(self.read::<Saved>(FILE).as_ref());
+        if let Some(confirmation) = &mut forwarding.confirmation {
+            confirmation.requester_known = self.requester_known(confirmation.requester.as_deref());
+        }
+        forwarding
     }
 
     /// The latest box in this phone's inbox, opened and recorded; None without an address, a
@@ -428,9 +564,10 @@ impl Core {
             } => {
                 saved.confirmation = Some(GmailConfirmation {
                     code: code.clone(),
-                    link: link.clone(),
+                    link: link.as_deref().and_then(gmail_link),
                     requester: requester.clone(),
                     sent_at: *sent_at,
+                    requester_known: None,
                 });
             }
         }

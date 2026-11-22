@@ -1022,6 +1022,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_forwarding_status(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_up_forwarding(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding(
@@ -1299,6 +1301,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_forwarding_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_leave_old_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_set_up_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -1857,6 +1861,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 61987) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding() and 0xFFFF) != 64678) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 16094) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1950,7 +1957,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_in() and 0xFFFF) != 30202) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 42865) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 7796) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 45517) {
@@ -3473,6 +3480,13 @@ public interface CoreInterface {
     fun `forwardingStatus`(`flow`: kotlin.String): Forwarding
     
     /**
+     * Takes this phone off the addresses a sign-out (or another student signing in) left
+     * behind. The edge keeps a student's address with no phone on it, for their next sign-in to
+     * join. Best effort: an address not left yet stays queued for the next call.
+     */
+    suspend fun `leaveOldForwarding`(`flow`: kotlin.String)
+    
+    /**
      * Gives this phone a forwarding address. A student who already has one (made on another
      * phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
      * working; otherwise a new address is made and tied to them. Does nothing when this phone
@@ -3641,8 +3655,8 @@ public interface CoreInterface {
     suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): SignIn
     
     /**
-     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
-     * address again through the edge). Logs stay.
+     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address, and queues the
+     * address to be left on the edge (a sign-in can join it again there). Logs stay.
      */
     fun `signOut`(`flow`: kotlin.String)
     
@@ -5384,6 +5398,34 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Takes this phone off the addresses a sign-out (or another student signing in) left
+     * behind. The edge keeps a student's address with no phone on it, for their next sign-in to
+     * join. Best effort: an address not left yet stays queued for the next call.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `leaveOldForwarding`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_leave_old_forwarding(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Gives this phone a forwarding address. A student who already has one (made on another
      * phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
      * working; otherwise a new address is made and tied to them. Does nothing when this phone
@@ -6185,8 +6227,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
-     * address again through the edge). Logs stay.
+     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address, and queues the
+     * address to be left on the edge (a sign-in can join it again there). Logs stay.
      */override fun `signOut`(`flow`: kotlin.String)
         = 
     callWithHandle {
@@ -10789,6 +10831,12 @@ data class GmailConfirmation (
      * Unix seconds.
      */
     var `sentAt`: kotlin.Long
+    , 
+    /**
+     * Whether `requester` is an address on the student's saved VTOP profile; None without a
+     * requester or a saved profile. Anyone who knows the address can make Gmail send one.
+     */
+    var `requesterKnown`: kotlin.Boolean?
     
 ){
     
@@ -10809,6 +10857,7 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterLong.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
         )
     }
 
@@ -10816,7 +10865,8 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
             FfiConverterOptionalString.allocationSize(value.`code`) +
             FfiConverterOptionalString.allocationSize(value.`link`) +
             FfiConverterOptionalString.allocationSize(value.`requester`) +
-            FfiConverterLong.allocationSize(value.`sentAt`)
+            FfiConverterLong.allocationSize(value.`sentAt`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`requesterKnown`)
     )
 
     override fun write(value: GmailConfirmation, buf: ByteBuffer) {
@@ -10824,6 +10874,7 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
             FfiConverterOptionalString.write(value.`link`, buf)
             FfiConverterOptionalString.write(value.`requester`, buf)
             FfiConverterLong.write(value.`sentAt`, buf)
+            FfiConverterOptionalBoolean.write(value.`requesterKnown`, buf)
     }
 }
 
@@ -17607,6 +17658,38 @@ public object FfiConverterOptionalDouble: FfiConverterRustBuffer<kotlin.Double?>
         } else {
             buf.put(1)
             FfiConverterDouble.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<kotlin.Boolean?> {
+    override fun read(buf: ByteBuffer): kotlin.Boolean? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterBoolean.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.Boolean?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterBoolean.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.Boolean?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterBoolean.write(value, buf)
         }
     }
 }

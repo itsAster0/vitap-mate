@@ -10,6 +10,7 @@ import java.security.KeyStore
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
@@ -87,6 +88,18 @@ object AppCore {
                 runBlocking { flow("store.start") { StoreCap.enforce(app, it) } }
                 AccountBackup.save(app)
             }.onFailure { Log.warn("store", "start housekeeping failed: ${it::class.simpleName}") }
+            leaveOldForwarding()
+        }
+    }
+
+    /**
+     * Takes this phone off the forwarding addresses a sign-out (or another student signing in) left
+     * behind, in the background; Rust keeps the list until the edge confirms each.
+     */
+    fun leaveOldForwarding() {
+        AppScope.launch {
+            runCatching { flow("forwarding.leave", unattended = true) { f -> withContext(Dispatchers.IO) { await().leaveOldForwarding(f) } } }
+                .onFailure { Log.warn("forwarding", "leave failed: ${it::class.simpleName}") }
         }
     }
 
