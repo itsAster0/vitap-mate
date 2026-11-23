@@ -115,10 +115,18 @@ export const Gateway = Effect.gen(function* () {
     },
     build: { context: "../rust", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
   });
+  // The image is built on the builder, so the Linode has only the tag it pulled last: a
+  // container made from `image` would run that stale binary. Pulled on the host each deploy.
+  const pulled = yield* Docker.RemoteImage("GatewayPull", {
+    context: host,
+    name: image.name,
+    tag: image.tag,
+    platform: "linux/amd64",
+  });
   return yield* Docker.Container("Gateway", {
     context: host,
     name: "vitapmate-gateway",
-    image,
+    image: pulled,
     // The gateway sees each phone's real address (its Noise sessions are keyed
     // by it), with no Docker NAT in the UDP path.
     networkMode: "host",
