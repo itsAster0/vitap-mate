@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use tracing::info;
 
 use crate::device::EdgeError;
+use crate::remote::consent::{self, CookieKind};
 use crate::remote::keys::{AccessKey, KeyView, refused};
 use crate::{Core, CoreError, traced};
 
@@ -617,6 +618,24 @@ impl Core {
         ask: bool,
         gmail: Option<GmailGrant>,
     ) -> Result<(), CoreError> {
+        // The password leaves the phone whatever carries the call (a kept token or a proof,
+        // neither of which asks). Asked, the Server screen's own "Let the server sign in for
+        // you?" is the consent; unasked, only a remembered yes sends.
+        if !ask {
+            let host = consent::host(server);
+            if !consent::allowed(
+                &self.shared,
+                flow,
+                CookieKind::Account,
+                action,
+                &host,
+                false,
+            )
+            .await
+            {
+                return Err(CoreError::ConsentDenied);
+            }
+        }
         let account = self
             .read::<crate::Account>(crate::ACCOUNT)
             .ok_or(CoreError::NotSignedIn)?;

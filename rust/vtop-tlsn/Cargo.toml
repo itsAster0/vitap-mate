@@ -1,0 +1,31 @@
+[package]
+name = "vtop-tlsn"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "TLSNotary (proxy mode) proof of the VTOP registration number, without showing the session: the app proves, the engine verifies"
+
+[features]
+# A local TLS server that plays VTOP, for the tests here, the engine's and the app crate's.
+# Its certificates (assets/fake/) are tlsn's tls-server-fixture ones, valid to 2124.
+fake-vtop = ["dep:tokio", "dep:tokio-util", "dep:futures-rustls"]
+
+[dependencies]
+# Prover and verifier are one crate in tlsn; both sessions here run on any executor, so the
+# app (no tokio) proves and the engine verifies with the same code.
+tlsn = { git = "https://github.com/tlsnotary/tlsn", tag = "v0.1.0-beta.1", features = ["mozilla-certs"] }
+anyhow = "1"
+futures = "0.3"
+sha2 = "0.11"
+tokio = { workspace = true, features = ["rt", "net", "io-util"], optional = true }
+tokio-util = { version = "0.7", features = ["compat"], optional = true }
+futures-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"], optional = true }
+
+[dev-dependencies]
+vtop-tlsn = { path = ".", features = ["fake-vtop"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+
+[lints]
+workspace = true

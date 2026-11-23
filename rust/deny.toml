@@ -15,7 +15,12 @@ all-features = true
 # RustSec advisories, unmaintained and yanked crates. Ignore one only with a reason:
 # ignore = [{ id = "RUSTSEC-0000-0000", reason = "..." }]
 yanked = "deny"
-ignore = []
+ignore = [
+  # crypto-bigint 0.5 under tlsn's elliptic-curve 0.13 (vtop-tlsn), with no fixed 0.5 release:
+  # its k256/p256 serve attestations and MPC-TLS's key exchange, neither of which a proxy-mode
+  # proof runs (the prover's own TLS is rustls with ring). Drop when tlsn moves on.
+  { id = "RUSTSEC-2026-0387", reason = "tlsn's curves; proxy mode runs none of their secret arithmetic" },
+]
 
 [licenses]
 # What the dependency tree uses today, all permissive (MPL-2.0 is file-level copyleft:
@@ -28,6 +33,8 @@ allow = [
   "BSD-1-Clause",
   "BSD-3-Clause",
   "BSL-1.0",
+  # Public-domain dedication: tiny-keccak, under tlsn (vtop-tlsn).
+  "CC0-1.0",
   "CDLA-Permissive-2.0",
   "ISC",
   "MIT",
@@ -38,6 +45,109 @@ allow = [
 ]
 confidence-threshold = 0.9
 unused-allowed-license = "allow"
+
+# TLSNotary's git crates (vtop-tlsn) leave out the license field; their READMEs license every
+# crate in the repo (tlsn, mpz2, tlsn-utils) under MIT OR Apache-2.0.
+[[licenses.clarify]]
+crate = "futures-plex"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "matrix-transpose"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-circuits"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-circuits-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-circuits-data"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-cointoss-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-common"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-fields"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-garble"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-garble-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-hash"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-ideal-vm"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-memory-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-ole"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-ole-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-ot"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-ot-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-share-conversion"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-share-conversion-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-vm-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-zk"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "mpz-zk-core"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "tlsn-attestation"
+expression = "MIT OR Apache-2.0"
+license-files = []
+[[licenses.clarify]]
+crate = "tlsn-deap"
+expression = "MIT OR Apache-2.0"
+license-files = []
 
 # The workspace's own crates are MIT (../LICENSE) with `publish = false`.
 
@@ -51,4 +161,10 @@ allow-wildcard-paths = true
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []
+# TLSNotary (vtop-tlsn) and the git dependencies of its tag: it is not on crates.io.
+allow-git = [
+  "https://github.com/tlsnotary/tlsn",
+  "https://github.com/tlsnotary/tlsn-utils",
+  "https://github.com/tlsnotary/mpz2",
+  "https://github.com/tlsnotary/rs-merkle.git",
+]

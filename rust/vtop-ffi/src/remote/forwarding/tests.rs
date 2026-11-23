@@ -5,7 +5,7 @@ use vtop_shared::device_sig;
 use super::*;
 use crate::remote::consent;
 use crate::remote::edge::SERVER_FILE;
-use crate::test_edge::{Edge, ID, now, serve, signed_in};
+use crate::test_edge::{Edge, ID, keep_token, now, serve, signed_in};
 
 /// Seals `payload` the way the edge does: to the registered seal key, for mailbox [`ID`].
 fn seal(edge: &Arc<Mutex<Edge>>, payload: Value) {
@@ -23,8 +23,8 @@ async fn sets_up_checks_fetches_and_turns_off() {
     let url = serve(edge.clone()).await;
     fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
     // No address to join yet: a new one, then claimed for the student.
-    let core = signed_in(&dir, url);
-    let _gate = consent::tests::yes(&core);
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
     assert_eq!(
         core.forwarding_status("f".into()).state,
         ForwardingState::Off
@@ -60,7 +60,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
         assert!(mail_seal::is_public_key(
             register["sealKey"].as_str().unwrap()
         ));
-        assert!(edge.requests[1].body["session"]["cookies"].is_string());
+        assert_eq!(edge.requests[1].body, json!({ "accountToken": "tok" }));
         assert_eq!(edge.requests[2].body, json!({}));
         assert_eq!(edge.requests[3].body["id"], json!(ID));
     }
@@ -144,18 +144,19 @@ async fn sets_up_checks_fetches_and_turns_off() {
 }
 
 #[tokio::test]
-async fn forwarding_setup_denied_sends_nothing() {
+async fn forwarding_setup_without_a_token_or_proof_sends_nothing() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-deny-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let edge = Arc::new(Mutex::new(Edge::default()));
-    fs::write(dir.join(SERVER_FILE), serve(edge.clone()).await).unwrap();
-    let core = Core::for_test(&dir);
-    consent::tests::signed_in(&core);
+    let url = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), &url).unwrap();
+    // Signed in, but no proof network here: the proof fails before anything is sent.
+    let core = signed_in(&dir, url);
     let gate = consent::tests::no(&core);
     let set_up = core.set_up_forwarding("f".into()).await;
-    assert_eq!(set_up, Err(CoreError::ConsentDenied));
-    assert_eq!(gate.asks(), 1);
+    assert!(matches!(set_up, Err(CoreError::Other { .. })), "{set_up:?}");
+    assert_eq!(gate.asks(), 0);
     assert!(edge.lock().unwrap().requests.is_empty());
     assert!(!dir.join(FILE).exists());
     let _ = fs::remove_dir_all(&dir);
@@ -169,8 +170,8 @@ async fn check_shows_the_confirmation_the_edge_kept() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let url = serve(edge.clone()).await;
     fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
-    let core = signed_in(&dir, url);
-    let _gate = consent::tests::yes(&core);
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
     core.set_up_forwarding("f".into()).await.unwrap();
     // Gmail's mail came before this install joined: no box, only the kept confirmation.
     let kept = {
@@ -346,8 +347,8 @@ async fn sign_out_leaves_the_address_on_the_edge() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let url = serve(edge.clone()).await;
     fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
-    let core = signed_in(&dir, url);
-    let _gate = consent::tests::yes(&core);
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
     core.set_up_forwarding("f".into()).await.unwrap();
 
     core.sign_out("f-out".into());

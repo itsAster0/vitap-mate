@@ -34,12 +34,14 @@ pub(crate) struct Edge {
     pub(crate) seal_key: Option<String>,
     pub(crate) sealed: Option<String>,
     pub(crate) gone: bool,
-    /// An account token to issue on answers to calls that send the session.
+    /// An account token to hand back, as a renewal, on answers to calls with one.
     pub(crate) issue: Option<String>,
 }
 
 pub(crate) const ID: &str = "k3f9x2ab7q";
 pub(crate) const DEVICE_ID: &str = "0123456789abcdef0123456789abcdef";
+/// The account-proof challenge `/v1/account/prove/start` hands out.
+pub(crate) const CHALLENGE: &str = "00112233445566778899aabbccddeeff";
 
 fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
     head.lines().find_map(|line| {
@@ -84,6 +86,7 @@ fn answer(edge: &mut Edge, path: &str, body: &Value) -> (u16, Value) {
             edge.seal_key = body["sealKey"].as_str().map(str::to_string);
             (201, json!({ "deviceId": DEVICE_ID }))
         }
+        "/v1/account/prove/start" => (200, json!({ "challenge": CHALLENGE, "expiresAt": 0 })),
         "/v1/mail-otp/reclaim" => gone,
         "/v1/mail-otp/owner" => (204, Value::Null),
         "/v1/mail-otp/register" => {
@@ -152,7 +155,7 @@ pub(crate) async fn serve(edge: Arc<Mutex<Edge>>) -> String {
                     )
                 };
                 let issued = match &edge.issue {
-                    Some(token) if json.get("session").is_some() && reply.0 < 300 => {
+                    Some(token) if json.get("accountToken").is_some() && reply.0 < 300 => {
                         let at = (now() + 14 * 86_400) * 1000;
                         format!(
                             "x-vm-account-token: {token}\r\nx-vm-account-token-expires-at: {at}\r\n"
@@ -193,7 +196,7 @@ pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
             ..VtopConfig::default()
         })
         .with_session(&SessionState {
-            cookies: "JSESSIONID=abc".into(),
+            cookies: format!("JSESSIONID={}", vtop_tlsn::fake::SID),
             csrf_token: Some("csrf-1".into()),
             registration_number: Some("22BCE0001".into()),
             otp_issued_at: None,
@@ -216,6 +219,18 @@ pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
     let core = Core::for_test(dir);
     core.install(Some(Arc::new(RwLock::new(session))));
     core
+}
+
+/// Keeps account token `tok` for the signed-in 22BCE0001 on `server`, as a proof would, so
+/// account calls go with it.
+pub(crate) fn keep_token(core: &Core, server: &str) {
+    let saved = crate::remote::account_token::Saved {
+        server: server.into(),
+        registration_number: "22BCE0001".into(),
+        token: "tok".into(),
+        expires_at: (now() + 86_400) * 1000,
+    };
+    core.write_plain(crate::remote::account_token::FILE, &saved);
 }
 
 pub(crate) fn now() -> i64 {

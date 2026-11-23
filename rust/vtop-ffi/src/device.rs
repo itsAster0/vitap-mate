@@ -267,6 +267,20 @@ impl Core {
         Ok(id)
     }
 
+    /// The vm1 headers of a signed `method path` with no body as install `id`, for a request
+    /// another stack sends (the account proof's WebSocket).
+    #[cfg(feature = "tlsn")]
+    pub(crate) fn signed_headers(
+        &self,
+        method: &str,
+        path: &str,
+        id: &str,
+    ) -> Vec<(String, String)> {
+        let device = self.device();
+        let time = unix_now().saturating_add(device.clock_offset);
+        signed(&device.seed, Some(id), method, path, time, b"")
+    }
+
     /// A signed POST to the edge as this install. A `stale_time` answer corrects the clock offset
     /// and retries once; `unknown_device` registers again and retries once.
     pub(crate) async fn edge_post(

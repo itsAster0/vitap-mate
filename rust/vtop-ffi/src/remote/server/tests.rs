@@ -2,7 +2,7 @@ use std::fs;
 use std::sync::{Arc, Mutex};
 
 use super::*;
-use crate::test_edge::{DEVICE_ID, Edge, serve, signed_in};
+use crate::test_edge::{DEVICE_ID, Edge, keep_token, serve, signed_in};
 
 fn core(name: &str) -> Core {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-server-{name}-{}", std::process::id()));
@@ -40,8 +40,8 @@ async fn semester_push_is_quiet() {
     )
     .unwrap();
     fs::write(core.at(crate::SELECTED), r#""AP2026""#).unwrap();
-    crate::remote::consent::tests::signed_in(&core);
-    let gate = crate::remote::consent::tests::yes(&core);
+    consent::tests::signed_in(&core);
+    let gate = consent::tests::yes(&core);
     assert_eq!(core.send_server_semester("f".into()).await, Ok(()));
     let resent = core.resend_server_password("f".into(), None).await;
     assert_eq!(resent, Ok(false));
@@ -81,7 +81,7 @@ async fn status_reads_everything_the_server_keeps() {
     can(&edge, "/v1/app/status", 200, status);
     can(&edge, "/v1/mail-otp/devices", 200, devices);
     let core = signed_in(&core.dir, server.clone());
-    let _gate = crate::remote::consent::tests::yes(&core);
+    keep_token(&core, &server);
     let status = core.status_with(&server, "f-s", "Load").await.unwrap();
     assert!(status.linked && status.forwarding);
     assert_eq!(
@@ -172,7 +172,7 @@ async fn an_older_server_and_an_unlinked_phone_still_show_what_applies() {
         json!({ "registrationNumber": "22BCE0001", "thisPhone": false }),
     );
     let core = signed_in(&core.dir, server.clone());
-    let _gate = crate::remote::consent::tests::yes(&core);
+    keep_token(&core, &server);
     let status = core.status_with(&server, "f", "Load").await.unwrap();
     assert!(!status.linked && status.mailbox.is_none());
     assert_eq!(
@@ -221,6 +221,58 @@ async fn deleting_this_device_forgets_its_id_unless_the_server_lacks_the_route()
 }
 
 #[tokio::test]
+async fn the_password_never_goes_without_consent() {
+    use consent::tests as gates;
+    let dir = core("password-consent").dir;
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    let core = signed_in(&dir, server.clone());
+    let at = crate::unix_now() * 1000 + 86_400_000;
+    let kept = json!({ "server": server, "registration_number": "22BCE0001", "token": "tok", "expires_at": at });
+    core.write_plain(crate::remote::account_token::FILE, &kept);
+    fs::write(
+        core.at(crate::ACCOUNT),
+        r#"{"username":"22BCE0001","password":"pw"}"#,
+    )
+    .unwrap();
+    can(
+        &edge,
+        "/v1/link",
+        200,
+        json!({ "savedCredentials": true, "forwarding": false }),
+    );
+
+    // Unasked without a remembered yes: refused, and nobody is asked.
+    let gate = gates::no(&core);
+    let unasked = core
+        .save_password_with(&server, "f", "save", false, None)
+        .await;
+    assert!(matches!(unasked, Err(CoreError::ConsentDenied)));
+    assert_eq!(gate.asks(), 0);
+    assert!(
+        !edge
+            .lock()
+            .unwrap()
+            .requests
+            .iter()
+            .any(|r| r.path == "/v1/link")
+    );
+
+    // A remembered yes lets the unasked resend go.
+    gates::remember(&core, CookieKind::Account);
+    core.save_password_with(&server, "f", "save", false, None)
+        .await
+        .unwrap();
+    assert!(
+        edge.lock()
+            .unwrap()
+            .requests
+            .iter()
+            .any(|r| r.path == "/v1/link")
+    );
+}
+
+#[tokio::test]
 async fn the_password_goes_sealed_only_when_the_server_can_get_the_code() {
     let dir = core("password").dir;
     let edge = Arc::new(Mutex::new(Edge::default()));
@@ -253,14 +305,17 @@ async fn the_password_goes_sealed_only_when_the_server_can_get_the_code() {
         client_secret: None,
         delete_after_reading: true,
     };
-    core.save_password_with(&server, "f", "save", false, Some(gmail))
+    let gate = consent::tests::yes(&core);
+    core.save_password_with(&server, "f", "save", true, Some(gmail))
         .await
         .unwrap();
     assert!(
-        core.save_password_with(&server, "f", "save", false, None)
+        core.save_password_with(&server, "f", "save", true, None)
             .await
             .is_err()
     );
+    // Asked, the Server screen's dialog is the consent: no second prompt.
+    assert_eq!(gate.asks(), 0);
     let edge = edge.lock().unwrap();
     let sent = &edge
         .requests

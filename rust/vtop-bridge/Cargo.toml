@@ -10,7 +10,9 @@ description = "The engine: VTOP sessions, sign-in and the MCP tools for the Clou
 vtop-core = { path = "../vtop-core", features = ["reqwest"] }
 vtop-shared = { path = "../vtop-shared" }
 vtop-mcp = { path = "../vtop-mcp" }
-axum = "0.8"
+vtop-tlsn = { path = "../vtop-tlsn" }
+tokio-util = { version = "0.7", features = ["compat"] }
+axum = { version = "0.8", features = ["ws"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 reqwest = { workspace = true }
 serde = { workspace = true }
@@ -26,6 +28,8 @@ futures = "0.3"
 tower-http = { version = "0.7", default-features = false, features = ["compression-br", "compression-gzip"] }
 
 [dev-dependencies]
+vtop-tlsn = { path = "../vtop-tlsn", features = ["fake-vtop"] }
+tokio-tungstenite = "0.29"
 tokio = { workspace = true, features = ["test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

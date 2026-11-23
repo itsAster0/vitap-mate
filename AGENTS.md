@@ -44,6 +44,7 @@ rust/                 Cargo workspace
   vtop-proto/         parsers, types and HTTP shapes as page machines, with no I/O
   vtop-core/          VTOP client that runs vtop-proto's machines over a Transport
   vtop-shared/        formats the app, engine and edge share (device_sig, mail_seal, page_dictionary)
+  vtop-tlsn/          TLSNotary account proof of /vtop/content (prover in the app, verifier in the engine)
   vtop-wire/          vm1, Noise IK over UDP for slow, lossy links
   vtop-gateway/       UDP gateway on the Linode fedora-in-maa
   vtop-bridge/        the engine: sign-in, CAPTCHA, fetch and parse; Railway service engine-v2

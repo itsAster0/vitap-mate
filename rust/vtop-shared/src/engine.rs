@@ -31,6 +31,12 @@ pub const VTOP_LOGIN_RESEND: &str = "/engine/vtop-login/resend";
 /// mail-otp routes: `{cookies}` answers `{ownerHash, registrationNumber}`,
 /// `401` when VTOP refuses it.
 pub const MAIL_OWNER: &str = "/internal/mail-otp/owner";
+/// Engine: verifies a phone's TLSNotary proof of its regno (vtop-tlsn), a
+/// WebSocket the edge opens as `GET ?device=<id>&challenge=<hex>` after it
+/// checked and consumed that device's challenge. Binary messages carry the
+/// tlsn session both ways; the engine's last message is one text frame, a
+/// [`ProofVerdict`], which the edge keeps from the phone.
+pub const PROOF_VERIFY: &str = "/engine/proof";
 /// Edge: the outcome of a [`LOGIN`].
 pub const LOGIN_DONE: &str = "/internal/accounts/login-done";
 /// Edge: waits for the next forwarded OTP of a student, sealed to a key.
@@ -61,6 +67,21 @@ pub enum SessionStatus {
     Expired,
     /// VTOP could not be asked.
     Unknown,
+}
+
+/// How a [`PROOF_VERIFY`] ended: the regno it proved and its owner hash, or
+/// why there is no proof (never the session: the engine never sees it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum ProofVerdict {
+    #[serde(rename_all = "camelCase")]
+    Ok {
+        registration_number: String,
+        owner_hash: String,
+    },
+    Failed {
+        reason: String,
+    },
 }
 
 /// No `Debug`: it holds cookies.

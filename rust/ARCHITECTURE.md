@@ -8,6 +8,7 @@ rust/                    Cargo workspace
 ├── vtop-shared/         formats shared by app, engine and edge (wire_page, mail_seal, ...)
 ├── vtop-bridge/         the Engine: axum service over vtop-core, Railway service engine-v2
 ├── vtop-mcp/            MCP tools served by the Engine behind the edge's /mcp
+├── vtop-tlsn/           TLSNotary proofs of VTOP's /vtop/content (the account proof): prover for the app, verifier for the Engine
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
 └── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out; makes its own weekly keys (on a Linode in Chennai)
 edge/                    the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript, at the repo root)
@@ -139,18 +140,46 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   never ask and send only with the tick. A session request while the
   app is away only posts a notification; tapping it opens the app and asks.
 - **Account token** (`vtop-ffi/src/remote/account_token.rs`, API.md "Account
-  tokens"). After the edge checks the session for an account call
-  (Connected apps, the Server page, mail forwarding), linked phone or not, it
-  answers with a 14-day token naming the student and this install; the
-  student's `Account` object keeps the live token per install and revokes it
-  when the install leaves the account or the forwarding address. It proves
-  who the student is, not that the phone is linked. The app
-  keeps it (`account_token.json`) and sends it in place of the session, so
-  those calls skip the VTOP check and the consent dialog; a refused or
-  expiring token is dropped and the session goes once more. Calls that also
-  send the password, a connected app's session and the routes keep sending
-  the session. Dropped on sign-out, another student, and deleting the
-  server account or this install.
+  tokens"). A 14-day token naming the student and this install, for the
+  account calls (Connected apps, the Server page, mail forwarding), linked
+  phone or not; the student's `Account` object keeps the live token per
+  install and revokes it when the install leaves the account or the
+  forwarding address. It proves who the student is, not that the phone is
+  linked. The app keeps it (`account_token.json`) and sends it in place of
+  the session. Without one (or after a refused or expired one) it gets one
+  from the account proof below, so the session never goes and no consent is
+  asked; a call nobody started (`ask` false) never proves and stays
+  `ConsentDenied`. Saving the password goes with the token too: asked, the
+  Server screen's dialog is the consent; unasked, it needs a remembered
+  `Account` yes. A connected app's session and the routes still send the
+  session. Dropped on sign-out,
+  another student, and deleting the server account or this install. Old
+  installs still send the session to get one (`withSession` in
+  `edge/src/account.ts`), deprecated.
+- **Account proof** (`vtop-ffi/src/remote/account_proof.rs`, `vtop-tlsn`,
+  API.md "Account proof"). The phone proves its regno with TLSNotary in
+  proxy mode: `POST /v1/account/prove/start` gives a single-use challenge
+  (2 minutes, kept in the install's `Device` object), then the phone opens
+  the signed WebSocket `GET /v1/account/prove?challenge=`. The edge uses
+  the challenge up and relays binary messages to the engine's
+  `/engine/proof?device=&challenge=` (`INTERNAL_TOKEN`, at most 4 at once).
+  The engine dials VTOP itself and relays the phone's TLS to it; the phone
+  sends one fixed `GET /vtop/content?n=<binding>`, binding =
+  `hex(SHA-256("vitapmate-tlsn-v1:" + challenge + ":" + device))[..32]`,
+  revealing all of it but the 32-hex-digit `JSESSIONID`, and reveals the
+  response's head and the page the template covers, regno included (never a
+  whole direction, and it reads to the end, capped at 1 MB). The verifier holds both to the template
+  (`vtop-tlsn/assets/content.tmpl`, matched from body byte 0, strict
+  framing, no `Set-Cookie`), checks the server name, the binding and the
+  caps (16 MB prover I/O, 1 MB server I/O, reveal 4 KB sent, 16 KB
+  received) and sends its verdict (regno, owner hash) as the last text
+  message; the edge mints the token as after a cookie check and sends the
+  phone `{ accountToken, expiresAt, registrationNumber }`. Kotlin carries
+  the socket (`ProofNetwork`, set with `set_proof_network`). tlsn's
+  sessions end on its mux's close handshake, not on EOF, and it does not
+  always flush, so both ends' pipe sinks are channels drained by a writer
+  loop (`vtop_tlsn::session::Pipe`). vtop-ffi builds it behind the `tlsn`
+  feature (on by default).
 
 The edge also serves `POST /v1/app/status` (signed by the phone, with the
 registration number, no VTOP cookies): the sealed session's and password's ages,
@@ -232,11 +261,15 @@ and `~/vitapmate-gateway/data` for the keys.
   pages that must not panic. Fixtures are synthetic or redacted.
 - `vtop-core/src/client/tests.rs`: session reuse against an in-process mock VTOP.
 - `vtop-bridge`: the engine routes (session, seal, sign-in with a forwarded
-  or Gmail OTP).
+  or Gmail OTP, the proof route over a real WebSocket).
+- `vtop-tlsn/tests`: the content policy (`content.rs`) and real tlsn
+  sessions against a fake VTOP (`e2e.rs`, feature `fake-vtop`): relays
+  swapping the device or challenge, signed out, smuggled headers,
+  `Set-Cookie`, planted copies, over-cap reveals, another server.
 - `vtop-wire`: framing, Reed-Solomon, the loss estimate, and client ↔
   gateway over localhost UDP (30% loss, restarts, replays, two processes).
 - `vtop-gateway`: the client through the gateway to a mock engine.
-- `edge/` (`bun run test`): accounts, devices, mail OTP, the `/vtop/` proxy.
+- `edge/` (`bun run test`): accounts, devices, mail OTP, the `/vtop/` proxy, account proofs' challenges and relay.
 - `vtop-ffi/src/tests.rs`, `<module>/tests.rs` (`pages/outing/`, `remote/forwarding/`, ...) and next to
   each module: the app's crate; `test_edge.rs` is the mock edge they share.
 - `vtop-core/examples/parse_bench.rs`: parser timings on fixtures or raw pages.

@@ -15,14 +15,21 @@ name = "uniffi-bindgen"
 required-features = ["cli"]
 
 [features]
+default = ["tlsn"]
 # Only the host bindgen needs uniffi's CLI; the Android library builds without it.
 cli = ["uniffi/cli", "uniffi/cargo-metadata"]
+# The account proof (remote/account_proof.rs): TLSNotary's prover. Without it account calls
+# that have no token fail.
+tlsn = ["dep:vtop-tlsn"]
 
 [dependencies]
 vtop-core = { path = "../vtop-core" }
 vtop-shared = { path = "../vtop-shared" }
 # The UDP route; its client runs on the app's sockets (`udp::UdpNetwork`), not tokio's.
 vtop-wire = { path = "../vtop-wire", default-features = false }
+# The account proof's prover; it runs on any executor, so no tokio here either.
+vtop-tlsn = { path = "../vtop-tlsn", optional = true }
+futures = "0.3"
 # No tokio: async exports run on the futures Kotlin polls (see vtop_core::sync).
 uniffi = { version = "0.32.2", default-features = false }
 # UniFFI's foreign async traits (HttpTransport) need it; already in the tree via vtop-mcp.
@@ -40,7 +47,9 @@ android_log-sys = "0.3"
 # Host tests have no app transport: vtop-core's reqwest one stands in (resolver 2 keeps this
 # feature out of the app build).
 vtop-core = { path = "../vtop-core", features = ["reqwest"] }
-tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "time"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "net", "io-util", "time", "sync"] }
+vtop-tlsn = { path = "../vtop-tlsn", features = ["fake-vtop"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 
 [lints]
 workspace = true

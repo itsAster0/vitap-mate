@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use super::*;
 use crate::remote::consent;
-use crate::test_edge::{Edge, serve, signed_in};
+use crate::test_edge::{Edge, keep_token, serve, signed_in};
 
 fn core(name: &str) -> Core {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-keys-{name}-{}", std::process::id()));
@@ -95,11 +95,11 @@ fn other_phones_with_keys_are_listed() {
 }
 
 #[tokio::test]
-async fn linking_sends_the_session_and_no_key() {
+async fn linking_sends_the_account_token_and_no_key() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
     let core = signed_in(&core("link").dir, server.clone());
-    let _gate = consent::tests::yes(&core);
+    keep_token(&core, &server);
     can(
         &edge,
         "/v1/link",
@@ -110,11 +110,9 @@ async fn linking_sends_the_session_and_no_key() {
     let edge = edge.lock().unwrap();
     let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
     assert_eq!(paths, ["/v1/devices/register", "/v1/link"]);
-    let cookies = &edge.requests[1].body["session"]["cookies"];
-    assert!(cookies.as_str().is_some_and(|c| c.contains("JSESSIONID=")));
     assert_eq!(
         edge.requests[1].body,
-        json!({ "session": { "cookies": cookies }, "label": "vitapmate" })
+        json!({ "accountToken": "tok", "label": "vitapmate" })
     );
 }
 
@@ -123,7 +121,7 @@ async fn a_first_key_links_the_phone_then_is_made() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
     let core = signed_in(&core("create").dir, server.clone());
-    let _gate = consent::tests::yes(&core);
+    keep_token(&core, &server);
     let not_linked = json!({ "code": "not_linked", "error": "Link first." });
     can(&edge, "/v1/keys", 409, not_linked);
     let made =
@@ -156,15 +154,13 @@ async fn a_first_key_links_the_phone_then_is_made() {
         ["/v1/devices/register", "/v1/keys", "/v1/link", "/v1/keys"]
     );
     assert!(edge.requests.iter().all(|r| r.signed && r.flow == "f-key"));
-    let cookies = &edge.requests[1].body["session"]["cookies"];
-    assert!(cookies.is_string());
     assert_eq!(
         edge.requests[1].body,
-        json!({ "session": { "cookies": cookies }, "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
+        json!({ "accountToken": "tok", "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
     );
     assert_eq!(
         edge.requests[2].body,
-        json!({ "session": { "cookies": cookies }, "label": "vitapmate" })
+        json!({ "accountToken": "tok", "label": "vitapmate" })
     );
 }
 
@@ -205,7 +201,7 @@ async fn refusals_read_as_what_to_do() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
     let core = signed_in(&core("refused").dir, server.clone());
-    let _gate = consent::tests::yes(&core);
+    keep_token(&core, &server);
     can(
         &edge,
         "/v1/keys",
@@ -232,21 +228,17 @@ async fn refusals_read_as_what_to_do() {
 }
 
 #[tokio::test]
-async fn account_calls_ask_before_reading_the_session() {
+async fn account_calls_never_ask_or_send_the_session() {
+    // Without a token they prove; with no proof network (this test's) that fails first.
     let core = core("consent");
     let edge = Arc::new(Mutex::new(Edge::default()));
-    fs::write(
-        core.at(crate::remote::edge::SERVER_FILE),
-        serve(edge.clone()).await,
-    )
-    .unwrap();
-    consent::tests::signed_in(&core);
+    let server = serve(edge.clone()).await;
+    let core = signed_in(&core.dir, server.clone());
+    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
     let gate = consent::tests::no(&core);
-    let apps = core.connected_apps("f".into()).await;
-    assert_eq!(apps.unwrap_err(), CoreError::ConsentDenied);
-    let key = core.create_key("f2".into(), false, None).await;
-    assert_eq!(key.unwrap_err(), CoreError::ConsentDenied);
-    assert_eq!(gate.asks(), 2);
+    assert!(core.connected_apps("f".into()).await.is_err());
+    assert!(core.create_key("f2".into(), false, None).await.is_err());
+    assert_eq!(gate.asks(), 0);
     assert!(edge.lock().unwrap().requests.is_empty());
 }
 

@@ -12,6 +12,11 @@ export const SEAL = "/engine/seal";
 export const LOGIN = "/engine/login";
 /** Engine: the mailbox owner hash of a live session (mail-otp routes). */
 export const MAIL_OWNER = "/internal/mail-otp/owner";
+/** Engine: verifies a phone's TLSNotary proof of its regno, a WebSocket the
+ * edge opens as `GET ?device=<id>&challenge=<hex>` after it consumed that
+ * device's challenge. Binary messages carry the proof both ways; the
+ * engine's last message is one text frame, a `ProofVerdict`. */
+export const PROOF_VERIFY = "/engine/proof";
 /** Edge: the outcome of a `LOGIN`. */
 export const LOGIN_DONE = "/internal/accounts/login-done";
 /** Edge: waits for the next forwarded OTP of a student, sealed to a key. */
@@ -41,6 +46,11 @@ export interface SessionChecked {
   /** The student's mailbox owner hash, when valid. */
   ownerHash?: string;
 }
+
+/** How a `PROOF_VERIFY` ended. */
+export type ProofVerdict =
+  | { status: "ok"; registrationNumber: string; ownerHash: string }
+  | { status: "failed"; reason: string };
 
 export interface SealVault {
   account: string;

@@ -7,14 +7,27 @@
 
 import { DurableObject } from "cloudflare:workers";
 
+import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+
 import { type Env, notFound, now, unknownDevice } from "./common";
 import { send } from "./fcm";
+import { hash, hashesEqual } from "./shared/tokens";
 import * as sql from "./sql";
 
 /** How long the log keeps an event for catch-up. */
 export const EVENT_TTL_SECS = 24 * 60 * 60;
 /** The most events one catch-up returns; the app asks again from the last. */
 const PAGE = 100;
+/** How long an account-proof challenge lasts (account-proof.ts). */
+export const PROOF_TTL_SECS = 120;
+/** Where the install's one live challenge is kept (key-value storage, so
+ * the SQL schema, and every install's row, stays as it is). */
+const PROOF_KEY = "proof";
+const PROOF_STARTS_KEY = "proof-starts";
+/** Account proofs an install may start: one per `PROOF_GAP_SECS`, `PROOF_HOURLY` an hour.
+ * Each holds a verifier slot on the engine, so one install cannot keep them all busy. */
+const PROOF_GAP_SECS = 5;
+const PROOF_HOURLY = 20;
 
 /** What an event says. The app reads these names; a cookie request's fields
  * are strings, as FCM data is. */
@@ -137,6 +150,35 @@ export class Device extends DurableObject<Env> {
       events: (count && sql.int(count, "n")) ?? 0,
       latest: sql.int(row, "seq") ?? 0,
     };
+  }
+
+  /** A new account-proof challenge (128 random bits, hex) for this install,
+   * replacing any before it; "unknown" when it is not registered, "too_many"
+   * past the install's rate. Synchronous storage, so no other call runs
+   * between the read and the write. */
+  startProof(): { challenge: string; expiresAt: number } | "unknown" | "too_many" {
+    if (!this.doc()) return "unknown";
+    const kv = this.ctx.storage.kv;
+    const at = now();
+    const starts = (kv.get<number[]>(PROOF_STARTS_KEY) ?? []).filter((t) => at - t < 3600);
+    if (starts.length >= PROOF_HOURLY || (starts.length > 0 && at - starts[starts.length - 1] < PROOF_GAP_SECS)) {
+      return "too_many";
+    }
+    kv.put(PROOF_STARTS_KEY, [...starts, at]);
+    const proof = { challenge: bytesToHex(randomBytes(16)), expiresAt: at + PROOF_TTL_SECS };
+    kv.put(PROOF_KEY, proof);
+    return proof;
+  }
+
+  /** Whether `challenge` is this install's live one. It is used up either
+   * way (one try per challenge), read and deleted with no await between, so
+   * two sockets cannot both use it. */
+  takeProof(challenge: string): boolean {
+    const kv = this.ctx.storage.kv;
+    const proof = kv.get<{ challenge: string; expiresAt: number }>(PROOF_KEY);
+    if (proof === undefined) return false;
+    kv.delete(PROOF_KEY);
+    return now() < proof.expiresAt && hashesEqual(hash(proof.challenge), hash(challenge));
   }
 
   /** Forgets the install: keys, FCM token and events. Its sockets close. */

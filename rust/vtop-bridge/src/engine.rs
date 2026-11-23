@@ -9,7 +9,7 @@
 //!
 //! Routes (`Authorization: Bearer $INTERNAL_TOKEN`):
 //! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
-//! and `/engine/fetch-batch` (in `fetch`), and
+//! and `/engine/fetch-batch` (in `fetch`), `GET /engine/proof` (in `proof`), and
 //! [`MAIL_OWNER`](vtop_shared::engine::MAIL_OWNER) (whose a session is, as
 //! an owner hash).
 

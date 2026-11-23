@@ -12,6 +12,7 @@ pub mod gmail;
 pub mod login;
 pub mod page_pack;
 pub mod pages;
+pub mod proof;
 pub mod vault;
 pub mod verify;
 pub mod vtop_login;
@@ -52,6 +53,10 @@ pub struct AppState {
     pub gmail: Arc<dyn GmailRefresher>,
     /// The VTOP that phone sign-ins and fetches go to.
     pub vtop: vtop_core::VtopConfig,
+    /// The server account proofs are held to and dialed.
+    pub proof: proof::ProofTarget,
+    /// Slots for proofs running at once.
+    pub proofs: Arc<tokio::sync::Semaphore>,
     sealer: Sealer,
 }
 
@@ -64,6 +69,8 @@ impl AppState {
             edge: parts.edge,
             gmail: parts.gmail,
             vtop: vtop_core::VtopConfig::default(),
+            proof: proof::ProofTarget::vtop(),
+            proofs: Arc::new(tokio::sync::Semaphore::new(proof::MAX_PROOFS)),
             config,
         }
     }
@@ -71,6 +78,12 @@ impl AppState {
     /// Sends phone sign-ins and fetches to another VTOP (a mock, in tests).
     pub fn with_vtop(mut self, vtop: vtop_core::VtopConfig) -> Self {
         self.vtop = vtop;
+        self
+    }
+
+    /// Holds account proofs to another server (a fake VTOP, in tests).
+    pub fn with_proof(mut self, target: proof::ProofTarget) -> Self {
+        self.proof = target;
         self
     }
 
@@ -87,6 +100,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
+        .route(vtop_shared::engine::PROOF_VERIFY, get(proof::verify))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::FETCH_BATCH, post(fetch::fetch_batch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))

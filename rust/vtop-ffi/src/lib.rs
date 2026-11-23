@@ -271,6 +271,9 @@ struct Shared {
     consent: Mutex<remote::consent::State>,
     /// What [`dev::dev_configure`] set before the core was made.
     dev: Option<dev::DevConfig>,
+    /// The server account proofs are held to, and its roots, in place of VTOP's.
+    #[cfg(all(test, feature = "tlsn"))]
+    proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
 }
 
 impl Shared {

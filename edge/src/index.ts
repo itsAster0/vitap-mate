@@ -25,6 +25,7 @@
 // made with.
 
 import * as account from "./account";
+import { proveSocket, proveStart } from "./account-proof";
 import * as oauth from "./oauth";
 import { tokenInvalid, verifyToken } from "./account-token";
 import { type Signed, base64Url, checkSignature, deviceIdFor, signed } from "./auth";
@@ -465,6 +466,8 @@ const SIGNED: Record<string, (auth: Signed, req: Request, env: Env) => Promise<R
   "POST /v1/app/status": (auth, _req, env) => account.appCall(auth, env, "status"),
   "POST /v1/app/session/clear": (auth, _req, env) => account.appCall(auth, env, "session-clear"),
   "POST /v1/app/login": (auth, _req, env) => account.appCall(auth, env, "login"),
+  "POST /v1/account/prove/start": (auth, _req, env) => proveStart(auth, env),
+  "GET /v1/account/prove": proveSocket,
   ...Object.fromEntries(
     Object.entries(MAIL_ROUTES).map(([path, handler]) => [
       `POST ${path}`,

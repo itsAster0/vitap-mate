@@ -107,6 +107,8 @@ Every route, with its auth kind; the sections below give the details.
 | POST | `/v1/account/clear-sign-ins` | signed | Drops the sign-in history. |
 | POST | `/v1/session/answer` | signed | A phone's answer to a session request. |
 | POST | `/v1/account/credentials-rejected` | signed | VTOP rejected the password on the phone. |
+| POST | `/v1/account/prove/start` | signed | A challenge for an account proof. |
+| GET | `/v1/account/prove` | signed | The account proof's WebSocket, relayed to the engine; ends with the account token. |
 | GET | `/.well-known/oauth-protected-resource` | none | RFC 9728 resource metadata. |
 | GET | `/.well-known/oauth-protected-resource/mcp` | none | RFC 9728 resource metadata. |
 | GET | `/.well-known/oauth-authorization-server` | none | RFC 8414 server metadata. |
@@ -310,7 +312,11 @@ Up to 5 devices per address. Mail is sealed per device to its current
 All `POST`, signed. Routes that send `session` need the phone's live VTOP
 session (`{ cookies: "<Cookie header>" }`); the engine says whose it is.
 Instead of `session` they take `accountToken` (below), which needs no
-engine or VTOP call; with both, the token is used. Errors common to those:
+engine or VTOP call; with both, the token is used. New apps never send
+`session` here: they get the token from an [account proof](#account-proof)
+and send only that. **Deprecated:** `session` on these routes and on
+`/v1/mail-otp/owner` and `/reclaim` stays for older installs only and will
+be removed in a later release (about two weeks after the proof ships). Errors common to those:
 `400` without `session.cookies` (or a token), `401 session_invalid`, `503
 vtop_unreachable`, `403 not_linked` (this device is not one of the
 account's phones), `409 not_linked` (no phone linked yet).
@@ -350,6 +356,44 @@ valid token, as they do with its session. Errors:
 |---|---|---|
 | 401 | `token_invalid` | bad signature or shape, another device's, or revoked (as above); the phone drops it and sends the session |
 | 401 | `token_expired` | past `exp` |
+
+### Account proof
+
+How a new app gets its token without its VTOP cookie leaving the phone: it
+proves its registration number with TLSNotary in proxy mode (`rust/vtop-tlsn`,
+`rust/ARCHITECTURE.md` "Account proof"), and the edge issues the token exactly
+as after a session check (same claims, the device's `iat` row replaced, the
+owner hash and `student:<owner hash>` kept).
+
+| Route | Request | Response |
+|---|---|---|
+| `/v1/account/prove/start` | `{}` | `{ challenge, expiresAt }`: 32 lower-case hex digits (128 random bits), good for 2 minutes and one try; a new one replaces the last. `expiresAt` in unix ms |
+
+### `GET /v1/account/prove`
+
+Signed (empty body, the query in `pathWithQuery`), a WebSocket:
+`?challenge=<the challenge>`. Before the upgrade: `426 upgrade_required`
+without `Upgrade: websocket`, `401 challenge_invalid` when it is not this
+device's live challenge (it is used up either way), `503 proof_busy` when
+the engine runs its most proofs at once, `503 engine_unavailable`.
+
+Then binary messages carry the tlsn session both ways, relayed to the
+engine's `GET /engine/proof?device=<this device>&challenge=<it>` (below),
+which builds the statement from those two before it reads a byte: the
+request must be `GET /vtop/content?n=<binding>` with
+`binding = hex(sha256("vitapmate-tlsn-v1:" + challenge + ":" + deviceId))[..32]`,
+so a proof made for another device or challenge fails. The engine's verdict
+goes to the edge only. The phone's last message is one text frame, then the
+socket closes:
+
+- `{ accountToken, expiresAt, registrationNumber }`: the token (as in the
+  headers above; `expiresAt` in unix ms);
+- or `{ code, error }`: `proof_failed` (no proof: signed out, a refused
+  page, a broken proof; `error` says which step), `token_unavailable`
+  (no `ACCOUNT_TOKEN_SECRET`), `internal_error`.
+
+A text message from the phone, or either side closing first, closes both
+without a token.
 
 | Route | Request | Response |
 |---|---|---|
@@ -524,7 +568,12 @@ nothing else, so a compromised gateway cannot wait for OTPs or reach accounts.
 
 Every call carries `Authorization: Bearer <INTERNAL_TOKEN>`:
 `POST /engine/session`, `/engine/seal`, `/engine/login` (answers `202`, then
-reports to `/internal/accounts/login-done`), `/internal/mail-otp/owner`
+reports to `/internal/accounts/login-done`), `GET /engine/proof` (the
+[account proof](#get-v1accountprove)'s WebSocket: `?device=&challenge=`, 32
+lower-case hex each, `400` otherwise, `503 proof_busy` past 4 at once; binary
+messages both ways, then the engine's text frame `{ status: "ok",
+registrationNumber, ownerHash }` or `{ status: "failed", reason }`),
+`/internal/mail-otp/owner`
 (`{ cookies }` → `{ ownerHash, registrationNumber }`, `401` if VTOP
 refuses; an engine without `registrationNumber` means no token), and the
 `/engine/fetch`, `/engine/fetch-batch`, `/engine/vtop-login*` routes above. `/mcp` keeps the

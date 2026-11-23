@@ -196,7 +196,9 @@ async function withKey(
 
 /** Asks the engine whose live VTOP session the app sent (or reads the
  * account token sent instead, account-token.ts), then hands the call to
- * that student's account. */
+ * that student's account. The session path is deprecated: new apps get
+ * their token from an account proof (account-proof.ts) and send only it;
+ * the session stays for older installs until it is removed. */
 async function withSession(env: Env, op: AppOp, body: Record<string, unknown>, device: DeviceInfo): Promise<Response> {
   const token = str(body.accountToken);
   if (token !== undefined) {
@@ -271,9 +273,21 @@ export async function withAccountToken(
   deviceId: string,
   ownerHash: string,
 ): Promise<Response> {
+  if (!response.ok) return response;
+  return withToken(response, await accountToken(env, registrationNumber, deviceId, ownerHash));
+}
+
+/** An account token for install `deviceId` of student `registrationNumber`
+ * (owner hash `ownerHash`), after a cookie check or a proof (account-proof.ts);
+ * null when none can be issued. */
+export async function accountToken(
+  env: Env,
+  registrationNumber: string,
+  deviceId: string,
+  ownerHash: string,
+): Promise<{ token: string; expiresAt: number } | null> {
   const account = accountId(registrationNumber);
-  if (!response.ok || !isAccountId(account)) return response;
-  return withToken(response, await accountStub(env, account).issueToken(account, deviceId, ownerHash));
+  return isAccountId(account) ? accountStub(env, account).issueToken(account, deviceId, ownerHash) : null;
 }
 
 /** Takes an install off a student's phones and revokes its token, as it

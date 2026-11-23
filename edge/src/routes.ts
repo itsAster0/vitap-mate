@@ -64,6 +64,9 @@ export const ROUTES: Route[] = [
   post("/v1/account/clear-sign-ins", "signed", "Drops the sign-in history."),
   post("/v1/session/answer", "signed", "A phone's answer to a session request."),
   post("/v1/account/credentials-rejected", "signed", "VTOP rejected the password on the phone."),
+  // Account proofs (account-proof.ts).
+  post("/v1/account/prove/start", "signed", "A challenge for an account proof."),
+  get("/v1/account/prove", "signed", "The account proof's WebSocket, relayed to the engine; ends with the account token."),
   // OAuth for MCP clients (oauth.ts).
   get("/.well-known/oauth-protected-resource", "none", "RFC 9728 resource metadata."),
   get("/.well-known/oauth-protected-resource/mcp", "none", "RFC 9728 resource metadata."),
