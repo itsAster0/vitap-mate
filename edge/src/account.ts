@@ -73,6 +73,7 @@ import {
   variable,
 } from "./common";
 import type { DeviceInfo, EventBody } from "./device";
+import { type Exported, TABLES, dump } from "./export";
 import {
   LOGIN,
   type LoginDone,
@@ -381,6 +382,11 @@ export class Account extends DurableObject<Env> {
 
   private doc(): AccountRecord | null {
     return loadAccount(this.db);
+  }
+
+  /** Its stored state, for the move to v3 (export.ts). */
+  async exportState(): Promise<Exported> {
+    return dump(this.ctx.storage.sql, TABLES.account.keep, TABLES.account.count);
   }
 
   private save(doc: AccountRecord): void {

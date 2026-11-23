@@ -1,48 +1,29 @@
 use super::*;
 use crate::Parts;
 use crate::config::Config;
-use crate::fakes::{FakeLogin, FakeRefresher, FakeVerifier, session as cookies_session};
+use crate::fakes::{FakeLogin, FakeRefresher, FakeVerifier, STALE_OTP, session as cookies_session};
 use axum::body::Body;
 use axum::http::Request;
 use http_body_util::BodyExt;
 use serde_json::Value;
-use std::sync::Mutex;
+use std::sync::atomic::Ordering;
 use tower::ServiceExt;
 
 const RELAY: &str = "relay-secret-relay-secret-relay-secret";
 const GATEWAY: &str = "gateway-secret-gateway-secret-gateway";
 const REG: &str = "22BCE0001";
 
-/// Hands out one forwarded OTP (or says there is no mailbox) and keeps
-/// what sign-ins report.
+/// Convex as far as the routes tested here need it: nothing.
 #[derive(Default)]
-struct FakeEdge {
-    code: Option<&'static str>,
-    no_mailbox: bool,
-    done: Mutex<Vec<LoginDone>>,
-    awaited: Mutex<Vec<OtpAwait>>,
-}
+struct FakeEdge;
 
 #[async_trait]
 impl EdgeLink for FakeEdge {
-    async fn await_otp(&self, request: &OtpAwait) -> Result<Option<String>, EdgeError> {
-        self.awaited.lock().unwrap().push(request.clone());
-        if self.no_mailbox {
-            return Err(EdgeError::NoMailbox);
-        }
-        Ok(self.code.map(|code| {
-            let payload = json!({ "kind": "otp", "code": code, "sentAt": request.since + 130 });
-            mail_seal::seal(
-                &request.public_key,
-                &request.owner_hash,
-                payload.to_string().as_bytes(),
-            )
-            .unwrap()
-        }))
+    async fn proof_ticket(&self, _: &str) -> Result<Option<String>, EdgeError> {
+        Ok(None)
     }
 
-    async fn login_done(&self, done: &LoginDone) -> Result<(), EdgeError> {
-        self.done.lock().unwrap().push(done.clone());
+    async fn proof_done(&self, _: &ProofDone) -> Result<(), EdgeError> {
         Ok(())
     }
 }
@@ -104,16 +85,6 @@ async fn post(app: &axum::Router, uri: &str, auth: &str, body: Value) -> (Status
         status,
         serde_json::from_slice(&bytes).unwrap_or(Value::Null),
     )
-}
-
-async fn wait_for_done(edge: &FakeEdge) -> LoginDone {
-    for _ in 0..200 {
-        if let Some(done) = edge.done.lock().unwrap().first().cloned() {
-            return done;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    panic!("the sign-in never reported");
 }
 
 #[tokio::test]
@@ -192,10 +163,10 @@ async fn dead_and_unreachable_sessions() {
     .await;
     assert_eq!(body["status"], "unknown");
     assert!(body.get("cookies").is_none());
-    // A cached one is handed back as it is.
-    let sealed = state
-        .accounts_sealer()
-        .seal_json("accounts/A", &cookies_session("REG=A; down"));
+    // A cached one is handed back as it is, with its CSRF token.
+    let mut cached = cookies_session("REG=A; down");
+    cached.csrf_token = Some("csrf-1".into());
+    let sealed = state.accounts_sealer().seal_json("accounts/A", &cached);
     let (_, body) = post(
         &app,
         vtop_shared::engine::SESSION,
@@ -205,6 +176,7 @@ async fn dead_and_unreachable_sessions() {
     .await;
     assert_eq!(body["status"], "unknown");
     assert_eq!(body["cookies"], "REG=A; down");
+    assert_eq!(body["csrfToken"], "csrf-1");
     let (status, _) = post(&app, vtop_shared::engine::SESSION, RELAY, json!({})).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
@@ -221,32 +193,50 @@ async fn sealed_vault(app: &axum::Router, account: &str) -> String {
     body["sealedVault"].as_str().unwrap().to_string()
 }
 
+/// One sign-in step; the outcome when it is done.
+async fn step(app: &axum::Router, body: Value) -> Value {
+    let (status, body) = post(app, vtop_shared::engine::LOGIN, RELAY, body).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body
+}
+
+fn done(body: Value) -> LoginOutcome {
+    serde_json::from_value(body).expect("a finished sign-in")
+}
+
 #[tokio::test]
-async fn signs_in_with_the_forwarded_otp_and_reports_to_the_edge() {
-    let edge = Arc::new(FakeEdge {
-        code: Some("123456"),
-        ..FakeEdge::default()
-    });
-    let (app, state) = engine_app(edge.clone(), FakeLogin::default());
+async fn a_forwarded_sign_in_stops_at_the_otp_and_resumes_with_the_mail() {
+    let login = Arc::new(FakeLogin::default());
+    let (app, state) = engine_app_with(
+        Arc::default(),
+        login.clone(),
+        Arc::default(),
+        vtop_core::VtopConfig::default(),
+    );
     let vault = sealed_vault(&app, REG).await;
-    let (status, _) = post(
+    let waiting = step(
         &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
-        json!({"account": REG, "sealedVault": vault, "requestId": "r1"}),
+        json!({"account": REG, "sealedVault": vault, "forwarding": true}),
     )
     .await;
-    assert_eq!(status, StatusCode::ACCEPTED);
-    let done = wait_for_done(&edge).await;
+    assert_eq!(waiting["status"], "otp_needed");
+    // VTOP mailed the code at 1000 (the fake's clock); its clock may run behind.
+    assert_eq!(waiting["since"], 1_000 - CLOCK_SLACK_SECS);
+    let resume = |waiting: &Value, code: &str| json!({"account": REG, "sealedState": waiting["sealedState"], "otp": code});
+    // An older mail's code leaves it waiting, and is not sent twice.
+    let again = step(&app, resume(&waiting, STALE_OTP)).await;
+    assert_eq!(again["status"], "otp_needed");
+    let calls = login.calls();
+    let again = step(&app, resume(&again, STALE_OTP)).await;
     assert_eq!(
-        (done.account.as_str(), done.request_id.as_str()),
-        (REG, "r1")
+        (again["status"].as_str(), login.calls()),
+        (Some("otp_needed"), calls)
     );
     let LoginOutcome::Ok {
         cookies,
         sealed_session,
         ..
-    } = done.outcome
+    } = done(step(&app, resume(&again, "123456")).await)
     else {
         panic!("not signed in");
     };
@@ -256,81 +246,47 @@ async fn signs_in_with_the_forwarded_otp_and_reports_to_the_edge() {
         .open_json(&format!("accounts/{REG}"), &sealed_session)
         .unwrap();
     assert_eq!(opened.cookies, "JSESSIONID=fresh");
-    let awaited = edge.awaited.lock().unwrap();
-    assert_eq!(
-        awaited[0].owner_hash,
-        owner_hash(&state.config.vault_key, REG)
-    );
-}
-
-#[tokio::test]
-async fn no_forwarding_address_means_no_server_sign_in() {
-    let edge = Arc::new(FakeEdge {
-        no_mailbox: true,
-        ..FakeEdge::default()
-    });
-    let (app, _) = engine_app(edge.clone(), FakeLogin::default());
-    let vault = sealed_vault(&app, REG).await;
-    post(
+    // The waiting sign-in opens for its own account only.
+    let theirs =
+        json!({"account": "23ABC4567", "sealedState": waiting["sealedState"], "otp": "123456"});
+    assert!(matches!(
+        done(step(&app, theirs).await),
+        LoginOutcome::Failed { .. }
+    ));
+    let (status, _) = post(
         &app,
         vtop_shared::engine::LOGIN,
         RELAY,
-        json!({"account": REG, "sealedVault": vault, "requestId": "r"}),
+        json!({"account": REG}),
     )
     .await;
-    assert!(wait_for_done(&edge).await.outcome == LoginOutcome::ForwardingRequired);
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn rejected_and_foreign_credentials() {
-    let edge = Arc::new(FakeEdge {
-        code: Some("1"),
-        ..FakeEdge::default()
-    });
     let (app, _) = engine_app(
-        edge.clone(),
+        Arc::default(),
         FakeLogin::answering(Err(LoginError::InvalidCredentials)),
     );
     let vault = sealed_vault(&app, REG).await;
-    post(
-        &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
-        json!({"account": REG, "sealedVault": vault, "requestId": "r"}),
-    )
-    .await;
-    assert!(wait_for_done(&edge).await.outcome == LoginOutcome::InvalidCredentials);
+    let body = json!({"account": REG, "sealedVault": vault, "forwarding": true});
+    assert!(done(step(&app, body).await) == LoginOutcome::InvalidCredentials);
 
     // Credentials sealed for one account do not open for another, and
     // ones that sign in someone else are not used.
-    let edge = Arc::new(FakeEdge {
-        code: Some("1"),
-        ..FakeEdge::default()
-    });
-    let (app, _) = engine_app(edge.clone(), FakeLogin::default());
+    let (app, _) = engine_app(Arc::default(), FakeLogin::default());
     let other = sealed_vault(&app, "23ABC4567").await;
-    post(
+    let body = json!({"account": REG, "sealedVault": other, "forwarding": true});
+    assert!(done(step(&app, body).await) == LoginOutcome::VaultUnusable);
+    let waiting = step(
         &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
-        json!({"account": REG, "sealedVault": other, "requestId": "r"}),
+        json!({"account": "23ABC4567", "sealedVault": other, "forwarding": true}),
     )
     .await;
-    assert!(wait_for_done(&edge).await.outcome == LoginOutcome::VaultUnusable);
-    let edge = Arc::new(FakeEdge {
-        code: Some("1"),
-        ..FakeEdge::default()
-    });
-    let (app, _) = engine_app(edge.clone(), FakeLogin::default());
-    let theirs = sealed_vault(&app, "23ABC4567").await;
-    post(
-        &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
-        json!({"account": "23ABC4567", "sealedVault": theirs, "requestId": "r"}),
-    )
-    .await;
-    assert!(wait_for_done(&edge).await.outcome == LoginOutcome::VaultUnusable);
+    let body =
+        json!({"account": "23ABC4567", "sealedState": waiting["sealedState"], "otp": "123456"});
+    assert!(done(step(&app, body).await) == LoginOutcome::VaultUnusable);
 }
 
 #[tokio::test]
@@ -417,32 +373,23 @@ async fn gmail_access_is_sealed_with_the_credentials() {
 }
 
 async fn sign_in_once(
-    edge: Arc<FakeEdge>,
     login: Arc<FakeLogin>,
     gmail: Arc<FakeRefresher>,
     grant: Option<Value>,
-) -> (LoginOutcome, Arc<AppState>) {
-    let (app, state) =
-        engine_app_with(edge.clone(), login, gmail, vtop_core::VtopConfig::default());
+    forwarding: bool,
+) -> (Value, Arc<AppState>) {
+    let (app, state) = engine_app_with(
+        Arc::default(),
+        login,
+        gmail,
+        vtop_core::VtopConfig::default(),
+    );
     let vault = match grant {
         Some(grant) => gmail_vault(&app, grant).await,
         None => sealed_vault(&app, REG).await,
     };
-    post(
-        &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
-        json!({"account": REG, "sealedVault": vault, "requestId": "r"}),
-    )
-    .await;
-    (wait_for_done(&edge).await.outcome, state)
-}
-
-fn no_mailbox() -> Arc<FakeEdge> {
-    Arc::new(FakeEdge {
-        no_mailbox: true,
-        ..FakeEdge::default()
-    })
+    let body = json!({"account": REG, "sealedVault": vault, "forwarding": forwarding});
+    (step(&app, body).await, state)
 }
 
 #[tokio::test]
@@ -450,45 +397,37 @@ async fn without_forwarding_gmail_reads_the_otp() {
     let gmail = Arc::new(FakeRefresher::default());
     let login = Arc::new(FakeLogin::answering(Err(LoginError::InvalidCredentials)));
     let (outcome, _) = sign_in_once(
-        no_mailbox(),
         login.clone(),
         gmail.clone(),
         Some(json!({"refreshToken": "r", "clientId": "c"})),
+        false,
     )
     .await;
-    assert!(outcome == LoginOutcome::InvalidCredentials);
+    assert!(done(outcome) == LoginOutcome::InvalidCredentials);
     assert_eq!(gmail.calls.load(Ordering::SeqCst), 1);
     assert_eq!(login.calls(), 1);
 }
 
 #[tokio::test]
 async fn forwarding_comes_before_gmail() {
-    let edge = Arc::new(FakeEdge {
-        code: Some("123456"),
-        ..FakeEdge::default()
-    });
     let gmail = Arc::new(FakeRefresher::default());
     let (outcome, _) = sign_in_once(
-        edge,
         Arc::new(FakeLogin::default()),
         gmail.clone(),
         Some(json!({"refreshToken": "r", "clientId": "c"})),
+        true,
     )
     .await;
-    assert!(matches!(outcome, LoginOutcome::Ok { .. }));
+    assert_eq!(outcome["status"], "otp_needed");
     assert_eq!(gmail.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
 async fn gmail_picked_on_the_phone_skips_forwarding() {
-    let edge = Arc::new(FakeEdge {
-        code: Some("123456"),
-        ..FakeEdge::default()
-    });
     let gmail = Arc::new(FakeRefresher::default());
     let login = Arc::new(FakeLogin::answering(Err(LoginError::InvalidCredentials)));
     let (app, state) = engine_app_with(
-        edge.clone(),
+        Arc::default(),
         login.clone(),
         gmail.clone(),
         vtop_core::VtopConfig::default(),
@@ -503,14 +442,8 @@ async fn gmail_picked_on_the_phone_skips_forwarding() {
     .await;
     let vault = body["sealedVault"].as_str().unwrap();
     assert_eq!(opened(&state, vault).otp, Some(OtpMethod::Gmail));
-    post(
-        &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
-        json!({"account": REG, "sealedVault": vault, "requestId": "r"}),
-    )
-    .await;
-    assert!(wait_for_done(&edge).await.outcome == LoginOutcome::InvalidCredentials);
+    let body = json!({"account": REG, "sealedVault": vault, "forwarding": true});
+    assert!(done(step(&app, body).await) == LoginOutcome::InvalidCredentials);
     assert_eq!(gmail.calls.load(Ordering::SeqCst), 1);
 }
 
@@ -518,16 +451,16 @@ async fn gmail_picked_on_the_phone_skips_forwarding() {
 async fn revoked_gmail_access_is_dropped_and_the_password_kept() {
     let login = Arc::new(FakeLogin::default());
     let (outcome, state) = sign_in_once(
-        no_mailbox(),
         login.clone(),
         Arc::new(FakeRefresher {
             revoked: true,
             ..FakeRefresher::default()
         }),
         Some(json!({"refreshToken": "r", "clientId": "c"})),
+        false,
     )
     .await;
-    let LoginOutcome::GmailRevoked { sealed_vault } = outcome else {
+    let LoginOutcome::GmailRevoked { sealed_vault } = done(outcome) else {
         panic!("not revoked");
     };
     let vault = opened(&state, &sealed_vault);
@@ -543,38 +476,16 @@ async fn revoked_gmail_access_is_dropped_and_the_password_kept() {
 #[tokio::test]
 async fn neither_forwarding_nor_gmail_means_no_server_sign_in() {
     let login = Arc::new(FakeLogin::default());
-    let (outcome, _) = sign_in_once(no_mailbox(), login.clone(), Arc::default(), None).await;
-    assert!(outcome == LoginOutcome::ForwardingRequired);
+    let (outcome, _) = sign_in_once(login.clone(), Arc::default(), None, false).await;
+    assert!(done(outcome) == LoginOutcome::ForwardingRequired);
     assert_eq!(login.calls(), 0);
-}
-
-#[tokio::test]
-async fn codes_skip_what_vtop_rejected() {
-    let edge = Arc::new(FakeEdge {
-        code: Some("111111"),
-        ..FakeEdge::default()
-    });
-    let codes = ForwardedCodes::new(edge, "owner".into());
-    assert_eq!(
-        codes
-            .next(1_000, Duration::from_secs(3), Vec::new())
-            .await
-            .as_deref(),
-        Some("111111")
-    );
-    assert_eq!(
-        codes
-            .next(1_000, Duration::from_millis(1500), vec!["111111".into()])
-            .await,
-        None
-    );
 }
 
 // ---- phone sign-in and fetches (`vtop_login`, `fetch`) ----------------
 
 fn phone_app() -> axum::Router {
     engine_app(
-        Arc::new(FakeEdge::default()),
+        Arc::default(),
         FakeLogin::answering(Err(LoginError::InvalidCredentials)),
     )
     .0
@@ -708,7 +619,7 @@ async fn vtop_with_semesters() -> (wiremock::MockServer, axum::Router) {
         ..Default::default()
     };
     let app = engine_app_on(
-        Arc::new(FakeEdge::default()),
+        Arc::default(),
         FakeLogin::answering(Err(LoginError::InvalidCredentials)),
         config,
     )
@@ -824,4 +735,92 @@ async fn another_dictionary_gets_plain_json() {
         assert_eq!(response.headers()["content-type"], "application/json");
         assert_eq!(response.headers()["content-encoding"], "br");
     }
+}
+
+thread_local! {
+    /// What this thread's log lines are written into, while a test reads them.
+    static CAPTURED: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Writes into this thread's `CAPTURED`, if it is capturing.
+struct ThreadCapture;
+
+impl std::io::Write for ThreadCapture {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        CAPTURED.with_borrow_mut(|captured| {
+            if let Some(buffer) = captured {
+                buffer.extend_from_slice(bytes);
+            }
+        });
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// The access line of one `/healthz` call with these headers, as logged.
+///
+/// One global subscriber rather than a scoped one per test: a scoped one
+/// races the other tests' threads, which cache the access callsite as off
+/// while no subscriber is set. The test runtime runs on this thread, so the
+/// thread-local buffer gets exactly this call's lines.
+async fn access_line(headers: &[(&str, &str)]) -> String {
+    static GLOBAL: std::sync::Once = std::sync::Once::new();
+    GLOBAL.call_once(|| {
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_writer(|| ThreadCapture)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("no other test sets a global subscriber");
+    });
+    CAPTURED.with_borrow_mut(|captured| *captured = Some(Vec::new()));
+    let (app, _) = engine_app(Arc::default(), FakeLogin::default());
+    let mut request = Request::builder().uri("/healthz");
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+    let response = app
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = CAPTURED.with_borrow_mut(Option::take).unwrap_or_default();
+    String::from_utf8(bytes).unwrap()
+}
+
+#[tokio::test]
+async fn access_line_carries_the_callers_flow_and_regno() {
+    let line = access_line(&[("x-vtop-flow", "sync-3f2a:1"), ("x-vtop-regno", REG)]).await;
+    assert!(
+        line.contains(&format!("request{{flow=sync-3f2a:1 regno={REG}}}")),
+        "{line}"
+    );
+    assert!(line.contains("GET /healthz 200"), "{line}");
+}
+
+#[tokio::test]
+async fn trace_headers_that_are_not_short_and_plain_are_left_out() {
+    let long = "f".repeat(65);
+    let line = access_line(&[("x-vtop-flow", &long), ("x-vtop-regno", "22BCE 0001\"")]).await;
+    assert!(!line.contains("flow="), "{line}");
+    assert!(!line.contains("regno="), "{line}");
+    assert!(line.contains("GET /healthz 200"), "{line}");
+}
+
+#[test]
+fn trace_value_takes_only_short_plain_values() {
+    let value = |text: &str| axum::http::HeaderValue::from_str(text).unwrap();
+    assert_eq!(
+        crate::trace_value(Some(&value("a-b_c.d:1")), 64).as_deref(),
+        Some("a-b_c.d:1")
+    );
+    assert_eq!(crate::trace_value(Some(&value("abc")), 2), None);
+    for bad in ["", "a b", "a/b", "ünï", "x=1"] {
+        let header = axum::http::HeaderValue::from_bytes(bad.as_bytes()).unwrap();
+        assert_eq!(crate::trace_value(Some(&header), 64), None, "{bad}");
+    }
+    assert_eq!(crate::trace_value(None, 64), None);
 }

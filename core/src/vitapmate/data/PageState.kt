@@ -80,13 +80,22 @@ inline fun <T> orNull(block: () -> T): T? = try {
 }
 
 /**
+ * [cause] of a call to our server in [flow], as the Server and Connected apps screens get it
+ * back, so their problem view's Details opens that flow.
+ */
+class ServerFailure(val flow: String, override val cause: Throwable) : Exception(cause) {
+    val problem get() = problemOf(cause, flow, server = true)
+}
+
+/**
  * The one mapping from a failure to a [Problem] (texts from the Flutter app's `app_errors.dart`
  * and `common_toast.dart`). Anything that is not a [CoreException] is [ProblemKind.Unexpected].
+ * [server]: the call went to our server, not VTOP, so its failures don't blame VTOP.
  */
-fun problemOf(e: Throwable, flow: String): Problem {
+fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem {
     fun p(kind: ProblemKind, title: String, message: String, retryable: Boolean = true) = Problem(kind, title, message, flow, retryable)
     return when (e) {
-        is CoreException.Offline -> p(ProblemKind.Offline, "No Internet Connection", "We couldn't reach VTOP. Check your internet connection and try again.")
+        is CoreException.Offline -> p(ProblemKind.Offline, "No Internet Connection", "We couldn't reach ${if (server) "the server" else "VTOP"}. Check your internet connection and try again.")
         is CoreException.VtopUnavailable -> p(
             ProblemKind.VtopDown,
             "VTOP Is Down",
@@ -115,7 +124,7 @@ fun problemOf(e: Throwable, flow: String): Problem {
             retryable = false,
         )
         is CoreException.ConsentDenied -> p(ProblemKind.ConsentDenied, "Not Sent", "Not sent: your VTOP cookie stays on the phone.")
-        is CoreException.Other -> p(ProblemKind.Unexpected, "VTOP Problem", UNEXPECTED)
+        is CoreException.Other -> if (server) p(ProblemKind.Unexpected, "Server Problem", e.reason.trim().ifEmpty { UNEXPECTED }) else p(ProblemKind.Unexpected, "VTOP Problem", UNEXPECTED)
         else -> p(ProblemKind.Unexpected, "Something Went Wrong", UNEXPECTED)
     }
 }

@@ -780,7 +780,7 @@ fn sign_out_forgets_the_connection_choice() {
         shared_cache(),
     )
     .unwrap();
-    core.set_route("route-set".into(), route::Route::Proxy)
+    core.set_route("route-set".into(), route::Route::Server)
         .unwrap();
     assert!(dir.join(route::FILE).exists());
     core.sign_out("route-out".into());

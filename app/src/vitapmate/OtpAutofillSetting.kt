@@ -33,7 +33,7 @@ fun OtpAutofillSetting() {
     val hint = when (picked) {
         OtpSource.Forwarding -> when (forwarding?.state) {
             null -> "…"
-            ForwardingState.OFF -> "Off · OTPs are typed by hand"
+            ForwardingState.OFF -> "Mail forwarding · not set up yet, so OTPs are typed by hand"
             ForwardingState.WAITING -> "Mail forwarding · finish setting up in Gmail"
             ForwardingState.ON -> "Mail forwarding" + (forwarding.lastOtpAt?.let { " · last OTP ${ago(it)}" } ?: "")
         }

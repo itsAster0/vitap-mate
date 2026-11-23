@@ -1,20 +1,20 @@
 //! The engine's side of the edge: VTOP work and nothing else kept. The
 //! edge holds accounts, keys and requests; it asks here whose a session is,
 //! to seal saved credentials (only the engine has `VAULT_KEY`) and to sign
-//! in with them. A sign-in answers at once and reports to the edge when
-//! done; the OTP comes from the student's forwarded mail, sealed by the
-//! edge to a key made for that one sign-in, or, for students without a
-//! forwarding address, from their Gmail with the access sealed in their
-//! credentials.
+//! in with them. A sign-in runs one step per call and answers when the step
+//! is done: with the OTP read from the student's Gmail (with the access
+//! sealed in their credentials), the step signs in whole; with forwarded
+//! mail, it stops at VTOP's OTP and hands back the half-done sign-in sealed.
+//! Convex sends it back with the code when the mail comes.
 //!
 //! Routes (`Authorization: Bearer $INTERNAL_TOKEN`):
 //! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
-//! and `/engine/fetch-batch` (in `fetch`), `GET /engine/proof` (in `proof`), and
+//! and `/engine/fetch-batch` (in `fetch`), `GET /engine/proof` (in `proof`; the phone's own
+//! `GET /proof` there takes no token), and
 //! [`MAIL_OWNER`](vtop_shared::engine::MAIL_OWNER) (whose a session is, as
 //! an owner hash).
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -28,33 +28,34 @@ use serde_json::json;
 use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
-    GmailGrant, LOGIN_DONE, LoginDone, LoginOutcome, LoginStart, OTP_AWAIT, OtpAwait, OtpMethod,
-    SealVault, SealedVault, SessionCheck, SessionChecked, SessionStatus,
+    GmailGrant, LoginOutcome, OtpMethod, SealVault, SealedVault, SessionCheck, SessionChecked,
+    SessionStatus,
 };
-use vtop_shared::mail_seal;
 use vtop_shared::mailbox::owner_hash;
 use vtop_shared::tokens;
 
 use crate::AppState;
 use crate::error::ApiError;
 use crate::gmail::{GmailCodes, RefreshError};
-use crate::login::{LoginError, OtpCodes};
+use crate::login::{LoginError, Started};
+use crate::proof::{PROOF_DONE, PROOF_TICKET, ProofDone};
 use crate::verify::VerifyError;
 
-/// What the engine asks of the edge.
+/// What the engine asks of the edge (or of Convex, which serves the same internal routes).
 #[async_trait]
 pub trait EdgeLink: Send + Sync {
-    /// The next forwarded mail of `request.owner_hash`, sealed to
-    /// `request.public_key`; `None` when nothing came in time.
-    async fn await_otp(&self, request: &OtpAwait) -> Result<Option<String>, EdgeError>;
-    async fn login_done(&self, done: &LoginDone) -> Result<(), EdgeError>;
+    /// Uses up a proof ticket: the device it was issued to, or `None` when it is unknown,
+    /// used or expired.
+    async fn proof_ticket(&self, ticket: &str) -> Result<Option<String>, EdgeError>;
+    /// The verdict on a ticket's proof.
+    async fn proof_done(&self, done: &ProofDone) -> Result<(), EdgeError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EdgeError {
-    /// The student has no forwarding address.
-    NoMailbox,
     Unavailable(String),
+    /// Convex is at its proof cap for everyone (429).
+    Busy,
 }
 
 /// The edge over HTTPS, with `Authorization: Bearer $INTERNAL_TOKEN`.
@@ -83,126 +84,46 @@ impl HttpEdge {
 
 #[async_trait]
 impl EdgeLink for HttpEdge {
-    async fn await_otp(&self, request: &OtpAwait) -> Result<Option<String>, EdgeError> {
-        let response = self.post(OTP_AWAIT, request).await?;
-        match response.status().as_u16() {
-            200 => {
-                let body: vtop_shared::engine::OtpAwaited = response
-                    .json()
-                    .await
-                    .map_err(|error| EdgeError::Unavailable(error.to_string()))?;
-                Ok(body.sealed)
-            }
-            404 => Err(EdgeError::NoMailbox),
-            status => Err(EdgeError::Unavailable(format!("edge answered {status}"))),
+    async fn proof_ticket(&self, ticket: &str) -> Result<Option<String>, EdgeError> {
+        #[derive(Deserialize)]
+        struct Ticketed {
+            device: String,
         }
+        let response = self
+            .post(PROOF_TICKET, &json!({ "ticket": ticket }))
+            .await?;
+        match response.status().as_u16() {
+            404 => return Ok(None),
+            429 => return Err(EdgeError::Busy),
+            _ => {}
+        }
+        succeeded(&response)?;
+        let body: Ticketed = response
+            .json()
+            .await
+            .map_err(|error| EdgeError::Unavailable(error.without_url().to_string()))?;
+        Ok(Some(body.device))
     }
 
-    async fn login_done(&self, done: &LoginDone) -> Result<(), EdgeError> {
-        let response = self.post(LOGIN_DONE, done).await?;
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            Err(EdgeError::Unavailable(format!(
-                "edge answered {}",
-                response.status()
-            )))
-        }
+    async fn proof_done(&self, done: &ProofDone) -> Result<(), EdgeError> {
+        let response = self.post(PROOF_DONE, done).await?;
+        succeeded(&response)
     }
 }
 
-/// OTP codes from forwarded mail, opened with a key made for this sign-in.
-pub struct ForwardedCodes {
-    edge: Arc<dyn EdgeLink>,
-    owner_hash: String,
-    secret: String,
-    public_key: String,
-    /// Set when the edge says the student has no forwarding address.
-    pub no_mailbox: AtomicBool,
+fn succeeded(response: &reqwest::Response) -> Result<(), EdgeError> {
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(EdgeError::Unavailable(format!(
+            "edge answered {}",
+            response.status()
+        )))
+    }
 }
 
 /// Mail dates come from VTOP's clock; allow it to run a little behind.
 const CLOCK_SLACK_SECS: u64 = 120;
-/// How long one wait at the edge lasts; the edge's own limit is shorter
-/// than a request may take.
-const AWAIT_STEP_SECS: u64 = 25;
-
-impl ForwardedCodes {
-    pub fn new(edge: Arc<dyn EdgeLink>, owner_hash: String) -> Self {
-        let (secret, public_key) = mail_seal::generate_keypair();
-        Self {
-            edge,
-            owner_hash,
-            secret,
-            public_key,
-            no_mailbox: AtomicBool::new(false),
-        }
-    }
-
-    /// Tells the edge to keep this sign-in's codes from now on, before VTOP
-    /// is asked for one, so a mail that comes quickly is not missed.
-    pub async fn register(&self) -> Result<(), EdgeError> {
-        let request = OtpAwait {
-            owner_hash: self.owner_hash.clone(),
-            public_key: self.public_key.clone(),
-            since: vtop_core::now_unix().saturating_sub(CLOCK_SLACK_SECS),
-            wait_secs: 0,
-        };
-        self.edge.await_otp(&request).await.map(|_| ())
-    }
-
-    /// The code in a sealed mail payload, if it is a VTOP OTP.
-    fn open(&self, sealed: &str) -> Option<String> {
-        #[derive(Deserialize)]
-        struct Payload {
-            kind: String,
-            #[serde(default)]
-            code: Option<String>,
-        }
-        let plaintext = mail_seal::open(&self.secret, &self.owner_hash, sealed).ok()?;
-        let payload: Payload = serde_json::from_slice(&plaintext).ok()?;
-        (payload.kind == "otp").then_some(payload.code?)
-    }
-}
-
-#[async_trait]
-impl OtpCodes for ForwardedCodes {
-    async fn next(
-        &self,
-        issued_at: u64,
-        remaining: Duration,
-        tried: Vec<String>,
-    ) -> Option<String> {
-        let deadline = tokio::time::Instant::now() + remaining;
-        loop {
-            let left = deadline.saturating_duration_since(tokio::time::Instant::now());
-            if left < Duration::from_secs(1) {
-                return None;
-            }
-            let request = OtpAwait {
-                owner_hash: self.owner_hash.clone(),
-                public_key: self.public_key.clone(),
-                since: issued_at.saturating_sub(CLOCK_SLACK_SECS),
-                wait_secs: left.as_secs().min(AWAIT_STEP_SECS),
-            };
-            match self.edge.await_otp(&request).await {
-                Ok(Some(sealed)) => match self.open(&sealed) {
-                    Some(code) if !tried.contains(&code) => return Some(code),
-                    _ => {}
-                },
-                Ok(None) => {}
-                Err(EdgeError::NoMailbox) => {
-                    self.no_mailbox.store(true, Ordering::SeqCst);
-                    return None;
-                }
-                Err(EdgeError::Unavailable(reason)) => {
-                    tracing::info!("engine: waiting for a forwarded OTP: {reason}");
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                }
-            }
-        }
-    }
-}
 
 /// Saved credentials, sealed to `accounts/<id>`. No `Debug`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -307,7 +228,15 @@ pub async fn session(
                 .accounts_sealer()
                 .open_json::<SessionState>(&accounts_aad(&account), sealed)
             {
-                Ok(session) => (cookies_only(&session.cookies), Some(account)),
+                // Its CSRF token too: handed back with the cached session, it saves the
+                // caller a trip to VTOP for one.
+                Ok(session) => (
+                    SessionState {
+                        csrf_token: session.csrf_token,
+                        ..cookies_only(&session.cookies)
+                    },
+                    Some(account),
+                ),
                 Err(_) => return Ok(Json(checked(SessionStatus::Expired)).into_response()),
             }
         }
@@ -372,86 +301,147 @@ pub async fn seal(
     Ok(Json(SealedVault { sealed_vault }).into_response())
 }
 
-/// Starts a sign-in with saved credentials; the outcome goes to the edge.
+/// One step of a sign-in with saved credentials: the first (`sealed_vault`,
+/// and whether the student has a forwarding address), or the next with the
+/// mailed `otp` (`sealed_state` from [`LoginStepped::OtpNeeded`]). No `Debug`.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginStep {
+    account: String,
+    #[serde(default)]
+    sealed_vault: Option<String>,
+    #[serde(default)]
+    forwarding: bool,
+    #[serde(default)]
+    sealed_state: Option<String>,
+    #[serde(default)]
+    otp: Option<String>,
+}
+
+/// How a step ended: done, or waiting for the OTP mail. No `Debug`.
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum LoginStepped {
+    #[serde(rename_all = "camelCase")]
+    OtpNeeded {
+        status: &'static str,
+        /// [`Pending`], sealed to the account.
+        sealed_state: String,
+        /// Only mail sent from then on (unix seconds) can hold the code.
+        since: u64,
+    },
+    Done(LoginOutcome),
+}
+
+/// A sign-in waiting for its OTP, between two steps. No `Debug`.
+#[derive(Serialize, Deserialize)]
+struct Pending {
+    session: SessionState,
+    since: u64,
+    /// Codes VTOP turned down, so a mail sent again is not tried again.
+    tried: Vec<String>,
+}
+
+/// What a waiting sign-in is sealed to, apart from saved sessions.
+fn logins_aad(account: &str) -> String {
+    format!("logins/{account}")
+}
+
+/// Runs one step of a sign-in with saved credentials and answers how it
+/// ended; nothing waits here for mail.
 pub async fn login(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    body: Result<Json<LoginStart>, JsonRejection>,
+    body: Result<Json<LoginStep>, JsonRejection>,
 ) -> Result<Response, ApiError> {
     require_secret(&state, &headers)?;
-    let Json(start) = body.map_err(|_| bad_request("Invalid JSON body."))?;
-    let edge = state.edge.clone();
-    let account = account_id(&start.account);
-    tokio::spawn(async move {
-        let outcome = sign_in(&state, edge.clone(), &account, &start.sealed_vault).await;
-        let done = LoginDone {
-            account: account.clone(),
-            request_id: start.request_id,
-            outcome,
-        };
-        // The edge's request times out on its own if this never lands.
-        for attempt in 0..3 {
-            match edge.login_done(&done).await {
-                Ok(()) => return,
-                Err(error) => {
-                    tracing::warn!(
-                        "engine: report sign-in of {account} (try {attempt}): {error:?}"
-                    );
-                    tokio::time::sleep(Duration::from_secs(2)).await;
-                }
-            }
+    let Json(step) = body.map_err(|_| bad_request("Invalid JSON body."))?;
+    let account = account_id(&step.account);
+    let stepped = match (step.sealed_state, step.otp, step.sealed_vault) {
+        (Some(pending), Some(otp), _) => resume(&state, &account, &pending, otp.trim()).await,
+        (None, None, Some(vault)) => start(&state, &account, &vault, step.forwarding).await,
+        _ => {
+            return Err(bad_request(
+                "sealedVault, or sealedState and otp, are required.",
+            ));
         }
-    });
-    Ok(StatusCode::ACCEPTED.into_response())
+    };
+    Ok(Json(stepped).into_response())
 }
 
-async fn sign_in(
+async fn start(
     state: &AppState,
-    edge: Arc<dyn EdgeLink>,
     account: &str,
     sealed_vault: &str,
-) -> LoginOutcome {
+    forwarding: bool,
+) -> LoginStepped {
     let Ok(vault) = state
         .accounts_sealer()
         .open_json::<Vault>(&accounts_aad(account), sealed_vault)
     else {
-        return LoginOutcome::VaultUnusable;
+        return LoginStepped::Done(LoginOutcome::VaultUnusable);
     };
     // Gmail when the phone picked it; else forwarding first, Gmail only
-    // for students without it.
-    if vault.otp == Some(OtpMethod::Gmail)
-        && let Some(grant) = vault.gmail.clone().and_then(GmailGrant::usable)
-    {
-        return sign_in_with_gmail(state, account, vault, grant).await;
-    }
-    let codes = ForwardedCodes::new(edge, owner_hash(&state.config.vault_key, account));
-    match codes.register().await {
-        Ok(()) => {}
-        // No forwarding address: VTOP is not asked unless Gmail can read
-        // the OTP (it would mail one nobody can read here).
-        Err(EdgeError::NoMailbox) => {
-            return match vault.gmail.clone().and_then(GmailGrant::usable) {
-                Some(grant) => sign_in_with_gmail(state, account, vault, grant).await,
-                None => LoginOutcome::ForwardingRequired,
-            };
+    // for students without it. Without either VTOP is not asked: it would
+    // mail an OTP nobody can read here.
+    match vault.gmail.clone().and_then(GmailGrant::usable) {
+        Some(grant) if vault.otp == Some(OtpMethod::Gmail) || !forwarding => {
+            return LoginStepped::Done(sign_in_with_gmail(state, account, vault, grant).await);
         }
-        Err(EdgeError::Unavailable(reason)) => {
-            tracing::info!("engine: could not register for {account}'s OTP: {reason}");
-        }
+        None if !forwarding => return LoginStepped::Done(LoginOutcome::ForwardingRequired),
+        _ => {}
     }
-    let result = state
+    match state
         .forwarded_login
-        .login(
-            &vault.username,
-            &vault.password,
-            &codes,
-            state.config.otp_wait,
-        )
-        .await;
-    if matches!(result, Err(LoginError::Failed(_))) && codes.no_mailbox.load(Ordering::SeqCst) {
-        return LoginOutcome::ForwardingRequired;
+        .start(&vault.username, &vault.password)
+        .await
+    {
+        Ok(Started::SignedIn(session)) => {
+            LoginStepped::Done(signed_in(state, account, Ok(session)))
+        }
+        Ok(Started::OtpNeeded { session, issued_at }) => {
+            let pending = Pending {
+                session,
+                since: issued_at.saturating_sub(CLOCK_SLACK_SECS),
+                tried: Vec::new(),
+            };
+            otp_needed(state, account, &pending)
+        }
+        Err(error) => LoginStepped::Done(signed_in(state, account, Err(error))),
     }
-    signed_in(state, account, result)
+}
+
+/// Sends the mailed code on the waiting sign-in; one VTOP turns down (an
+/// older mail's) leaves it waiting for the next mail.
+async fn resume(state: &AppState, account: &str, sealed: &str, code: &str) -> LoginStepped {
+    let Ok(mut pending) = state
+        .accounts_sealer()
+        .open_json::<Pending>(&logins_aad(account), sealed)
+    else {
+        return LoginStepped::Done(LoginOutcome::Failed {
+            reason: "login_expired: the waiting sign-in does not open".into(),
+        });
+    };
+    if pending.tried.iter().any(|tried| tried == code) {
+        return otp_needed(state, account, &pending);
+    }
+    match state.forwarded_login.submit(&pending.session, code).await {
+        Err(LoginError::OtpRejected) => {
+            pending.tried.push(code.to_string());
+            otp_needed(state, account, &pending)
+        }
+        result => LoginStepped::Done(signed_in(state, account, result)),
+    }
+}
+
+fn otp_needed(state: &AppState, account: &str, pending: &Pending) -> LoginStepped {
+    LoginStepped::OtpNeeded {
+        status: "otp_needed",
+        sealed_state: state
+            .accounts_sealer()
+            .seal_json(&logins_aad(account), pending),
+        since: pending.since,
+    }
 }
 
 /// Signs in with the OTP read from the student's Gmail. Access Google
@@ -522,6 +512,10 @@ fn signed_in(
             }
         }
         Err(LoginError::InvalidCredentials) => LoginOutcome::InvalidCredentials,
+        // Only a later step sends an OTP of its own; Gmail's are tried in its sign-in.
+        Err(LoginError::OtpRejected) => LoginOutcome::Failed {
+            reason: "otp_rejected: VTOP did not take the OTP".into(),
+        },
         Err(LoginError::Failed(reason)) => {
             tracing::info!("engine: sign-in of {account} failed for now: {reason}");
             LoginOutcome::Failed { reason }

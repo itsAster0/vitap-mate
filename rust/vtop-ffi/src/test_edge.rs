@@ -1,114 +1,229 @@
-//! A stand-in edge for tests: a local HTTP server answering the routes the app calls (and
-//! VTOP's session check), checking each request's device signature as the edge does.
+//! A stand-in server for tests: a fake Convex backend answering the functions the app calls by
+//! name, checking `signed` calls' signatures and that `jwt` calls go with a JWT, as the server
+//! does; plus a local HTTP server for VTOP's session check and the public HTTP actions. A core
+//! whose server (`SERVER_FILE`) is one [`serve`] made uses its fake backend.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use vtop_shared::device_sig;
 
 use crate::Core;
+use crate::convex::CallError;
+use crate::remote::backend::{Backend, Kind, Refresh};
 use crate::remote::forwarding::GONE;
 
-/// One request the fake edge got.
+/// One call the fake server got.
 pub(crate) struct Request {
+    /// The function (`mail:inbox`), or an HTTP path.
     pub(crate) path: String,
-    /// `x-request-id`.
     pub(crate) flow: String,
+    /// The arguments without `flow`; a signed call's payload.
     pub(crate) body: Value,
-    /// Whether `x-vm-*` verified against the registered key (or, for registration, the key
-    /// it registers), with `x-vm-device` only off registration.
+    /// A signed call: its signature verified. Any other: it went with a JWT.
     pub(crate) signed: bool,
 }
 
-/// A stand-in edge: answers the routes the app calls, from `Edge`.
+/// A stand-in server: answers the functions the app calls, from `Edge`.
 #[derive(Default)]
 pub(crate) struct Edge {
     pub(crate) requests: Vec<Request>,
-    /// Answers for other routes (path with query), taken in order before the built-in ones.
+    /// Answers by function (or HTTP path), taken in order before the built-in ones; a status
+    /// of 300 or more throws the body as a `ConvexError`.
     pub(crate) canned: HashMap<String, VecDeque<(u16, Value)>>,
-    /// The registered `signKey` and `sealKey`.
-    pub(crate) sign_key: Option<String>,
+    /// The `sealKey` the last `auth:token` sent.
     pub(crate) seal_key: Option<String>,
     pub(crate) sealed: Option<String>,
     pub(crate) gone: bool,
-    /// An account token to hand back, as a renewal, on answers to calls with one.
-    pub(crate) issue: Option<String>,
+    /// Where `mail:join` finds the student's address once this install's went (`gone`); none:
+    /// the student has no address.
+    pub(crate) moved_to: Option<String>,
+    /// The JWT the client goes with.
+    pub(crate) auth: Option<String>,
+    /// JWTs issued so far.
+    pub(crate) issued: u32,
 }
 
 pub(crate) const ID: &str = "k3f9x2ab7q";
-pub(crate) const DEVICE_ID: &str = "0123456789abcdef0123456789abcdef";
-/// The account-proof challenge `/v1/account/prove/start` hands out.
+/// The ticket `auth:proveStart` hands out.
 pub(crate) const CHALLENGE: &str = "00112233445566778899aabbccddeeff";
+/// The refresh token [`keep_token`] keeps.
+pub(crate) const REFRESH: &str = "vrt_kept";
 
-fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
-    head.lines().find_map(|line| {
-        let (key, value) = line.split_once(':')?;
-        key.eq_ignore_ascii_case(name).then(|| value.trim())
-    })
+/// Functions that take a signature, not a JWT.
+const SIGNED: [&str; 5] = [
+    "auth:proveStart",
+    "auth:token",
+    "vtop:login",
+    "vtop:loginOtp",
+    "vtop:loginResend",
+];
+/// Functions anyone may call.
+const PUBLIC: [&str; 4] = [
+    "udp:keys",
+    "guides:demo",
+    "guides:updates",
+    "guides:forwarding",
+];
+
+/// The fake server behind every core whose server is one [`serve`] made.
+static EDGES: Mutex<Vec<(String, Arc<Mutex<Edge>>)>> = Mutex::new(Vec::new());
+
+/// The fake backend of `server`, if [`serve`] made it.
+pub(crate) fn backend_for(server: &str) -> Option<Arc<dyn Backend>> {
+    let edges = EDGES.lock().unwrap();
+    let edge = edges.iter().find(|(url, _)| url == server)?.1.clone();
+    Some(Arc::new(Fake(edge)))
 }
 
-/// Checks the vm1 headers the way the edge does.
-fn verify(edge: &Edge, path: &str, head: &str, body: &[u8], json: &Value) -> bool {
-    let register = path == "/v1/devices/register";
-    let key = if register {
-        json["signKey"].as_str()
-    } else {
-        edge.sign_key.as_deref()
-    };
-    let device_ok = match header(head, device_sig::DEVICE) {
-        None => register,
-        Some(id) => !register && id == DEVICE_ID,
-    };
-    let time = header(head, device_sig::TIME).and_then(|t| t.parse::<i64>().ok());
-    let fresh = time.is_some_and(|t| (t - now()).abs() <= 120);
-    match (key, header(head, device_sig::SIG), time) {
-        (Some(key), Some(sig), Some(time)) => {
-            device_ok && fresh && device_sig::verify(key, sig, "POST", path, time, body)
-        }
-        _ => false,
+struct Fake(Arc<Mutex<Edge>>);
+
+impl Backend for Fake {
+    fn run<'a>(
+        &'a self,
+        _kind: Kind,
+        path: &'a str,
+        mut args: Value,
+    ) -> BoxFuture<'a, Result<Value, CallError>> {
+        let mut edge = self.0.lock().unwrap();
+        let flow = args
+            .as_object_mut()
+            .and_then(|args| args.remove("flow"))
+            .and_then(|flow| flow.as_str().map(str::to_string))
+            .unwrap_or_default();
+        let (body, signed) = match args.get("signed") {
+            Some(signed) => {
+                let payload = args["payload"].as_str().unwrap_or_default().to_string();
+                let text = |key: &str| signed[key].as_str().unwrap_or_default().to_string();
+                let time = signed["time"].as_i64().unwrap_or_default();
+                if (time - now()).abs() > 120 {
+                    let stale = json!({ "code": "stale_time", "serverTime": now() });
+                    edge.requests.push(Request {
+                        path: path.to_string(),
+                        flow,
+                        body: Value::Null,
+                        signed: false,
+                    });
+                    return Box::pin(async move { Err(convex(stale)) });
+                }
+                let ok = device_sig::verify(
+                    &text("key"),
+                    &text("sig"),
+                    "CALL",
+                    &format!("/{path}"),
+                    time,
+                    payload.as_bytes(),
+                );
+                (serde_json::from_str(&payload).unwrap_or(Value::Null), ok)
+            }
+            None => (args, edge.auth.is_some()),
+        };
+        let reply = if PUBLIC.contains(&path) {
+            answer(&mut edge, path, &body)
+        } else if !signed && SIGNED.contains(&path) {
+            Err(convex(
+                json!({ "code": "bad_signature", "error": "Bad signature." }),
+            ))
+        } else if !signed {
+            Err(convex(
+                json!({ "code": "unauthenticated", "error": "Sign in first." }),
+            ))
+        } else {
+            answer(&mut edge, path, &body)
+        };
+        edge.requests.push(Request {
+            path: path.to_string(),
+            flow,
+            body,
+            signed,
+        });
+        Box::pin(async move { reply })
+    }
+
+    fn set_auth(&self, jwt: Option<String>) {
+        self.0.lock().unwrap().auth = jwt;
+    }
+
+    /// Answers once, at once, as the query's first result.
+    fn watch(&self, path: &str, args: Value, on_update: crate::remote::backend::OnUpdate) -> u64 {
+        let answer = self.run(Kind::Query, path, args).now_or_never();
+        on_update(answer.unwrap_or(Err(CallError::Closed)));
+        0
+    }
+
+    fn unwatch(&self, _id: u64) {}
+}
+
+fn convex(data: Value) -> CallError {
+    CallError::Convex {
+        message: "Uncaught ConvexError".into(),
+        data,
     }
 }
 
-fn answer(edge: &mut Edge, path: &str, body: &Value) -> (u16, Value) {
-    let gone = (
-        404,
-        json!({ "code": GONE, "error": "No such forwarding address." }),
-    );
+fn answer(edge: &mut Edge, path: &str, body: &Value) -> Result<Value, CallError> {
+    if let Some(canned) = edge.canned.get_mut(path).and_then(VecDeque::pop_front) {
+        return match canned {
+            (status, body) if status >= 300 => Err(convex(body)),
+            (_, body) => Ok(body),
+        };
+    }
+    let gone = || {
+        Err(convex(
+            json!({ "code": GONE, "error": "No such forwarding address." }),
+        ))
+    };
     match path {
-        _ if edge.canned.get(path).is_some_and(|c| !c.is_empty()) => {
-            edge.canned.get_mut(path).unwrap().pop_front().unwrap()
+        "auth:proveStart" => Ok(json!({ "ticket": CHALLENGE, "expiresAt": 0 })),
+        "auth:token" => {
+            if let Some(seal) = body["device"]["sealKey"].as_str() {
+                edge.seal_key = Some(seal.to_string());
+            }
+            edge.issued += 1;
+            let regno = if body["demo"] == json!(true) {
+                "DEMO2026"
+            } else {
+                "22BCE0001"
+            };
+            Ok(json!({
+                "jwt": format!("jwt-{}", edge.issued),
+                "jwtExpiresAt": (now() + 900) * 1000,
+                "refreshToken": format!("vrt_{}", edge.issued),
+                "regno": regno,
+                "account": "acct1",
+            }))
         }
-        "/v1/devices/register" => {
-            edge.sign_key = body["signKey"].as_str().map(str::to_string);
-            edge.seal_key = body["sealKey"].as_str().map(str::to_string);
-            (201, json!({ "deviceId": DEVICE_ID }))
-        }
-        "/v1/account/prove/start" => (200, json!({ "challenge": CHALLENGE, "expiresAt": 0 })),
-        "/v1/mail-otp/reclaim" => gone,
-        "/v1/mail-otp/owner" => (204, Value::Null),
-        "/v1/mail-otp/register" => {
+        "mail:register" => {
             let address = format!("otp+{ID}@vmate.aster0.dev");
-            (201, json!({ "id": ID, "address": address }))
+            Ok(json!({ "id": ID, "address": address }))
         }
-        _ if edge.gone => gone,
-        "/v1/mail-otp/inbox" => match &edge.sealed {
-            Some(sealed) => (200, json!({ "sealed": sealed, "receivedAt": now() })),
-            None => (200, json!({ "sealed": null })),
+        "mail:join" if edge.gone => Ok(match &edge.moved_to {
+            Some(id) => json!({ "id": id, "address": format!("otp+{id}@vmate.aster0.dev") }),
+            None => Value::Null,
+        }),
+        _ if edge.gone && path.starts_with("mail:") => gone(),
+        "mail:inbox" => match &edge.sealed {
+            Some(sealed) => Ok(json!({ "sealed": sealed, "receivedAt": now() })),
+            None => Ok(json!({ "sealed": null })),
         },
-        "/v1/mail-otp/delete" | "/v1/mail-otp/leave" => (204, Value::Null),
-        _ => (
-            404,
-            json!({ "code": "not_found", "error": "No such route." }),
-        ),
+        "mail:remove" | "mail:leave" => Ok(Value::Null),
+        _ => Err(CallError::Message(format!(
+            "Could not find public function for '{path}'"
+        ))),
     }
 }
 
+/// A fake server: its URL, which also answers VTOP's session check and the public HTTP
+/// actions (from `canned`, by path).
 pub(crate) async fn serve(edge: Arc<Mutex<Edge>>) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
+    EDGES.lock().unwrap().push((url.clone(), edge.clone()));
     tokio::spawn(async move {
         loop {
             let (mut socket, _) = listener.accept().await.unwrap();
@@ -143,33 +258,23 @@ pub(crate) async fn serve(edge: Arc<Mutex<Edge>>) -> String {
                 .unwrap_or_default()
                 .to_string();
             let json: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
-            let (status, reply, issued) = {
+            let (status, reply) = {
                 let mut edge = edge.lock().unwrap();
-                let signed = verify(&edge, &path, &head, &body, &json);
-                let reply = if signed {
-                    answer(&mut edge, &path, &json)
-                } else {
-                    (
-                        401,
-                        json!({ "code": "bad_signature", "error": "Bad signature." }),
-                    )
-                };
-                let issued = match &edge.issue {
-                    Some(token) if json.get("accountToken").is_some() && reply.0 < 300 => {
-                        let at = (now() + 14 * 86_400) * 1000;
-                        format!(
-                            "x-vm-account-token: {token}\r\nx-vm-account-token-expires-at: {at}\r\n"
-                        )
-                    }
-                    _ => String::new(),
-                };
+                let reply = edge
+                    .canned
+                    .get_mut(&path)
+                    .and_then(VecDeque::pop_front)
+                    .unwrap_or((
+                        404,
+                        json!({ "code": "not_found", "error": "No such route." }),
+                    ));
                 edge.requests.push(Request {
                     path,
                     flow,
                     body: json,
-                    signed,
+                    signed: false,
                 });
-                (reply.0, reply.1, issued)
+                reply
             };
             let text = if reply.is_null() {
                 String::new()
@@ -177,7 +282,7 @@ pub(crate) async fn serve(edge: Arc<Mutex<Edge>>) -> String {
                 reply.to_string()
             };
             let response = format!(
-                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\n{issued}content-length: {}\r\nconnection: close\r\n\r\n{text}",
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{text}",
                 text.len()
             );
             socket.write_all(response.as_bytes()).await.unwrap();
@@ -186,10 +291,19 @@ pub(crate) async fn serve(edge: Arc<Mutex<Edge>>) -> String {
     url
 }
 
-/// A core signed in to VTOP at `base` (the mock edge also answers VTOP's session check).
+fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
+    head.lines().find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        key.eq_ignore_ascii_case(name).then(|| value.trim())
+    })
+}
+
+/// A core signed in to VTOP at `base` (the mock server also answers VTOP's session check),
+/// whose server is `base` too.
 pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
     use vtop_core::sync::RwLock;
     use vtop_core::{SessionState, VtopClient, VtopConfig};
+    std::fs::write(dir.join(crate::remote::edge::SERVER_FILE), &base).unwrap();
     let client = VtopClient::builder()
         .config(VtopConfig {
             base_url: base,
@@ -221,16 +335,20 @@ pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
     core
 }
 
-/// Keeps account token `tok` for the signed-in 22BCE0001 on `server`, as a proof would, so
-/// account calls go with it.
+/// Keeps refresh token [`REFRESH`] for 22BCE0001 on `server`, as a proof would, so jwt calls
+/// go without proving.
 pub(crate) fn keep_token(core: &Core, server: &str) {
-    let saved = crate::remote::account_token::Saved {
+    core.keep_refresh(Some(Refresh {
         server: server.into(),
-        registration_number: "22BCE0001".into(),
-        token: "tok".into(),
-        expires_at: (now() + 86_400) * 1000,
-    };
-    core.write_plain(crate::remote::account_token::FILE, &saved);
+        token: REFRESH.into(),
+        regno: "22BCE0001".into(),
+    }));
+}
+
+/// The functions (and paths) the fake server got, in order.
+pub(crate) fn paths(edge: &Arc<Mutex<Edge>>) -> Vec<String> {
+    let edge = edge.lock().unwrap();
+    edge.requests.iter().map(|r| r.path.clone()).collect()
 }
 
 pub(crate) fn now() -> i64 {

@@ -1,23 +1,19 @@
-//! This install as the edge knows it: an Ed25519 seed that signs every request
-//! (`vtop_shared::device_sig`), the X25519 key forwarded OTPs are sealed to, the id each server
-//! gave it, and the FCM token. All in `device.json`; nothing of it is ever logged. Every call to
-//! the edge goes through [`Core::edge_post`] or [`Core::edge_get`].
+//! This install as the server knows it: an Ed25519 seed that signs `signed` calls
+//! (`vtop_shared::device_sig`; the server's id for it is derived from its key), the X25519 key
+//! forwarded OTPs are sealed to, the refresh token `auth:token` gave it, and the FCM token. All in
+//! `device.json`; nothing of it is ever logged. Calls go through [`crate::remote::backend`].
 
-use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
+use std::sync::{Mutex, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
-use tracing::{info, warn};
-use vtop_core::client::Hop;
-use vtop_shared::{device_sig, mail_seal, page_dictionary};
+use tracing::info;
+use vtop_shared::{device_sig, mail_seal};
 
-use crate::{Core, CoreError, Shared, traced, transport, unix_now};
+use crate::remote::backend::{Kind, Refresh};
+use crate::{Core, CoreError, traced, unix_now};
 
 const FILE: &str = "device.json";
-const TIMEOUT: Duration = Duration::from_secs(10);
-const VTOP_TIMEOUT: Duration = Duration::from_secs(35);
 
 /// Serialises read-modify-write of [`FILE`].
 static LOCK: Mutex<()> = Mutex::new(());
@@ -28,9 +24,8 @@ pub(crate) struct Device {
     pub(crate) seed: String,
     pub(crate) seal_secret: String,
     pub(crate) seal_key: String,
-    /// Server URL → this install's id there.
     #[serde(default)]
-    ids: BTreeMap<String, String>,
+    pub(crate) refresh: Option<Refresh>,
     #[serde(default)]
     push_token: Option<String>,
     /// Seconds to add to this phone's clock, learnt from a `stale_time` answer.
@@ -62,115 +57,6 @@ impl From<EdgeError> for CoreError {
     }
 }
 
-pub(crate) struct Answer {
-    status: u16,
-    pub body: Value,
-    /// A page the engine packed with the page dictionary (`body` is then null).
-    pub packed: Option<Vec<u8>>,
-    /// An account token the edge issued, with its end in unix ms ([`crate::remote::account_token`]).
-    pub(crate) account_token: Option<(String, i64)>,
-}
-
-impl Answer {
-    fn text(&self, key: &str) -> Option<String> {
-        self.body.get(key)?.as_str().map(str::to_string)
-    }
-
-    fn error(&self) -> EdgeError {
-        let status = self.status;
-        EdgeError::Status {
-            code: self
-                .text("code")
-                .unwrap_or_else(|| format!("http_{status}")),
-            message: self
-                .text("error")
-                .unwrap_or_else(|| format!("The server answered HTTP {status}.")),
-        }
-    }
-}
-
-struct Request<'a> {
-    method: &'a str,
-    server: &'a str,
-    path: &'a str,
-    flow: &'a str,
-    body: &'a [u8],
-    timeout: Duration,
-}
-
-/// Sends `req` through the app's transport, with the flow as `x-request-id` and `headers`.
-async fn send(
-    shared: &Arc<Shared>,
-    req: &Request<'_>,
-    headers: Vec<(String, String)>,
-) -> Result<Answer, EdgeError> {
-    let offline = |error: &dyn std::fmt::Display| {
-        warn!(path = req.path, error = %error, "edge unreachable");
-        EdgeError::Offline
-    };
-    let transport = transport::current(shared).map_err(|error| offline(&error))?;
-    let mut all = vec![("x-request-id".into(), req.flow.into())];
-    if req.method == "POST" {
-        all.push(("content-type".into(), "application/json".into()));
-    }
-    all.extend(headers);
-    let hop = Hop {
-        method: req.method.into(),
-        url: format!("{}{}", req.server.trim_end_matches('/'), req.path),
-        headers: all,
-        body: req.body.to_vec(),
-        timeout: req.timeout,
-        connect_timeout: req.timeout.min(TIMEOUT),
-        download_to: None,
-    };
-    let response = transport.send(hop).await.map_err(|error| offline(&error))?;
-    let status = response.status;
-    let packed = response.header("content-type") == Some(page_dictionary::CONTENT_TYPE);
-    let account_token = response
-        .header("x-vm-account-token")
-        .zip(response.header("x-vm-account-token-expires-at"))
-        .and_then(|(token, at)| Some((token.to_string(), at.parse().ok()?)));
-    let bytes = response.bytes().await.ok();
-    if packed {
-        return Ok(Answer {
-            status,
-            body: Value::Null,
-            packed: bytes,
-            account_token,
-        });
-    }
-    // 204 has no body.
-    let body = bytes
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or(Value::Null);
-    Ok(Answer {
-        status,
-        body,
-        packed: None,
-        account_token,
-    })
-}
-
-/// The vm1 headers; `id` is None for registration, which the new key signs on its own.
-fn signed(
-    seed: &str,
-    id: Option<&str>,
-    method: &str,
-    path: &str,
-    time: i64,
-    body: &[u8],
-) -> Vec<(String, String)> {
-    let sig = device_sig::sign(seed, method, path, time, body).unwrap_or_default();
-    let mut headers = vec![
-        (device_sig::TIME.into(), time.to_string()),
-        (device_sig::SIG.into(), sig),
-    ];
-    if let Some(id) = id {
-        headers.push((device_sig::DEVICE.into(), id.into()));
-    }
-    headers
-}
-
 impl Core {
     /// This install's keys, made on first use.
     pub(crate) fn device(&self) -> Device {
@@ -183,7 +69,7 @@ impl Core {
             seed: device_sig::generate_seed(),
             seal_secret,
             seal_key,
-            ids: BTreeMap::new(),
+            refresh: None,
             push_token: None,
             clock_offset: 0,
         };
@@ -200,280 +86,62 @@ impl Core {
         }
     }
 
-    /// This install's id on `server` (None before it registered there), and whether it has an
-    /// FCM token.
-    pub(crate) fn registration(&self, server: &str) -> (Option<String>, bool) {
+    /// This install's id on the server (derived from its key) and whether it has an FCM token.
+    pub(crate) fn registration(&self) -> (String, bool) {
         let device = self.device();
-        (device.ids.get(server).cloned(), device.push_token.is_some())
+        let key = device_sig::public_key(&device.seed).unwrap_or_default();
+        let id = device_sig::device_id(&key).unwrap_or_default();
+        (id, device.push_token.is_some())
     }
 
-    /// Forgets this install's id on `server` (the edge deleted it); the next call registers
-    /// afresh.
-    pub(crate) fn forget_device_id(&self, server: &str) {
-        self.update_device(|d| {
-            d.ids.remove(server);
-        });
+    /// Keeps (or, None, drops) the refresh token.
+    pub(crate) fn keep_refresh(&self, refresh: Option<Refresh>) {
+        self.device();
+        self.update_device(|d| d.refresh = refresh);
     }
 
-    /// Current unix time in seconds adjusted for the edge's clock (`unix_now() + clock_offset`).
+    /// Current unix time in seconds adjusted for the server's clock (`unix_now() + clock_offset`).
     pub(crate) fn server_now(&self) -> i64 {
         unix_now().saturating_add(self.device().clock_offset)
     }
 
-    #[cfg(test)]
     pub(crate) fn set_clock_offset(&self, offset: i64) {
         self.device();
         self.update_device(|d| d.clock_offset = offset);
     }
 
-    /// This install's id on `server`, registering it there first if needed.
-    pub(crate) async fn device_id(&self, server: &str, flow: &str) -> Result<String, EdgeError> {
+    /// `device` for `auth:token`: what the server keeps about this install.
+    pub(crate) fn device_info(&self) -> Value {
         let device = self.device();
-        if let Some(id) = device.ids.get(server) {
-            return Ok(id.clone());
-        }
-        let path = "/v1/devices/register";
-        let sign_key = device_sig::public_key(&device.seed).unwrap_or_default();
-        let mut body = json!({
-            "signKey": sign_key,
+        let mut info = json!({
             "sealKey": device.seal_key,
-            "label": crate::remote::server::label(),
             "platform": "android",
+            "label": crate::remote::server::label(),
         });
         if let Some(token) = &device.push_token {
-            crate::json_set(&mut body, "fcmToken", json!(token));
+            crate::json_set(&mut info, "fcmToken", json!(token));
         }
-        let bytes = serde_json::to_vec(&body).unwrap_or_default();
-        let req = Request {
-            method: "POST",
-            server,
-            path,
-            flow,
-            body: &bytes,
-            timeout: TIMEOUT,
-        };
-        let answer = self.signed_send(&req, None).await?;
-        if !(200..300).contains(&answer.status) {
-            return Err(answer.error());
-        }
-        let id = answer.text("deviceId").ok_or_else(|| EdgeError::Status {
-            code: "bad_answer".into(),
-            message: "The server sent an unexpected answer.".into(),
-        })?;
-        self.update_device(|d| {
-            d.ids.insert(server.to_string(), id.clone());
-        });
-        info!("device registered");
-        Ok(id)
-    }
-
-    /// The vm1 headers of a signed `method path` with no body as install `id`, for a request
-    /// another stack sends (the account proof's WebSocket).
-    #[cfg(feature = "tlsn")]
-    pub(crate) fn signed_headers(
-        &self,
-        method: &str,
-        path: &str,
-        id: &str,
-    ) -> Vec<(String, String)> {
-        let device = self.device();
-        let time = unix_now().saturating_add(device.clock_offset);
-        signed(&device.seed, Some(id), method, path, time, b"")
-    }
-
-    /// A signed POST to the edge as this install. A `stale_time` answer corrects the clock offset
-    /// and retries once; `unknown_device` registers again and retries once.
-    pub(crate) async fn edge_post(
-        &self,
-        server: &str,
-        path: &str,
-        flow: &str,
-        body: &Value,
-    ) -> Result<Value, EdgeError> {
-        Ok(self.edge_answer(server, path, flow, body).await?.body)
-    }
-
-    /// A signed GET to the edge as this install. A `stale_time` answer corrects the clock offset
-    /// and retries once; `unknown_device` registers again and retries once.
-    pub(crate) async fn edge_get(
-        &self,
-        server: &str,
-        path: &str,
-        flow: &str,
-        timeout: Duration,
-    ) -> Result<Value, EdgeError> {
-        let req = Request {
-            method: "GET",
-            server,
-            path,
-            flow,
-            body: b"",
-            timeout,
-        };
-        Ok(self.edge_send(&req).await?.body)
-    }
-
-    /// As [`Self::edge_post`], with a packed page kept as it came.
-    pub(crate) async fn edge_answer(
-        &self,
-        server: &str,
-        path: &str,
-        flow: &str,
-        body: &Value,
-    ) -> Result<Answer, EdgeError> {
-        let bytes = serde_json::to_vec(body).unwrap_or_default();
-        // The engine signs in or fetches from VTOP behind `/v1/vtop/` (the edge gives up at 32 s).
-        let timeout = if path.starts_with("/v1/vtop/") {
-            VTOP_TIMEOUT
-        } else {
-            TIMEOUT
-        };
-        let req = Request {
-            method: "POST",
-            server,
-            path,
-            flow,
-            body: &bytes,
-            timeout,
-        };
-        self.edge_send(&req).await
-    }
-
-    async fn edge_send(&self, req: &Request<'_>) -> Result<Answer, EdgeError> {
-        for attempt in 0..2 {
-            let id = self.device_id(req.server, req.flow).await?;
-            let answer = self.signed_send(req, Some(&id)).await?;
-            if (200..300).contains(&answer.status) {
-                return Ok(answer);
-            }
-            let error = answer.error();
-            if error.code() == "unknown_device" && attempt == 0 {
-                self.update_device(|d| {
-                    d.ids.remove(req.server);
-                });
-                continue;
-            }
-            return Err(error);
-        }
-        Err(EdgeError::Offline)
-    }
-
-    /// Sends `req` signed with this install's seed, as `id` (None: registering). A
-    /// `stale_time` answer sets the clock offset from the edge's `serverTime` and retries once.
-    async fn signed_send(&self, req: &Request<'_>, id: Option<&str>) -> Result<Answer, EdgeError> {
-        let mut retried = false;
-        loop {
-            let device = self.device();
-            let time = unix_now().saturating_add(device.clock_offset);
-            let headers = signed(&device.seed, id, req.method, req.path, time, req.body);
-            let answer = send(&self.shared, req, headers).await?;
-            if (200..300).contains(&answer.status) {
-                return Ok(answer);
-            }
-            let code = answer.text("code").unwrap_or_default();
-            info!(
-                path = req.path,
-                status = answer.status,
-                code = code.as_str(),
-                "edge refused"
-            );
-            match answer.body.get("serverTime").and_then(Value::as_i64) {
-                Some(server_time) if code == "stale_time" && !retried => {
-                    self.update_device(|d| {
-                        d.clock_offset = server_time.saturating_sub(unix_now());
-                    });
-                    retried = true;
-                }
-                _ => return Ok(answer),
-            }
-        }
+        info
     }
 }
 
 #[uniffi::export]
 impl Core {
-    /// Saves the FCM token and sends it to every server this install is registered with.
+    /// Saves the FCM token and sends it to the server once this install has an identity there.
     pub async fn set_push_token(&self, flow: String, token: String) -> Result<(), CoreError> {
         traced("set_push_token", &flow, async {
             self.device();
             self.update_device(|d| d.push_token = Some(token.clone()));
-            let servers: Vec<String> = self.device().ids.keys().cloned().collect();
-            for server in servers {
-                self.edge_post(
-                    &server,
-                    "/v1/devices/update",
-                    &flow,
-                    &json!({ "fcmToken": token }),
-                )
-                .await?;
+            let body = json!({ "fcmToken": token });
+            match self
+                .device_call(&flow, Kind::Mutation, "devices:update", body)
+                .await
+            {
+                // Sent with the device at the next `auth:token`.
+                Err(error) if error.code() == "unauthenticated" => Ok(()),
+                sent => sent.map(drop).map_err(CoreError::from),
             }
-            Ok(())
         })
         .await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    /// Against the deployed edge: `cargo test -p vtop-ffi live_edge -- --ignored`. Registers a
-    /// throwaway install (no mailbox, no mail).
-    #[tokio::test]
-    #[ignore = "needs the network and the live edge"]
-    async fn live_edge() {
-        let server = "https://vmate.aster0.dev";
-        let dir = std::env::temp_dir().join(format!("vtop-ffi-live-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let core = Core::for_test(dir);
-        let id = core.device_id(server, "live").await.unwrap();
-        assert!(id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()));
-        let label = json!({ "label": "vitapmate-live-test" });
-        let updated = core
-            .edge_post(server, "/v1/devices/update", "live", &label)
-            .await;
-        assert_eq!(updated.unwrap(), Value::Null);
-        let inbox = core
-            .edge_post(
-                server,
-                "/v1/mail-otp/inbox",
-                "live",
-                &json!({ "id": "zzzzzzzzzz" }),
-            )
-            .await;
-        assert_eq!(inbox.unwrap_err().code(), "mailbox_not_found");
-        // Unsigned, and signed with the wrong device id.
-        let bytes = label.to_string().into_bytes();
-        let req = Request {
-            method: "POST",
-            server,
-            path: "/v1/devices/update",
-            flow: "live",
-            body: &bytes,
-            timeout: TIMEOUT,
-        };
-        let unsigned = send(&core.shared, &req, vec![]).await.unwrap();
-        assert_eq!(unsigned.status, 401);
-        assert_eq!(unsigned.text("code").as_deref(), Some("bad_signature"));
-        let seed = core.device().seed;
-        let headers = signed(
-            &seed,
-            Some(&"0".repeat(32)),
-            "POST",
-            "/v1/devices/update",
-            unix_now(),
-            &bytes,
-        );
-        let stranger = send(&core.shared, &req, headers).await.unwrap();
-        assert_eq!(stranger.status, 404);
-        // A phone clock 15 minutes slow: corrected from `serverTime`, then accepted.
-        core.update_device(|d| d.clock_offset = -900);
-        let updated = core
-            .edge_post(server, "/v1/devices/update", "live", &label)
-            .await;
-        assert_eq!(updated.unwrap(), Value::Null);
-        assert!(core.device().clock_offset.abs() < 60);
     }
 }

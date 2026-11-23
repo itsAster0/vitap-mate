@@ -64,10 +64,12 @@ import vitapmate.core.CoreException
 import vitapmate.core.SignIn
 import vitapmate.data.AccountState
 import vitapmate.data.AppCore
+import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
 import vitapmate.data.SavedPasswords
 import vitapmate.data.SemesterChoice
+import vitapmate.data.Settings
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.data.problemOf
@@ -134,15 +136,20 @@ fun AccountScreen() {
                     is SignIn.Done -> true
                     // The app's OTP sheet takes it from here; saved once the code is accepted.
                     is SignIn.NeedsOtp -> {
-                        // VTOP accepted the password before asking for the OTP; Rust already kept it.
-                        AccountState.rejected = false
-                        savedPassword = password
+                        // VTOP accepted the password before asking for the OTP; Rust already kept
+                        // it for the saved student, not yet for another one (saved with the code).
+                        if (!other) {
+                            AccountState.rejected = false
+                            savedPassword = password
+                        }
                         OtpPrompt.askAndWait(result.message)
                     }
                 }
                 Log.info("ui.account", "save result", flowId, mapOf("done" to "$done"))
                 if (done) {
                     AccountState.rejected = false
+                    // Paused over the old password: the next run can try again.
+                    if (Settings.syncPaused == SYNC_PASSWORD_REJECTED) Settings.syncPaused = null
                     savedPassword = password
                     if (other) {
                         PageFetches.cancelAll()
@@ -150,6 +157,10 @@ fun AccountScreen() {
                         flow("account.semesters") { SemesterChoice.readCache(it) }
                         // The last student's Mailbox would keep sending this phone their OTPs.
                         AppCore.leaveOldForwarding()
+                        // Their Gmail grant and the sync built on it aren't this student's.
+                        Gmail.disconnect(flowId)
+                        Settings.forgetStudent()
+                        BackgroundSync.apply(context)
                     }
                     accountVersion++
                     haptics.confirm()

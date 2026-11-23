@@ -11,6 +11,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import { type Env, now } from "./common";
+import { type Exported, MAILBOX_KV, TABLES, dump } from "./export";
 import type { OtpAwaited } from "./shared/engine-api";
 import * as sql from "./sql";
 import { type MailboxDoc, type Waiter, WAITER_TTL_SECS, clearExpired, nextExpiry } from "./state";
@@ -170,6 +171,13 @@ export class Mailbox extends DurableObject<Env> {
     const due = (at + CONFIRMATION_TTL_SECS + 1) * 1000;
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm === null || alarm > due) await this.ctx.storage.setAlarm(due);
+  }
+
+  /** Its stored state, for the move to v3 (export.ts). */
+  async exportState(): Promise<Exported> {
+    const state = dump(this.ctx.storage.sql, TABLES.mailbox.keep, TABLES.mailbox.count);
+    state.kv = Object.fromEntries(await this.ctx.storage.get(MAILBOX_KV));
+    return state;
   }
 
   /** Wipes the address, tables and all. */

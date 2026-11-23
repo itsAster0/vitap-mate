@@ -29,8 +29,10 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
 import vitapmate.core.Core
+import vitapmate.core.ForwardingState
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
+import vitapmate.data.OtpSource
 import vitapmate.data.Settings
 import vitapmate.data.StoreCap
 import vitapmate.data.VtopSync
@@ -54,8 +56,15 @@ object BackgroundSync {
     private const val OLD_CHANNEL = "changes"
     private val debugRegistered = AtomicBoolean(false)
 
-    /** Whether it can be turned on: OTP auto-fill is set up and working. */
-    fun available(): Boolean = OtpAutofill.inUse() != null
+    /**
+     * Whether it can be turned on: OTP auto-fill is set up and working; for mail forwarding, an
+     * OTP got through already, since nobody is there to finish Gmail's setup.
+     */
+    fun available(): Boolean = when (OtpAutofill.inUse()) {
+        null -> false
+        OtpSource.Forwarding -> MailForwarding.status?.state == ForwardingState.ON
+        OtpSource.Gmail -> true
+    }
 
     /** Schedules or cancels the job to match the settings; call after any of them changes. */
     fun apply(context: Context) {
@@ -180,6 +189,9 @@ class SeenReceiver : android.content.BroadcastReceiver() {
     }
 }
 
+/** Why sync is paused when VTOP turned the saved password down; saving a new one clears it. */
+internal const val SYNC_PASSWORD_REJECTED = "VTOP turned down your password"
+
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext
@@ -204,7 +216,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 } else if (why != null) Settings.syncPaused = why
                 why == null
             }
-            if (result.outcome == VtopSync.Outcome.Done) {
+            if (result.outcome == VtopSync.Outcome.Rejected) Settings.syncPaused = SYNC_PASSWORD_REJECTED
+            // A run that fetched nothing (offline, VTOP down) says nothing about auto-fill working.
+            if (result.outcome == VtopSync.Outcome.Done && result.fetched > 0) {
                 Settings.syncPaused = null
                 prefs.edit().remove(MISSES).apply()
             }

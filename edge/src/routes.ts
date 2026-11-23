@@ -83,6 +83,7 @@ export const ROUTES: Route[] = [
   post("/internal/mail-otp/await", "internal", "The engine waits for a student's next OTP."),
   post("/internal/udp-keys", "internal", "The UDP gateway reports its keys (GATEWAY_TOKEN)."),
   post("/internal/accounts/login-done", "internal", "The engine reports a server sign-in."),
+  post("/internal/export", "internal", "One Durable Object's stored state, for the move to v3."),
 ];
 
 /** The Markdown table of `routes`, as API.md's generated block holds it. */

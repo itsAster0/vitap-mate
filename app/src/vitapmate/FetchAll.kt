@@ -38,7 +38,7 @@ object FetchAll {
                     label?.let { status = "Fetching ${it.substringAfter(": ").replace('_', ' ')}…" }
                 }
             }
-            val result = VtopSync.run("sync.all", LABEL, everything = true, pageTimeoutMs = 60_000) { e, _ ->
+            val result = VtopSync.run("sync.all", LABEL, everything = true, pageTimeoutMs = null) { e, _ ->
                 status = "Waiting for the OTP…"
                 OtpPrompt.askAndWait(e.reason)
             }
@@ -46,6 +46,7 @@ object FetchAll {
             status = when (result.outcome) {
                 VtopSync.Outcome.Done -> if (result.failed == 0) "Fetched ${result.fetched} pages" else "Fetched ${result.fetched} pages, ${result.failed} failed"
                 VtopSync.Outcome.StoppedAtOtp -> "Stopped: the OTP wasn't entered"
+                VtopSync.Outcome.Rejected -> "Stopped: VTOP turned down your password"
                 VtopSync.Outcome.Failed -> "Couldn't start: try again"
             }
             running = false

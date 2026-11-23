@@ -1,4 +1,4 @@
-//! Several read pages in one round trip on the Server and UDP routes (`/v1/vtop/fetch-batch`,
+//! Several read pages in one round trip on the Server and UDP routes (`vtop:fetchBatch`,
 //! or a [`BATCH`] request to the gateway), for the open-app sweep. The batch is asked about
 //! once and signs in again once, as a page does ([`Core::on_server`]); its pages wait in
 //! [`super::State::prefetched`] for each page's own fetch (`fetch_attendance`, ...), which
@@ -15,8 +15,7 @@ use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{BATCH, WirePageRequest, batch_args};
 
 use super::plan::ServerError;
-use super::{Route, unpacked};
-use crate::device::EdgeError;
+use super::{Route, page_data};
 use crate::{Core, CoreError, SEMESTERS, SemesterData, traced};
 
 /// The pages a batch takes, by their engine names: those whose fetch caches the page as it
@@ -156,8 +155,8 @@ impl Core {
             .flatten()
     }
 
-    /// The batch's answers, over UDP while that route is on, else over HTTPS; None from a
-    /// server that has no batches (404).
+    /// The batch's answers, over UDP while that route is on, else over the socket; None from a
+    /// server that has no batches.
     async fn batch_on_server(
         &self,
         flow: &str,
@@ -199,24 +198,17 @@ impl Core {
             }
         }
         let body = serde_json::to_value(request).unwrap_or_default();
-        let server = self.forwarding_server();
-        let mut answer = match self.edge_answer(&server, BATCH, flow, &body).await {
-            Err(EdgeError::Status { code, .. }) if code == "not_found" || code == "http_404" => {
+        let answer = match self.engine_call(flow, "vtop:fetchBatch", body).await {
+            Err(ServerError::Failed(reason)) if reason.starts_with("not_found") => {
                 info!("the server has no batches; page by page");
                 return Ok(None);
             }
             answer => answer?,
         };
         self.shared.used(Route::Server);
-        let data = match answer.packed {
-            Some(packed) => unpacked(BATCH, &packed)
-                .ok_or_else(|| ServerError::Failed("unreadable packed batch".into()))?,
-            None => answer
-                .body
-                .get_mut("data")
-                .map(Value::take)
-                .unwrap_or_default(),
-        };
+        // Packed with the batch's name, as the gateway's are.
+        let data = page_data(BATCH, answer)
+            .ok_or_else(|| ServerError::Failed("unreadable packed batch".into()))?;
         answers(data, count).map(Some)
     }
 }
@@ -282,6 +274,7 @@ mod tests {
     use crate::test_edge::Edge;
     use crate::{PAGES, SELECTED};
 
+    const FETCH_BATCH: &str = "vtop:fetchBatch";
     const ATTENDANCE: &str =
         include_str!("../../../../vtop-proto/tests/fixtures/attendance.expected.json");
 
@@ -296,10 +289,7 @@ mod tests {
 
     fn paths(edge: &Mutex<Edge>) -> Vec<String> {
         let edge = edge.lock().unwrap();
-        let vtop = edge
-            .requests
-            .iter()
-            .filter(|r| r.path.starts_with("/v1/vtop/"));
+        let vtop = edge.requests.iter().filter(|r| r.path.starts_with("vtop:"));
         vtop.map(|r| r.path.clone()).collect()
     }
 
@@ -320,7 +310,7 @@ mod tests {
         let (core, edge) = picked("batch-mixed", Route::Server).await;
         let gate = consent::tests::yes(&core);
         let answer = json!({ "data": [{ "data": attendance() }, { "code": "vtop_unavailable", "error": "slow" }] });
-        can(&edge, BATCH, 200, answer);
+        can(&edge, FETCH_BATCH, 200, answer);
         let names = vec!["attendance".to_string(), "marks".to_string()];
         let fetched = core.fetch_pages("f".into(), names).await.unwrap();
         assert_eq!(fetched[0].error, None);
@@ -330,7 +320,7 @@ mod tests {
                 reason: "slow".into()
             })
         );
-        assert_eq!(paths(&edge), [BATCH]);
+        assert_eq!(paths(&edge), [FETCH_BATCH]);
         assert_eq!(gate.asks(), 1, "asked once for the batch");
         let body = &edge.lock().unwrap().requests.last().unwrap().body.clone();
         assert_eq!(body["semester"], "AP1");
@@ -348,28 +338,18 @@ mod tests {
 
     #[tokio::test]
     async fn an_old_server_gets_page_by_page() {
-        // An old edge (404 not_found), then an old engine behind a new edge (a bare 404).
-        for (i, old) in [None, Some(Value::Null)].into_iter().enumerate() {
-            let (core, edge) = picked(&format!("batch-old-{i}"), Route::Server).await;
-            let _gate = consent::tests::yes(&core);
-            if let Some(body) = old {
-                can(&edge, BATCH, 404, body);
-            }
-            can(
-                &edge,
-                "/v1/vtop/fetch",
-                200,
-                json!({ "data": attendance() }),
-            );
-            let fetched = core
-                .fetch_pages("f".into(), vec!["attendance".into()])
-                .await
-                .unwrap();
-            assert_eq!(fetched[0].error, None);
-            assert_eq!(paths(&edge), [BATCH, "/v1/vtop/fetch"]);
-            assert!(core.route_status("f".into()).skipped.is_empty(), "no skip");
-            assert!(core.at(format!("{PAGES}/AP1/attendance.json")).exists());
-        }
+        // A server without `vtop:fetchBatch`.
+        let (core, edge) = picked("batch-old", Route::Server).await;
+        let _gate = consent::tests::yes(&core);
+        can(&edge, "vtop:fetch", 200, json!({ "data": attendance() }));
+        let fetched = core
+            .fetch_pages("f".into(), vec!["attendance".into()])
+            .await
+            .unwrap();
+        assert_eq!(fetched[0].error, None);
+        assert_eq!(paths(&edge), [FETCH_BATCH, "vtop:fetch"]);
+        assert!(core.route_status("f".into()).skipped.is_empty(), "no skip");
+        assert!(core.at(format!("{PAGES}/AP1/attendance.json")).exists());
     }
 
     #[tokio::test]
@@ -378,7 +358,7 @@ mod tests {
         let _gate = consent::tests::yes(&core);
         can(
             &edge,
-            BATCH,
+            FETCH_BATCH,
             200,
             json!({ "data": [{ "data": attendance() }] }),
         );

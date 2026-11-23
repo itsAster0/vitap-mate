@@ -62,6 +62,7 @@ import vitapmate.data.AccountState
 import vitapmate.data.AppCore
 import vitapmate.data.Downloads
 import vitapmate.data.Foreground
+import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
 import vitapmate.data.Settings
@@ -73,6 +74,7 @@ import vitapmate.features.docs.MessTimingsSheet
 import vitapmate.features.docs.messTimingsSummary
 import vitapmate.features.login.OtpAutofillSheet
 import vitapmate.observability.Log
+import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.AvatarPhoto
@@ -311,11 +313,16 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             {
                 confirmSignOut = false
                 scope.launch {
-                    runCatching { coreFlow("sign_out", Core::signOut) }
+                    // Off the server first (its forwarding address, this install), while the identity lasts.
+                    runCatching { coreFlow("sign_out") { c, f -> runCatching { c.signOutOfServer(f, false) }; c.signOut(f) } }
                         .onFailure { Log.error("ui.settings", "sign out failed: $it") }
                     // Off the student's forwarding address too, or this phone keeps getting their OTPs.
                     AppCore.leaveOldForwarding()
                     withContext(Dispatchers.IO) { AccountBackup.forgetAccount(context) }
+                    // Their Gmail grant and the sync built on it go too.
+                    flow("gmail.disconnect") { Gmail.disconnect(it) }
+                    Settings.forgetStudent()
+                    BackgroundSync.apply(context)
                     // A collapsed OTP prompt and running page fetches belong to the session
                     // just dropped: not over the login screen, not into the next account.
                     OtpPrompt.cancel()

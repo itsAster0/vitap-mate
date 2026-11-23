@@ -10,6 +10,7 @@ import { DurableObject } from "cloudflare:workers";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 
 import { type Env, notFound, now, unknownDevice } from "./common";
+import { type Exported, TABLES, dump } from "./export";
 import { send } from "./fcm";
 import { hash, hashesEqual } from "./shared/tokens";
 import * as sql from "./sql";
@@ -134,6 +135,11 @@ export class Device extends DurableObject<Env> {
     if (!doc) return null;
     const { seq: _, ...info } = doc;
     return info;
+  }
+
+  /** Its stored state, for the move to v3 (export.ts). */
+  async exportState(): Promise<Exported> {
+    return dump(this.ctx.storage.sql, TABLES.device.keep, TABLES.device.count);
   }
 
   /** What the app's Server page shows of the install: no keys or token,

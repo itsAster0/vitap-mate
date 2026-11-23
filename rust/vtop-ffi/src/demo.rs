@@ -1,6 +1,6 @@
 //! The demo account, for UI tests, demos and store reviews without a VTOP account. Signing in
-//! with [`USERNAME`] and [`PASSWORD`] asks VTOP nothing: it downloads the sample pages from the
-//! edge (`/guides/demo.json`, see `edge/API.md`), and every read page comes from them
+//! with [`USERNAME`] and [`PASSWORD`] asks VTOP nothing: it reads the sample pages from the
+//! server (`guides:demo`), and every read page comes from them
 //! ([`Core::demo_page`]). Calls that need a real session (outing writes, downloads, the web view,
 //! forwarding) answer [`unavailable`], and nothing goes to the server.
 //!
@@ -10,18 +10,16 @@
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use tracing::{info, warn};
-use vtop_core::client::Hop;
 use vtop_core::sync::RwLock;
 
-use crate::{
-    ACCOUNT, Account, Core, CoreError, Shared, SignIn, Slot, dev, obs, traced_sync, transport,
-};
+use crate::device::EdgeError;
+use crate::remote::backend::Kind;
+use crate::{ACCOUNT, Account, Core, CoreError, SignIn, Slot, dev, obs, traced_sync};
 
 /// Not a VTOP registration number, so no student lands here by mistake.
 pub(crate) const USERNAME: &str = "DEMO2026";
@@ -33,7 +31,6 @@ pub(crate) const FILE: &str = "demo.json";
 const RECORD: &str = "demo_record.json";
 /// The JSON shape this app reads; the edge bumps it only for a change old apps can't read.
 const SCHEMA: u32 = 1;
-const TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Default, Serialize, Deserialize)]
 struct Bundle {
@@ -96,8 +93,20 @@ impl Core {
         flow: &str,
         account: Account,
     ) -> Result<SignIn, CoreError> {
-        let bytes = download(&self.shared, &self.forwarding_server(), flow).await?;
-        self.open_demo(account, bytes).await
+        let bundle = self
+            .public_call(flow, Kind::Query, "guides:demo", json!({}))
+            .await
+            .map_err(|error| {
+                warn!(code = error.code(), "demo not downloaded");
+                match error {
+                    EdgeError::Offline => CoreError::Offline,
+                    EdgeError::Status { message, .. } => CoreError::VtopUnavailable {
+                        reason: format!("The demo isn't available right now ({message})."),
+                    },
+                }
+            })?;
+        self.open_demo(account, bundle.to_string().into_bytes())
+            .await
     }
 
     /// Signs in as the demo account on `bytes`, the downloaded sample pages.
@@ -174,32 +183,6 @@ impl Core {
             Err(error) => warn!(%error, "demo page not recorded"),
         }
     }
-}
-
-async fn download(shared: &Arc<Shared>, server: &str, flow: &str) -> Result<Vec<u8>, CoreError> {
-    let hop = Hop {
-        method: "GET".into(),
-        url: format!("{}/guides/{FILE}", server.trim_end_matches('/')),
-        headers: vec![("x-request-id".into(), flow.into())],
-        body: Vec::new(),
-        timeout: TIMEOUT,
-        connect_timeout: TIMEOUT,
-        download_to: None,
-    };
-    let response = transport::current(shared)?
-        .send(hop)
-        .await
-        .map_err(|_| CoreError::Offline)?;
-    if response.status != 200 {
-        warn!(status = response.status, "demo not downloaded");
-        return Err(CoreError::VtopUnavailable {
-            reason: format!(
-                "The demo isn't available right now (HTTP {}).",
-                response.status
-            ),
-        });
-    }
-    response.bytes().await.map_err(|_| CoreError::Offline)
 }
 
 #[cfg(test)]

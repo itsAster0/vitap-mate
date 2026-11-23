@@ -21,3 +21,6 @@ pub mod mailbox;
 pub mod page_dictionary;
 pub mod tokens;
 pub mod wire_page;
+
+/// For the app's Convex client, which reads `{ "$bytes": base64 }` values.
+pub use base64;

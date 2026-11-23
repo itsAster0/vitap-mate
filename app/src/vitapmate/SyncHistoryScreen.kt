@@ -54,7 +54,7 @@ fun SyncHistoryScreen() {
                 BackgroundSyncSetting { on ->
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         SyncStat("Last sync", "sync.last", last?.let { atText(it.startT, h24) } ?: "None yet", last?.steps?.lastOrNull()?.let { s -> if (s.state == StepState.Skipped) "skipped: ${s.reason}" else s.label })
-                        if (Settings.backgroundSync) SyncStat("Next sync", "sync.next", next?.let { atText(it, h24) } ?: "Once the phone is online", null)
+                        if (on) SyncStat("Next sync", "sync.next", next?.let { atText(it, h24) } ?: "Once the phone is online", null)
                     }
                     // How far along the wait from the last run to the next is.
                     val from = last?.startT

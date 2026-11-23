@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use super::*;
 use crate::remote::consent;
-use crate::test_edge::{Edge, keep_token, serve, signed_in};
+use crate::test_edge::{Edge, keep_token, paths, serve, signed_in};
 
 fn core(name: &str) -> Core {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-keys-{name}-{}", std::process::id()));
@@ -95,47 +95,30 @@ fn other_phones_with_keys_are_listed() {
 }
 
 #[tokio::test]
-async fn linking_sends_the_account_token_and_no_key() {
+async fn linking_gets_an_identity_and_sends_the_semester() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
     let core = signed_in(&core("link").dir, server.clone());
     keep_token(&core, &server);
-    can(
-        &edge,
-        "/v1/link",
-        200,
-        json!({ "savedCredentials": false, "forwarding": false }),
-    );
-    core.link_with(&server, "f-link", "Link").await.unwrap();
+    fs::write(core.at(crate::SELECTED), r#""AP2026""#).unwrap();
+    can(&edge, "account:setSemester", 200, Value::Null);
+    core.link_with("f-link", "Link").await.unwrap();
+    assert_eq!(paths(&edge), ["auth:token", "account:setSemester"]);
     let edge = edge.lock().unwrap();
-    let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
-    assert_eq!(paths, ["/v1/devices/register", "/v1/link"]);
-    assert_eq!(
-        edge.requests[1].body,
-        json!({ "accountToken": "tok", "label": "vitapmate" })
-    );
+    assert_eq!(edge.requests[1].body, json!({ "semesterId": "AP2026" }));
 }
 
 #[tokio::test]
-async fn a_first_key_links_the_phone_then_is_made() {
+async fn keys_are_made_as_the_student() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
     let core = signed_in(&core("create").dir, server.clone());
     keep_token(&core, &server);
-    let not_linked = json!({ "code": "not_linked", "error": "Link first." });
-    can(&edge, "/v1/keys", 409, not_linked);
     let made =
         json!({ "id": "ab12cd34", "key": "vtm_secret", "mcpUrl": "https://vmate.aster0.dev/mcp" });
-    can(&edge, "/v1/keys", 201, made);
-    can(
-        &edge,
-        "/v1/link",
-        200,
-        json!({ "savedCredentials": false, "forwarding": false }),
-    );
+    can(&edge, "keys:create", 201, made);
     let key = core
         .create_key_with(
-            &server,
             "f-key",
             "Make an access key",
             true,
@@ -147,39 +130,29 @@ async fn a_first_key_links_the_phone_then_is_made() {
         (key.id.as_str(), key.key.as_str()),
         ("ab12cd34", "vtm_secret")
     );
+    assert_eq!(paths(&edge), ["auth:token", "keys:create"]);
     let edge = edge.lock().unwrap();
-    let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
-    assert_eq!(
-        paths,
-        ["/v1/devices/register", "/v1/keys", "/v1/link", "/v1/keys"]
-    );
     assert!(edge.requests.iter().all(|r| r.signed && r.flow == "f-key"));
     assert_eq!(
         edge.requests[1].body,
-        json!({ "accountToken": "tok", "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
-    );
-    assert_eq!(
-        edge.requests[2].body,
-        json!({ "accountToken": "tok", "label": "vitapmate" })
+        json!({ "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
     );
 }
 
 #[tokio::test]
 async fn pair_codes_name_their_mcp_client() {
-    let core = core("pair-app");
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
+    let core = signed_in(&core("pair-app").dir, server.clone());
+    keep_token(&core, &server);
     can(
         &edge,
-        "/v1/pair/info",
+        "pair:info",
         200,
         json!({ "kind": "mcp", "name": "Claude", "host": "claude.ai" }),
     );
-    can(&edge, "/v1/pair/info", 200, json!({ "kind": "browser" }));
-    let app = core
-        .pair_app_with(&server, "f-pair", "ABCDE12345")
-        .await
-        .unwrap();
+    can(&edge, "pair:info", 200, json!({ "kind": "browser" }));
+    let app = core.pair_app_with("f-pair", "ABCDE12345").await.unwrap();
     assert_eq!(
         app,
         Some(PairApp {
@@ -187,12 +160,11 @@ async fn pair_codes_name_their_mcp_client() {
             host: "claude.ai".into()
         })
     );
-    let browser = core
-        .pair_app_with(&server, "f-pair", "ABCDE12345")
-        .await
-        .unwrap();
+    let browser = core.pair_app_with("f-pair", "ABCDE12345").await.unwrap();
     assert_eq!(browser, None);
     let edge = edge.lock().unwrap();
+    // Over the socket with the JWT, as a query (no flow).
+    assert_eq!(edge.requests[1].path, "pair:info");
     assert_eq!(edge.requests[1].body, json!({ "code": "ABCDE12345" }));
 }
 
@@ -204,13 +176,13 @@ async fn refusals_read_as_what_to_do() {
     keep_token(&core, &server);
     can(
         &edge,
-        "/v1/keys",
+        "keys:create",
         409,
         json!({ "code": "key_limit", "error": "x" }),
     );
     can(
         &edge,
-        "/v1/keys",
+        "keys:create",
         400,
         json!({ "code": "bad_request", "error": "x" }),
     );
@@ -218,10 +190,10 @@ async fn refusals_read_as_what_to_do() {
         Err(CoreError::Other { reason }) => reason,
         other => panic!("{other:?}"),
     };
-    let full = core.create_key_with(&server, "f", "Key", false, None).await;
+    let full = core.create_key_with("f", "Key", false, None).await;
     assert!(reason(full).starts_with("Revoke a key first"));
     let bad = core
-        .create_key_with(&server, "f", "Key", false, Some("ABCDE12345".into()))
+        .create_key_with("f", "Key", false, Some("ABCDE12345".into()))
         .await;
     assert!(reason(bad).starts_with("Check the code"));
     assert_eq!(edge.lock().unwrap().requests[1].body["label"], "MCP");
@@ -229,35 +201,13 @@ async fn refusals_read_as_what_to_do() {
 
 #[tokio::test]
 async fn account_calls_never_ask_or_send_the_session() {
-    // Without a token they prove; with no proof network (this test's) that fails first.
-    let core = core("consent");
+    // Without an identity they prove; with no proof network (this test's) that fails first.
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
-    let core = signed_in(&core.dir, server.clone());
-    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
+    let core = signed_in(&core("consent").dir, server);
     let gate = consent::tests::no(&core);
     assert!(core.connected_apps("f".into()).await.is_err());
     assert!(core.create_key("f2".into(), false, None).await.is_err());
-    assert_eq!(gate.asks(), 0);
-    assert!(edge.lock().unwrap().requests.is_empty());
-}
-
-#[tokio::test]
-async fn handover_for_another_server_never_asks() {
-    let core = core("handover-elsewhere");
-    let edge = Arc::new(Mutex::new(Edge::default()));
-    fs::write(
-        core.at(crate::remote::edge::SERVER_FILE),
-        serve(edge.clone()).await,
-    )
-    .unwrap();
-    consent::tests::signed_in(&core);
-    let gate = consent::tests::yes(&core);
-    let callback = "https://evil.example/v1/session/answer?account=x";
-    let answered = core
-        .answer_session_request("f".into(), "r1".into(), callback.into(), None)
-        .await;
-    assert!(matches!(answered, Err(CoreError::Other { .. })));
     assert_eq!(gate.asks(), 0);
     assert!(edge.lock().unwrap().requests.is_empty());
 }
@@ -268,19 +218,24 @@ async fn handover_unattended_answers_with_error_not_cookies() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
     fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
-    let path = "/v1/session/answer?account=22bce0001";
-    can(&edge, path, 200, json!({ "ok": true }));
+    keep_token(&core, &server);
+    can(&edge, "sessions:answer", 200, json!({ "ok": true }));
     consent::tests::signed_in(&core);
     // In the pocket, even with "don't ask again" ticked.
     let gate = consent::tests::install(&core, false, false);
     consent::tests::remember(&core, CookieKind::Handover);
     let answered = core
-        .answer_session_request("f".into(), "r1".into(), format!("{server}{path}"), None)
+        .answer_session_request("f".into(), "r1".into(), None)
         .await;
     assert_eq!(answered, Err(CoreError::ConsentDenied));
     assert_eq!(gate.asks(), 0);
     let edge = edge.lock().unwrap();
-    let answer = &edge.requests.iter().find(|r| r.path == path).unwrap().body;
+    let answer = &edge
+        .requests
+        .iter()
+        .find(|r| r.path == "sessions:answer")
+        .unwrap()
+        .body;
     assert_eq!(
         answer,
         &json!({ "requestId": "r1", "error": "The student hasn't allowed it on the phone." })
@@ -293,36 +248,24 @@ async fn session_requests_get_cookies_or_why_not() {
     let core = core("answer");
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
-    let path = "/v1/session/answer?account=22bce0001";
-    let callback = format!("{server}{path}");
-    can(&edge, path, 200, json!({ "ok": true }));
-    core.answer_with(&server, "f-a", "r1", &callback, Ok("JSESSIONID=c".into()))
+    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
+    keep_token(&core, &server);
+    can(&edge, "sessions:answer", 200, json!({ "ok": true }));
+    core.answer_with("f-a", "r1", Ok("JSESSIONID=c".into()))
         .await
         .unwrap();
-    // Signed out (no session in this core): the edge hears why, the caller gets the error.
-    can(&edge, path, 200, json!({ "ok": true }));
-    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
+    // Signed out (no session in this core): the server hears why, the caller gets the error.
+    can(&edge, "sessions:answer", 200, json!({ "ok": true }));
     let signed_out = core
-        .answer_session_request("f-b".into(), "r2".into(), callback.clone(), None)
+        .answer_session_request("f-b".into(), "r2".into(), None)
         .await;
     assert_eq!(signed_out, Err(CoreError::NotSignedIn));
-    // Another server's callback is not sent anything.
-    let elsewhere = core
-        .answer_with(
-            &server,
-            "f-c",
-            "r3",
-            "https://evil.example/v1/session/answer?account=x",
-            Ok("c=1".into()),
-        )
-        .await;
-    assert!(matches!(elsewhere, Err(CoreError::Other { .. })));
 
     let edge = edge.lock().unwrap();
     let answers: Vec<&Value> = edge
         .requests
         .iter()
-        .filter(|r| r.path == path)
+        .filter(|r| r.path == "sessions:answer")
         .map(|r| &r.body)
         .collect();
     assert_eq!(
@@ -333,4 +276,33 @@ async fn session_requests_get_cookies_or_why_not() {
         ]
     );
     assert!(edge.requests.iter().all(|r| r.signed));
+}
+
+#[tokio::test]
+async fn pending_session_requests_come_from_the_server() {
+    let core = core("pending");
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
+    // No identity: none, and nothing sent.
+    assert!(
+        core.pending_session_requests("f".into())
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(edge.lock().unwrap().requests.is_empty());
+    keep_token(&core, &server);
+    let pending =
+        json!([{ "requestId": "r1", "expiresAt": 1_700_000_000_000_i64, "wantCredentials": true }]);
+    can(&edge, "sessions:pending", 200, pending);
+    let requests = core.pending_session_requests("f-p".into()).await.unwrap();
+    assert_eq!(
+        requests,
+        [SessionRequest {
+            request_id: "r1".into(),
+            expires_at: 1_700_000_000_000,
+            want_credentials: true,
+        }]
+    );
 }

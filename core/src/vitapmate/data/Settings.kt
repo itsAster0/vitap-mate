@@ -159,6 +159,20 @@ object Settings {
     var syncCourse by text("settings_sync_course")
 
     /** Whether background sync notifies about changes of [kind] ("attendance", "marks", "timetable", "exams", "grades"). */
+    /**
+     * Forgets what was set up for the student who signed out or was replaced: the OTP source
+     * (their Gmail or address), background sync built on it, and where sync left off. The caller
+     * disconnects Gmail and re-applies the sync job.
+     */
+    fun forgetStudent() {
+        otpSource = null
+        backgroundSync = false
+        syncPaused = null
+        syncCourse = null
+        wrappedSeen = emptySet()
+        wrappedHideGrades = emptySet()
+    }
+
     fun notifies(kind: String): Boolean = notifyOff[kind] != true
 
     fun setNotifies(kind: String, on: Boolean) {
@@ -209,7 +223,7 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
     QueueDrop("dev_queue_drop_s", "Waiting fetch limit", "s", 60, 5..600, "An automatic fetch for a page left behind is dropped after waiting this long"),
     VtopTimeout("dev_vtop_timeout_s", "VTOP request timeout", "s", 30, 5..180, "One VTOP request, from the next launch"),
     SessionReuse("dev_session_reuse_min", "VTOP session reuse", "min", 0, 0..10_080, "A saved session older than this signs in again at launch; 0: any age"),
-    OtpPoll("dev_otp_poll_s", "Forwarded OTP check", "s", 2, 1..30, "How often the OTP prompt checks forwarded mail"),
+    OtpPoll("dev_otp_poll_s", "OTP check without the live socket", "s", 2, 1..30, "How often the OTP prompt checks Gmail, or forwarded mail when the server can't push it"),
     SessionAnswer("dev_session_answer_s", "Session request timeout", "s", 15, 3..60, "How long the phone tries to answer a browser's or AI app's session request"),
     CookieAsk("dev_cookie_ask_s", "Cookie consent wait", "s", 60, 10..300, "How long the 'send your VTOP cookie?' dialog waits before it counts as Cancel"),
     SyncBiometricDays("dev_sync_bio_days", "Biometric days per sync", "days", 3, 0..7, "Recent days not final in the cache, newest first; 0 turns it off"),

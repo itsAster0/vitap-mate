@@ -22,6 +22,7 @@
 #[macro_use]
 mod macros;
 
+mod convex;
 mod demo;
 mod dev;
 mod device;
@@ -116,6 +117,10 @@ pub enum CoreError {
     SemesterNeeded,
     /// The student said no (or wasn't there to ask): the VTOP session stayed on the phone.
     ConsentDenied,
+    /// This phone has no forwarding address, or the server deleted it: an OTP wait on it ends.
+    ForwardingOff {
+        reason: String,
+    },
     Other {
         reason: String,
     },
@@ -134,6 +139,7 @@ impl std::fmt::Display for CoreError {
             Self::VtopUnavailable { reason }
             | Self::OtpRequired { reason, .. }
             | Self::OtpRejected { reason }
+            | Self::ForwardingOff { reason }
             | Self::Other { reason } => formatter.write_str(reason),
         }
     }
@@ -153,6 +159,7 @@ impl CoreError {
             Self::NotSignedIn => "NotSignedIn",
             Self::SemesterNeeded => "SemesterNeeded",
             Self::ConsentDenied => "ConsentDenied",
+            Self::ForwardingOff { .. } => "ForwardingOff",
             Self::Other { .. } => "Other",
         }
     }
@@ -268,6 +275,10 @@ type Slot = RwLock<Session>;
 #[derive(Default)]
 struct Shared {
     route: Mutex<remote::route::State>,
+    /// The server's client and its JWT.
+    backend: Mutex<remote::backend::State>,
+    /// One identity fetch at a time ([`remote::backend`]): a refresh token works once.
+    identity_turn: futures::lock::Mutex<()>,
     consent: Mutex<remote::consent::State>,
     /// What [`dev::dev_configure`] set before the core was made.
     dev: Option<dev::DevConfig>,

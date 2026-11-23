@@ -1,0 +1,32 @@
+# The mail Worker for backend v3 (README.md). Deploy only when asked:
+#   bunx wrangler queues create vmate-mail-retry   (once)
+#   bunx wrangler secret put MAIL_TOKEN
+#   bunx wrangler deploy
+# Then point the Email Routing rule otp@vmate.aster0.dev at `vmate-mail` instead of
+# `vmate-edge` (in the dashboard; subdomains have no catch-all).
+name = "vmate-mail"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[vars]
+# Convex's HTTP actions; the Worker POSTs /internal/mail there.
+CONVEX_URL = "https://vmate3.aster0.dev"
+# Where mail to other or unknown addresses goes; empty rejects it.
+FALLBACK_FORWARD = ""
+
+[observability.logs]
+enabled = true
+invocation_logs = false
+
+# Mail Convex didn't take waits here. The consumer gives up after 10 minutes on its own
+# (src/index.ts), well inside max_retries with its backoff.
+[[queues.producers]]
+binding = "MAIL_QUEUE"
+queue = "vmate-mail-retry"
+
+[[queues.consumers]]
+queue = "vmate-mail-retry"
+max_batch_size = 10
+max_batch_timeout = 1
+max_retries = 20

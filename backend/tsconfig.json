@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["convex/**/*.ts", "dev/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "vitest.config.ts", "env.d.ts"]
+}

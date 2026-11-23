@@ -18,7 +18,9 @@ import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.editableText
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.composables.icons.lucide.Eye
@@ -49,7 +51,12 @@ fun PasswordField(
     var shown by remember(initiallyShown) { mutableStateOf(initiallyShown) }
     OutlinedSecureTextField(
         rememberSyncedTextFieldState(value, onValueChange),
-        modifier.testTag(tag).semantics { contentType = ContentType.Password },
+        modifier.testTag(tag).semantics {
+            contentType = ContentType.Password
+            // The field's own node gives accessibility services the typed text; masked as a platform
+            // password EditText does. Autofill reads the field's input text, not this.
+            if (!shown) editableText = AnnotatedString("\u2022".repeat(value.length))
+        },
         enabled = enabled,
         label = { androidx.compose.material3.Text(label) },
         leadingIcon = leadingIcon,

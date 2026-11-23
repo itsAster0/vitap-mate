@@ -3,7 +3,7 @@ use std::time::Duration;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use tokio::net::UdpSocket;
-use vtop_gateway::{Config, run};
+use vtop_gateway::{APP_LOGIN, Config, run};
 use vtop_shared::engine::{BatchPage, FETCH, FETCH_BATCH, UDP_KEYS_INTERNAL, VTOP_LOGIN};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
@@ -32,6 +32,7 @@ async fn gateway(engine: &MockServer) -> (u16, [u8; 32]) {
     let config = Config {
         engine_url: engine.uri(),
         edge_url: engine.uri(),
+        login_poll: Duration::ZERO,
         token: "internal-token".into(),
         host: "udp.example".into(),
         ports: vec![port],
@@ -249,8 +250,7 @@ async fn sign_in(port: u16, key: [u8; 32], path: &str, body: &str) -> WirePageRe
 }
 
 #[tokio::test]
-async fn sign_ins_go_where_the_edge_would_send_them() {
-    // One mock is both the engine and the edge.
+async fn the_phones_sign_ins_go_to_the_engine() {
     let server = MockServer::start().await;
     let ok = r#"{"status":"ok","session":{"cookies":"JSESSIONID=s"}}"#;
     Mock::given(method("POST"))
@@ -260,17 +260,6 @@ async fn sign_ins_go_where_the_edge_would_send_them() {
             serde_json::json!({ "username": "U", "password": "P" }),
         ))
         .respond_with(ResponseTemplate::new(200).set_body_string(ok))
-        .expect(1)
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
-        .and(path("/v1/app/login"))
-        .and(body_partial_json(
-            serde_json::json!({ "appSecret": "secret" }),
-        ))
-        .respond_with(
-            ResponseTemplate::new(401).set_body_string(r#"{"code":"invalid_credentials"}"#),
-        )
         .expect(1)
         .mount(&server)
         .await;
@@ -284,20 +273,11 @@ async fn sign_ins_go_where_the_edge_would_send_them() {
     )
     .await;
     assert_eq!((phone.status, phone.body), (200, ok.as_bytes().to_vec()));
-
-    let by_server = sign_in(
-        port,
-        key,
-        "/v1/app/login",
-        r#"{"registrationNumber":"24MIC0000","appSecret":"secret"}"#,
-    )
-    .await;
-    assert_eq!(by_server.status, 401);
 }
 
 #[tokio::test]
 async fn an_expired_session_is_renewed_in_the_fetch() {
-    // One mock is the engine and the edge.
+    // One mock is the engine and Convex.
     let server = MockServer::start().await;
     let page = r#"{"data":{"ok":true}}"#;
     Mock::given(method("POST"))
@@ -318,9 +298,19 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
         .expect(2)
         .mount(&server)
         .await;
+    // Convex's sign-in waits for the OTP mail, then answers when followed.
     Mock::given(method("POST"))
-        .and(path("/v1/app/login"))
-        .and(body_partial_json(serde_json::json!({ "appSecret": "s" })))
+        .and(path(APP_LOGIN))
+        .and(header("authorization", "Bearer phone-jwt"))
+        .respond_with(
+            ResponseTemplate::new(202).set_body_string(r#"{"status":"pending","requestId":"r1"}"#),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("{APP_LOGIN}/r1")))
+        .and(header("authorization", "Bearer phone-jwt"))
         .respond_with(ResponseTemplate::new(200).set_body_string(
             r#"{"status":"ok","session":{"cookies":"JSESSIONID=new","registration_number":"R"}}"#,
         ))
@@ -344,7 +334,7 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
         dictionary: None,
         session_hash: session_hash(old),
         session: Some(old.into()),
-        account: Some(r#"{"registrationNumber":"R","appSecret":"s"}"#.into()),
+        account: Some("phone-jwt".into()),
     };
 
     let got = fetch(&cfg, &request.encode().unwrap(), Duration::from_secs(20))

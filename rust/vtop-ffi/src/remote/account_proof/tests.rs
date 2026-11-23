@@ -1,6 +1,6 @@
-//! Account calls without a token prove first: a real tlsn prover in the core, over a fake
-//! [`ProofNetwork`] that plays the edge and the engine in one (it checks the signed socket's
-//! challenge, verifies against vtop-tlsn's fake VTOP and answers as the edge does).
+//! Account calls without an identity prove first: a real tlsn prover in the core, over a fake
+//! [`ProofNetwork`] that plays the engine's `/proof` (it checks the ticket, verifies against
+//! vtop-tlsn's fake VTOP and answers as the engine does), then trade the ticket for a JWT.
 
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -8,21 +8,21 @@ use std::sync::{Arc, Mutex};
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use vtop_shared::device_sig;
 use vtop_tlsn::content::binding;
-use vtop_tlsn::fake::{self, ME, Page};
+use vtop_tlsn::fake::{self, Page};
 use vtop_tlsn::session;
 
 use super::*;
-use crate::remote::account_token::{FILE, Saved};
+use crate::remote::backend::Kind;
 use crate::remote::consent;
-use crate::test_edge::{CHALLENGE, DEVICE_ID, Edge, serve, signed_in};
+use crate::test_edge::{CHALLENGE, Edge, paths, serve, signed_in};
 use crate::transport::Header;
 
-/// The edge's and the engine's part, for one proof per open.
+/// The engine's part, for one proof per open.
 struct FakeNetwork {
     vtop: SocketAddr,
-    edge: Arc<Mutex<Edge>>,
+    /// The proving install's id, as the server hands it to the engine with the ticket.
+    device: String,
     /// The URLs opened.
     opened: Mutex<Vec<String>>,
 }
@@ -51,7 +51,7 @@ impl ProofSocket for FakeSocket {
             buf.truncate(n);
             return Ok(Some(ProofFrame::Binary { data: buf }));
         }
-        // The engine's end of the pipe is gone: the edge's answer comes last.
+        // The engine's end of the pipe is gone: its answer comes last.
         let Some(last) = self.last.lock().await.take() else {
             return Ok(None);
         };
@@ -59,14 +59,6 @@ impl ProofSocket for FakeSocket {
     }
 
     fn shutdown(&self) {}
-}
-
-fn header<'a>(headers: &'a [Header], name: &str) -> &'a str {
-    headers
-        .iter()
-        .find(|h| h.name == name)
-        .map(|h| h.value.as_str())
-        .unwrap_or_default()
 }
 
 #[async_trait::async_trait]
@@ -78,33 +70,21 @@ impl ProofNetwork for FakeNetwork {
         _timeout_ms: u32,
     ) -> Result<ProofOpened, TransportError> {
         self.opened.lock().unwrap().push(url.clone());
-        let path = url.split_once("://").unwrap().1;
-        let path = &path[path.find('/').unwrap()..];
-        let time = header(&headers, device_sig::TIME).parse().unwrap();
-        let key = self.edge.lock().unwrap().sign_key.clone().unwrap();
-        let signed = header(&headers, device_sig::DEVICE) == DEVICE_ID
-            && device_sig::verify(
-                &key,
-                header(&headers, device_sig::SIG),
-                "GET",
-                path,
-                time,
-                b"",
-            );
-        let challenge = path.split_once("challenge=").map(|(_, c)| c.to_string());
-        if !signed || challenge.as_deref() != Some(CHALLENGE) {
+        assert!(headers.is_empty(), "the ticket is the only credential");
+        let ticket = url.split_once("/proof?ticket=").map(|(_, t)| t.to_string());
+        if ticket.as_deref() != Some(CHALLENGE) {
             let body = json!({ "code": "challenge_invalid", "error": "Start again." });
             return Ok(ProofOpened {
                 socket: None,
-                status: 401,
+                status: 404,
                 body: body.to_string().into_bytes(),
             });
         }
         let (phone, engine) = tokio::io::duplex(1 << 20);
         let (last_tx, last_rx) = tokio::sync::oneshot::channel();
-        let vtop = self.vtop;
+        let (vtop, device) = (self.vtop, self.device.clone());
         tokio::spawn(async move {
-            let stmt = fake::statement(binding(CHALLENGE, DEVICE_ID));
+            let stmt = fake::statement(binding(CHALLENGE, &device));
             let dial = async move {
                 tokio::net::TcpStream::connect(vtop)
                     .await
@@ -119,11 +99,7 @@ impl ProofNetwork for FakeNetwork {
             )
             .await;
             let last = match proven {
-                Ok(proven) => json!({
-                    "accountToken": "proved",
-                    "expiresAt": 4_102_444_800_000_i64,
-                    "registrationNumber": proven.page["regno"],
-                }),
+                Ok(proven) => json!({ "ok": true, "registrationNumber": proven.page["regno"] }),
                 Err(e) => json!({ "code": "proof_failed", "error": format!("{e:#}") }),
             };
             last_tx.send(last.to_string()).unwrap();
@@ -142,7 +118,7 @@ impl ProofNetwork for FakeNetwork {
     }
 }
 
-/// A core signed in as [`ME`] with the fake VTOP's session, its server the mock edge, and
+/// A core signed in as [`ME`] with the fake VTOP's session, its server the mock one, and
 /// account proofs going to the fake VTOP through a [`FakeNetwork`].
 async fn setup(name: &str, page: Page) -> (Core, Arc<Mutex<Edge>>, String, Arc<FakeNetwork>) {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-proof-{name}-{}", std::process::id()));
@@ -155,90 +131,93 @@ async fn setup(name: &str, page: Page) -> (Core, Arc<Mutex<Edge>>, String, Arc<F
     *core.shared.proof_target.lock().unwrap() = Some((fake::HOST.into(), fake::roots()));
     let network = Arc::new(FakeNetwork {
         vtop: fake::serve(page).await,
-        edge: edge.clone(),
+        device: core.registration().0,
         opened: Mutex::default(),
     });
     set_proof_network(network.clone());
     (core, edge, server, network)
 }
 
-fn can(edge: &Arc<Mutex<Edge>>, status: u16, body: Value) {
+fn can(edge: &Arc<Mutex<Edge>>, path: &str, status: u16, body: Value) {
     let mut edge = edge.lock().unwrap();
-    let canned = edge.canned.entry("/v1/account".into()).or_default();
-    canned.push_back((status, body));
-}
-
-fn paths(edge: &Arc<Mutex<Edge>>) -> Vec<String> {
-    let edge = edge.lock().unwrap();
-    edge.requests.iter().map(|r| r.path.clone()).collect()
-}
-
-fn bodies(edge: &Arc<Mutex<Edge>>) -> Vec<Value> {
-    let edge = edge.lock().unwrap();
-    let calls = edge.requests.iter().filter(|r| r.path == "/v1/account");
-    calls.map(|r| r.body.clone()).collect()
+    edge.canned
+        .entry(path.into())
+        .or_default()
+        .push_back((status, body));
 }
 
 const VIEW: &str = r#"{ "thisPhone": true, "keys": [] }"#;
 
-#[tokio::test(flavor = "multi_thread")]
-async fn no_token_proves_keeps_the_token_and_sends_only_it() {
-    let (core, edge, server, network) = setup("proves", Page::Honest).await;
-    let gate = consent::tests::no(&core);
-    can(&edge, 200, serde_json::from_str(VIEW).unwrap());
-    can(&edge, 200, serde_json::from_str(VIEW).unwrap());
-    assert!(core.connected_apps("f".into()).await.unwrap().linked);
-    assert_eq!(gate.asks(), 0);
-    let ws = server.replacen("http://", "ws://", 1);
-    let opened = network.opened.lock().unwrap().clone();
-    assert_eq!(
-        opened,
-        [format!("{ws}/v1/account/prove?challenge={CHALLENGE}")]
-    );
-    assert_eq!(
-        paths(&edge),
-        [
-            "/v1/devices/register",
-            "/v1/account/prove/start",
-            "/v1/account"
-        ]
-    );
-    assert_eq!(bodies(&edge), [json!({ "accountToken": "proved" })]);
-    let kept = core.read::<Saved>(FILE).unwrap();
-    assert_eq!(
-        (kept.token.as_str(), kept.registration_number.as_str()),
-        ("proved", ME)
-    );
-    assert!(kept.server == server && kept.expires_at == 4_102_444_800_000);
-    // The next call goes with the kept token: no second proof.
-    core.connected_apps("f2".into()).await.unwrap();
-    assert_eq!(network.opened.lock().unwrap().len(), 1);
-    assert_eq!(bodies(&edge)[1], json!({ "accountToken": "proved" }));
-    assert!(
-        edge.lock()
-            .unwrap()
-            .requests
-            .iter()
-            .all(|r| r.body.get("session").is_none())
+fn view(edge: &Arc<Mutex<Edge>>) {
+    can(
+        edge,
+        "account:view",
+        200,
+        serde_json::from_str(VIEW).unwrap(),
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_refused_token_is_dropped_and_proved_again_once() {
+async fn no_identity_proves_and_trades_the_ticket_for_a_jwt() {
+    let (core, edge, server, network) = setup("proves", Page::Honest).await;
+    let gate = consent::tests::no(&core);
+    view(&edge);
+    view(&edge);
+    assert!(core.connected_apps("f".into()).await.unwrap().linked);
+    assert_eq!(gate.asks(), 0);
+    let ws = server.replacen("http://", "ws://", 1);
+    let opened = network.opened.lock().unwrap().clone();
+    assert_eq!(opened, [format!("{ws}/proof?ticket={CHALLENGE}")]);
+    assert_eq!(
+        paths(&edge),
+        ["auth:proveStart", "auth:token", "account:view"]
+    );
+    {
+        let edge = edge.lock().unwrap();
+        let token = &edge.requests[1].body;
+        assert_eq!(token["ticket"], CHALLENGE);
+        assert_eq!(token["device"]["platform"], "android");
+        assert!(edge.requests.iter().all(|r| r.signed));
+        assert!(
+            edge.requests
+                .iter()
+                .all(|r| r.body.get("session").is_none())
+        );
+    }
+    let kept = core.device().refresh.unwrap();
+    assert_eq!(
+        (kept.token.as_str(), kept.regno.as_str()),
+        ("vrt_1", "22BCE0001")
+    );
+    // The next call goes with the JWT: no second proof.
+    core.connected_apps("f2".into()).await.unwrap();
+    assert_eq!(network.opened.lock().unwrap().len(), 1);
+    assert_eq!(paths(&edge).len(), 4);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_refused_refresh_token_is_dropped_and_proved_again_once() {
     let (core, edge, server, network) = setup("refused", Page::Honest).await;
     crate::test_edge::keep_token(&core, &server);
-    can(&edge, 401, json!({ "code": "token_expired", "error": "x" }));
-    can(&edge, 200, serde_json::from_str(VIEW).unwrap());
+    can(
+        &edge,
+        "auth:token",
+        401,
+        json!({ "code": "refresh_reused", "error": "x" }),
+    );
+    view(&edge);
     core.connected_apps("f".into()).await.unwrap();
     assert_eq!(network.opened.lock().unwrap().len(), 1);
     assert_eq!(
-        bodies(&edge),
+        paths(&edge),
         [
-            json!({ "accountToken": "tok" }),
-            json!({ "accountToken": "proved" })
+            "auth:token",
+            "auth:proveStart",
+            "auth:token",
+            "account:view"
         ]
     );
-    assert_eq!(core.read::<Saved>(FILE).unwrap().token, "proved");
+    assert_eq!(core.device().refresh.unwrap().token, "vrt_1");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -254,45 +233,38 @@ async fn a_failed_proof_fails_the_call_cleanly() {
         "{reason}"
     );
     assert!(reason.contains("sets a cookie"), "{reason}");
-    assert!(!paths(&edge).contains(&"/v1/account".to_string()));
-    assert!(core.read::<Saved>(FILE).is_none());
+    assert_eq!(paths(&edge), ["auth:proveStart"]);
+    assert!(core.device().refresh.is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn the_edges_refusal_and_a_missing_network_are_clear_errors() {
+async fn the_engines_refusal_and_a_missing_network_are_clear_errors() {
     let (core, edge, _server, _) = setup("refusal", Page::Honest).await;
-    edge.lock()
-        .unwrap()
-        .canned
-        .entry("/v1/account/prove/start".into())
-        .or_default()
-        .push_back((
-            200,
-            json!({ "challenge": "ffffffffffffffffffffffffffffffff" }),
-        ));
+    let other = json!({ "ticket": "ffffffffffffffffffffffffffffffff" });
+    can(&edge, "auth:proveStart", 200, other);
     let error = core.connected_apps("f".into()).await.unwrap_err();
     assert_eq!(error.to_string(), "Start again.");
 
     *network().lock().unwrap() = None;
     let error = core.connected_apps("f".into()).await.unwrap_err();
     assert!(error.to_string().contains("cannot open"), "{error}");
-    assert!(core.read::<Saved>(FILE).is_none());
-    assert_eq!(bodies(&edge), Vec::<Value>::new());
+    assert!(core.device().refresh.is_none());
+    assert!(!paths(&edge).contains(&"auth:token".to_string()));
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_unasked_call_never_proves() {
-    let (core, edge, server, network) = setup("unasked", Page::Honest).await;
+    let (core, edge, _server, network) = setup("unasked", Page::Honest).await;
     let unasked = core
-        .account_post(&server, "/v1/account", "f", "Test", false, json!({}))
+        .account_call("f", Kind::Query, "account:view", "Test", false, json!({}))
         .await;
-    assert_eq!(unasked.unwrap_err(), CoreError::ConsentDenied);
+    assert!(matches!(unasked, Err(CoreError::ConsentDenied)));
     assert!(network.opened.lock().unwrap().is_empty());
     assert!(edge.lock().unwrap().requests.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_session_id_the_proof_cannot_carry_fails_before_the_edge() {
+async fn a_session_id_the_proof_cannot_carry_fails_before_the_server() {
     let (core, edge, _server, network) = setup("bad-cookie", Page::Honest).await;
     let slot = core.current().unwrap();
     slot.read()
@@ -306,5 +278,5 @@ async fn a_session_id_the_proof_cannot_carry_fails_before_the_edge() {
         "{error}"
     );
     assert!(network.opened.lock().unwrap().is_empty());
-    assert!(!paths(&edge).contains(&"/v1/account/prove/start".to_string()));
+    assert!(paths(&edge).is_empty());
 }

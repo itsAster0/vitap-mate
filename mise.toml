@@ -90,6 +90,11 @@ run = [
 description = "Kotlin as App Build runs it: core and design tests, then detekt"
 run = ["./kotlin test", "mise run detekt"]
 
+[tasks.check-backend]
+description = "The Convex backend: type checks and tests"
+dir = "backend"
+run = ["[ -d node_modules ] || bun install --frozen-lockfile", "bun run check", "bun run test"]
+
 [tasks.check-edge]
 description = "The edge Worker as Edge Check runs it: type checks and tests"
 dir = "edge"

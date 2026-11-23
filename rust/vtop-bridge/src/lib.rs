@@ -28,6 +28,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{DefaultPredicate, NotForContentType, Predicate};
+use tracing::Instrument;
 
 use config::Config;
 use engine::EdgeLink;
@@ -57,6 +58,8 @@ pub struct AppState {
     pub proof: proof::ProofTarget,
     /// Slots for proofs running at once.
     pub proofs: Arc<tokio::sync::Semaphore>,
+    /// Proofs started per client address.
+    pub proof_gate: proof::ProofGate,
     sealer: Sealer,
 }
 
@@ -71,6 +74,7 @@ impl AppState {
             vtop: vtop_core::VtopConfig::default(),
             proof: proof::ProofTarget::vtop(),
             proofs: Arc::new(tokio::sync::Semaphore::new(proof::MAX_PROOFS)),
+            proof_gate: proof::ProofGate::default(),
             config,
         }
     }
@@ -101,6 +105,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
         .route(vtop_shared::engine::PROOF_VERIFY, get(proof::verify))
+        .route(proof::PROOF_PUBLIC, get(proof::public))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::FETCH_BATCH, post(fetch::fetch_batch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))
@@ -124,8 +129,11 @@ pub fn router(state: Arc<AppState>) -> Router {
 /// Request bodies are small JSON objects; refuse anything bigger.
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
-/// Logs method, route, status and latency. Never headers or bodies, which
-/// carry cookies, passwords and tokens.
+/// Logs method, route, status and latency, inside a `request` span that
+/// carries the caller's `flow` and `regno` (Convex sends them as
+/// `x-vtop-flow` and `x-vtop-regno`), so every line the handler writes can
+/// be matched to the phone's own log. Never headers or bodies, which carry
+/// cookies, passwords and tokens.
 async fn access_log(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let route = request
@@ -143,15 +151,49 @@ async fn access_log(request: Request, next: Next) -> Response {
             .unwrap_or(none)
             .to_owned()
     });
-    let started = Instant::now();
-    let response = next.run(request).await;
-    tracing::info!(
-        target: "vtop_bridge::access",
-        "{method} {route} {} {}ms via={via} request_id={request_id}",
-        response.status().as_u16(),
-        started.elapsed().as_millis()
+    let [flow, regno] = [(FLOW_HEADER, MAX_FLOW_LEN), (REGNO_HEADER, MAX_REGNO_LEN)]
+        .map(|(name, max)| trace_value(request.headers().get(name), max));
+    let span = tracing::info_span!(
+        "request",
+        flow = tracing::field::Empty,
+        regno = tracing::field::Empty
     );
+    if let Some(flow) = &flow {
+        span.record("flow", tracing::field::display(flow));
+    }
+    if let Some(regno) = &regno {
+        span.record("regno", tracing::field::display(regno));
+    }
+    let started = Instant::now();
+    let response = next.run(request).instrument(span.clone()).await;
+    span.in_scope(|| {
+        tracing::info!(
+            target: "vtop_bridge::access",
+            "{method} {route} {} {}ms via={via} request_id={request_id}",
+            response.status().as_u16(),
+            started.elapsed().as_millis()
+        );
+    });
     response
+}
+
+/// The flow id and registration number Convex puts on its engine calls.
+pub const FLOW_HEADER: &str = "x-vtop-flow";
+pub const REGNO_HEADER: &str = "x-vtop-regno";
+const MAX_FLOW_LEN: usize = 64;
+const MAX_REGNO_LEN: usize = 20;
+
+/// A trace header's value, if it is short and only letters, digits and
+/// `-_.:`. Anything else is dropped rather than logged: the header is the
+/// caller's to set, and a log line must not carry what it was not meant to.
+pub fn trace_value(value: Option<&axum::http::HeaderValue>, max: usize) -> Option<String> {
+    let text = value?.to_str().ok()?;
+    let fits = !text.is_empty()
+        && text.len() <= max
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b':'));
+    fits.then(|| text.to_owned())
 }
 
 /// Nothing is stored here, so up is healthy.

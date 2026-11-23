@@ -1,5 +1,4 @@
-//! Plumbing every call to the edge (`edge/`) shares: which server, and the VTOP
-//! session's cookies for the calls that send it.
+//! Which server the app talks to, and the VTOP session's cookies for the calls that send it.
 
 use std::fs;
 
@@ -8,11 +7,18 @@ use vtop_core::{VtopClient, VtopError};
 use crate::remote::consent::{self, CookieKind};
 use crate::{Core, CoreError};
 
-/// Optional one-line server URL (e.g. `http://127.0.0.1:8787` for `wrangler dev` behind
-/// `adb reverse`), read when an address is set up; the address keeps the server it was made on.
+/// Optional one-line server URL (e.g. `http://127.0.0.1:3210` for a local Convex behind
+/// `adb reverse`), read when the server's client is made; an address keeps the server it was
+/// made on.
 pub(crate) const SERVER_FILE: &str = "forwarding_server";
-/// The edge (`edge/`).
-const DEFAULT_SERVER: &str = "https://vmate.aster0.dev";
+/// The server (`backend/`, Convex). The v3 test build's; prod moves to `vmate.aster0.dev`.
+pub(crate) const DEFAULT_SERVER: &str = "https://vmate3.aster0.dev";
+
+/// [`DEFAULT_SERVER`], for the app's plain HTTP reads on the same host (the help pages).
+#[uniffi::export]
+pub fn default_server() -> String {
+    DEFAULT_SERVER.into()
+}
 
 impl Core {
     pub(crate) fn forwarding_server(&self) -> String {
@@ -24,7 +30,7 @@ impl Core {
     }
 
     /// The signed-in VTOP session's cookies, after VTOP confirmed it (signing in again when it
-    /// had expired), so the edge can tell whose session it is. Only once the student allowed it
+    /// had expired), so a connected app gets it. Only once the student allowed it
     /// for `action` ([`consent::allowed`], before any VTOP hit); else `ConsentDenied`.
     pub(crate) async fn session_cookies(
         &self,

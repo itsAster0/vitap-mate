@@ -68,4 +68,13 @@ class ProblemTest {
         val p = problemOf(CoreException.Other("serde: missing field `x` at line 3"), "f")
         assertFalse("serde" in p.message)
     }
+
+    @Test
+    fun serverFailuresBlameTheServerAndKeepTheirFlow() {
+        val offline = ServerFailure("s1", CoreException.Offline()).problem
+        assertEquals("s1", offline.flow)
+        assertTrue("the server" in offline.message && "VTOP" !in offline.message)
+        assertEquals("Proof rejected", ServerFailure("s2", CoreException.Other(" Proof rejected ")).problem.message)
+        assertTrue(ServerFailure("s3", CoreException.Other("")).problem.message.startsWith("Something went wrong"))
+    }
 }

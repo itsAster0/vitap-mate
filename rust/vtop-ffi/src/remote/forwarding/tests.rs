@@ -5,13 +5,13 @@ use vtop_shared::device_sig;
 use super::*;
 use crate::remote::consent;
 use crate::remote::edge::SERVER_FILE;
-use crate::test_edge::{Edge, ID, keep_token, now, serve, signed_in};
+use crate::test_edge::{Edge, ID, keep_token, now, paths, serve, signed_in};
 
-/// Seals `payload` the way the edge does: to the registered seal key, for mailbox [`ID`].
-fn seal(edge: &Arc<Mutex<Edge>>, payload: Value) {
-    let mut edge = edge.lock().unwrap();
-    let key = edge.seal_key.clone().unwrap();
-    edge.sealed = Some(mail_seal::seal(&key, ID, payload.to_string().as_bytes()).unwrap());
+/// Seals `payload` the way the server does: to this install's seal key, for mailbox [`ID`].
+fn seal(core: &Core, edge: &Arc<Mutex<Edge>>, payload: Value) {
+    let key = core.device().seal_key;
+    edge.lock().unwrap().sealed =
+        Some(mail_seal::seal(&key, ID, payload.to_string().as_bytes()).unwrap());
 }
 
 #[tokio::test]
@@ -22,7 +22,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
     let edge = Arc::new(Mutex::new(Edge::default()));
     let url = serve(edge.clone()).await;
     fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
-    // No address to join yet: a new one, then claimed for the student.
+    // The server makes the student's address, or joins theirs.
     let core = signed_in(&dir, url.clone());
     keep_token(&core, &url);
     assert_eq!(
@@ -30,7 +30,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
         ForwardingState::Off
     );
     let fetched = core.fetch_forwarded_otp("f".into(), 0).await;
-    assert!(matches!(fetched, Err(CoreError::Other { .. })));
+    assert!(matches!(fetched, Err(CoreError::ForwardingOff { .. })));
 
     let set_up = core.set_up_forwarding("f-setup".into()).await.unwrap();
     assert_eq!(set_up.state, ForwardingState::Waiting);
@@ -42,31 +42,13 @@ async fn sets_up_checks_fetches_and_turns_off() {
     {
         let edge = edge.lock().unwrap();
         let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
-        assert_eq!(
-            paths,
-            [
-                "/v1/devices/register",
-                "/v1/mail-otp/reclaim",
-                "/v1/mail-otp/register",
-                "/v1/mail-otp/owner"
-            ]
-        );
+        assert_eq!(paths, ["auth:token", "mail:register"]);
         assert!(edge.requests.iter().all(|r| r.flow == "f-setup"));
-        let register = &edge.requests[0].body;
-        assert_eq!(
-            (&register["label"], &register["platform"]),
-            (&json!(crate::remote::server::label()), &json!("android"))
-        );
-        assert!(mail_seal::is_public_key(
-            register["sealKey"].as_str().unwrap()
-        ));
-        assert_eq!(edge.requests[1].body, json!({ "accountToken": "tok" }));
-        assert_eq!(edge.requests[2].body, json!({}));
-        assert_eq!(edge.requests[3].body["id"], json!(ID));
+        assert_eq!(edge.requests[1].body, json!({}));
     }
     // Set up already: nothing is sent.
     core.set_up_forwarding("f".into()).await.unwrap();
-    assert_eq!(edge.lock().unwrap().requests.len(), 4);
+    assert_eq!(edge.lock().unwrap().requests.len(), 2);
 
     // Nothing forwarded yet.
     let checked = core.check_forwarding("f".into()).await.unwrap();
@@ -76,13 +58,14 @@ async fn sets_up_checks_fetches_and_turns_off() {
         json!({ "id": ID })
     );
 
-    // Gmail's confirmation proves the address works.
+    // Gmail's confirmation shows the address was added, not that forwarding works yet.
     seal(
+        &core,
         &edge,
         json!({ "kind": "gmail_confirm", "code": "981234567", "link": null, "requester": "me@vitapstudent.ac.in", "sentAt": 1_700_000_000 }),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.state, ForwardingState::On);
+    assert_eq!(checked.state, ForwardingState::Waiting);
     let confirmation = checked.confirmation.unwrap();
     assert_eq!(confirmation.code.as_deref(), Some("981234567"));
     assert_eq!(checked.last_mail_at, Some(1_700_000_000));
@@ -92,6 +75,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
 
     let sent = now();
     seal(
+        &core,
         &edge,
         json!({ "kind": "otp", "code": "401295", "sentAt": sent }),
     );
@@ -101,7 +85,10 @@ async fn sets_up_checks_fetches_and_turns_off() {
     let code = core.fetch_forwarded_otp("f".into(), sent + 120).await;
     assert_eq!(code, Ok(None));
     let status = core.forwarding_status("f".into());
-    assert_eq!(status.last_otp_at, Some(sent));
+    assert_eq!(
+        (status.state, status.last_otp_at),
+        (ForwardingState::On, Some(sent))
+    );
     // No key or secret in forwarding.json.
     let saved = fs::read_to_string(dir.join(FILE)).unwrap();
     assert!(!saved.contains("secret") && !saved.contains("seed"));
@@ -112,7 +99,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
         let last = edge.requests.last().unwrap();
         assert_eq!(
             (last.path.as_str(), last.flow.as_str()),
-            ("/v1/mail-otp/delete", "f-off")
+            ("mail:remove", "f-off")
         );
         assert_eq!(last.body, json!({ "id": ID, "everywhere": false }));
     }
@@ -122,24 +109,24 @@ async fn sets_up_checks_fetches_and_turns_off() {
     );
     assert!(!dir.join(FILE).exists());
 
-    // An address the edge lost is forgotten here.
+    // An address the server lost is forgotten here.
     core.set_up_forwarding("f".into()).await.unwrap();
     edge.lock().unwrap().gone = true;
     let checked = core.check_forwarding("f".into()).await;
-    assert!(matches!(checked, Err(CoreError::Other { .. })));
+    assert!(matches!(checked, Err(CoreError::ForwardingOff { .. })));
     assert_eq!(
         core.forwarding_status("f".into()).state,
         ForwardingState::Off
     );
 
-    // Registered once; every request was signed as this install.
+    // One identity; every call went signed or with its JWT.
     let edge = edge.lock().unwrap();
-    let registers = edge
+    let tokens = edge
         .requests
         .iter()
-        .filter(|r| r.path == "/v1/devices/register")
+        .filter(|r| r.path == "auth:token")
         .count();
-    assert_eq!(registers, 1);
+    assert_eq!(tokens, 1);
     assert!(edge.requests.iter().all(|r| r.signed));
 }
 
@@ -175,16 +162,10 @@ async fn check_shows_the_confirmation_the_edge_kept() {
     core.set_up_forwarding("f".into()).await.unwrap();
     // Gmail's mail came before this install joined: no box, only the kept confirmation.
     let kept = {
-        let edge = edge.lock().unwrap();
         let payload = json!({ "kind": "gmail_confirm", "code": "981234567", "link": null, "requester": null, "sentAt": 1_700_000_000 });
-        mail_seal::seal(
-            edge.seal_key.as_deref().unwrap(),
-            ID,
-            payload.to_string().as_bytes(),
-        )
-        .unwrap()
+        mail_seal::seal(&core.device().seal_key, ID, payload.to_string().as_bytes()).unwrap()
     };
-    let inbox = "/v1/mail-otp/inbox".to_string();
+    let inbox = "mail:inbox".to_string();
     edge.lock().unwrap().canned.insert(
         inbox.clone(),
         [(
@@ -194,7 +175,7 @@ async fn check_shows_the_confirmation_the_edge_kept() {
         .into(),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.state, ForwardingState::On);
+    assert_eq!(checked.state, ForwardingState::Waiting);
     assert_eq!(
         checked.confirmation.unwrap().code.as_deref(),
         Some("981234567")
@@ -212,35 +193,34 @@ async fn check_shows_the_confirmation_the_edge_kept() {
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
     assert_eq!(checked.last_otp_at, Some(1_700_000_100));
-    // and Gmail's confirmation goes, here as on the edge.
+    // and Gmail's confirmation goes, here as on the server.
     assert!(checked.confirmation.is_none());
     let _ = fs::remove_dir_all(&dir);
 }
 
 #[tokio::test]
-async fn requests_carry_valid_signatures() {
+async fn signed_calls_are_this_installs() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-sig-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), &server).unwrap();
     let core = Core::for_test(&dir);
-    let body = json!({ "id": ID });
-    core.edge_post(&server, "/v1/mail-otp/inbox", "f", &body)
+    let kind = Kind::Mutation;
+    core.signed_call("f", kind, "auth:proveStart", &json!({}))
         .await
         .unwrap();
-    let edge = edge.lock().unwrap();
-    assert_eq!(edge.requests.len(), 2);
-    assert!(edge.requests.iter().all(|r| r.signed));
-    // The key the edge saw is this install's: a signature by another seed does not verify.
+    assert!(edge.lock().unwrap().requests[0].signed);
+    // Another seed's signature over the same call does not verify against this install's key.
+    let key = device_sig::public_key(&core.device().seed).unwrap();
     let other = device_sig::generate_seed();
-    let sig = device_sig::sign(&other, "POST", "/v1/mail-otp/inbox", now(), b"{}").unwrap();
-    let key = edge.sign_key.as_deref().unwrap();
+    let sig = device_sig::sign(&other, "CALL", "/auth:proveStart", now(), b"{}").unwrap();
     assert!(!device_sig::verify(
-        key,
+        &key,
         &sig,
-        "POST",
-        "/v1/mail-otp/inbox",
+        "CALL",
+        "/auth:proveStart",
         now(),
         b"{}"
     ));
@@ -289,12 +269,15 @@ async fn offline_keeps_the_address() {
         id: ID.into(),
         address: "a@b".into(),
         owner_claimed: false,
+        joined: false,
         ready: false,
         last_mail_at: None,
         last_otp_at: None,
         confirmation: None,
     };
     core.write(FILE, &saved);
+    // With an identity on the default server, which this test can't reach.
+    keep_token(&core, crate::remote::edge::DEFAULT_SERVER);
     assert_eq!(
         core.check_forwarding("f".into()).await,
         Err(CoreError::Offline)
@@ -354,12 +337,12 @@ async fn sign_out_leaves_the_address_on_the_edge() {
     core.sign_out("f-out".into());
     assert!(!dir.join(FILE).exists());
     assert!(dir.join(LEAVE_FILE).exists());
-    // An edge without `/leave` (or offline): still queued.
+    // A server refusing it for now (or offline): still queued.
     edge.lock().unwrap().canned.insert(
-        "/v1/mail-otp/leave".into(),
+        "mail:leave".into(),
         [(
-            404,
-            json!({ "code": "not_found", "error": "No such route." }),
+            500,
+            json!({ "code": "server_error", "error": "Try again." }),
         )]
         .into(),
     );
@@ -372,7 +355,7 @@ async fn sign_out_leaves_the_address_on_the_edge() {
         let last = edge.requests.last().unwrap();
         assert_eq!(
             (last.path.as_str(), last.flow.as_str()),
-            ("/v1/mail-otp/leave", "f-leave")
+            ("mail:leave", "f-leave")
         );
         assert_eq!(last.body, json!({ "id": ID }));
     }
@@ -380,6 +363,65 @@ async fn sign_out_leaves_the_address_on_the_edge() {
     let sent = edge.lock().unwrap().requests.len();
     core.leave_old_forwarding("f".into()).await.unwrap();
     assert_eq!(edge.lock().unwrap().requests.len(), sent);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+async fn forwarding_core(name: &str) -> (Core, Arc<Mutex<Edge>>, std::path::PathBuf, String) {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let url = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
+    core.set_up_forwarding("f".into()).await.unwrap();
+    (core, edge, dir, url)
+}
+
+#[tokio::test]
+async fn a_queued_leave_waits_for_the_next_identity() {
+    let (core, edge, dir, url) = forwarding_core("later").await;
+    core.sign_out("f-out".into());
+    core.forget_identity();
+    core.leave_old_forwarding("f".into()).await.unwrap();
+    assert!(dir.join(LEAVE_FILE).exists());
+    assert!(!paths(&edge).contains(&"mail:leave".to_string()));
+    // The next student's identity leaves it, whichever call gets it.
+    keep_token(&core, &url);
+    core.leave_old_forwarding("f-next".into()).await.unwrap();
+    assert!(!dir.join(LEAVE_FILE).exists());
+    let leaves = paths(&edge).iter().filter(|p| *p == "mail:leave").count();
+    assert_eq!(leaves, 1);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn signing_out_of_the_server_leaves_first_then_forgets() {
+    let (core, edge, dir, _url) = forwarding_core("signout").await;
+    edge.lock()
+        .unwrap()
+        .canned
+        .insert("auth:signOut".into(), [(200, Value::Null)].into());
+    core.sign_out_of_server("f-s".into(), true).await.unwrap();
+    let sent = paths(&edge);
+    let tail: Vec<&str> = sent
+        .iter()
+        .rev()
+        .take(2)
+        .rev()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(tail, ["mail:leave", "auth:signOut"]);
+    assert_eq!(
+        edge.lock().unwrap().requests.last().unwrap().body,
+        json!({ "everywhere": true })
+    );
+    assert!(!dir.join(FILE).exists());
+    assert!(core.device().refresh.is_none());
+    // The local sign-out then has nothing left to queue.
+    core.sign_out("f-out".into());
+    assert!(!dir.join(LEAVE_FILE).exists());
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -429,5 +471,93 @@ fn knows_a_requester_on_the_profile() {
     );
     assert_eq!(core.requester_known(Some("someone@gmail.com")), Some(false));
     assert_eq!(core.requester_known(None), None);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn an_address_kept_from_v2_is_rejoined_once() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-keep-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let url = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
+    let v2 = Saved {
+        server: url.clone(),
+        id: ID.into(),
+        address: format!("otp+{ID}@vmate.aster0.dev"),
+        owner_claimed: true,
+        joined: false,
+        ready: true,
+        last_mail_at: Some(5),
+        last_otp_at: Some(5),
+        confirmation: None,
+    };
+    core.write(FILE, &v2);
+    // An OTP wait before the rejoin: the server doesn't know this install on the address yet,
+    // so it is rejoined there and then, not forgotten.
+    edge.lock().unwrap().gone = true;
+    let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
+    assert!(matches!(pulled, Err(CoreError::Other { .. })), "{pulled:?}");
+    assert_eq!(paths(&edge), ["auth:token", "mail:inbox", "mail:register"]);
+    edge.lock().unwrap().gone = false;
+    let kept = core.read::<Saved>(FILE).unwrap();
+    assert!(kept.joined);
+    // The same address: its Gmail setup still holds.
+    assert_eq!((kept.id.as_str(), kept.ready), (ID, true));
+    core.keep_forwarding("f".into()).await.unwrap();
+    // Joined: opening the app again asks nothing.
+    assert_eq!(paths(&edge).len(), 3);
+
+    // The account holds another address: this phone moves to it and checks Gmail again.
+    core.write(
+        FILE,
+        &Saved {
+            id: "zzzzzzzzzz".into(),
+            ..v2
+        },
+    );
+    core.keep_forwarding("f".into()).await.unwrap();
+    let moved = core.read::<Saved>(FILE).unwrap();
+    assert_eq!(
+        (moved.id.as_str(), moved.ready, moved.joined),
+        (ID, false, true)
+    );
+    // The old address's "last OTP" isn't shown for the new one.
+    assert_eq!((moved.last_otp_at, moved.last_mail_at), (None, None));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn a_phone_moved_to_the_students_old_address_follows_it() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-moved-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let url = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
+    core.set_up_forwarding("f".into()).await.unwrap();
+    // The server gave the account's old address the win: this phone is on it now.
+    {
+        let mut edge = edge.lock().unwrap();
+        edge.gone = true;
+        edge.moved_to = Some("zzzzzzzzzz".into());
+    }
+    let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
+    assert!(matches!(pulled, Err(CoreError::Other { .. })), "{pulled:?}");
+    let kept = core.read::<Saved>(FILE).unwrap();
+    assert_eq!(
+        (kept.id.as_str(), kept.ready, kept.joined),
+        ("zzzzzzzzzz", false, true)
+    );
+    // Deleted on another phone: no address to follow, so it is forgotten.
+    edge.lock().unwrap().moved_to = None;
+    let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
+    assert!(matches!(pulled, Err(CoreError::ForwardingOff { .. })));
+    assert!(core.read::<Saved>(FILE).is_none());
     let _ = fs::remove_dir_all(&dir);
 }

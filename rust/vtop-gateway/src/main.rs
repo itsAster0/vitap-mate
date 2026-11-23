@@ -1,7 +1,8 @@
 //! `vtop-gateway`: UDP mode's gateway, on its own host next to an engine
 //! elsewhere.
 //!
-//! Environment: `ENGINE_URL` (the engine's base URL), `EDGE_URL`,
+//! Environment: `ENGINE_URL` (the engine's base URL), `EDGE_URL` (Convex's
+//! HTTP actions),
 //! `GATEWAY_TOKEN` (its own bearer token, which the engine takes for fetches
 //! and sign-ins and the edge for `/internal/udp-keys`; `INTERNAL_TOKEN` is
 //! read when it is unset, for a gateway deployed before it had one),
@@ -35,6 +36,7 @@ async fn main() {
         let config = Config {
             engine_url: var("ENGINE_URL")?,
             edge_url: var("EDGE_URL")?,
+            login_poll: std::time::Duration::from_secs(2),
             token: var("GATEWAY_TOKEN").or_else(|_| var("INTERNAL_TOKEN"))?,
             host: var("UDP_HOST")?,
             data_dir: var("GATEWAY_DATA_DIR")

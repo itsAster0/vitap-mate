@@ -33,6 +33,8 @@ export interface Env {
   GATEWAY_TOKEN?: string;
   /** Signs account tokens (account-token.ts); without it none are issued. */
   ACCOUNT_TOKEN_SECRET: string;
+  /** Set for the move to v3: writes answer `503 frozen` (export.ts). */
+  FREEZE?: string;
 }
 
 /** Unix seconds. */

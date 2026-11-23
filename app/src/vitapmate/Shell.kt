@@ -35,6 +35,7 @@ import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.FloatingToolbarExitDirection
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.snapshotFlow
@@ -67,6 +68,9 @@ fun Shell(nav: Nav, onSignedOut: () -> Unit) {
     val tabStates = rememberSaveableStateHolder()
     val reselect = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
     val keys = nav.stack.map { it.key }
+    // Connected apps' session requests, answered on screen as the server lists them.
+    val context = LocalContext.current.applicationContext
+    LaunchedEffect(Unit) { Push.follow(context) }
     LaunchedEffect(keys, tabs) {
         scroll.state.offset = 0f
         Log.info("ui.shell", "route ${nav.top.key}", fields = mapOf("tab" to nav.tab.orEmpty(), "stack" to keys.joinToString(">")))

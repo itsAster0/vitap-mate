@@ -122,6 +122,7 @@ Every route, with its auth kind; the sections below give the details.
 | POST | `/internal/mail-otp/await` | internal | The engine waits for a student's next OTP. |
 | POST | `/internal/udp-keys` | internal | The UDP gateway reports its keys (GATEWAY_TOKEN). |
 | POST | `/internal/accounts/login-done` | internal | The engine reports a server sign-in. |
+| POST | `/internal/export` | internal | One Durable Object's stored state, for the move to v3. |
 
 <!-- routes:end -->
 
@@ -563,6 +564,22 @@ nothing else, so a compromised gateway cannot wait for OTPs or reach accounts.
 | `POST /internal/accounts/login-done` | engine | `{ account, requestId, outcome }` (`LoginDone` in `src/shared/engine-api.ts`) | `204` |
 | `POST /internal/mail-otp/await` | engine | `{ ownerHash, publicKey, since, waitSecs }` | `{ sealed }` or `{ sealed: null }`; `404 mailbox_not_found` |
 | `POST /internal/udp-keys` | gateway | see UDP | `204` |
+| `POST /internal/export` | backfill | `{ kind, id }` or `{ kind, objectId }` | `{ kind, id \| objectId, found, tables, kv, omitted }` |
+
+`/internal/export` is for the one-time move to backend v3
+(`backend/scripts/backfill.ts`). It reads one Durable Object and changes
+nothing, not even a missing table. `kind` is `device`, `account`, `mailbox`,
+`oauth` or `fcm`; `id` is the object's name (a device id, a registration
+number, a mailbox id, `oauth`) and `objectId` its 64-hex id, as the Cloudflare
+API lists a namespace's objects. `tables` has each table's rows as stored
+(sealed values as they are), `kv` a mailbox's Gmail confirmation and latest
+OTP time, and `omitted` the row counts of the tables left out: short-lived ones,
+some holding live secrets (an account's session `requests` and `pending`,
+OAuth `requests` and `grants`, a mailbox's engine `waiters`), and a device's
+`events`. `fcm` is always `found: false`: that object caches Google's token in
+memory only. The `Index` objects keep no list of their names, and everything
+they hold is in the accounts' and mailboxes' own tables, so they aren't
+exported.
 
 ## Edge → engine
 
@@ -586,3 +603,9 @@ Vars: `MAIL_DOMAIN`, `ENGINE_URL`, `FCM_URL`, `PUBLIC_URL`,
 `INTERNAL_TOKEN`, `GATEWAY_TOKEN` (the UDP gateway's, for `/internal/udp-keys`
 only), `ACCOUNT_TOKEN_SECRET` (signs account tokens; unset, none
 are issued and every token is `token_invalid`; changing it voids them all).
+`FREEZE` (any value, for the cutover to backend v3): every route that writes
+the Durable Objects answers `503 frozen` with `retry-after: 60`. Still open:
+`/healthz`, `/vtop/*`, `/internal/*`, mail coming in, GET routes but `GET
+/v1/account/prove`, and the POST routes that only read (`/v1/devices/info`,
+`/v1/app/status`, `/v1/mail-otp/inbox`, `/v1/mail-otp/devices`,
+`/v1/pair/info`, `/v1/vtop/*`).

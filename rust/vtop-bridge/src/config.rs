@@ -9,7 +9,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 #[derive(Clone)]
 pub struct Config {
     pub vault_key: [u8; 32],
-    /// The Cloudflare edge this engine works for.
+    /// Where the engine reports and checks keys: Convex (`CONVEX_URL`) for backend v3, else
+    /// the Cloudflare edge (`EDGE_URL`). Both serve the same internal routes.
     pub edge_url: String,
     /// The bearer token shared with the edge, both ways (`INTERNAL_TOKEN`).
     pub internal_token: String,
@@ -19,6 +20,10 @@ pub struct Config {
     pub gateway_token: Option<String>,
     /// How long a sign-in waits for the forwarded OTP mail.
     pub otp_wait: Duration,
+    /// Proxies in front that each append the address they saw to `X-Forwarded-For`
+    /// (`PROXY_HOPS`): 1 for hawk's Caddy alone, 2 with Railway's edge behind it. The phone's
+    /// address is that many entries from the end; earlier ones it may have made up.
+    pub proxy_hops: usize,
     pub listen: SocketAddr,
 }
 
@@ -54,9 +59,13 @@ impl Config {
             .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
             .ok_or_else(|| ConfigError("VAULT_KEY must be 32 bytes, base64".into()))?;
 
-        let edge_url = required("EDGE_URL")?.trim_end_matches('/').to_string();
+        let (name, edge_url) = ["CONVEX_URL", "EDGE_URL"]
+            .into_iter()
+            .find_map(|name| Some((name, required(name).ok()?)))
+            .ok_or_else(|| ConfigError("CONVEX_URL or EDGE_URL is required".into()))?;
+        let edge_url = edge_url.trim_end_matches('/').to_string();
         if !edge_url.starts_with("https://") && !edge_url.starts_with("http://") {
-            return Err(ConfigError("EDGE_URL must be an HTTP(S) URL".into()));
+            return Err(ConfigError(format!("{name} must be an HTTP(S) URL")));
         }
 
         let internal_token = required("INTERNAL_TOKEN")?;
@@ -77,12 +86,17 @@ impl Config {
 
         let otp_wait = Duration::from_secs(parse(&lookup, "OTP_WAIT_SECS", 45)?);
         let port: u16 = parse(&lookup, "PORT", 8080)?;
+        let proxy_hops: usize = parse(&lookup, "PROXY_HOPS", 1)?;
+        if proxy_hops == 0 {
+            return Err(ConfigError("PROXY_HOPS must be at least 1".into()));
+        }
         Ok(Self {
             vault_key,
             edge_url,
             internal_token,
             gateway_token,
             otp_wait,
+            proxy_hops,
             listen: SocketAddr::from((std::net::Ipv6Addr::UNSPECIFIED, port)),
         })
     }
@@ -126,6 +140,7 @@ mod tests {
         assert_eq!(c.edge_url, "https://edge.example");
         assert_eq!(c.otp_wait, Duration::from_secs(45));
         assert_eq!(c.listen.port(), 8080);
+        assert_eq!(c.proxy_hops, 1);
         assert!(c.gateway_token.is_none());
     }
 
@@ -140,6 +155,7 @@ mod tests {
     fn rejects_bad_values() {
         assert!(config(&[("VAULT_KEY", "short")]).is_err());
         assert!(config(&[("EDGE_URL", "edge.example")]).is_err());
+        assert!(config(&[("CONVEX_URL", "convex.example")]).is_err());
         assert!(config(&[("INTERNAL_TOKEN", "short")]).is_err());
         assert!(config(&[("GATEWAY_TOKEN", "short")]).is_err());
         assert!(config(&[("OTP_WAIT_SECS", "x")]).is_err());
@@ -151,6 +167,12 @@ mod tests {
         let error = Config::from_lookup(|name| vars.get(name).map(|v| v.to_string()))
             .err()
             .unwrap();
-        assert_eq!(error.0, "EDGE_URL is required");
+        assert_eq!(error.0, "CONVEX_URL or EDGE_URL is required");
+    }
+
+    #[test]
+    fn convex_comes_before_the_edge() {
+        let c = config(&[("CONVEX_URL", "https://convex.example/")]).unwrap();
+        assert_eq!(c.edge_url, "https://convex.example");
     }
 }

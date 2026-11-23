@@ -195,8 +195,7 @@ mod tests {
             (Server, &[], Udp, NOW, false),
             (Udp, &[], Udp, NOW, true),
             (Udp, &[], Server, NOW, true),
-            (Udp, &[], Proxy, NOW, false),
-            (Proxy, &[], Proxy, NOW, true),
+            (Udp, &[], Direct, NOW, false),
             (Server, &[(Server, failed("x"), NOW)], Server, NOW, false),
             (
                 Server,
@@ -221,7 +220,6 @@ mod tests {
             ),
             (Udp, &[(Udp, failed("x"), NOW)], Udp, NOW, false),
             (Udp, &[(Udp, failed("x"), NOW)], Server, NOW, true),
-            (Proxy, &[(Proxy, failed("x"), NOW)], Proxy, NOW + 1, false),
         ];
         for (chosen, results, route, at, want) in cases {
             let mut plan = plan(*chosen);
@@ -241,7 +239,6 @@ mod tests {
         // (chosen, failed routes at NOW, at, next)
         let cases: &[(Route, &[Route], i64, Option<Route>)] = &[
             (Route::Direct, &[], NOW, None),
-            (Route::Proxy, &[], NOW, None),
             (Route::Server, &[], NOW, Some(Route::Server)),
             (Route::Udp, &[], NOW, Some(Route::Udp)),
             (Route::Udp, &[Route::Udp], NOW, Some(Route::Server)),

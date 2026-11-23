@@ -312,8 +312,8 @@ fun DeveloperScreen() {
                 }
             }
             item {
-                ListGroup("Mail forwarding") {
-                    GroupItem("Forwarding server", "dev.forwarding_server", Lucide.Server, server ?: "…", onClick = { editServer = true })
+                ListGroup("Server") {
+                    GroupItem("Server", "dev.forwarding_server", Lucide.Server, server ?: "…", onClick = { editServer = true })
                     tunable(Tunable.OtpPoll)
                 }
             }
@@ -364,8 +364,8 @@ fun DeveloperScreen() {
     }
     if (editServer) {
         TextDialog(
-            "Forwarding server",
-            "New forwarding addresses are made on this server, e.g. http://127.0.0.1:8787 with adb reverse. An existing address keeps its own.",
+            "Server",
+            "Every server call goes here: Convex, e.g. http://127.0.0.1:3210 with adb reverse. A forwarding address made on another server stops working here.",
             server.orEmpty(),
             number = false,
             check = { it.trim().startsWith("http://") || it.trim().startsWith("https://") },

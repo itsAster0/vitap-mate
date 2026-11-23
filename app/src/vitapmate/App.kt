@@ -35,6 +35,7 @@ import vitapmate.data.orNull
 import vitapmate.features.login.ChooseSemester
 import vitapmate.features.login.FetchOtpOverlay
 import vitapmate.features.login.LoginScreen
+import vitapmate.features.login.MailForwarding
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.DownloadFolderPrompt
@@ -108,6 +109,9 @@ fun App() {
             signedIn?.fold(
                 onSuccess = { yes ->
                     if (yes) {
+                        // After a sign-in or on opening signed in, while the session is likely live.
+                        // The address may have moved: what Settings shows is read again after.
+                        LaunchedEffect(Unit) { AppCore.keepForwarding { MailForwarding.load("keep") } }
                         when {
                             !semesterRead -> {}
                             SemesterChoice.selected == null -> {

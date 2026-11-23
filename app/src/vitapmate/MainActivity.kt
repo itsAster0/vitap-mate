@@ -95,11 +95,10 @@ class MainActivity : ComponentActivity() {
         // A connected app's session request from the notification: asked once the app shows.
         if (open == OPEN_SESSION_REQUEST) {
             val requestId = intent.getStringExtra(ITEM) ?: return
-            val callbackUrl = intent.getStringExtra(Push.CALLBACK) ?: return
             intent.removeExtra(OPEN)
             lifecycleScope.launch {
                 lifecycle.withStarted {}
-                Push.answer(applicationContext, requestId, callbackUrl, tapped = true)
+                Push.answer(applicationContext, requestId, tapped = true)
             }
             return
         }
@@ -114,8 +113,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStart() {
-        super.onStart()
+        // Before super: the screens it starts read whether the app is on screen.
         Foreground.started()
+        super.onStart()
         // The calendar from the cache, if it is on.
         AppScope.launch { CalendarSync.sync(applicationContext) }
     }

@@ -21,6 +21,8 @@ import vitapmate.core.setCookieGate
 import vitapmate.core.setDeviceLabel
 import vitapmate.core.setHttpTransport
 import vitapmate.core.setSharedCookies
+import vitapmate.core.setConvexNetwork
+import vitapmate.core.setProofNetwork
 import vitapmate.core.setUdpNetwork
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
@@ -74,6 +76,8 @@ object AppCore {
                 setHttpTransport(if (engine) VtopHttpEngine(app) else inspectedHttp(app))
                 Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "urlconnection"))
                 setUdpNetwork(VtopUdp(app))
+                setConvexNetwork(SocketConvexNetwork())
+                setProofNetwork(SocketProofNetwork())
                 setCookieGate(CookieConsent)
                 setSharedCookies(VtopCookies)
                 setDeviceLabel(if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}")
@@ -89,6 +93,19 @@ object AppCore {
                 AccountBackup.save(app)
             }.onFailure { Log.warn("store", "start housekeeping failed: ${it::class.simpleName}") }
             leaveOldForwarding()
+        }
+    }
+
+    /**
+     * Rejoins a forwarding address kept from before backend v3, so forwarded OTPs keep coming
+     * after the update. Rust proves the student once (no cookie leaves the phone) and does
+     * nothing after that, so it runs whenever the app is signed in.
+     */
+    fun keepForwarding(then: suspend () -> Unit = {}) {
+        AppScope.launch {
+            runCatching { flow("forwarding.keep") { f -> withContext(Dispatchers.IO) { await().keepForwarding(f) } } }
+                .onFailure { Log.warn("forwarding", "keep failed: ${it::class.simpleName}") }
+            then()
         }
     }
 

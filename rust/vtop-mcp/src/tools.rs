@@ -202,6 +202,10 @@ pub(crate) fn tool_error(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message.into())])
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "an early tool answer, made once per call; big only with serde_json's preserve_order"
+)]
 pub(crate) fn input<T>(parsed: VtopResult<T>) -> Result<T, CallToolResult> {
     parsed.map_err(|error| tool_error(format!("invalid input: {error}")))
 }

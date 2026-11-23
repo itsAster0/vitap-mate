@@ -357,6 +357,7 @@ impl Core {
                     info!("forwarding server back to the default");
                 }
             }
+            self.shared.reset_backend();
             Ok(())
         })
     }

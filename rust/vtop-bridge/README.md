@@ -8,9 +8,9 @@ Objects. The engine only:
 
 - checks whose a VTOP session is (`/engine/session`);
 - seals saved credentials for an account (`/engine/seal`);
-- signs in with saved credentials, reading the OTP from the student's
-  forwarded mail or, without a forwarding address, from their Gmail
-  (`/engine/login`);
+- signs in with saved credentials one step per call (`/engine/login`):
+  whole with the OTP read from the student's Gmail, or stopping at VTOP's
+  OTP and resuming when Convex sends the forwarded code;
 - fetches and parses pages on a phone's own session for "Fetch on the
   server", one (`/engine/fetch`) or several in one round trip
   (`/engine/fetch-batch`), keeping nothing;

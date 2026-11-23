@@ -29,6 +29,10 @@ vtop-shared = { path = "../vtop-shared" }
 vtop-wire = { path = "../vtop-wire", default-features = false }
 # The account proof's prover; it runs on any executor, so no tokio here either.
 vtop-tlsn = { path = "../vtop-tlsn", optional = true }
+# The Convex client (src/convex): the sync protocol's messages and their JSON. No tokio.
+convex_sync_types = "=0.10.2"
+# Its JSON conversions name anyhow's error, so values implementing them do too.
+anyhow = "1"
 futures = "0.3"
 # No tokio: async exports run on the futures Kotlin polls (see vtop_core::sync).
 uniffi = { version = "0.32.2", default-features = false }

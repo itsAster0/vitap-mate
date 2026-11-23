@@ -30,6 +30,7 @@ import * as oauth from "./oauth";
 import { tokenInvalid, verifyToken } from "./account-token";
 import { type Signed, base64Url, checkSignature, deviceIdFor, signed } from "./auth";
 import { eventStream } from "./event-stream";
+import { exportObject, frozen } from "./export";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
 import { udpGateway, udpKeys } from "./udp-gateway";
 import { PHONE_ROUTES, phoneVtop } from "./vtop-phone";
@@ -507,6 +508,8 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (method === "GET" && path === "/healthz") {
     return Response.json(healthBody(req.cf as { colo?: unknown } | undefined));
   }
+  const freeze = frozen(env, method, path);
+  if (freeze) return account.handles(path) ? withCors(freeze, req.headers.get("origin"), env) : freeze;
   if (isVtopPath(path)) return proxyVtop(req);
   if (method === "POST" && path === "/v1/devices/register") return deviceRegister(req, env);
   const phoneRoute = SIGNED[`${method} ${path}`];
@@ -517,6 +520,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (SIGNED_PATHS.has(path)) return methodNotAllowed();
   if (method === "POST" && path === "/internal/mail-otp/await") return mailAwait(req, env);
   if (method === "POST" && path === "/internal/udp-keys") return udpKeys(req, env);
+  if (method === "POST" && path === "/internal/export") return exportObject(req, env);
   if (path.startsWith("/internal/accounts/")) return account.internal(req, env, path);
   if (account.handles(path)) {
     const origin = req.headers.get("origin");

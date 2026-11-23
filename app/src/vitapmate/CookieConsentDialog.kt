@@ -92,7 +92,8 @@ fun CookieConsentSetting() {
     var version by remember { mutableIntStateOf(0) }
     // Read again after each dialog (a tick may have added a kind) and after a reset.
     val remembered by produceState(emptyList(), version, CookieConsent.pending.size) {
-        value = orNull { coreFlow("settings.cookie_consent") { c, f -> c.cookieConsentRemembered(f) } }.orEmpty()
+        // The saved password's consent sends no cookie, so this row isn't about it.
+        value = orNull { coreFlow("settings.cookie_consent") { c, f -> c.cookieConsentRemembered(f) } }.orEmpty().filter { it != CookieKind.ACCOUNT }
     }
     if (remembered.isEmpty()) return
     GroupItem(
@@ -114,13 +115,14 @@ fun CookieConsentSetting() {
 }
 
 private val CookieKind.label get() = when (this) {
-    CookieKind.ROUTE -> "server and proxy routes"
+    CookieKind.ROUTE -> "server routes"
     CookieKind.ACCOUNT -> "your server account"
     CookieKind.HANDOVER -> "connected apps"
 }
 
 private val CookieKind.line get() = when (this) {
     CookieKind.ROUTE -> "It is used for this fetch, with your password if VTOP needs a new sign-in, and not kept."
-    CookieKind.ACCOUNT -> "It only proves who you are; the server doesn't keep it."
+    // The account proof (TLSNotary) sends no cookie; this kind now only covers the saved password.
+    CookieKind.ACCOUNT -> "Your password goes to the server to keep sealed, so it can sign in for you."
     CookieKind.HANDOVER -> "A connected app (browser extension or AI app) gets a live VTOP session."
 }

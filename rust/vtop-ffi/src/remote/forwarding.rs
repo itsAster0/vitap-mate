@@ -1,10 +1,11 @@
 //! Mail forwarding (the Flutter app's `mail_forwarding_service.dart`): Gmail forwards VTOP's OTP
 //! mail to `otp+<id>@<domain>`; the edge Worker reads it, seals the code to this install's
 //! X25519 seal key (`device.json`, see [`crate::device`]; `vtop_shared::mail_seal`, the mailbox
-//! id as associated data) and keeps the latest box for 5 minutes, which the app pulls from
-//! `/v1/mail-otp/inbox`. Every call is signed as this install ([`Core::edge_post`]); the edge
-//! knows the mailbox's members by device id, so `forwarding.json` holds no secret. Codes and
-//! mail contents are never logged.
+//! id as associated data) and the server keeps the latest box for 5 minutes, which the app reads
+//! from `mail:inbox`. Every call goes as the student this install proved to be
+//! ([`Core::account_call`]); a mailbox belongs to their regno from the start and the server knows
+//! its members by device id, so `forwarding.json` holds no secret. Codes and mail contents are
+//! never logged.
 //!
 //! Only two kinds of mail are relayed: VTOP's OTP and Gmail's forwarding confirmation (sent once,
 //! when the student adds the address in Gmail). That confirmation reaching the phone proves the
@@ -21,6 +22,7 @@ use vtop_shared::mail_seal;
 use vtop_core::spec;
 use vtop_core::types::StudentProfile;
 
+use crate::remote::backend::Kind;
 use crate::{Core, CoreError, PAGES, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
@@ -116,9 +118,16 @@ struct Saved {
     server: String,
     id: String,
     address: String,
+    /// From v2, where the student's first address claimed its owner hash. Unused now, and kept
+    /// only so a file a v2 install wrote still reads (unknown fields are refused).
     #[serde(default)]
     owner_claimed: bool,
-    /// Mail arrived: Gmail's confirmation, or an OTP (now or, as the edge says, before).
+    /// This install is on the address on `server` as the backend v3 knows it. An address kept
+    /// from the v2 edge isn't, until [`Core::keep_forwarding`] proves the student and rejoins it.
+    #[serde(default)]
+    joined: bool,
+    /// Forwarding works: an OTP came through (now or, as the server says, before). Gmail's
+    /// confirmation alone doesn't count.
     #[serde(default)]
     ready: bool,
     #[serde(default)]
@@ -212,6 +221,8 @@ fn string(body: &Value, key: &str) -> Result<String, CoreError> {
 
 /// The edge no longer knows this address (deleted, or this install is no longer on it).
 pub(crate) const GONE: &str = "mailbox_not_found";
+/// This install was removed on the server, which took it off every address.
+const REMOVED: &str = "device_removed";
 
 /// Mail forwarding calls; each takes the caller's flow id first.
 #[uniffi::export]
@@ -223,9 +234,8 @@ impl Core {
     }
 
     /// Gives this phone a forwarding address. A student who already has one (made on another
-    /// phone; the edge knows it by their VTOP session) joins it, so their Gmail filter keeps
-    /// working; otherwise a new address is made and tied to them. Does nothing when this phone
-    /// already has one.
+    /// phone) joins it, so their Gmail filter keeps working; otherwise a new address is made for
+    /// them. Does nothing when this phone already has one.
     pub async fn set_up_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("set_up_forwarding", &flow, async {
             // A signed-out student's address first, as it may be the one this sign-in joins.
@@ -236,35 +246,22 @@ impl Core {
             }
             let server = self.forwarding_server();
             let action = "Set up mail forwarding";
-            // An address made without the student's session (or account token) is never tied to
-            // them: their next phone could not join it and the server could not sign in with it.
-            let mut joined = None;
-            let reclaim = self.account_post(
-                &server,
-                "/v1/mail-otp/reclaim",
-                &flow,
-                action,
-                true,
-                json!({}),
-            );
-            match reclaim.await? {
-                Ok(body) => joined = Some(body),
-                Err(error) if error.code() == GONE => info!("no address yet: making one"),
-                Err(error) => return Err(error.into()),
-            }
-            let reclaimed = joined.is_some();
-            let body = match joined {
-                Some(body) => body,
-                None => {
-                    self.edge_post(&server, "/v1/mail-otp/register", &flow, &json!({}))
-                        .await?
-                }
-            };
-            let mut saved = Saved {
-                server: server.clone(),
+            let body = self
+                .account_call(
+                    &flow,
+                    Kind::Mutation,
+                    "mail:register",
+                    action,
+                    true,
+                    json!({}),
+                )
+                .await??;
+            let saved = Saved {
+                server,
                 id: string(&body, "id")?,
                 address: string(&body, "address")?,
-                owner_claimed: reclaimed,
+                owner_claimed: true,
+                joined: true,
                 // Even a joined address may never have been confirmed in Gmail: the next pull
                 // brings Gmail's confirmation or the latest OTP, which tells.
                 ready: false,
@@ -273,29 +270,13 @@ impl Core {
                 confirmation: None,
             };
             self.write(FILE, &saved);
-            info!(reclaimed, "forwarding address set up");
-            // Best effort: lets the student's next phone join it, and the server sign in with it.
-            if !reclaimed {
-                let owner = json!({ "id": saved.id });
-                let path = "/v1/mail-otp/owner";
-                match self
-                    .account_post(&server, path, &flow, action, true, owner)
-                    .await
-                {
-                    Ok(Ok(_)) => {
-                        saved.owner_claimed = true;
-                        self.write(FILE, &saved);
-                    }
-                    Ok(Err(error)) => warn!(code = error.code(), "owner not claimed"),
-                    Err(error) => warn!(%error, "owner not claimed"),
-                }
-            }
+            info!("forwarding address set up");
             Ok(self.forwarding_view())
         })
         .await
     }
 
-    /// Pulls the latest forwarded mail (the edge keeps it 5 minutes): Gmail's confirmation while
+    /// Pulls the latest forwarded mail (the server keeps it 5 minutes): Gmail's confirmation while
     /// setting up, or an OTP. Either one proves the address works.
     pub async fn check_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("check_forwarding", &flow, async {
@@ -341,19 +322,100 @@ impl Core {
         .await
     }
 
+    /// Rejoins an address kept from the v2 edge, proving who the student is once (the proof sends
+    /// no cookie): the backfill kept the address, but mail is sealed only to the installs on it,
+    /// so without this the OTPs stop after the update. Does nothing once joined, without an
+    /// address, or for one on another server. Call it with a live session: after a sign-in, or
+    /// when the app opens signed in.
+    pub async fn keep_forwarding(&self, flow: String) -> Result<(), CoreError> {
+        traced("keep_forwarding", &flow, async {
+            let Some(saved) = self.read::<Saved>(FILE) else {
+                return Ok(());
+            };
+            if saved.joined || saved.server != self.forwarding_server() {
+                return Ok(());
+            }
+            self.rejoin(&flow, &saved, true).await.map(drop)
+        })
+        .await
+    }
+
     /// Takes this phone off the addresses a sign-out (or another student signing in) left
     /// behind. The edge keeps a student's address with no phone on it, for their next sign-in to
     /// join. Best effort: an address not left yet stays queued for the next call.
     pub async fn leave_old_forwarding(&self, flow: String) -> Result<(), CoreError> {
         traced("leave_old_forwarding", &flow, async {
-            self.leave_queued(&flow).await;
+            self.sign_out_last_student(&flow).await;
+            self.leave_with_identity(&flow).await;
             Ok(())
         })
         .await
     }
 }
 
+/// How [`Core::rejoin`] went.
+enum Rejoined {
+    Joined,
+    /// No identity to ask with, or forwarding changed meanwhile.
+    Later,
+    /// The student has no address.
+    NoAddress,
+}
+
 impl Core {
+    /// Joins `saved`'s address from this install, with the identity it has (a v2 account token
+    /// is traded in) but no proof: it runs unasked, on every open until it works, and the next
+    /// proof the student starts brings it about. True once joined.
+    async fn rejoin(&self, flow: &str, saved: &Saved, make: bool) -> Result<Rejoined, CoreError> {
+        let path = if make { "mail:register" } else { "mail:join" };
+        let body = match self
+            .account_call(
+                flow,
+                Kind::Mutation,
+                path,
+                "Keep mail forwarding",
+                false,
+                json!({}),
+            )
+            .await
+        {
+            Ok(answer) => answer?,
+            Err(CoreError::ConsentDenied) => {
+                info!("no identity yet: rejoined later");
+                return Ok(Rejoined::Later);
+            }
+            Err(error) => return Err(error),
+        };
+        if body.is_null() {
+            info!("the student has no address any more");
+            return Ok(Rejoined::NoAddress);
+        }
+        let id = string(&body, "id")?;
+        let address = string(&body, "address")?;
+        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        // Turned off or signed out meanwhile: not brought back.
+        let Some(mut kept) = self.read::<Saved>(FILE).filter(|now| now.id == saved.id) else {
+            info!("forwarding changed meanwhile, not rejoined");
+            return Ok(Rejoined::Later);
+        };
+        if id != kept.id {
+            // The student's account holds another address: mail goes there now, so its
+            // Gmail setup has to be checked again.
+            warn!("rejoined a different address");
+            kept.address = address;
+            kept.id = id;
+            kept.ready = false;
+            kept.last_mail_at = None;
+            kept.last_otp_at = None;
+            kept.confirmation = None;
+        }
+        kept.joined = true;
+        kept.server = self.forwarding_server();
+        self.write(FILE, &kept);
+        info!("forwarding address rejoined");
+        Ok(Rejoined::Joined)
+    }
+
     /// Queues this phone's address to be left; called before the student's files are forgotten.
     pub(crate) fn queue_leave(&self) {
         let Some(saved) = self.read::<Saved>(FILE) else {
@@ -371,7 +433,20 @@ impl Core {
         }
     }
 
-    async fn leave_queued(&self, flow: &str) {
+    /// [`Core::leave_queued`] as the student this install proved to be, never proving.
+    pub(crate) async fn leave_with_identity(&self, flow: &str) {
+        match self
+            .identity(flow, "Leave an old forwarding address", false)
+            .await
+        {
+            // A new identity already left them.
+            Ok(()) => self.leave_queued(flow).await,
+            Err(error) => info!(%error, "old addresses wait for an identity"),
+        }
+    }
+
+    /// Leaves the queued addresses with the JWT already set; one that fails stays queued.
+    pub(crate) async fn leave_queued(&self, flow: &str) {
         let queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
         let current = self.read::<Saved>(FILE).map(|saved| saved.id);
         let mut done = Vec::new();
@@ -382,13 +457,19 @@ impl Core {
                 continue;
             }
             let body = json!({ "id": leave.id });
+            // One on another server (the v2 edge) can't be reached from here any more.
+            if leave.server != self.forwarding_server() {
+                info!("old address on another server dropped");
+                done.push(leave);
+                continue;
+            }
             match self
-                .edge_post(&leave.server, "/v1/mail-otp/leave", flow, &body)
+                .jwt_call(flow, Kind::Mutation, "mail:leave", body)
                 .await
             {
                 Ok(_) => info!("left an old address"),
                 Err(error) if error.code() == GONE => info!("old address already gone"),
-                // Offline, or an edge without `/leave`: tried again later.
+                // Offline, or no identity yet: tried again later.
                 Err(error) => {
                     warn!(code = error.code(), "old address not left yet");
                     continue;
@@ -451,11 +532,14 @@ impl Core {
         };
         let body = json!({ "id": saved.id, "everywhere": everywhere });
         match self
-            .edge_post(&saved.server, "/v1/mail-otp/delete", flow, &body)
+            .device_call(flow, Kind::Mutation, "mail:remove", body)
             .await
         {
             Ok(_) => info!(everywhere, "left the address"),
-            Err(error) if error.code() == GONE => info!("address already gone"),
+            // Removed on another phone: the server took it off every address already.
+            Err(error) if matches!(error.code(), GONE | REMOVED) => {
+                info!(code = error.code(), "address already gone");
+            }
             Err(error) => return Err(error.into()),
         }
         self.forget_forwarding(&saved.id);
@@ -474,26 +558,50 @@ impl Core {
     /// box, or one that opens. An address the edge no longer knows is forgotten here.
     async fn pull(&self, flow: &str) -> Result<Option<Payload>, CoreError> {
         let Some(saved) = self.read::<Saved>(FILE) else {
-            return Err(CoreError::Other {
+            return Err(CoreError::ForwardingOff {
                 reason: "Mail forwarding is off.".into(),
             });
         };
         let body = json!({ "id": saved.id });
+        // While the inbox is watched (an OTP wait) the client answers this from that
+        // subscription, with no trip to the server.
         let inbox = match self
-            .edge_post(&saved.server, "/v1/mail-otp/inbox", flow, &body)
+            .device_call(flow, Kind::Query, "mail:inbox", body)
             .await
         {
             Ok(inbox) => inbox,
+            // Not on this address (any more): kept from v2 and not rejoined yet, or the server
+            // moved the student's phones to their old address. Joined where the student's
+            // address is; forgotten only when they have none (deleted) or it can't be asked.
             Err(error) if error.code() == GONE => {
+                let rejoined = Box::pin(self.rejoin(flow, &saved, !saved.joined)).await;
+                return Err(match rejoined {
+                    Ok(Rejoined::Joined) => CoreError::Other {
+                        reason: "Mail forwarding reconnected. Try again.".into(),
+                    },
+                    Ok(Rejoined::Later) if !saved.joined => CoreError::ForwardingOff {
+                        reason: "Mail forwarding reconnects once you're signed in.".into(),
+                    },
+                    Ok(Rejoined::Later | Rejoined::NoAddress) => {
+                        self.forget_forwarding(&saved.id);
+                        CoreError::ForwardingOff {
+                            reason: "Your forwarding address no longer exists. Set it up again."
+                                .into(),
+                        }
+                    }
+                    Err(error) => error,
+                });
+            }
+            Err(error) if error.code() == REMOVED => {
                 self.forget_forwarding(&saved.id);
-                return Err(CoreError::Other {
-                    reason: "Your forwarding address no longer exists. Set it up again.".into(),
+                return Err(CoreError::ForwardingOff {
+                    reason: "This phone was removed from your account. Sign in again.".into(),
                 });
             }
             Err(error) => return Err(error.into()),
         };
         let seal_secret = &self.device().seal_secret;
-        // Kept by the edge since setup, for a phone that joined after Gmail sent it.
+        // Kept by the server since setup, for a phone that joined after Gmail sent it.
         if let Some(sealed) = inbox
             .get("confirmation")
             .and_then(Value::as_str)
@@ -550,7 +658,9 @@ impl Core {
         };
         let before = saved.clone();
         let sent_at = payload.sent_at();
-        saved.ready = true;
+        // Gmail's confirmation mail only shows the address was added; forwarding works once
+        // Gmail forwards VTOP's mail, after the student confirmed and made the filter.
+        saved.ready |= matches!(payload, Payload::Otp { .. });
         saved.last_mail_at = saved.last_mail_at.max(Some(sent_at));
         match payload {
             Payload::Otp { .. } => saved.last_otp_at = saved.last_otp_at.max(Some(sent_at)),
@@ -574,6 +684,13 @@ impl Core {
         saved.drop_stale_confirmation();
         if saved != before {
             self.write(FILE, &saved);
+        }
+    }
+
+    /// Forgets this phone's address, whichever it is: the server deleted it with the account.
+    pub(crate) fn forget_any_forwarding(&self) {
+        if let Some(saved) = self.read::<Saved>(FILE) {
+            self.forget_forwarding(&saved.id);
         }
     }
 

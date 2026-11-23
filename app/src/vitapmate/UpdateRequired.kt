@@ -15,11 +15,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -52,11 +57,16 @@ fun UpdateRequired() {
             color = scheme.onSurfaceVariant,
         )
         Spacer(Modifier.weight(1f))
+        // Asking Play for the update can take seconds before its screen shows.
+        var starting by remember { mutableStateOf(false) }
         Button(
-            { activity?.let(PlayUpdate::updateNow) },
+            { activity?.let { starting = true; PlayUpdate.updateNow(it).invokeOnCompletion { starting = false } } },
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("update.required.start"),
+            enabled = !starting,
             shapes = ButtonDefaults.shapes(),
-        ) { Text("Update", style = MaterialTheme.typography.titleMediumEmphasized) }
+        ) {
+            if (starting) LoadingIndicator(Modifier.size(24.dp)) else Text("Update", style = MaterialTheme.typography.titleMediumEmphasized)
+        }
         Text(
             "Opens Google Play",
             Modifier.fillMaxWidth().padding(top = 12.dp),

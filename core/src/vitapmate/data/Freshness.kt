@@ -8,6 +8,8 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -27,16 +29,22 @@ object Foreground {
     @Volatile private var started = 0
     val shown get() = started > 0
     private var left = false
+    private val shownNow = MutableStateFlow(false)
+
+    /** [shown] as it changes: what follows the server live only does so while on screen. */
+    val shownFlow: StateFlow<Boolean> = shownNow
 
     /** From the activity's `onStart`. */
     fun started() {
         started++
+        shownNow.value = true
         if (left) resumes++
     }
 
     /** From the activity's `onStop`. */
     fun stopped() {
         started = (started - 1).coerceAtLeast(0)
+        shownNow.value = shown
         if (shown) return
         left = true
         CookieConsent.left()

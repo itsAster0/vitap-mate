@@ -7,15 +7,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CoreException
 import vitapmate.core.CoreInterface
+import vitapmate.core.LiveTopic
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Gmail
+import vitapmate.data.LiveWake
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
 import vitapmate.data.Tunable
@@ -183,7 +186,7 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
     suspend fun autofill(onCode: () -> Unit) {
         MailForwarding.load("otp")
         when (OtpAutofill.inUse()) {
-            OtpSource.Forwarding -> watch("forwarding.poll", "forwarded mail", onCode) { id -> AppCore.await().fetchForwardedOtp(id, roundStart) }
+            OtpSource.Forwarding -> watch("forwarding.poll", "forwarded mail", onCode, LiveTopic.MAIL_INBOX) { id -> AppCore.await().fetchForwardedOtp(id, roundStart) }
             OtpSource.Gmail -> {
                 val tried = mutableSetOf<String>()
                 watch("gmail.poll", "Gmail", onCode) { id ->
@@ -198,7 +201,7 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
         }
     }
 
-    private suspend fun watch(flowName: String, where: String, onCode: () -> Unit, pull: suspend (String) -> String?) {
+    private suspend fun watch(flowName: String, where: String, onCode: () -> Unit, wakeOn: LiveTopic? = null, pull: suspend (String) -> String?) = coroutineScope {
         source = "Watching your $where…"
         // The code fills in by itself: stay a pill until it comes or the wait ends.
         minimized = true
@@ -208,6 +211,8 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
             // Polling goes on after a fill: an older code (sent up to a minute before this
             // round) can come first and be turned down, and the right one comes a moment later.
             val filled = mutableSetOf<String>()
+            val wake = wakeOn?.let { LiveWake(this@coroutineScope, it) }
+            var off = false
             while (remaining > 0) {
                 val found = try {
                     withTimeoutOrNull(PULL_TIMEOUT_MS) { withContext(Dispatchers.IO) { pull(id) } }
@@ -221,6 +226,11 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
                         break
                     }
                     null
+                } catch (e: CoreException.ForwardingOff) {
+                    Log.info(src, "forwarding is off", id)
+                    error = e.reason
+                    off = true
+                    break
                 } catch (e: Throwable) {
                     Log.warn(src, "otp pull failed: ${e::class.simpleName}", id)
                     null
@@ -233,11 +243,16 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
                     Log.info(src, "otp filled from $where", id, mapOf("pulls" to "$pulls"))
                     onCode()
                 }
-                delay(Settings.tunable(Tunable.OtpPoll) * 1000L)
+                val interval = Settings.tunable(Tunable.OtpPoll) * 1000L
+                if (wake != null) wake.next(interval) else delay(interval)
             }
+            wake?.stop()
             Log.info(src, if (filled.isEmpty()) "no otp from $where" else "no otp from $where accepted", id, mapOf("pulls" to "$pulls", "filled" to "${filled.size}"))
             source = null
-            if (!resending && !willAutoResend) minimized = false
+            // Nothing will come this round or the next: open, so the student types the code.
+            if (off || (!resending && !willAutoResend)) minimized = false
+            // Settings shows forwarding as it is now (forgotten when the address is gone).
+            if (off) MailForwarding.load("forwarding_off")
         }
     }
 }

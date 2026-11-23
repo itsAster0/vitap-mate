@@ -35,6 +35,15 @@ pub fn public_key(seed: &str) -> Option<String> {
     Some(URL_SAFE_NO_PAD.encode(signing_key(seed)?.verifying_key().as_bytes()))
 }
 
+/// The device id of `public` (a base64url key): `hex(sha256(key bytes))[..32]`, as the server
+/// derives it, so it needs no lookup.
+pub fn device_id(public: &str) -> Option<String> {
+    let key = URL_SAFE_NO_PAD.decode(public.trim()).ok()?;
+    let mut id = hex::encode(Sha256::digest(key));
+    id.truncate(32);
+    Some(id)
+}
+
 /// What is signed: `vm1\n{METHOD}\n{path with query}\n{time}\n{hex sha256(body)}`.
 pub fn message(method: &str, path: &str, time: i64, body: &[u8]) -> Vec<u8> {
     format!(
@@ -186,5 +195,18 @@ mod tests {
             body
         ));
         assert_eq!(URL_SAFE_NO_PAD.decode(generate_seed()).unwrap().len(), 32);
+    }
+
+    /// The edge's `deviceIdFor`: sha256 of the raw key, not of its base64url text.
+    #[test]
+    fn device_id_hashes_the_key_bytes() {
+        let key = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+        let public = URL_SAFE_NO_PAD.encode(hex::decode(key).unwrap());
+        let id = device_id(&public).unwrap();
+        assert_eq!(
+            id,
+            &hex::encode(Sha256::digest(hex::decode(key).unwrap()))[..32]
+        );
+        assert_eq!(device_id("not base64!"), None);
     }
 }

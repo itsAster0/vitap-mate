@@ -1,5 +1,8 @@
 package vitapmate
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -69,6 +72,7 @@ import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
 import vitapmate.ui.OpenHaptic
 import vitapmate.ui.Space
+import vitapmate.ui.proofStage
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 
@@ -107,6 +111,10 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
     val deviceAuth = rememberDeviceAuth()
     val haptics = rememberHaptics()
     val typing = remember { FocusRequester() }
+    // A paired app's session requests reach a phone off screen only as a notification.
+    val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        Log.info("ui.connected_apps", "notifications", fields = mapOf("granted" to "$granted"))
+    }
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val code = pairCode(text)
@@ -124,6 +132,7 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
                             haptics.confirm()
                             if (app == null) showToast("Browser paired", "The extension signs in to VTOP by itself now.")
                             else showToast("${app.name} connected", "It can read your VTOP data now; outings stay off unless you turn them on.")
+                            if (!Push.canNotify(context)) notify.launch(Manifest.permission.POST_NOTIFICATIONS)
                             onDone()
                         }
                         .onFailure { haptics.reject() }
@@ -153,7 +162,7 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
 
     Sheet("connected_apps.pair_sheet", onDismiss) {
         Text("Pair a browser", style = MaterialTheme.typography.titleLarge)
-        Note("Open the vitapmate extension in Chrome or Firefox, or connect an AI app such as Claude to $MCP_URL. It shows a QR code and a 10-character code.")
+        Note("Open the vitapmate extension in Chrome or Firefox, or connect an AI app such as Claude to ${rememberServer()}/mcp. It shows a QR code and a 10-character code.")
         Button(if (busy) null else scan, Modifier.fillMaxWidth().height(60.dp).testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
         OutlinedTextField(
             vitapmate.ui.rememberSyncedTextFieldState(text) { text = it },
@@ -172,6 +181,7 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
         Button(code?.takeIf { !busy }?.let { { pair(it) } }, Modifier.fillMaxWidth().testTag("connected_apps.pair_confirm"), variant = ButtonVariant.Outline) {
             if (busy) LoadingIndicator() else Text("Pair")
         }
+        if (busy) Note(proofStage())
         Note("It gets its own key, which can't apply for outings unless you turn them on. You can revoke it here any time.")
     }
 }
@@ -220,7 +230,9 @@ internal fun NewMcpSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
             ) { if (busy) LoadingIndicator() else Text("Create key") }
         } else {
             Copyable("Key", key.key, "connected_apps.mcp_key") { copy(context, "MCP key", key.key) }
-            Copyable("MCP URL", key.mcpUrl.ifBlank { MCP_URL }, "connected_apps.mcp_url") { copy(context, "MCP URL", key.mcpUrl.ifBlank { MCP_URL }) }
+            val server = rememberServer()
+            val mcpUrl = key.mcpUrl.ifBlank { "$server/mcp" }
+            Copyable("MCP URL", mcpUrl, "connected_apps.mcp_url") { copy(context, "MCP URL", mcpUrl) }
             val warning = AppTheme.tones.warning
             Row(Modifier.fillMaxWidth().background(warning.subtle, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Lucide.TriangleAlert, null, Modifier.size(18.dp), tint = warning.base)

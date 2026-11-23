@@ -188,6 +188,8 @@ object Gmail {
             val saved = Account(email, client, refresh, access, expiry(tokens), account?.deleteAfterReading ?: true, ends)
             save(saved)
             Settings.otpSource = OtpSource.Gmail
+            // Paused over Gmail: the next run can try again.
+            if (Settings.syncPaused?.startsWith("Gmail") == true) Settings.syncPaused = null
             Log.info(SRC, "connected", flow, mapOf("grant_days" to "${saved.daysLeft ?: "-"}"))
             return saved
         } catch (e: Throwable) {

@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Lucide
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingState
@@ -41,6 +40,8 @@ import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip
+import vitapmate.core.LiveTopic
+import vitapmate.data.LiveWake
 
 /** While the address waits for Gmail's confirmation, the inbox is checked this often. */
 private const val WAITING_POLL_MS = 5_000L
@@ -63,9 +64,17 @@ internal fun ForwardingContent() {
         MailForwarding.load("open")
     }
     LaunchedEffect(status?.state) {
-        while (MailForwarding.status?.state == ForwardingState.WAITING) {
-            MailForwarding.check(quiet = true)
-            delay(WAITING_POLL_MS)
+        if (MailForwarding.status?.state != ForwardingState.WAITING) return@LaunchedEffect
+        // Checks again when the server says the inbox changed; every few seconds only while the
+        // live socket is down.
+        val wake = LiveWake(this, LiveTopic.MAIL_INBOX)
+        try {
+            while (MailForwarding.status?.state == ForwardingState.WAITING) {
+                MailForwarding.check(quiet = true)
+                wake.next(WAITING_POLL_MS)
+            }
+        } finally {
+            wake.stop()
         }
     }
     when {

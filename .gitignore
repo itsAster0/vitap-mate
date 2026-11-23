@@ -48,3 +48,6 @@ google-services.json
 # Built Rust libraries and Perfetto captures
 app/jniLibs/
 traces/
+backend/.env*.local
+backend/node_modules
+backend/.convex

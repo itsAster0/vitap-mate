@@ -326,6 +326,10 @@ apply for or cancel outings. They can turn it on in VITAP Mate → Settings → 
 apps → this key → Allow outing applications. Reading outings still works.";
 
 impl VtopTools {
+    #[expect(
+        clippy::result_large_err,
+        reason = "an early tool answer, made once per call; big only with serde_json's preserve_order"
+    )]
     fn caller(parts: &Parts) -> Result<String, CallToolResult> {
         parts
             .extensions
@@ -336,6 +340,10 @@ impl VtopTools {
 
     /// The caller's key, if the student let it act on outings. Asked fresh
     /// each time (no VTOP call), so turning it off takes effect at once.
+    #[expect(
+        clippy::result_large_err,
+        reason = "an early tool answer, made once per call; big only with serde_json's preserve_order"
+    )]
     async fn outing_caller(&self, parts: &Parts) -> Result<String, CallToolResult> {
         let key = Self::caller(parts)?;
         match self.source.whoami(&key).await {

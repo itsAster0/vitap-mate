@@ -7,8 +7,10 @@ Toolchain (no Gradle), over a Rust core through UniFFI. It runs on Android only;
 iOS would need other Kotlin bindings for UniFFI.
 
 Read `rust/ARCHITECTURE.md` (the crates, the routes from the phone, UDP mode,
-deploys) and `edge/API.md` (every edge route) before you change the
-Rust core or the server.
+deploys), `backend/README.md` (the Convex functions) and
+`docs/plans/2026-11-23-backend-v3.md` before you change the Rust core or the
+server. `edge/` is the v2 server, kept until the cutover's cleanup; only its
+`guides/` (served by the backend) is still used.
 
 ## Ways to break things
 
@@ -43,13 +45,15 @@ rust/                 Cargo workspace
                       UDP (remote/udp.rs), server page (remote/server.rs), logs (obs.rs)
   vtop-proto/         parsers, types and HTTP shapes as page machines, with no I/O
   vtop-core/          VTOP client that runs vtop-proto's machines over a Transport
-  vtop-shared/        formats the app, engine and edge share (device_sig, mail_seal, page_dictionary)
+  vtop-shared/        formats the app, engine and backend share (device_sig, mail_seal, page_dictionary)
   vtop-tlsn/          TLSNotary account proof of /vtop/content (prover in the app, verifier in the engine)
   vtop-wire/          vm1, Noise IK over UDP for slow, lossy links
   vtop-gateway/       UDP gateway on the Linode fedora-in-maa
   vtop-bridge/        the engine: sign-in, CAPTCHA, fetch and parse; Railway service engine-v2
-  vtop-mcp/           MCP tools the engine serves behind the edge's /mcp
-edge/                 Cloudflare Worker and Durable Objects (TypeScript, bun), all server state
+  vtop-mcp/           MCP tools the engine serves behind the backend's /mcp
+backend/              self-hosted Convex (TypeScript, bun): all server state; the phone's one socket
+mail/                 Cloudflare Email Worker: hands forwarded mail to the backend, keeps nothing
+edge/                 the v2 Worker and Durable Objects (until cleanup); guides/ is still the source
 extension/            Chrome and Firefox extension (Svelte, bun)
 fastlane/             Play Store lanes and release notes
 keystore/             release keystore (gitignored; never read or print it)
@@ -65,29 +69,31 @@ keystore/             release keystore (gitignored; never read or print it)
 | Shared widget | `design/src/vitapmate/ui/`, one widget per file. |
 | Shell, nav, Settings, Developer, Inspector UI | `app/src/vitapmate/`. |
 | Data, settings store, downloads, files | `core/src/vitapmate/data/`. |
-| How the app reaches VTOP | `rust/vtop-ffi/src/remote/route.rs` (Direct, Proxy, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/remote/route/plan.rs`. |
+| How the app reaches VTOP | `rust/vtop-ffi/src/remote/route.rs` (Direct, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/remote/route/plan.rs`. |
 | Logging | Kotlin: `core/src/vitapmate/observability/` (`Log`, `flow()`). Rust: `tracing`, with the pipeline in `rust/vtop-ffi/src/obs.rs`. |
-| Server-side state | Durable Objects in `edge/`, never the engine or the gateway. Document each route in `edge/API.md`. |
+| Server-side state | Convex in `backend/convex/`, never the engine or the gateway. A read the app shows is a query it can watch live (`LiveTopic`); queries take no `flow` argument, so the same read shares the watch's subscription. List new functions in `backend/README.md`. |
 
 ### Touch every surface
 
 A page or route change reaches more than one place. Check each:
 
-- The four routes: Direct, Proxy, Server and Udp (`rust/vtop-ffi/src/remote/route.rs`).
+- The three routes: Direct, Server and Udp (`rust/vtop-ffi/src/remote/route.rs`).
 - Cached and fresh data: `cached_x` with no cache yet, and `fetch_x` over it.
 - The vtop-mcp tools (`rust/vtop-mcp/src/tools.rs`) for a read page.
-- The extension, when a session or edge route changes (`extension/AGENTS.md`).
+- The extension, when a session or server route changes (`extension/AGENTS.md`).
 - `"since": <versionCode>` in `edge/guides/updates.json` for a new feature.
 - The demo data in `edge/guides/demo.json`, so the demo account shows it.
 
 ### Glossary
 
 - flow: one user action or background run (`flow()`); its id goes first in every `Core` call.
-- route: how the phone reaches VTOP: Direct, Proxy (hops through the edge's
-  `/vtop/`), Server (the engine fetches) or Udp (Server over vm1).
+- route: how the phone reaches VTOP: Direct, Server (the engine fetches) or Udp
+  (Server over vm1).
 - spec: a `PageSpec` in `rust/vtop-proto/src/spec.rs`: name, args, cache file, machine.
 - page: one VTOP page, fetched by its spec and cached on the phone per semester.
-- edge: the Cloudflare Worker and Durable Objects at vmate.aster0.dev (`edge/`).
+- backend: the self-hosted Convex the phone talks to over one WebSocket (`backend/`);
+  the test one is vmate3.aster0.dev, prod moves to vmate.aster0.dev at cutover.
+- edge: the v2 Cloudflare Worker and Durable Objects (`edge/`), retired at cutover.
 - engine: `rust/vtop-bridge`, Railway `engine-v2`: signs in and fetches for the server routes.
 - gateway: `rust/vtop-gateway`, the UDP end of vm1 on the Linode.
 - vm1: Noise IK over UDP for slow, lossy links (`rust/vtop-wire`).
@@ -136,8 +142,9 @@ The local `flutter` bookmark keeps the old Flutter app for reference; its server
 `.env.example.json`). `mise run firebase` turns it into
 `app/res/values/firebase.xml`, which the app reads at start. CI writes
 `.env.json` from the `ENV_JSON` secret. The server URL is `DEFAULT_SERVER` in
-`rust/vtop-ffi/src/remote/edge.rs` (`https://vmate.aster0.dev`). Phones sign
-their requests with their own device key, so the app ships no server secret.
+`rust/vtop-ffi/src/remote/edge.rs`. A phone proves the account once (TLSNotary),
+then holds a short JWT and a refresh token signed by its own device key, so the
+app ships no server secret.
 
 ## Commands
 
@@ -156,7 +163,8 @@ mise run detekt              # Kotlin lint (brew install detekt); CI runs the sa
 mise run notes [since]       # draft the release notes from the commits since the last release
 
 cd rust && cargo fmt && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-cd edge && bun run test && bun run check
+cd backend && bunx tsc -p . --noEmit && bunx vitest run
+cd backend && bunx convex deploy -y && bun run smoke   # vmate3 only; prod needs an OK
 cd extension && bun run test && bun run build
 mise run check               # all of what CI runs; or check-rust, check-kotlin, check-edge, check-ext
 ```
@@ -215,7 +223,7 @@ Test on the emulator or a connected phone, not only with a build. Parser tests
 are in `rust/vtop-proto/tests`, client tests in
 `rust/vtop-core/src/client/tests.rs`, the app crate's in
 `rust/vtop-ffi/src/tests.rs` and next to each module, vm1's in
-`rust/vtop-wire/src/tests.rs`, the edge's in `edge/src/*.test.ts`,
+`rust/vtop-wire/src/tests.rs`, the backend's in `backend/convex/*.test.ts`,
 and Kotlin's in `core/test/` and `features/<name>/test/`.
 
 - Extend an existing test before adding one, and test at the lowest layer that

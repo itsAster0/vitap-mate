@@ -7,16 +7,17 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import vitapmate.core.defaultServer
 import vitapmate.observability.Log
 
 /**
- * Help pages the app reads from the edge instead of shipping them (`edge/guides`, see
- * `/guides/` in `edge/API.md`): JSON and its images, fetched when a page first opens and
- * kept in the cache folder. Each open shows the kept copy and checks it with its ETag, so a fixed
- * guide needs only an edge deploy, not a release.
+ * Help pages the app reads from the server (`GET /guides/...` on [defaultServer]) instead of
+ * shipping them: JSON and its images, fetched when a page first opens and kept in the cache
+ * folder. Each open shows the kept copy and checks it with its ETag, so a fixed guide needs only
+ * a server deploy, not a release.
  */
 object Guides {
-    private const val BASE = "https://vmate.aster0.dev/guides/"
+    private val BASE by lazy { defaultServer() + "/guides/" }
 
     /** The JSON shape this app reads; the edge bumps `schema` only for a change old apps can't read. */
     const val SCHEMA = 1

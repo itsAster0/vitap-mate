@@ -28,6 +28,7 @@ import com.composables.icons.lucide.Smartphone
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.Space
+import vitapmate.ui.proofStage
 
 /** Mail forwarding while off: what it does, the privacy note and "Create my address". */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -56,7 +57,7 @@ internal fun ForwardingIntro(onSetUp: () -> Unit) {
     val busy = MailForwarding.busy == "setup"
     Button(if (busy) null else onSetUp, Modifier.fillMaxWidth().testTag("forwarding.setup"), prefix = if (busy) null else Lucide.Forward) {
         if (busy) LoadingIndicator(Modifier.size(20.dp))
-        Text(if (busy) "Setting up…" else "Create my address")
+        Text(if (busy) proofStage() else "Create my address")
     }
 }
 

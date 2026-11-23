@@ -39,11 +39,15 @@ use vtop_shared::wire_page::{
 use vtop_wire::fec::MAX_RESPONSE;
 use vtop_wire::gateway::{Gateway, NewRequest, Token};
 
+/// Convex's `app:login` over HTTP, as the phone whose JWT it carries;
+/// `GET {APP_LOGIN}/<requestId>` follows one that waits for the OTP mail.
+pub const APP_LOGIN: &str = "/v1/app/login";
+
 /// Over the engine's own VTOP limit (25 s a page), like the edge's.
 const ENGINE_TIMEOUT: Duration = Duration::from_secs(32);
-/// Over the edge's wait for a sign-in by the server (90 s), which includes
-/// the engine's wait for the OTP mail.
-const LOGIN_TIMEOUT: Duration = Duration::from_secs(95);
+/// The longest a renewal follows a server sign-in that waits for its OTP
+/// mail: under the phone's own wait for the answer.
+const LOGIN_TIMEOUT: Duration = Duration::from_secs(90);
 const SESSION_KEEP: Duration = Duration::from_secs(6 * 3600);
 const MAX_SESSIONS: usize = 20_000;
 /// Engine calls at once; more are told to use HTTPS. Anyone with the app
@@ -62,8 +66,11 @@ const ANNOUNCE_RETRY_MAX: Duration = Duration::from_secs(600);
 /// No `Debug`: it holds the internal token.
 pub struct Config {
     pub engine_url: String,
-    /// The edge: `/v1/app/login`, and [`UDP_KEYS_INTERNAL`] for the keys.
+    /// Convex's HTTP actions: [`APP_LOGIN`], and [`UDP_KEYS_INTERNAL`] for the keys.
     pub edge_url: String,
+    /// How often a renewal asks how a server sign-in waiting for its OTP
+    /// mail stands.
+    pub login_poll: Duration,
     /// `GATEWAY_TOKEN`: the engine takes it for fetches and sign-ins, the
     /// edge for `/internal/udp-keys`.
     pub token: String,
@@ -151,6 +158,7 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
         config.engine_url,
         config.token.clone(),
         config.edge_url.clone(),
+        config.login_poll,
     ));
     let keys = current_keys(&config.data_dir).await;
     let privates = |keys: &[keys::Key]| keys.iter().map(keys::Key::private).collect::<Vec<_>>();
@@ -256,7 +264,7 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
 }
 
 /// A device's VTOP session, and its account when the server may sign in
-/// for it (`/v1/app/login`'s body).
+/// for it: the phone's JWT, which [`APP_LOGIN`] takes.
 struct Kept {
     hash: u64,
     session: serde_json::Value,
@@ -269,16 +277,18 @@ struct Engine {
     url: String,
     token: String,
     edge_url: String,
+    login_poll: Duration,
     sessions: std::sync::Mutex<HashMap<[u8; 32], Kept>>,
 }
 
 impl Engine {
-    fn new(url: String, token: String, edge_url: String) -> Self {
+    fn new(url: String, token: String, edge_url: String, login_poll: Duration) -> Self {
         Self {
             http: engine_http(),
             url: url.trim_end_matches('/').to_string(),
             token,
             edge_url: edge_url.trim_end_matches('/').to_string(),
+            login_poll,
             sessions: std::sync::Mutex::default(),
         }
     }
@@ -416,8 +426,8 @@ impl Engine {
         account: String,
         expired: WirePageResponse,
     ) -> WirePageResponse {
-        let login = self.sign_in(page, "/v1/app/login", account.clone()).await;
-        if login.status == 401 {
+        let login = self.app_login(page, &account).await;
+        if is_code(&login, "invalid_credentials") {
             return login;
         }
         let session = (login.status == 200)
@@ -435,11 +445,8 @@ impl Engine {
         answer
     }
 
-    /// A sign-in request, named by the edge path the phone would use over
-    /// HTTPS, answered as that path answers: the phone's own sign-in goes
-    /// to the engine as the edge sends it, a sign-in by the server with its
-    /// saved password to the edge (the phone proves it is linked with its
-    /// app secret, and the server reads the OTP itself).
+    /// The phone's own sign-in, named by the edge path the phone would use
+    /// over HTTPS, sent to the engine as the edge sends it.
     async fn sign_in(&self, page: &WirePageRequest, path: &str, body: String) -> WirePageResponse {
         let to_engine = |route: &str| {
             self.post(page, format!("{}{route}", self.url))
@@ -449,9 +456,6 @@ impl Engine {
             "/v1/vtop/login" => to_engine(VTOP_LOGIN),
             "/v1/vtop/login/otp" => to_engine(VTOP_LOGIN_OTP),
             "/v1/vtop/login/resend" => to_engine(VTOP_LOGIN_RESEND),
-            "/v1/app/login" => self
-                .post(page, format!("{}{path}", self.edge_url))
-                .timeout(LOGIN_TIMEOUT),
             _ => return error(404, "not_found", "No such sign-in."),
         };
         let sent = request
@@ -482,6 +486,62 @@ impl Engine {
                 session: None,
             },
             Err(_) => error(503, "engine_unavailable", "The answer broke off."),
+        }
+    }
+
+    /// A sign-in by the server with the saved password, as the phone with
+    /// JWT `jwt` (`app:login` over [`APP_LOGIN`]). One that waits for VTOP's
+    /// OTP mail answers `202` with its `requestId`, followed until it ends
+    /// or [`LOGIN_TIMEOUT`] passes.
+    async fn app_login(&self, page: &WirePageRequest, jwt: &str) -> WirePageResponse {
+        let deadline = Instant::now() + LOGIN_TIMEOUT;
+        let flow = serde_json::json!({ "flow": page.request_id.as_deref().unwrap_or("udp") });
+        let url = format!("{}{APP_LOGIN}", self.edge_url);
+        let mut answer = self
+            .relay(
+                self.post(page, url.clone())
+                    .bearer_auth(jwt)
+                    .json(&flow)
+                    // The first step may read the OTP from Gmail, over a fetch's limit.
+                    .timeout(LOGIN_TIMEOUT),
+            )
+            .await;
+        while answer.status == 202 && Instant::now() < deadline {
+            let Some(id) = serde_json::from_slice::<serde_json::Value>(&answer.body)
+                .ok()
+                .and_then(|body| body["requestId"].as_str().map(str::to_string))
+            else {
+                break;
+            };
+            tokio::time::sleep(self.login_poll).await;
+            let follow = self.http.get(format!("{url}/{id}")).bearer_auth(jwt);
+            answer = self.relay(follow).await;
+        }
+        answer
+    }
+
+    /// Sends a request to Convex and passes its answer back as it is.
+    async fn relay(&self, request: reqwest::RequestBuilder) -> WirePageResponse {
+        let answer = match request.send().await {
+            Ok(answer) => answer,
+            Err(e) => {
+                tracing::warn!("server sign-in: {}", e.without_url());
+                return error(
+                    503,
+                    "server_unavailable",
+                    "The server cannot sign in right now.",
+                );
+            }
+        };
+        let status = answer.status().as_u16();
+        match answer.bytes().await {
+            Ok(bytes) => WirePageResponse {
+                status,
+                packed: false,
+                body: bytes.to_vec(),
+                session: None,
+            },
+            Err(_) => error(503, "server_unavailable", "The answer broke off."),
         }
     }
 
@@ -521,6 +581,10 @@ impl Engine {
             return None;
         }
         kept.at = Instant::now();
+        // A newer JWT, sent without the session: the kept one runs out in 15 minutes.
+        if page.account.is_some() {
+            kept.account.clone_from(&page.account);
+        }
         Some((kept.session.clone(), kept.account.clone()))
     }
 
@@ -579,10 +643,13 @@ fn engine_http() -> reqwest::Client {
 
 /// Whether the engine said the session expired.
 fn expired(answer: &WirePageResponse) -> bool {
-    answer.status == 401
-        && serde_json::from_slice::<serde_json::Value>(&answer.body)
-            .ok()
-            .is_some_and(|body| body["code"] == "session_expired")
+    answer.status == 401 && is_code(answer, "session_expired")
+}
+
+fn is_code(answer: &WirePageResponse, code: &str) -> bool {
+    serde_json::from_slice::<serde_json::Value>(&answer.body)
+        .ok()
+        .is_some_and(|body| body["code"] == code)
 }
 
 fn error(status: u16, code: &str, message: &str) -> WirePageResponse {

@@ -6,6 +6,7 @@ use vtop_shared::wire_page::{BATCH, batch_args, batch_pages};
 use vtop_wire::gateway::Gateway as WireGateway;
 
 use super::*;
+use crate::test_edge::{Edge, serve};
 
 /// Kotlin's part, on blocking std sockets.
 struct StdNetwork;
@@ -228,124 +229,41 @@ async fn gateway_key_uses_server_adjusted_time_when_clock_is_skewed() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-async fn mock_udp_edge(
-    seed: String,
-    server_time: i64,
-    udp_port: u16,
-    public: String,
-    always_stale: bool,
-) -> (String, Arc<std::sync::atomic::AtomicUsize>) {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use vtop_shared::device_sig;
-
-    let hits = Arc::new(AtomicUsize::new(0));
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let base = format!("http://{}", listener.local_addr().unwrap());
-    let count = hits.clone();
-    tokio::spawn(async move {
-        while let Ok((mut socket, _)) = listener.accept().await {
-            let (count, seed, public) = (count.clone(), seed.clone(), public.clone());
-            tokio::spawn(async move {
-                let mut buf = vec![0u8; 8192];
-                let mut total = 0;
-                loop {
-                    let Ok(n) = socket.read(&mut buf[total..]).await else {
-                        return;
-                    };
-                    if n == 0 {
-                        break;
-                    }
-                    total += n;
-                    if buf[..total].windows(4).any(|w| w == b"\r\n\r\n") || total == buf.len() {
-                        break;
-                    }
-                }
-                let req = String::from_utf8_lossy(&buf[..total]);
-                let mut lines = req.lines();
-                let first = lines.next().unwrap_or("");
-                let mut parts = first.split_whitespace();
-                let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
-                let header = |name: &str| {
-                    req.lines().skip(1).find_map(|line| {
-                        let (k, v) = line.split_once(':')?;
-                        k.trim().eq_ignore_ascii_case(name).then(|| v.trim())
-                    })
-                };
-                let (status, body) = match (method, path) {
-                    ("POST", "/v1/devices/register") => (
-                        "201 Created",
-                        json!({ "deviceId": "0123456789abcdef0123456789abcdef" }).to_string(),
-                    ),
-                    ("GET", "/v1/udp") => {
-                        count.fetch_add(1, Ordering::SeqCst);
-                        let dev = header(device_sig::DEVICE).unwrap_or("");
-                        let time: i64 = header(device_sig::TIME)
-                            .and_then(|v| v.parse().ok())
-                            .unwrap_or(0);
-                        let sig = header(device_sig::SIG).unwrap_or("");
-                        let expected_sig =
-                            device_sig::sign(&seed, "GET", "/v1/udp", time, b"").unwrap();
-                        if dev != "0123456789abcdef0123456789abcdef" || sig != expected_sig {
-                            (
-                                "401 Unauthorized",
-                                json!({ "code": "bad_signature", "error": "bad sig" }).to_string(),
-                            )
-                        } else if always_stale || (time - server_time).abs() > 120 {
-                            (
-                                "401 Unauthorized",
-                                json!({
-                                    "code": "stale_time",
-                                    "error": "clock skewed",
-                                    "serverTime": server_time,
-                                })
-                                .to_string(),
-                            )
-                        } else {
-                            (
-                                "200 OK",
-                                json!({
-                                    "host": "127.0.0.1",
-                                    "ports": [udp_port],
-                                    "keys": [{
-                                        "id": "k1",
-                                        "publicKey": public,
-                                        "from": server_time - 60,
-                                        "until": server_time + 60,
-                                    }],
-                                })
-                                .to_string(),
-                            )
-                        }
-                    }
-                    _ => ("404 Not Found", "{}".to_string()),
-                };
-                let response = format!(
-                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                    body.len()
-                );
-                let _ = socket.write_all(response.as_bytes()).await;
-            });
-        }
+/// The fake server's `udp:keys`: the gateway at `udp_port` with `public`, current at
+/// `server_time`.
+fn can_keys(edge: &Arc<Mutex<Edge>>, server_time: i64, udp_port: u16, public: &str) {
+    let keys = json!({
+        "host": "127.0.0.1",
+        "ports": [udp_port],
+        "keys": [{
+            "id": "k1",
+            "publicKey": public,
+            "from": server_time - 60,
+            "until": server_time + 60,
+        }],
     });
-    (base, hits)
+    let mut edge = edge.lock().unwrap();
+    edge.canned
+        .entry("udp:keys".into())
+        .or_default()
+        .push_back((200, keys));
 }
 
 #[tokio::test]
-async fn udp_gateway_handles_stale_time_and_fetches_page() {
-    use std::sync::atomic::Ordering;
-
-    let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-stale-{}", std::process::id()));
+async fn udp_keys_come_from_the_server_and_go_by_its_clock() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-keys-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let core = Core::for_test(&dir);
-    let seed = core.device().seed;
     let (udp_port, public) = spawn_gateway();
+    // The phone's clock an hour slow, as a signed call's `stale_time` taught it.
     let skew = 3600;
-    let server_time = unix_now() + skew;
-    let (edge, hits) = mock_udp_edge(seed, server_time, udp_port, public, false).await;
-    core.dev_set_forwarding_server("f".into(), Some(edge))
+    core.set_clock_offset(skew);
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    core.dev_set_forwarding_server("f".into(), Some(server))
         .unwrap();
+    can_keys(&edge, unix_now() + skew, udp_port, &public);
 
     let request = PageFetch {
         session: json!({ "cookies": "JSESSIONID=x" }),
@@ -355,14 +273,18 @@ async fn udp_gateway_handles_stale_time_and_fetches_page() {
         dictionary: Some("d1c7".into()),
     };
     set_udp_network(Arc::new(StdNetwork));
-    let page = core.udp_page("stale-flow", &request).await;
+    let page = core.udp_page("keys-flow", &request).await;
     assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
-    assert_eq!(hits.load(Ordering::SeqCst), 2);
-    assert!(
-        (core.device().clock_offset - skew).abs() <= 5,
-        "clock_offset was {}",
-        core.device().clock_offset
-    );
+    {
+        let edge = edge.lock().unwrap();
+        let asked: Vec<_> = edge
+            .requests
+            .iter()
+            .filter(|r| r.path == "udp:keys")
+            .collect();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].body, json!({}), "udp:keys takes no arguments");
+    }
     let saved = core.read::<Gateway>(GATEWAY).unwrap();
     assert!((saved.fetched - unix_now()).abs() <= 5);
     assert!(saved.key(unix_now()).is_none());
@@ -372,20 +294,22 @@ async fn udp_gateway_handles_stale_time_and_fetches_page() {
 }
 
 #[tokio::test]
-async fn udp_gateway_stops_after_one_stale_time_retry() {
-    use std::sync::atomic::Ordering;
-
-    let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-stale-stop-{}", std::process::id()));
+async fn udp_keys_the_server_refuses_are_a_clear_error() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-keys-no-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let core = Core::for_test(&dir);
-    let seed = core.device().seed;
-    let (_, public) = mail_seal::generate_keypair();
-    let (edge, hits) = mock_udp_edge(seed, unix_now() + 3600, 3478, public, true).await;
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    core.dev_set_forwarding_server("f".into(), Some(server.clone()))
+        .unwrap();
+    edge.lock().unwrap().canned.insert(
+        "udp:keys".into(),
+        [(503, json!({ "code": "gateway_down" }))].into(),
+    );
 
-    let err = core.udp_gateway(&edge, "stale-loop").await.err().unwrap();
-    assert_eq!(err, "/v1/udp: stale_time");
-    assert_eq!(hits.load(Ordering::SeqCst), 2);
+    let err = core.udp_gateway(&server, "keys-down").await.err().unwrap();
+    assert_eq!(err, "udp:keys: gateway_down");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

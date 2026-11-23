@@ -27,7 +27,7 @@ const FLOW_GRANT_S: i64 = 120;
 )]
 #[serde(rename_all = "snake_case")]
 pub enum CookieKind {
-    /// The Server, UDP or Proxy route fetching VTOP.
+    /// The Server or UDP route fetching VTOP.
     Route,
     /// The server checking who the student is (Server page, Connected apps, forwarding).
     Account,
@@ -133,6 +133,12 @@ fn save(state: &State) {
     }
 }
 
+/// Whether `flow` has the student on screen (no gate or no flow: no).
+pub(crate) fn attended(shared: &Shared, flow: &str) -> bool {
+    let gate = shared.consent().gate.clone();
+    gate.is_some_and(|gate| !flow.is_empty() && gate.attended(flow.to_string()))
+}
+
 /// Whether the session may go to `server` for `action` now. With `ask` false (a call the
 /// student didn't start) only a remembered yes sends. Logs the decision, never the session.
 pub(crate) async fn allowed(
@@ -235,6 +241,18 @@ impl Core {
         )]
         let _ = traced_sync("cookie_consent_remembered", &flow, || Ok(()));
         self.shared.consent().remembered.iter().copied().collect()
+    }
+
+    /// Remembers a yes for `kind` given in the app's own words, as "Don't ask again" in the
+    /// dialog would (choosing Server fetch already says the cookie goes to the server).
+    pub fn remember_cookie_consent(&self, flow: String, kind: CookieKind) -> Result<(), CoreError> {
+        traced_sync("remember_cookie_consent", &flow, || {
+            let mut state = self.shared.consent();
+            state.remembered.insert(kind);
+            save(&state);
+            info!(?kind, "cookie consent remembered");
+            Ok(())
+        })
     }
 
     /// Asks every time again.

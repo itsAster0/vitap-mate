@@ -88,11 +88,12 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
             )
             IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
         }
-        // Waiting in the warning tone, ready in the neutral one, working in success.
+        // Waiting in the warning tone, the confirmation in the neutral one, working in success.
         val lastOtpAt = status.lastOtpAt
         val (label, tone) = when {
             lastOtpAt != null -> "Working · last OTP ${ago(lastOtpAt)}" to tones.success
-            on -> "Ready · no OTP forwarded yet" to neutralTone
+            on -> "Working · no OTP forwarded yet" to tones.success
+            status.confirmation != null -> "Confirm in Gmail, then create the filter" to neutralTone
             else -> "Waiting for Gmail's confirmation mail…" to tones.warning
         }
         Row(
@@ -138,7 +139,7 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
             "On a phone, open the link in Chrome with ⋮ → Desktop site. Leave \"Disable forwarding\" selected."
     }
     Step(2, "Confirm it", null, null, state = state(added, false)) {
-        "Gmail's confirmation mail comes here, not to your inbox. Tap Check, then Confirm in Gmail or type the code into Gmail's Verify box."
+        "Gmail's confirmation mail comes here, not to your inbox, and shows up above on its own. Confirm in Gmail, or type the code into Gmail's Verify box."
     }
     Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
         "Reload Gmail first. Then create a new filter with From ${status.sender}, tick Forward it to and pick your address, then Create filter."

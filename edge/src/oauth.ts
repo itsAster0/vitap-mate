@@ -26,6 +26,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, randomBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 
 import { type Env, badRequest, error, mcpUrl, methodNotAllowed, now, str, variable } from "./common";
+import { type Exported, TABLES, dump } from "./export";
 import { pairCode } from "./pair";
 import { qrSvg } from "./qr";
 import { toBase64Url } from "./shared/base64";
@@ -165,6 +166,11 @@ export class OAuth extends DurableObject<Env> {
       this.ready = true;
     }
     return db;
+  }
+
+  /** Its stored state, for the move to v3 (export.ts). */
+  async exportState(): Promise<Exported> {
+    return dump(this.ctx.storage.sql, TABLES.oauth.keep, TABLES.oauth.count);
   }
 
   /** Stores a client and returns its id, dropping the one unused longest

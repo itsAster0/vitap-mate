@@ -40,6 +40,9 @@ object MailForwarding {
 
     val isOn get() = status?.state?.let { it != ForwardingState.OFF } ?: false
 
+    /** Counts the actions the student starts: a quiet check that began before one is stale. */
+    private var actions = 0
+
     /** Reads the saved status (no network). */
     suspend fun load(trigger: String) {
         try {
@@ -78,17 +81,26 @@ object MailForwarding {
         }
     }
 
-    /** One action as flow `forwarding.<name>`; a failure is a toast (unless [quiet]), and the status is read again. */
+    /**
+     * One action as flow `forwarding.<name>`; a failure is a toast (unless [quiet]), and the status
+     * is read again. A [quiet] one (the sheet watching the inbox) doesn't mark the sheet busy, so its
+     * buttons don't flicker on each check.
+     */
     private suspend fun run(name: String, quiet: Boolean = false, call: suspend (String) -> Forwarding): Forwarding? {
         if (busy != null) return null
-        busy = name
-        error = null
-        report()
+        val started = actions
+        if (!quiet) {
+            actions++
+            busy = name
+            error = null
+            report()
+        }
         var flowId = ""
         return try {
             flow("forwarding.$name") { id ->
                 flowId = id
-                withContext(Dispatchers.IO) { call(id) }.also { show(it, id, "action" to name) }
+                // A quiet check that a "Turn off" overtook would show the address it removed.
+                withContext(Dispatchers.IO) { call(id) }.also { if (!quiet || started == actions) show(it, id, "action" to name) }
             }
         } catch (e: CancellationException) {
             throw e
@@ -99,8 +111,10 @@ object MailForwarding {
             load("after_$name")
             null
         } finally {
-            busy = null
-            report()
+            if (!quiet) {
+                busy = null
+                report()
+            }
         }
     }
 
@@ -134,8 +148,9 @@ object MailForwarding {
         is CoreException.Offline -> "Couldn't reach the server" to "Check your connection and try again."
         is CoreException.OtpRequired -> "Verify your sign-in" to "VTOP wants the OTP first; enter it, then try again."
         is CoreException.NotSignedIn -> "Sign-in needed" to "Sign in to VTOP, then try again."
-        is CoreException.ConsentDenied -> "Not sent" to "Your VTOP cookie stayed on the phone, so no address was made."
+        is CoreException.ConsentDenied -> "Not set up yet" to "The server doesn't know this phone yet. Try again while signed in to VTOP."
         is CoreException.VtopUnavailable -> "VTOP is down" to "Try again in a few minutes."
+        is CoreException.ForwardingOff -> "Mail forwarding is off" to e.reason
         is CoreException.Other -> "Mail forwarding" to e.reason
         else -> "Something went wrong" to "Try again; if it keeps happening, share the log from the Inspector."
     }

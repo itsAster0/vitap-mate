@@ -20,7 +20,8 @@ import vitapmate.observability.flow
  * Fetches VTOP's pages for background sync and More → Fetch all: semesters and attendance first,
  * then the rest through [PageFetches]' lanes (several at once on a fast link; Fetch all as the
  * student's, background sync at the lowest priority). Each page gets [pageTimeoutMs] once it has a
- * lane; a page that fails is logged and skipped (the others still run). When VTOP asks for the
+ * lane (none: Fetch all, where a consent prompt or a proof may run inside a fetch, and the
+ * transports' own timeouts end a stuck page); a page that fails is logged and skipped (the others still run). When VTOP asks for the
  * OTP, [otp] must get it accepted (background: auto-fill alone; Fetch all: the prompt), asked once
  * however many pages need it, and returns false to stop the whole run. [everything] adds the pages background sync
  * leaves out (profile, course page, outings). Rust records what changed on each fetch (the
@@ -29,7 +30,7 @@ import vitapmate.observability.flow
  */
 object VtopSync {
     /** How a run ended. */
-    enum class Outcome { Done, StoppedAtOtp, Failed }
+    enum class Outcome { Done, StoppedAtOtp, Rejected, Failed }
 
     data class Result(val outcome: Outcome, val fetched: Int, val failed: Int)
 
@@ -37,7 +38,7 @@ object VtopSync {
         flowName: String,
         label: String,
         everything: Boolean,
-        pageTimeoutMs: Long,
+        pageTimeoutMs: Long?,
         unattended: Boolean = false,
         otp: suspend (CoreException.OtpRequired, String) -> Boolean,
     ): Result = flow(flowName, unattended) { f ->
@@ -52,6 +53,7 @@ object VtopSync {
         val fetched = AtomicInteger()
         val failed = AtomicInteger()
         class Stop : Exception()
+        class Rejected : Exception()
         class TimedOut : Exception()
         // Pages that run into the OTP together share one prompt: the first asks, the rest wait for
         // it and try again; [otpRounds] counts the codes accepted, [stopped] that one wasn't.
@@ -69,7 +71,8 @@ object VtopSync {
                 try {
                     PageFetches.start(key, f, user = everything, background = !everything) {
                         Activity.track("$label: $name", f) {
-                            withTimeoutOrNull(pageTimeoutMs) { withContext(Dispatchers.IO) { fetch(core) } } ?: throw TimedOut()
+                            if (pageTimeoutMs == null) withContext(Dispatchers.IO) { fetch(core) }
+                            else withTimeoutOrNull(pageTimeoutMs) { withContext(Dispatchers.IO) { fetch(core) } } ?: throw TimedOut()
                         }
                     }.result.await()
                     fetched.incrementAndGet()
@@ -80,6 +83,10 @@ object VtopSync {
                     failed.incrementAndGet()
                     Log.warn("sync", "page timed out", f, mapOf("page" to id))
                     return
+                } catch (_: CoreException.InvalidCredentials) {
+                    // Every other page would be turned down the same way.
+                    AccountState.rejected = true
+                    throw Rejected()
                 } catch (e: CoreException.OtpRequired) {
                     if (attempt > 0) throw Stop()
                     otpPrompt.withLock {
@@ -132,7 +139,12 @@ object VtopSync {
             }
             // The rest in any order; the lanes keep them in this one.
             coroutineScope { pages.map { (id, fetch) -> async { page(id, fetch) } }.awaitAll() }
+        } catch (_: Rejected) {
+            Log.info("sync", "stopped: password rejected", f, mapOf("fetched" to "$fetched", "failed" to "$failed"))
+            return@flow Result(Outcome.Rejected, fetched.get(), failed.get())
         } catch (_: Stop) {
+            // The half-done sign-in waiting on that code would answer the next fetch with it.
+            runCatching { withContext(Dispatchers.IO) { core.cancelOtp(f) } }
             Log.info("sync", "stopped at the otp", f, mapOf("fetched" to "$fetched", "failed" to "$failed"))
             return@flow Result(Outcome.StoppedAtOtp, fetched.get(), failed.get())
         }

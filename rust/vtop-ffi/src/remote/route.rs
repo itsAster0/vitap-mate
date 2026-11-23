@@ -1,15 +1,13 @@
 //! How the app reaches VTOP (Settings → Connection):
 //! - Direct: the phone signs in and fetches from VTOP itself.
-//! - Proxy: the same requests through the edge's `/vtop/` (compressed); [`Routed`] swaps the
-//!   origin per hop, so cookies, redirects and the parsers never see the edge.
-//! - Server: the engine fetches and parses read pages on the phone's session
-//!   (`/v1/vtop/fetch`) and signs in with the saved password when it expired
-//!   (`/v1/vtop/login`); writes, downloads and the web view stay on the phone.
-//! - UDP: the server route over vm1 ([`Core::udp_page`]), then over HTTPS.
+//! - Server: the engine fetches and parses read pages on the phone's session (`vtop:fetch`)
+//!   and signs in with the saved password when it expired (`vtop:login`); writes, downloads and
+//!   the web view stay on the phone.
+//! - UDP: the server route over vm1 ([`Core::udp_page`]), then over the server's socket.
 //!
 //! A route that fails is skipped for [`plan::SKIP_S`] and the request goes on to the next, finally
-//! Direct; the student never has to change the setting to get their data. Proxy, Server and UDP
-//! send the VTOP session, so each asks first ([`consent::allowed`]); a no goes Direct and is not
+//! Direct; the student never has to change the setting to get their data. Server and UDP send
+//! the VTOP session, so each asks first ([`consent::allowed`]); a no goes Direct and is not
 //! skipped, so the next fetch the student watches asks again. A background run uses the chosen
 //! route only when the student ticked "don't ask again", else Direct.
 //!
@@ -33,6 +31,7 @@ use vtop_shared::engine::PageFetch;
 use vtop_shared::page_dictionary;
 
 use crate::device::EdgeError;
+use crate::remote::backend::Kind;
 use crate::remote::consent::{self, CookieKind};
 use crate::{Core, CoreError, Shared, Slot, traced_sync, transport, unix_now};
 
@@ -57,7 +56,6 @@ pub(crate) const FILE: &str = "route.json";
 pub enum Route {
     #[default]
     Direct,
-    Proxy,
     Server,
     Udp,
 }
@@ -88,7 +86,7 @@ struct Saved {
 /// The core's route state ([`Shared::routes`]).
 pub(crate) struct State {
     plan: RoutePlan,
-    /// The edge, for the proxy's origin.
+    /// The server, for the consent dialog.
     server: String,
     /// The span and route of the last "route used" line: one line per call, not per hop.
     logged: Option<(Option<u64>, Route)>,
@@ -113,7 +111,7 @@ impl Shared {
         self.route.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Whether the student lets `action` send the session over a route: to the edge's host.
+    /// Whether the student lets `action` send the session over a route: to the server's host.
     async fn consented(&self, flow: &str, action: &str) -> bool {
         let server = consent::host(&self.routes().server);
         consent::allowed(self, flow, CookieKind::Route, action, &server, true).await
@@ -177,9 +175,8 @@ impl Core {
     }
 }
 
-/// Sends VTOP's hops through the edge's `/vtop/` while the proxy route is on, else (or when the
-/// edge fails) straight to VTOP; downloads always go straight to VTOP. Holds its core's
-/// [`Shared`], for the plan and consent.
+/// VTOP's hops, straight to VTOP: what Direct used is recorded for the Connection screen.
+/// Holds its core's [`Shared`], for the plan.
 pub(crate) struct Routed(pub(crate) Arc<dyn Transport>, pub(crate) Arc<Shared>);
 
 impl std::fmt::Debug for Routed {
@@ -188,83 +185,12 @@ impl std::fmt::Debug for Routed {
     }
 }
 
-impl Routed {
-    fn is_vtop(hop: &Hop) -> bool {
-        hop.url.starts_with(&format!("{DEFAULT_BASE_URL}/"))
-    }
-}
-
-/// `hop` again; [`Hop`] isn't `Clone`.
-fn copy(hop: &Hop) -> Hop {
-    Hop {
-        method: hop.method.clone(),
-        url: hop.url.clone(),
-        headers: hop.headers.clone(),
-        body: hop.body.clone(),
-        timeout: hop.timeout,
-        connect_timeout: hop.connect_timeout,
-        download_to: hop.download_to.clone(),
-    }
-}
-
-/// `value` with origin `from` swapped for `to`.
-fn reorigin(value: &str, from: &str, to: &str) -> String {
-    match value.strip_prefix(from) {
-        Some(rest) => format!("{to}{rest}"),
-        None => value.to_string(),
-    }
-}
-
 impl Transport for Routed {
     fn send(&self, hop: Hop) -> HopFuture<'_> {
         Box::pin(async move {
-            if !Self::is_vtop(&hop) {
-                return self.0.send(hop).await;
-            }
-            // Downloads go straight to VTOP, as Android's DownloadManager does.
-            let download = hop.method == "HEAD" || hop.download_to.is_some();
-            // The dialog may be waited on inside the caller's session lock (hops run under it),
-            // for at most `CookieAsk`; Kotlin's `ask` calls no Rust, so it can't deadlock.
-            if !download
-                && self.1.active(Route::Proxy)
-                && (self.1)
-                    .consented(&transport::flow(), "Reach VTOP through the proxy")
-                    .await
-            {
-                let edge = self.1.routes().server.trim_end_matches('/').to_string();
-                let mut proxied = copy(&hop);
-                proxied.url = reorigin(&hop.url, DEFAULT_BASE_URL, &edge);
-                for (name, value) in &mut proxied.headers {
-                    if name.eq_ignore_ascii_case("origin") || name.eq_ignore_ascii_case("referer") {
-                        *value = reorigin(value, DEFAULT_BASE_URL, &edge);
-                    }
-                }
-                match self.0.send(proxied).await {
-                    // The edge's own errors are JSON; VTOP's are HTML.
-                    Ok(response)
-                        if matches!(response.status, 502..=504)
-                            && response
-                                .header("content-type")
-                                .is_some_and(|kind| kind.contains("json")) =>
-                    {
-                        (self.1)
-                            .failed(Route::Proxy, &format!("edge answered {}", response.status));
-                    }
-                    Ok(mut response) => {
-                        response.url = reorigin(&response.url, &edge, DEFAULT_BASE_URL);
-                        for (name, value) in &mut response.headers {
-                            if name.eq_ignore_ascii_case("location") {
-                                *value = reorigin(value, &edge, DEFAULT_BASE_URL);
-                            }
-                        }
-                        self.1.used(Route::Proxy);
-                        return Ok(response);
-                    }
-                    Err(error) => self.1.failed(Route::Proxy, &error.to_string()),
-                }
-            }
+            let vtop = hop.url.starts_with(&format!("{DEFAULT_BASE_URL}/"));
             let response = self.0.send(hop).await;
-            if response.is_ok() {
+            if vtop && response.is_ok() {
                 self.1.used(Route::Direct);
             }
             response
@@ -403,19 +329,22 @@ impl Core {
             }
         }
         let body = serde_json::to_value(request).unwrap_or_default();
-        let server = self.forwarding_server();
-        let mut answer = self
-            .edge_answer(&server, "/v1/vtop/fetch", flow, &body)
-            .await?;
+        let answer = self.engine_call(flow, "vtop:fetch", body).await?;
         self.shared.used(Route::Server);
-        match answer.packed {
-            Some(packed) => unpacked(&request.name, &packed)
-                .ok_or_else(|| ServerError::Failed(format!("unreadable packed {}", request.name))),
-            None => Ok(answer
-                .body
-                .get_mut("data")
-                .map(Value::take)
-                .unwrap_or_default()),
+        page_data(&request.name, answer)
+            .ok_or_else(|| ServerError::Failed(format!("unreadable packed {}", request.name)))
+    }
+
+    /// An engine action as the student; it proves who they are first only with them watching.
+    async fn engine_call(&self, flow: &str, path: &str, body: Value) -> Result<Value, ServerError> {
+        let ask = consent::attended(&self.shared, flow);
+        // Type-erased: with a proof inside, the page fetch's future is too deep for the
+        // compiler's `Send` check otherwise.
+        let answer: futures::future::BoxFuture<'_, _> =
+            Box::pin(self.account_call(flow, Kind::Action, path, path, ask, body));
+        match answer.await {
+            Ok(answer) => Ok(answer?),
+            Err(error) => Err(ServerError::Failed(format!("no identity: {error}"))),
         }
     }
 
@@ -440,8 +369,8 @@ impl Core {
             "username": session.account.username,
             "password": session.account.password,
         });
-        let server = self.forwarding_server();
-        let answer = match self.edge_post(&server, "/v1/vtop/login", flow, &body).await {
+        let login = self.signed_call(flow, Kind::Action, "vtop:login", &body);
+        let answer = match login.await {
             Err(EdgeError::Status { code, .. }) if code == "invalid_credentials" => {
                 // As on the phone: no more sign-ins with it (the phone's path then says so).
                 warn!("VTOP rejected the saved password on the server; no more sign-ins with it");
@@ -500,20 +429,19 @@ impl Core {
         let path = match code {
             Some(code) => {
                 crate::json_set(&mut body, "otp", json!(code));
-                "/v1/vtop/login/otp"
+                "vtop:loginOtp"
             }
-            None => "/v1/vtop/login/resend",
+            None => "vtop:loginResend",
         };
-        let server = self.forwarding_server();
-        let answer =
-            self.edge_post(&server, path, flow, &body)
-                .await
-                .map_err(|error| match error {
-                    EdgeError::Status { code, message } if code == "authentication_failed" => {
-                        CoreError::OtpRejected { reason: message }
-                    }
-                    error => error.into(),
-                })?;
+        let answer = self
+            .signed_call(flow, Kind::Action, path, &body)
+            .await
+            .map_err(|error| match error {
+                EdgeError::Status { code, message } if code == "authentication_failed" => {
+                    CoreError::OtpRejected { reason: message }
+                }
+                error => error.into(),
+            })?;
         let state: SessionState =
             serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
                 .map_err(|_| CoreError::from(VtopError::InvalidResponse))?;
@@ -529,9 +457,18 @@ impl Core {
 }
 
 /// A page the engine packed with the page dictionary, as its `data`; both server routes
-/// (HTTPS and UDP) get pages this way.
+/// (the socket and UDP) get pages this way.
 pub(crate) fn unpacked(name: &str, packed: &[u8]) -> Option<Value> {
     serde_json::from_slice(&page_dictionary::unpack(name, packed).ok()?).ok()
+}
+
+/// A `vtop:fetch*` answer's `data`: a packed page comes as bytes (an `ArrayBuffer`), anything
+/// else as `{ data }`. None for packed bytes that don't unpack.
+pub(crate) fn page_data(name: &str, mut answer: Value) -> Option<Value> {
+    match crate::convex::value::bytes(&answer) {
+        Some(packed) => unpacked(name, &packed),
+        None => Some(answer.get_mut("data").map(Value::take).unwrap_or_default()),
+    }
 }
 
 #[cfg(test)]
@@ -540,7 +477,6 @@ mod tests {
     use std::sync::Mutex;
 
     use serde_json::Value;
-    use vtop_core::client::HopResponse;
 
     use super::*;
     use crate::test_edge::{Edge, serve};
@@ -559,6 +495,7 @@ mod tests {
         .unwrap();
         let core = Core::for_test(dir);
         consent::tests::signed_in(&core);
+        crate::test_edge::keep_token(&core, &core.forwarding_server());
         core.set_route("f".into(), route).unwrap();
         load(&core);
         (core, edge)
@@ -636,88 +573,5 @@ mod tests {
         assert_eq!(sent, Err(CoreError::ConsentDenied));
         assert_eq!(gate.asks(), 1);
         assert!(edge.lock().unwrap().requests.is_empty());
-    }
-
-    /// Answers every hop with 200 and keeps its URL.
-    #[derive(Debug, Default)]
-    struct Hops(Mutex<Vec<String>>);
-
-    impl Transport for Hops {
-        fn send(&self, hop: Hop) -> HopFuture<'_> {
-            self.0.lock().unwrap().push(hop.url.clone());
-            Box::pin(async move { Ok(HopResponse::whole(200, Vec::new(), hop.url, Vec::new())) })
-        }
-    }
-
-    /// Three VTOP hops in one flow through the proxy route; the URLs they went to.
-    /// With `yes`, the student says yes; the core is returned for its route state.
-    async fn three_hops(yes: bool) -> (Vec<String>, Core) {
-        let core = Core::for_test(std::env::temp_dir());
-        let gate = consent::tests::install(&core, true, !yes);
-        {
-            let mut state = core.shared.routes();
-            state.plan.choose(Route::Proxy);
-            state.server = "https://edge.test".into();
-        }
-        let hops = Arc::new(Hops::default());
-        let routed = Routed(hops.clone(), core.shared.clone());
-        transport::with_flow("f".into(), async {
-            for _ in 0..3 {
-                let hop = Hop {
-                    method: "GET".into(),
-                    url: format!("{DEFAULT_BASE_URL}/vtop/content"),
-                    headers: Vec::new(),
-                    body: Vec::new(),
-                    timeout: std::time::Duration::from_secs(1),
-                    connect_timeout: std::time::Duration::from_secs(1),
-                    download_to: None,
-                };
-                routed.send(hop).await.unwrap();
-            }
-        })
-        .await;
-        assert_eq!(gate.asks(), 1);
-        let urls = hops.0.lock().unwrap().clone();
-        (urls, core)
-    }
-
-    #[tokio::test]
-    async fn proxy_asks_once_per_flow() {
-        let (urls, _core) = three_hops(true).await;
-        assert!(
-            urls.iter()
-                .all(|url| url.starts_with("https://edge.test/vtop/"))
-        );
-    }
-
-    #[tokio::test]
-    async fn proxy_denied_goes_straight_to_vtop() {
-        let (urls, core) = three_hops(false).await;
-        assert!(urls.iter().all(|url| url.starts_with(DEFAULT_BASE_URL)));
-        assert!(
-            core.shared
-                .routes()
-                .plan
-                .status(unix_now())
-                .skipped
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn origins_swap_only_at_the_start() {
-        let edge = "https://vmate.aster0.dev";
-        assert_eq!(
-            reorigin(
-                "https://vtop.vitap.ac.in/vtop/login",
-                DEFAULT_BASE_URL,
-                edge
-            ),
-            "https://vmate.aster0.dev/vtop/login"
-        );
-        assert_eq!(
-            reorigin("/vtop/content", edge, DEFAULT_BASE_URL),
-            "/vtop/content"
-        );
     }
 }

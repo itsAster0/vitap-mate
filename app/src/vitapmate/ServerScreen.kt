@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,12 +62,15 @@ import vitapmate.core.AccessKey
 import vitapmate.core.Core
 import vitapmate.core.CoreException
 import vitapmate.core.ServerOptions
+import vitapmate.core.LiveTopic
 import vitapmate.core.ServerStatus
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
 import vitapmate.data.Problem
+import vitapmate.data.ServerFailure
 import vitapmate.data.problemOf
+import vitapmate.data.rememberLive
 import vitapmate.features.login.OtpAutofill
 import vitapmate.features.login.ago
 import vitapmate.observability.Log
@@ -81,7 +83,7 @@ import vitapmate.ui.StatusChip
 import vitapmate.ui.heroCookie
 import vitapmate.ui.neutralTone
 import vitapmate.ui.ProblemView
-import vitapmate.ui.Space
+import vitapmate.ui.ProofProgress
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 
@@ -95,7 +97,7 @@ private val VAULT_TTLS = listOf<Long?>(86_400, 172_800, null)
 private class Pending(val title: String, val text: String, val confirm: String, val name: String, val done: String, val call: suspend (Core, String) -> Boolean)
 
 /**
- * Server (Rust's `server.rs`): everything vmate.aster0.dev keeps for this student and this phone
+ * Server (Rust's `server.rs`): everything the server keeps for this student and this phone
  * (account, sealed session and password, options, phones, keys, the forwarding address, sign-ins,
  * this install's registration), each with a way to delete it (asks first, saying what goes).
  * Actions the deployed server doesn't offer yet are disabled once it says so. Flows `server.*`,
@@ -112,22 +114,24 @@ fun ServerScreen() {
     var loading by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<Pending?>(null) }
-    // Removed from the server: not loaded again on its own, since loading registers it afresh.
-    var removed by remember { mutableStateOf(false) }
+    // This phone removed, or the account deleted ([Pending.name]): not loaded again on its own,
+    // since loading registers the phone (and proves the account) afresh.
+    var removed by remember { mutableStateOf<String?>(null) }
     // Actions the server answered 404 to (`Pending.name`).
     var unsupported by remember { mutableStateOf(setOf<String>()) }
 
     fun load() {
         scope.launch {
             loading = true
-            removed = false
+            removed = null
             run("load") { c, f -> c.serverStatus(f) }
                 .onSuccess { status = it; problem = null }
-                .onFailure { e -> if (status == null) problem = problemOf(e, "") }
+                .onFailure { e -> if (status == null) problem = (e as ServerFailure).problem }
             loading = false
         }
     }
-    LaunchedEffect(Unit) { load() }
+    val change by rememberLive(LiveTopic.SERVER, status != null)
+    LaunchedEffect(change) { if (change > 0 && removed == null) load() }
 
     fun setOptions(options: ServerOptions) {
         scope.launch {
@@ -141,7 +145,8 @@ fun ServerScreen() {
     }
 
     fun ask(title: String, text: String, confirm: String, name: String, done: String, call: suspend (Core, String) -> Boolean) {
-        pending = Pending(title, text, confirm, name, done, call)
+        // One action at a time: a second tap while one runs would ask the server twice.
+        if (!saving) pending = Pending(title, text, confirm, name, done, call)
     }
 
     fun trash(tag: String, description: String, enabled: Boolean = true, onClick: () -> Unit): @Composable () -> Unit = {
@@ -152,9 +157,14 @@ fun ServerScreen() {
         LazyColumn(contentPadding = padding) {
             val s = status
             when {
-                removed -> item {
-                    ListGroup("This phone", footer = "The server registers this phone again the next time the app talks to it, such as when this page loads.") {
-                        GroupItem("Removed from the server", "server.removed", Lucide.Unplug, "Its keys, push token and events are gone")
+                removed != null -> item {
+                    val deleted = removed == "delete"
+                    ListGroup(
+                        if (deleted) "Account" else "This phone",
+                        footer = if (deleted) "Loading again proves who you are and starts a new, empty account." else "The server registers this phone again the next time the app talks to it, such as when this page loads.",
+                    ) {
+                        if (deleted) GroupItem("Deleted from the server", "server.deleted", Lucide.Trash2, "Keys, phones, session, password and history are gone")
+                        else GroupItem("Removed from the server", "server.removed", Lucide.Unplug, "Its keys and push token are gone")
                         GroupItem("Load again", "server.reload", Lucide.Server, onClick = ::load)
                     }
                 }
@@ -230,10 +240,10 @@ fun ServerScreen() {
                         }
                     }
                     if (s.phones.isNotEmpty()) item {
-                        ListGroup("Linked phones", footer = "Linked phones are asked for VTOP sessions. A removed phone links again when it adds a connected app.") {
+                        ListGroup("Linked phones", footer = "Linked phones are asked for VTOP sessions. A removed phone links again the next time it proves who you are.") {
                             s.phones.forEach { phone ->
-                                GroupItem(phone.label ?: "Phone", "server.phone.${phone.id}", Lucide.Smartphone, phoneText(phone.thisPhone, phone.seenAt, phone.addedAt), below = phoneChip(phone.thisPhone, phone.seenAt, phone.addedAt), trailing = trash("server.phone.${phone.id}.remove", "Remove") {
-                                    ask("Remove ${phone.label ?: "this phone"}?", "It is unlinked from your account and no longer asked for VTOP sessions. Keys it made stop getting sessions from it.", "Remove", "remove_phone", "It is no longer linked.") { c, f -> c.removePhone(f, phone.id); true }
+                                GroupItem(phone.label ?: "Phone", "server.phone.${phone.id}", Lucide.Smartphone, phoneText(phone.thisPhone, phone.seenAt, phone.addedAt), below = phoneChip(phone.thisPhone, phone.seenAt, phone.addedAt), trailing = if (phone.thisPhone) null else trash("server.phone.${phone.id}.remove", "Remove") {
+                                    ask("Remove ${phone.label ?: "this phone"}?", "It is unlinked from your account, no longer asked for VTOP sessions, and stops getting your forwarded OTPs. Keys it made stop getting sessions from it.", "Remove", "remove_phone", "It is no longer linked.") { c, f -> c.removePhone(f, phone.id); true }
                                 })
                             }
                         }
@@ -304,7 +314,7 @@ fun ServerScreen() {
                     item {
                         val d = s.device
                         val off = "remove_device" in unsupported
-                        ListGroup("This phone on the server", footer = "Every request is signed with a key only this phone holds; the server keeps its public half to check them.") {
+                        ListGroup("This phone on the server", footer = "Requests carry a short-lived token from your account proof, renewed with a key only this phone holds.") {
                             GroupItem(d.label, "server.device", Lucide.Smartphone, listOfNotNull(
                                 d.id?.let { "Id $it…" } ?: "Not registered",
                                 d.registeredAt?.let { "registered ${ago(it)}" },
@@ -312,13 +322,12 @@ fun ServerScreen() {
                             GroupItem("Push notifications", "server.device.push", Lucide.Server, below = {
                                 Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     if (d.pushToken) StatusChip("Token set", AppTheme.tones.success) else StatusChip("No token", neutralTone)
-                                    d.events?.let { Text("$it events waiting (kept 24 h)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 }
                             })
-                            GroupItem("Remove this phone from the server", "server.device.remove", Lucide.Unplug, if (off) "Needs a server update" else "Its keys, push token and events", enabled = d.id != null && !off, tone = AppTheme.tones.danger, onClick = {
+                            GroupItem("Remove this phone from the server", "server.device.remove", Lucide.Unplug, if (off) "Needs a server update" else "Its keys and push token", enabled = d.id != null && !off, tone = AppTheme.tones.danger, onClick = {
                                 ask(
                                     "Remove this phone from the server?",
-                                    "The server deletes this phone's keys, push token and waiting events${if (s.linked) ", unlinks it from your account" else ""}${if (s.mailbox != null) " and takes it off the forwarding address (deleting the address if it's the only phone on it)" else ""}. Your account and its keys stay. The phone registers again the next time it talks to the server.",
+                                    "The server deletes this phone's keys and push token${if (s.linked) ", unlinks it from your account" else ""}${if (s.mailbox != null) " and takes it off the forwarding address (deleting the address if it's the only phone on it)" else ""}. Your account and its keys stay. The phone registers again the next time it talks to the server.",
                                     "Remove",
                                     "remove_device",
                                     "This phone is removed from the server.",
@@ -332,7 +341,7 @@ fun ServerScreen() {
                             Button({
                                 ask(
                                     "Delete everything on the server?",
-                                    "The server deletes your account: every access key stops working, every phone is unlinked, and the saved session, password, options and sign-in history go. The forwarding address and this phone's registration stay; remove them above. Your data on this phone stays.",
+                                    "The server deletes your account: every access key stops working, every phone is unlinked, and the saved session, password, options, sign-in history and forwarding address go. Gmail's forwarding to it stops working; set it up again to get OTPs filled in. This phone's registration and your data on this phone stay.",
                                     "Delete",
                                     "delete",
                                     "The server keeps no account for you now.",
@@ -353,7 +362,7 @@ fun ServerScreen() {
                     }
                 }
                 problem != null -> item { problem?.let { ProblemView(it, onRetry = ::load, Modifier.fillMaxWidth(), busy = loading) } }
-                else -> item { Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator(Modifier.testTag("server.loading")) } }
+                else -> item { ProofProgress(Modifier.testTag("server.loading")) }
             }
         }
     }
@@ -366,6 +375,7 @@ fun ServerScreen() {
             {
                 pending = null
                 scope.launch {
+                    saving = true
                     run(p.name, p.call).onSuccess { done ->
                         if (!done) {
                             unsupported = unsupported + p.name
@@ -374,8 +384,9 @@ fun ServerScreen() {
                         }
                         haptics.confirm()
                         showToast("Server", p.done)
-                        if (p.name == "remove_device") { removed = true; status = null } else load()
+                        if (p.name == "remove_device" || p.name == "delete") { removed = p.name; status = null } else load()
                     }.onFailure { haptics.reject() }
+                    saving = false
                 }
             },
             icon = Lucide.TriangleAlert,
@@ -435,7 +446,8 @@ private fun AccountHero(s: ServerStatus) {
             }
             Column(Modifier.weight(1f)) {
                 Text(s.registrationNumber, style = MaterialTheme.typography.titleLargeEmphasized, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(s.createdAt?.let { "On vmate.aster0.dev since ${ago(it)}" } ?: "vmate.aster0.dev", style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
+                val host = rememberServer().host
+                Text(s.createdAt?.let { "On $host since ${ago(it)}" } ?: host, style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
             }
         }
         if (s.linked) StatusChip("Linked", tones.success) else StatusChip("Not linked", neutralTone)
@@ -457,7 +469,7 @@ private fun AccountHero(s: ServerStatus) {
             }
         } else {
             Text(
-                "This phone isn't linked to your server account, so the server shows it only what applies to this phone. It links when you add a connected app.",
+                "This phone isn't linked to your server account, so the server shows it only what applies to this phone. It links again the next time it proves who you are to the server.",
                 style = MaterialTheme.typography.bodySmall,
                 color = tones.accentTone.onSubtle,
             )
@@ -468,7 +480,7 @@ private fun AccountHero(s: ServerStatus) {
 private fun keyText(key: AccessKey) =
     listOfNotNull("Made ${ago(key.createdAt)}", key.lastUsedAt?.let { "last used ${ago(it)}" } ?: "never used").joinToString(" · ")
 
-/** One call as flow `server.<name>`, off the main thread; a failure is logged and toasted. */
+/** One call as flow `server.<name>`, off the main thread; a failure is logged, toasted and returned as a [ServerFailure]. */
 private suspend fun <T> run(name: String, call: suspend (Core, String) -> T): Result<T> {
     var flowId = ""
     return try {
@@ -480,8 +492,8 @@ private suspend fun <T> run(name: String, call: suspend (Core, String) -> T): Re
         when (e) {
             is CoreException.OtpRequired -> OtpPrompt.ask(e.reason)
             is CoreException.Other -> showToast("Server", e.reason)
-            else -> showToast(problemOf(e, flowId))
+            else -> showToast(problemOf(e, flowId, server = true))
         }
-        Result.failure(e)
+        Result.failure(ServerFailure(flowId, e))
     }
 }

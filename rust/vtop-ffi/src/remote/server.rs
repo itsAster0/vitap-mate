@@ -1,8 +1,7 @@
-//! The Server page (Settings → Account): what the edge keeps for this student and the phones
-//! linked to the account (`edge/API.md`, "Accounts — phones"). `/v1/account` sends the
-//! account token or the live VTOP session ([`crate::remote::account_token`]); `/v1/app/*` names the
-//! account by registration number. Every call is signed as this install ([`Core::edge_post`]);
-//! cookies are never logged.
+//! The Server page (Settings → Account): what the server keeps for this student and the phones
+//! linked to the account (the contract's `account:*`, `devices:*`, `app:*` and `mail:*`). Every
+//! call goes as the student this install proved to be ([`Core::account_call`]); the student
+//! comes from the JWT, never from the arguments. Cookies are never logged.
 
 use std::sync::OnceLock;
 
@@ -11,6 +10,7 @@ use serde_json::{Value, json};
 use tracing::info;
 
 use crate::device::EdgeError;
+use crate::remote::backend::Kind;
 use crate::remote::consent::{self, CookieKind};
 use crate::remote::keys::{AccessKey, KeyView, refused};
 use crate::{Core, CoreError, traced};
@@ -45,7 +45,7 @@ pub struct ServerSignIn {
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct LinkedPhone {
-    /// The short id the edge removes it by.
+    /// The short id the server removes it by.
     pub id: String,
     pub label: Option<String>,
     pub added_at: i64,
@@ -53,7 +53,7 @@ pub struct LinkedPhone {
     pub this_phone: bool,
 }
 
-/// How the server serves sessions to connected apps (`/v1/account/settings`).
+/// How the server serves sessions to connected apps (`account:setSettings`).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, uniffi::Record)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ServerOptions {
@@ -95,13 +95,12 @@ pub struct ServerMailbox {
 /// This install as the server knows it.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ServerDevice {
-    /// The first 8 characters of its id; None while it isn't registered.
+    /// The first 8 characters of its id; None while it has no identity on the server.
     pub id: Option<String>,
     pub label: String,
     pub push_token: bool,
-    /// From the server; None when it doesn't say (before `/v1/devices/info`).
+    /// From the server; None when it doesn't say (before `devices:info`).
     pub registered_at: Option<i64>,
-    pub events: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -187,7 +186,6 @@ struct DeviceView {
     label: Option<String>,
     push_token: bool,
     created_at: Option<i64>,
-    events: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -206,7 +204,7 @@ fn unexpected(_: serde_json::Error) -> CoreError {
     }
 }
 
-/// The edge has no such route (it predates it): `Ok(false)`.
+/// The server has no such function (it predates it): `Ok(false)`.
 fn supported(answer: Result<Value, EdgeError>, path: &str) -> Result<bool, CoreError> {
     match answer {
         Err(error) if error.code() == "not_found" => {
@@ -236,15 +234,14 @@ impl Core {
     pub async fn server_status(&self, flow: String) -> Result<ServerStatus, CoreError> {
         traced("server_status", &flow, async {
             let action = "Load what the server keeps for you";
-            self.status_with(&self.forwarding_server(), &flow, action)
-                .await
+            self.status_with(&flow, action).await
         })
         .await
     }
 
     /// Removes a linked phone (an id from [`ServerStatus::phones`]).
     pub async fn remove_phone(&self, flow: String, id: String) -> Result<(), CoreError> {
-        let path = "/v1/account/remove-phone";
+        let path = "account:removeDevice";
         let action = "Remove a phone from your account";
         self.account_op(
             "remove_phone",
@@ -258,13 +255,14 @@ impl Core {
     }
 
     /// Tells the server the semester picked here, so connected apps read the same one. Does
-    /// nothing while no semester is picked, or (it runs unasked) until the student ticked
-    /// "don't ask again" for [`CookieKind::Account`]; fails with `not_linked` before a key is made.
+    /// nothing while no semester is picked, or (it runs unasked, never proving) before this
+    /// install has a server identity; the identity sends it once it comes
+    /// ([`Core::semester_to_server`]).
     pub async fn send_server_semester(&self, flow: String) -> Result<(), CoreError> {
         let Some(semester) = self.read_kept::<String>(crate::SELECTED) else {
             return Ok(());
         };
-        let path = "/v1/account/semester";
+        let path = "account:setSemester";
         let body = json!({ "semesterId": semester });
         match self
             .account_op("send_server_semester", None, flow, path, body)
@@ -285,16 +283,15 @@ impl Core {
     ) -> Result<(), CoreError> {
         traced("save_server_password", &flow, async {
             let action = "Save your password on the server (it gets your password too)";
-            let server = self.forwarding_server();
-            self.save_password_with(&server, &flow, action, true, gmail)
-                .await
+            self.save_password_with(&flow, action, true, gmail).await
         })
         .await
     }
 
     /// Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
-    /// none for forwarding), only when the server already keeps one; false when it keeps none,
-    /// or (it runs unasked) the student hasn't ticked "don't ask again" for [`CookieKind::Account`].
+    /// none for forwarding), only when the server already keeps one: the student agreed to that
+    /// when saving it, so it isn't asked again. False when it keeps none, or there's no identity
+    /// to send it with (no proof is started for it).
     pub async fn resend_server_password(
         &self,
         flow: String,
@@ -302,9 +299,8 @@ impl Core {
     ) -> Result<bool, CoreError> {
         traced("resend_server_password", &flow, async {
             let action = "Send your password to the server again";
-            let server = self.forwarding_server();
             let account = self
-                .account_post(&server, "/v1/account", &flow, action, false, json!({}))
+                .account_call(&flow, Kind::Query, "account:view", action, false, json!({}))
                 .await;
             let account = match account {
                 Err(CoreError::ConsentDenied) => return Ok(false),
@@ -313,10 +309,7 @@ impl Core {
             if account.get("savedCredentials") != Some(&json!(true)) {
                 return Ok(false);
             }
-            match self
-                .save_password_with(&server, &flow, action, false, gmail)
-                .await
-            {
+            match self.save_password_with(&flow, action, true, gmail).await {
                 Err(CoreError::ConsentDenied) => Ok(false),
                 saved => saved.map(|()| true),
             }
@@ -326,7 +319,7 @@ impl Core {
 
     /// Drops the sealed password; the server can then no longer sign in by itself.
     pub async fn forget_server_password(&self, flow: String) -> Result<(), CoreError> {
-        let path = "/v1/account/forget-credentials";
+        let path = "account:forgetCredentials";
         let action = "Drop your password from the server";
         self.account_op(
             "forget_server_password",
@@ -339,14 +332,54 @@ impl Core {
         .map(drop)
     }
 
-    /// Deletes the account on the server: phones, keys, saved session and password, options and
-    /// sign-ins. Not the forwarding address, nor this phone's registration.
+    /// Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
+    /// address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
+    /// (for every phone on the account with `everywhere`), then forgets the identity here. Best
+    /// effort: offline, an address stays queued and the install stays listed in Server.
+    pub async fn sign_out_of_server(
+        &self,
+        flow: String,
+        everywhere: bool,
+    ) -> Result<(), CoreError> {
+        traced("sign_out_of_server", &flow, async {
+            self.leave_with_identity(&flow).await;
+            if let Some((_, id, _)) = self.saved_mailbox() {
+                let body = json!({ "id": id });
+                match self
+                    .device_call(&flow, Kind::Mutation, "mail:leave", body)
+                    .await
+                {
+                    Ok(_) => self.forget_forwarding(&id),
+                    Err(error) if error.code() == crate::remote::forwarding::GONE => {
+                        self.forget_forwarding(&id);
+                    }
+                    Err(error) => info!(code = error.code(), "address left at sign-out: queued"),
+                }
+            }
+            let body = json!({ "everywhere": everywhere });
+            match self
+                .device_call(&flow, Kind::Mutation, "auth:signOut", body)
+                .await
+            {
+                Ok(_) => info!(everywhere, "signed out of the server"),
+                Err(error) => info!(code = error.code(), "server sign-out not sent"),
+            }
+            self.forget_identity();
+            Ok(())
+        })
+        .await
+    }
+
+    /// Deletes the account on the server: phones, keys, saved session and password, options,
+    /// sign-ins and the forwarding address (it belongs to the account). Not this phone's
+    /// registration.
     pub async fn delete_server_account(&self, flow: String) -> Result<(), CoreError> {
-        let path = "/v1/account/delete";
+        let path = "account:remove";
         let action = "Delete your account on the server";
         let deleted = self.account_op("delete_server_account", Some(action), flow, path, json!({}));
         if deleted.await? {
-            self.forget_account_token();
+            self.forget_identity();
+            self.forget_any_forwarding();
         }
         Ok(())
     }
@@ -362,7 +395,7 @@ impl Core {
             "phoneWaitSecs": options.phone_wait_secs,
             "vaultTtlSecs": options.vault_ttl_secs,
         } });
-        let path = "/v1/account/settings";
+        let path = "account:setSettings";
         let action = "Change the server's options";
         self.account_op("set_server_options", Some(action), flow, path, settings)
             .await
@@ -371,7 +404,7 @@ impl Core {
 
     /// Drops the sign-in history; false when the server doesn't offer it yet.
     pub async fn clear_server_sign_ins(&self, flow: String) -> Result<bool, CoreError> {
-        let path = "/v1/account/clear-sign-ins";
+        let path = "account:clearSignIns";
         let action = "Clear the server's sign-in history";
         self.account_op("clear_server_sign_ins", Some(action), flow, path, json!({}))
             .await
@@ -380,19 +413,11 @@ impl Core {
     /// Drops the sealed VTOP session the server keeps for the extension and MCP.
     pub async fn clear_server_session(&self, flow: String) -> Result<(), CoreError> {
         traced("clear_server_session", &flow, async {
-            let regno = self
-                .saved_account(flow.clone())
-                .and_then(|account| account.registration_number)
-                .ok_or(CoreError::NotSignedIn)?;
-            let body = json!({ "registrationNumber": regno });
-            self.edge_post(
-                &self.forwarding_server(),
-                "/v1/app/session/clear",
-                &flow,
-                &body,
-            )
-            .await
-            .map_err(refused)?;
+            let action = "Drop the session the server keeps";
+            let path = "app:sessionClear";
+            self.account_call(&flow, Kind::Mutation, path, action, true, json!({}))
+                .await?
+                .map_err(refused)?;
             info!("server session cleared");
             Ok(())
         })
@@ -402,11 +427,13 @@ impl Core {
     /// Takes another phone (a [`MailPhone::id`]) off this phone's forwarding address.
     pub async fn remove_forwarding_phone(&self, flow: String, id: String) -> Result<(), CoreError> {
         traced("remove_forwarding_phone", &flow, async {
-            let (server, mailbox, _) = self.saved_mailbox().ok_or_else(|| CoreError::Other {
-                reason: "Mail forwarding is off.".into(),
-            })?;
+            let (_, mailbox, _) = self
+                .saved_mailbox()
+                .ok_or_else(|| CoreError::ForwardingOff {
+                    reason: "Mail forwarding is off.".into(),
+                })?;
             let body = json!({ "id": mailbox, "removeDevice": id });
-            self.edge_post(&server, "/v1/mail-otp/devices/remove", &flow, &body)
+            self.device_call(&flow, Kind::Mutation, "mail:removeDevice", body)
                 .await?;
             info!("phone removed from the address");
             Ok(())
@@ -424,22 +451,16 @@ impl Core {
         .await
     }
 
-    /// Deletes this install on the server (keys, push token, events), unlinks it from the account
-    /// and takes it off its forwarding address there, then forgets its id, so the next call
-    /// registers afresh. False when the server doesn't offer it yet.
+    /// Deletes this install on the server (keys, push token), unlinks it from the account
+    /// and takes it off its forwarding address there, then forgets its identity, so the next call
+    /// proves afresh. False when the server doesn't offer it yet.
     pub async fn delete_server_device(&self, flow: String) -> Result<bool, CoreError> {
         traced("delete_server_device", &flow, async {
             let server = self.forwarding_server();
-            if self.registration(&server).0.is_none() {
+            if self.device().refresh.is_none() {
                 return Ok(true);
             }
             let mut body = json!({});
-            if let Some(regno) = self
-                .saved_account(flow.clone())
-                .and_then(|account| account.registration_number)
-            {
-                crate::json_set(&mut body, "registrationNumber", json!(regno));
-            }
             let mailbox = self
                 .saved_mailbox()
                 .filter(|(on, ..)| *on == server)
@@ -447,11 +468,12 @@ impl Core {
             if let Some(id) = &mailbox {
                 crate::json_set(&mut body, "mailbox", json!(id));
             }
-            let path = "/v1/devices/delete";
-            if !supported(self.edge_post(&server, path, &flow, &body).await, path)? {
+            let path = "devices:remove";
+            let removed = self.device_call(&flow, Kind::Mutation, path, body).await;
+            if !supported(removed, path)? {
                 return Ok(false);
             }
-            self.forget_device_id(&server);
+            self.forget_identity();
             self.forget_account_token();
             if let Some(id) = mailbox {
                 self.forget_forwarding(&id);
@@ -463,72 +485,62 @@ impl Core {
     }
 }
 
+/// `screen:view`'s arguments: the same for the read and the live watch, so the read is answered
+/// from the watch.
+pub(crate) fn screen_args(mailbox: Option<&str>) -> Value {
+    mailbox.map_or_else(|| json!({}), |id| json!({ "mailbox": id }))
+}
+
 impl Core {
-    /// `/v1/account`, `/v1/devices/info`, `/v1/app/status` once this phone is linked, and
-    /// `/v1/mail-otp/devices` when it has an address.
-    async fn status_with(
-        &self,
-        server: &str,
-        flow: &str,
-        action: &str,
-    ) -> Result<ServerStatus, CoreError> {
-        let account = self
-            .account_post(server, "/v1/account", flow, action, true, json!({}))
+    /// `screen:view`: the account, this install, what the server keeps once this phone is
+    /// linked, and the phones on its address when it has one; one read, which the Server
+    /// screen's live watch ([`LiveTopic::Server`]) answers locally.
+    async fn status_with(&self, flow: &str, action: &str) -> Result<ServerStatus, CoreError> {
+        let saved = self.saved_mailbox();
+        let screen = self
+            .account_call(
+                flow,
+                Kind::Query,
+                "screen:view",
+                action,
+                true,
+                screen_args(saved.as_ref().map(|(_, id, _)| id.as_str())),
+            )
             .await?
             .map_err(refused)?;
-        let account: AccountView = serde_json::from_value(account).map_err(unexpected)?;
-        // Older servers lack it: the phone's own view then.
-        let device: DeviceView = self
-            .edge_post(server, "/v1/devices/info", flow, &json!({}))
-            .await
-            .inspect_err(|error| info!(code = error.code(), "no device info"))
-            .ok()
-            .and_then(|info| serde_json::from_value(info).ok())
-            .unwrap_or_default();
-        let status = if account.this_phone {
-            let body = json!({ "registrationNumber": account.registration_number });
-            let status = self
-                .edge_post(server, "/v1/app/status", flow, &body)
-                .await
-                .map_err(refused)?;
-            serde_json::from_value(status).map_err(unexpected)?
-        } else {
-            StatusView::default()
+        let part = |key: &str| screen.get(key).cloned().unwrap_or(Value::Null);
+        let account: AccountView = serde_json::from_value(part("account")).map_err(unexpected)?;
+        let device: DeviceView = serde_json::from_value(part("device")).unwrap_or_default();
+        let status: StatusView = match part("status") {
+            Value::Null => StatusView::default(),
+            status => serde_json::from_value(status).map_err(unexpected)?,
         };
-        let mailbox = match self.saved_mailbox() {
+        let on = part("mailbox");
+        let mailbox = match saved {
             None => None,
-            Some((on, id, address)) => {
-                let body = json!({ "id": id });
-                match self
-                    .edge_post(&on, "/v1/mail-otp/devices", flow, &body)
-                    .await
-                {
-                    Ok(list) => {
-                        let phones: Vec<MailPhoneView> = serde_json::from_value(
-                            list.get("devices").cloned().unwrap_or_default(),
-                        )
+            Some((_, id, _)) if on.get("gone") == Some(&json!(true)) => {
+                self.forget_forwarding(&id);
+                None
+            }
+            Some((_, _, address)) => {
+                let phones: Vec<MailPhoneView> =
+                    serde_json::from_value(on.get("devices").cloned().unwrap_or_default())
                         .map_err(unexpected)?;
-                        let phones = phones
-                            .into_iter()
-                            .map(|p| MailPhone {
-                                id: p.device_id,
-                                label: p.label,
-                                added_at: p.added_at,
-                                seen_at: p.seen_at,
-                                this_phone: p.this_device,
-                            })
-                            .collect();
-                        Some(ServerMailbox { address, phones })
-                    }
-                    Err(error) if error.code() == "mailbox_not_found" => {
-                        self.forget_forwarding(&id);
-                        None
-                    }
-                    Err(error) => return Err(error.into()),
-                }
+                let phones = phones
+                    .into_iter()
+                    .map(|p| MailPhone {
+                        id: p.device_id,
+                        label: p.label,
+                        added_at: p.added_at,
+                        seen_at: p.seen_at,
+                        this_phone: p.this_device,
+                    })
+                    .collect();
+                Some(ServerMailbox { address, phones })
             }
         };
-        let (id, push_token) = self.registration(server);
+        let (id, _) = self.registration();
+        let id = self.device().refresh.map(|_| id);
         info!(
             linked = account.this_phone,
             phones = account.phones.len(),
@@ -547,9 +559,9 @@ impl Core {
             device: ServerDevice {
                 id: id.map(|id| id.chars().take(8).collect()),
                 label: device.label.unwrap_or_else(|| label().to_string()),
-                push_token: device.push_token || push_token,
+                // What the server holds: a token the phone has but never sent can't wake it.
+                push_token: device.push_token,
                 registered_at: device.created_at,
-                events: device.events,
             },
             session_saved_at: status.session_saved_at,
             session_source: status.session_source,
@@ -582,9 +594,8 @@ impl Core {
         })
     }
 
-    /// A `/v1/account/*` call with the account token or the live session added to `body`, the
-    /// session once the student allowed it for `action` (asked: `Some`, else only when
-    /// remembered); false when the server has no such route yet.
+    /// An `account:*` mutation as the student, proving first only when asked (`action` is
+    /// `Some`); false when the server has no such function yet.
     async fn account_op(
         &self,
         name: &str,
@@ -595,8 +606,7 @@ impl Core {
     ) -> Result<bool, CoreError> {
         traced(name, &flow, async {
             let (why, ask) = (action.unwrap_or(name), action.is_some());
-            let server = self.forwarding_server();
-            let answer = self.account_post(&server, path, &flow, why, ask, body);
+            let answer = self.account_call(&flow, Kind::Mutation, path, why, ask, body);
             let done = supported(answer.await?, path)?;
             if done {
                 info!(path, "server account changed");
@@ -608,21 +618,35 @@ impl Core {
 }
 
 impl Core {
-    /// [`Core::save_server_password`] against `server`, as an account call for `action` (the
-    /// token, else the session once allowed, asking as `ask` says).
+    /// The picked semester, sent with a JWT just taken: a pick made before this install had a
+    /// server identity never reached it. Best effort; the demo account refuses it.
+    pub(crate) async fn semester_to_server(&self, flow: &str) {
+        let Some(semester) = self.read_kept::<String>(crate::SELECTED) else {
+            return;
+        };
+        let body = json!({ "semesterId": semester });
+        if let Err(error) = self
+            .jwt_call(flow, Kind::Mutation, "account:setSemester", body)
+            .await
+        {
+            info!(code = error.code(), "semester not sent");
+        }
+    }
+
+    /// [`Core::save_server_password`], as an account call for `action` (proving first only
+    /// when `ask`).
     async fn save_password_with(
         &self,
-        server: &str,
         flow: &str,
         action: &str,
         ask: bool,
         gmail: Option<GmailGrant>,
     ) -> Result<(), CoreError> {
-        // The password leaves the phone whatever carries the call (a kept token or a proof,
+        // The password leaves the phone whatever carries the call (a kept JWT or a proof,
         // neither of which asks). Asked, the Server screen's own "Let the server sign in for
         // you?" is the consent; unasked, only a remembered yes sends.
         if !ask {
-            let host = consent::host(server);
+            let host = consent::host(&self.forwarding_server());
             if !consent::allowed(
                 &self.shared,
                 flow,
@@ -659,8 +683,9 @@ impl Core {
             );
         }
         let body = json!({ "label": label(), "credentials": credentials });
+        let path = "account:saveCredentials";
         let answer = self
-            .account_post(server, "/v1/link", flow, action, ask, body)
+            .account_call(flow, Kind::Action, path, action, ask, body)
             .await?
             .map_err(refused)?;
         if answer.get("savedCredentials") != Some(&json!(true)) {

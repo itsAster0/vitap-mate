@@ -102,6 +102,11 @@ impl Core {
             }
             let mut session = slot.write().await;
             if session.client.otp_issued_at().is_none() {
+                // Another call (auto-fill, the prompt) already got in with a code.
+                if session.otp.is_none() && session.client.is_authenticated() {
+                    info!("otp no longer needed: signed in");
+                    return Ok(());
+                }
                 return self.fresh_challenge(&slot, &mut session).await;
             }
             session
@@ -299,6 +304,9 @@ impl Core {
             info!("another account signed in: cached pages and forwarding address dropped");
             self.queue_leave();
             self.forget(&STUDENT_FILES);
+            // The JWT names the last student: set aside to sign out of their account, while the
+            // next server call proves this one.
+            self.set_aside_identity();
         }
         let saved_at_ms = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)

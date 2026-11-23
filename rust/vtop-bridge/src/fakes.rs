@@ -8,7 +8,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use vtop_core::SessionState;
 
-use crate::login::{ForwardedLogin, LoginError, OtpCodes};
+use crate::login::{ForwardedLogin, LoginError, OtpCodes, Started};
 
 pub fn session(cookies: &str) -> SessionState {
     SessionState {
@@ -49,9 +49,25 @@ impl Default for FakeLogin {
     }
 }
 
-/// Asks `codes` once (as a real sign-in would when VTOP wants an OTP)
+/// The OTP [`FakeLogin::submit`] turns down, as VTOP does an older mail's.
+pub const STALE_OTP: &str = "000000";
+
+impl FakeLogin {
+    fn answer(&self) -> Result<SessionState, LoginError> {
+        let mut results = self.results.lock().unwrap();
+        if results.len() > 1 {
+            results.pop_front().unwrap()
+        } else {
+            results.front().cloned().expect("FakeLogin has no answer")
+        }
+    }
+}
+
+/// `login` asks `codes` once (as a real sign-in would when VTOP wants an OTP)
 /// unless the queued answer is `InvalidCredentials`, then answers from the
-/// queue; with no code it fails as a real sign-in would.
+/// queue; with no code it fails as a real sign-in would. `start` stops at the
+/// OTP unless the queued answer is `InvalidCredentials`, and `submit` then
+/// answers from the queue.
 #[async_trait]
 impl ForwardedLogin for FakeLogin {
     async fn login(
@@ -73,12 +89,31 @@ impl ForwardedLogin for FakeLogin {
                 "otp_not_found: the OTP mail did not arrive".into(),
             ));
         }
-        let mut results = self.results.lock().unwrap();
-        if results.len() > 1 {
-            results.pop_front().unwrap()
-        } else {
-            results.front().cloned().expect("FakeLogin has no answer")
+        self.answer()
+    }
+
+    async fn start(&self, _username: &str, _password: &str) -> Result<Started, LoginError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let next = self.results.lock().unwrap().front().cloned();
+        if let Some(Err(LoginError::InvalidCredentials)) = next {
+            return Err(LoginError::InvalidCredentials);
         }
+        Ok(Started::OtpNeeded {
+            session: SessionState {
+                otp_issued_at: Some(1_000),
+                ..session("JSESSIONID=pending")
+            },
+            issued_at: 1_000,
+        })
+    }
+
+    async fn submit(&self, session: &SessionState, otp: &str) -> Result<SessionState, LoginError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(session.cookies, "JSESSIONID=pending");
+        if otp == STALE_OTP {
+            return Err(LoginError::OtpRejected);
+        }
+        self.answer()
     }
 }
 

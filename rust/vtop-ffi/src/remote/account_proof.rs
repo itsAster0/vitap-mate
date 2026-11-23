@@ -1,13 +1,14 @@
-//! The account proof (`edge/API.md`, "Account proof"): how this phone gets its account token
-//! without the VTOP session leaving it. It proves its regno with TLSNotary (vtop-tlsn): the edge
-//! hands out a challenge, the phone opens a signed WebSocket to the edge, which relays it to the
-//! engine; the engine dials VTOP and relays this phone's TLS to it, then checks the proof, which
-//! reveals the page's regno and hides the session id. The edge mints the token from the engine's
-//! verdict and sends it as the socket's last message. So no consent is asked: no session goes.
+//! The account proof (the contract's "Identity: TLSNotary only"): how this phone shows the server
+//! who the student is without the VTOP session leaving it. It proves its regno with TLSNotary
+//! (vtop-tlsn): `auth:proveStart` hands out a one-use ticket, the phone opens
+//! `wss://<host>/proof?ticket=`, which goes straight to the engine; the engine dials VTOP and
+//! relays this phone's TLS to it, then checks the proof, which reveals the page's regno and hides
+//! the session id. The engine marks the ticket proved and says so as the socket's last message;
+//! the phone then trades the ticket for its JWT (`auth:token`, [`crate::remote::backend`]). So no
+//! consent is asked: no session goes.
 //!
-//! Kotlin carries the WebSocket ([`ProofNetwork`], OkHttp), as it carries VTOP's hops
-//! (`transport.rs`); without one, proving fails. The session id, challenge and token are never
-//! logged.
+//! Kotlin carries the WebSocket ([`ProofNetwork`]), as it carries VTOP's hops (`transport.rs`);
+//! without one, proving fails. The session id and ticket are never logged.
 
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -20,6 +21,7 @@ use tracing::{info, warn};
 use vtop_core::VtopError;
 
 use crate::device::EdgeError;
+use crate::remote::backend::Kind;
 use crate::transport::{Header, TransportError};
 use crate::{Core, CoreError};
 
@@ -31,11 +33,11 @@ const OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 pub enum ProofFrame {
     /// The tlsn session, either way.
     Binary { data: Vec<u8> },
-    /// The edge's last message: the token, or why there is none.
+    /// The engine's last message: proved, or why not.
     Text { text: String },
 }
 
-/// What opening the socket gave: the socket, or the edge's refusal before the upgrade (its
+/// What opening the socket gave: the socket, or the server's refusal before the upgrade (its
 /// status and `{ code, error }` body).
 #[derive(uniffi::Record)]
 pub struct ProofOpened {
@@ -44,13 +46,13 @@ pub struct ProofOpened {
     pub body: Vec<u8>,
 }
 
-/// Kotlin: WebSockets to the edge for account proofs, on the app's HTTP stack.
+/// Kotlin: WebSockets to the server for account proofs, on the app's network.
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait ProofNetwork: Send + Sync {
-    /// Opens a WebSocket to `url` (`wss://…`) with `headers` (its vm1 signature) as they are.
-    /// Never logs `url` (it carries the single-use challenge) or `headers` (the signature),
-    /// and neither follows redirects nor retries: a challenge works once.
+    /// Opens a WebSocket to `url` (`wss://…`) with `headers` as they are. Never logs `url` (it
+    /// carries the single-use ticket) or `headers`, and neither follows redirects nor retries: a
+    /// ticket works once.
     async fn open(
         &self,
         url: String,
@@ -60,7 +62,7 @@ pub trait ProofNetwork: Send + Sync {
 }
 
 /// One WebSocket. `send` and `receive` are called at the same time; `receive` keeps the
-/// order frames arrived in (the edge's last text often comes right before its close), and
+/// order frames arrived in (the engine's last text often comes right before its close), and
 /// `shutdown` makes a pending `receive` return promptly.
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
@@ -96,13 +98,11 @@ pub fn set_proof_network(network: Arc<dyn ProofNetwork>) {
         .unwrap_or_else(PoisonError::into_inner) = Some(network);
 }
 
-/// The edge's last message.
+/// The engine's last message when it proved.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Issued {
-    account_token: String,
-    /// Unix ms.
-    expires_at: i64,
+struct Proved {
+    ok: bool,
     registration_number: String,
 }
 
@@ -115,7 +115,7 @@ fn failed(reason: impl Into<String>) -> CoreError {
     }
 }
 
-/// `{ code, error }` from the edge as the error the account call would have given.
+/// `{ code, error }` from the server as the error the account call would have given.
 fn refusal(body: &[u8]) -> CoreError {
     let body: Value = serde_json::from_slice(body).unwrap_or_default();
     let text = |key| body.get(key).and_then(Value::as_str).unwrap_or_default();
@@ -139,14 +139,10 @@ impl Drop for Shut {
 }
 
 impl Core {
-    /// Proves the signed-in student's regno to `server`: the account token it issued, its end
-    /// (unix ms) and the regno, which VTOP named for this session too (a proof for anyone else
+    /// Proves the signed-in student's regno to the server: the ticket, now proved, for
+    /// `auth:token`. The regno is the one VTOP named for this session (a proof for anyone else
     /// fails).
-    pub(crate) async fn prove_account(
-        &self,
-        server: &str,
-        flow: &str,
-    ) -> Result<(String, i64, String), CoreError> {
+    pub(crate) async fn prove_account(&self, flow: &str) -> Result<String, CoreError> {
         // A live session: one that expired signs in again first, as before sending it did.
         #[expect(
             clippy::disallowed_methods,
@@ -167,29 +163,30 @@ impl Core {
             .to_string();
         drop(cookies);
         let started = Instant::now();
-        let device = self.device_id(server, flow).await?;
+        let device = self.registration().0;
         let start = self
-            .edge_post(server, "/v1/account/prove/start", flow, &json!({}))
+            .signed_call(flow, Kind::Mutation, "auth:proveStart", &json!({}))
             .await?;
-        let challenge = start
-            .get("challenge")
+        // Only URL-safe characters: it goes in the query as it is.
+        let ticket = start
+            .get("ticket")
             .and_then(Value::as_str)
-            .filter(|c| c.len() == 32 && c.bytes().all(|b| b.is_ascii_hexdigit()))
-            .ok_or_else(|| failed("the server sent no challenge"))?
+            .filter(|t| {
+                (16..=128).contains(&t.len())
+                    && t.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+            })
+            .ok_or_else(|| failed("the server sent no ticket"))?
             .to_string();
-        let path = format!("/v1/account/prove?challenge={challenge}");
-        let headers = self.signed_headers("GET", &path, &device).into_iter();
-        let headers = headers
-            .map(|(name, value)| Header { name, value })
-            .collect();
         let url = format!(
-            "{}{path}",
-            server
+            "{}/proof?ticket={ticket}",
+            self.forwarding_server()
+                .trim_end_matches('/')
                 .replacen("https://", "wss://", 1)
                 .replacen("http://", "ws://", 1)
         );
         let opened = network
-            .open(url, headers, OPEN_TIMEOUT.as_millis() as u32)
+            .open(url, Vec::new(), OPEN_TIMEOUT.as_millis() as u32)
             .await
             .map_err(|error| match error {
                 TransportError::Connect { .. } | TransportError::Timeout { .. } => {
@@ -202,7 +199,7 @@ impl Core {
             return Err(refusal(&opened.body));
         };
         let shut = Shut(socket.clone());
-        let binding = vtop_tlsn::content::binding(&challenge, &device);
+        let binding = vtop_tlsn::content::binding(&ticket, &device);
         let (host, roots) = self.proof_target()?;
         let stmt = vtop_tlsn::content::Content { host, binding }
             .statement()
@@ -212,11 +209,11 @@ impl Core {
         };
 
         // One reader for the socket, so no receive is ever dropped half-way: binary messages go
-        // to the prover, the edge's text is the answer.
+        // to the prover, the engine's text is the answer.
         let (to_prover, from_socket) = mpsc::unbounded::<Vec<u8>>();
         let reader = async {
             // Owned here, so the prover sees the end of the stream the moment the socket
-            // closes or the edge answers, instead of waiting out its deadline.
+            // closes or the engine answers, instead of waiting out its deadline.
             let to_prover = to_prover;
             loop {
                 match socket.receive().await {
@@ -252,7 +249,7 @@ impl Core {
             ));
             let proved = proved.await;
             if proved.is_err() {
-                // Nothing more will come that the edge could answer.
+                // Nothing more will come that the engine could answer.
                 socket.shutdown();
             }
             proved
@@ -274,32 +271,32 @@ impl Core {
                 error = format!("{error:#}"),
                 "proof failed"
             );
-            // The prover's own refusal is the cause; otherwise the edge's answer, when it sent
+            // The prover's own refusal is the cause; otherwise the engine's answer, when it sent
             // one, says why better than tlsn's broken link.
             let refused = error
                 .downcast_ref::<vtop_tlsn::session::Refused>()
                 .is_some();
             return Err(match last {
-                Some(text) if !refused && serde_json::from_str::<Issued>(&text).is_err() => {
+                Some(text) if !refused && serde_json::from_str::<Proved>(&text).is_err() => {
                     refusal(text.as_bytes())
                 }
                 _ => failed(format!("{error:#}")),
             });
         }
         let last = last.ok_or_else(|| failed("the server closed without an answer"))?;
-        let issued: Issued = match serde_json::from_str(&last) {
-            Ok(issued) => issued,
-            Err(_) => {
-                info!(ms, route = "proof", "proof answered without a token");
+        let proved = match serde_json::from_str::<Proved>(&last) {
+            Ok(proved) if proved.ok => proved,
+            _ => {
+                info!(ms, route = "proof", "proof refused");
                 return Err(refusal(last.as_bytes()));
             }
         };
-        if !issued.registration_number.eq_ignore_ascii_case(&regno) {
+        if !proved.registration_number.eq_ignore_ascii_case(&regno) {
             warn!(ms, route = "proof", "proof names another student");
             return Err(failed("VTOP's session is another student's"));
         }
         info!(ms, route = "proof", "account proved");
-        Ok((issued.account_token, issued.expires_at, regno))
+        Ok(ticket)
     }
 
     /// The server proofs are held to and its roots: VTOP's, or a test's fake one.

@@ -41,7 +41,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Minimize2
 import com.composables.icons.lucide.Radio
 import com.composables.icons.lucide.School
 import com.composables.icons.lucide.Server
@@ -51,6 +50,7 @@ import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import vitapmate.core.CookieKind
 import vitapmate.core.Route as VtopRoute
 import vitapmate.core.SkippedRoute
 import vitapmate.core.RouteStatus
@@ -73,7 +73,6 @@ private class RouteChoice(val route: VtopRoute, val title: String, val icon: Ima
 
 private val CHOICES = listOf(
     RouteChoice(VtopRoute.DIRECT, "Direct", Lucide.Smartphone, "The phone signs in and fetches from VTOP itself"),
-    RouteChoice(VtopRoute.PROXY, "Compressing proxy", Lucide.Minimize2, "The same requests through the vitapmate server, about 6× smaller"),
     RouteChoice(VtopRoute.SERVER, "Server fetch", Lucide.Server, "The server fetches pages; the phone gets only the data"),
     RouteChoice(VtopRoute.UDP, "Server fetch over UDP", Lucide.Radio, "Server fetch over vitapmate's UDP link, for slow or lossy networks"),
 )
@@ -101,10 +100,12 @@ fun ConnectionScreen() {
             delay(5_000)
         }
     }
-    fun choose(route: VtopRoute) {
+    fun choose(route: VtopRoute, consented: Boolean = false) {
         haptics.toggle(true)
         scope.logAction("connection.choose", "ui.connection", "route ${route.name.lowercase()}")
         scope.launch {
+            // The dialog said the cookie goes to the server: its yes stands for the cookie dialog's.
+            if (consented) orNull { coreFlow("connection.consent") { c, f -> c.rememberCookieConsent(f, CookieKind.ROUTE) } }
             orNull { coreFlow("connection.set") { c, f -> c.setRoute(f, route) } }
             load()
         }
@@ -150,10 +151,11 @@ fun ConnectionScreen() {
     }
 
     asking?.let { route ->
-        AppDialog({ asking = null }, "Let the server sign in?", "Use ${route.title()}", { asking = null; choose(route) }, icon = Lucide.Server) {
+        AppDialog({ asking = null }, "Let the server sign in?", "Use ${route.title()}", { asking = null; choose(route, consented = true) }, icon = Lucide.Server) {
             Text(
                 "With ${route.title()}, the vitapmate server signs in to VTOP for you when your session runs out. " +
                     "Your username and password are sent to the server each time it signs in; the server uses them for that sign-in only and doesn't keep them. " +
+                    "Your VTOP sign-in cookie goes to the server with each fetch too, and isn't kept. " +
                     "Changing what VTOP holds (outings) and downloads still happen on your phone.",
             )
         }
@@ -169,7 +171,6 @@ private fun RouteHero(status: RouteStatus) {
     val route = status.chosen
     val (first, second) = when (route) {
         VtopRoute.DIRECT -> null to null
-        VtopRoute.PROXY -> "6× smaller" to null
         VtopRoute.SERVER -> "data only" to "fetches"
         VtopRoute.UDP -> "UDP" to "fetches"
     }

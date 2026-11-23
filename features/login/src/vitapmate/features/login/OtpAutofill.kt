@@ -10,8 +10,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CoreException
 import vitapmate.core.GmailGrant
+import vitapmate.core.LiveTopic
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
+import vitapmate.data.LiveWake
 import vitapmate.data.OtpPrompt
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
@@ -112,47 +114,57 @@ object OtpAutofill {
             // Mail since the code was issued; with the source's own slack, about a minute for the clocks.
             val since = issued - 30
             withTimeoutOrNull(((issued + LIFETIME_S) * 1000 - System.currentTimeMillis()).coerceAtLeast(0)) {
-                while (true) {
-                    val code = try {
-                        withContext(Dispatchers.IO) {
-                            when (source) {
-                                OtpSource.Forwarding -> core.fetchForwardedOtp(flow, since)
-                                OtpSource.Gmail -> Gmail.findOtp(since, read, flow)?.also { gmail = it; read += it.messageId }?.code
+                // Forwarded mail wakes the loop as it lands; Gmail is pulled every few seconds.
+                val wake = if (source == OtpSource.Forwarding) LiveWake(this, LiveTopic.MAIL_INBOX) else null
+                try {
+                    while (true) {
+                        val code = try {
+                            withContext(Dispatchers.IO) {
+                                when (source) {
+                                    OtpSource.Forwarding -> core.fetchForwardedOtp(flow, since)
+                                    OtpSource.Gmail -> Gmail.findOtp(since, read, flow)?.also { gmail = it; read += it.messageId }?.code
+                                }
                             }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Gmail.GmailException) {
-                        if (e.code != "offline" && e.code != "unreachable") {
-                            why = if (Gmail.account?.needsReconnect == true) "Gmail needs reconnecting" else "Gmail refused: ${e.code}"
-                            return@withTimeoutOrNull
-                        }
-                        null
-                    } catch (e: Throwable) {
-                        Log.warn("sync", "otp pull failed: ${e::class.simpleName}", flow)
-                        null
-                    }
-                    if (code != null && code !in tried) {
-                        tried += code
-                        try {
-                            withContext(Dispatchers.IO) { core.submitOtp(flow, code) }
-                            Log.info("sync", "otp accepted", flow, mapOf("source" to source.name.lowercase()))
-                            // The app's prompt for the same sign-in, if open, has nothing left to do.
-                            if (OtpPrompt.message != null) withContext(Dispatchers.Main) { OtpPrompt.done() }
-                            gmail?.let { Gmail.tidyUp(it, flow) }
-                            why = null
-                            return@withTimeoutOrNull
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (_: CoreException.OtpRejected) {
-                            Log.info("sync", "otp turned down", flow)
-                        } catch (e: Throwable) {
-                            why = "VTOP didn't take the code"
-                            Log.warn("sync", "otp submit failed: ${e::class.simpleName}", flow)
+                        } catch (e: Gmail.GmailException) {
+                            if (e.code != "offline" && e.code != "unreachable") {
+                                why = if (Gmail.account?.needsReconnect == true) "Gmail needs reconnecting" else "Gmail refused: ${e.code}"
+                                return@withTimeoutOrNull
+                            }
+                            null
+                        } catch (e: CoreException.ForwardingOff) {
+                            // The address is gone: nothing will come to it in this wait.
+                            why = e.reason
                             return@withTimeoutOrNull
+                        } catch (e: Throwable) {
+                            Log.warn("sync", "otp pull failed: ${e::class.simpleName}", flow)
+                            null
                         }
+                        if (code != null && code !in tried) {
+                            tried += code
+                            try {
+                                withContext(Dispatchers.IO) { core.submitOtp(flow, code) }
+                                Log.info("sync", "otp accepted", flow, mapOf("source" to source.name.lowercase()))
+                                // The app's prompt for the same sign-in, if open, has nothing left to do.
+                                if (OtpPrompt.message != null) withContext(Dispatchers.Main) { OtpPrompt.done() }
+                                gmail?.let { Gmail.tidyUp(it, flow) }
+                                why = null
+                                return@withTimeoutOrNull
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: CoreException.OtpRejected) {
+                                Log.info("sync", "otp turned down", flow)
+                            } catch (e: Throwable) {
+                                why = "VTOP didn't take the code"
+                                Log.warn("sync", "otp submit failed: ${e::class.simpleName}", flow)
+                                return@withTimeoutOrNull
+                            }
+                        }
+                        if (wake != null) wake.next(3_000) else delay(3_000)
                     }
-                    delay(3_000)
+                } finally {
+                    wake?.stop()
                 }
             }
             if (why != NO_CODE) break

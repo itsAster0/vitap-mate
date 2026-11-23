@@ -307,3 +307,16 @@ fn hosts_drop_the_scheme_and_path() {
     );
     assert_eq!(host("vmate.aster0.dev"), "vmate.aster0.dev");
 }
+
+#[test]
+fn a_yes_given_by_choosing_server_fetch_is_kept() {
+    let core = core("choose");
+    let gate = no(&core);
+    load(&core);
+    core.remember_cookie_consent("f".into(), CookieKind::Route)
+        .unwrap();
+    assert!(check(&core, "f2", CookieKind::Route, true));
+    assert_eq!(gate.asks(), 0);
+    // Saved, as a "Don't ask again" in the dialog is.
+    assert!(core.at(FILE).exists());
+}
