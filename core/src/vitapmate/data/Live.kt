@@ -108,19 +108,19 @@ fun rememberLive(topic: LiveTopic, loaded: Boolean): State<Int> =
 class LiveWake(scope: CoroutineScope, topic: LiveTopic) {
     private val woken = Channel<Unit>(Channel.CONFLATED)
 
-    @Volatile
-    private var live = true
-
     private val job = scope.launch {
         Live.changes(topic).collect { woken.trySend(Unit) }
-        live = false
-        woken.trySend(Unit)
+        woken.close()
     }
 
-    fun stop() = job.cancel()
+    fun stop() {
+        job.cancel()
+        woken.close()
+    }
 
     suspend fun next(intervalMs: Long) {
-        if (live) withTimeoutOrNull(BACKSTOP_MS) { woken.receive() } else delay(intervalMs)
+        val got = withTimeoutOrNull(BACKSTOP_MS) { woken.receiveCatching() }
+        if (got != null && got.isClosed) delay(intervalMs)
     }
 
     private companion object {
