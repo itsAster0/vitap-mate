@@ -12,16 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +40,7 @@ import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.ui.DayPicker
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.Radii
 import vitapmate.ui.Skeleton
@@ -135,7 +130,7 @@ fun BiometricScreen() {
         ) { data -> DayView(data, isToday = day == today) }
     }
     if (picking) {
-        DayPicker(day, today, onDismiss = { picking = false }) {
+        DayPicker(day, FIRST_DAY..(today + 1), onDismiss = { picking = false }, modifier = Modifier.testTag("biometric.picker")) {
             picking = false
             select(it, "calendar")
         }
@@ -183,26 +178,3 @@ private fun DateChips(today: Int, day: Int, onSelect: (Int) -> Unit, onPick: () 
     }
 }
 
-/** M3 date picker from 2020 to tomorrow; picking a day closes it. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DayPicker(day: Int, today: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
-    val state = rememberDatePickerState(
-        initialSelectedDateMillis = day * DAY_MS,
-        yearRange = 2020..(formatDay(today + 1, "yyyy").toInt()),
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long) = (utcTimeMillis / DAY_MS).toInt() in FIRST_DAY..(today + 1)
-        },
-    )
-    LaunchedEffect(state) {
-        snapshotFlow { state.selectedDateMillis }.collect { ms ->
-            if (ms != null && (ms / DAY_MS).toInt() != day) onPick((ms / DAY_MS).toInt())
-        }
-    }
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-        modifier = Modifier.testTag("biometric.picker"),
-    ) { DatePicker(state, showModeToggle = false) }
-}

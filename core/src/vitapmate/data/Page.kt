@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -286,7 +287,12 @@ fun <T> rememberPage(
     val scope = rememberCoroutineScope()
     // A new handle per semester: picking another one reads that semester's cache and fetches it.
     val semester = SemesterChoice.selected
-    val page = remember(id, item, semester) { PageHandle(id, "$id/$item/$semester", scope, cached, fetch, updatedAt, count) }
+    // The handle outlives recompositions: it calls the latest lambdas, not the first one's captures.
+    val latestCached by rememberUpdatedState(cached)
+    val latestFetch by rememberUpdatedState(fetch)
+    val page = remember(id, item, semester) {
+        PageHandle(id, "$id/$item/$semester", scope, { c, f -> latestCached(c, f) }, { c, f -> latestFetch(c, f) }, updatedAt, count)
+    }
     // Which semester this screen fetched, saved by value: a key alone can come back restored for
     // another semester when the tab returns to the screen.
     var fetchedFor by rememberSaveable(id) { mutableStateOf<String?>(null) }

@@ -10,18 +10,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,14 +49,13 @@ import vitapmate.core.checkGeneralOuting
 import vitapmate.core.generalOutingTimes
 import vitapmate.core.generalReturnLastDay
 import vitapmate.ui.AppTheme
+import vitapmate.ui.DayPicker
 import vitapmate.ui.Radii
 import vitapmate.ui.Space
 import vitapmate.ui.clock
 import vitapmate.ui.formatDay
 import vitapmate.ui.is24Hour
 import vitapmate.ui.rememberNow
-
-private const val DAY_MS = 86_400_000L
 
 private enum class Picking { LeaveDate, LeaveTime, BackDate, BackTime }
 
@@ -150,7 +145,13 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
         Picking.LeaveDate, Picking.BackDate -> {
             val leave = p == Picking.LeaveDate
             val range = if (leave) form.firstDay..form.lastDay else leaveDay..generalReturnLastDay(leaveDay)
-            DayPicker(if (leave) leaveDay else backDay, range, onDismiss = { picking = null }) { day ->
+            DayPicker(
+                if (leave) leaveDay else backDay,
+                range,
+                onDismiss = { picking = null },
+                modifier = Modifier.testTag("outing.picker.date"),
+                setButton = Modifier.testTag("outing.picker.ok"),
+            ) { day ->
                 picking = null
                 if (leave) {
                     // Keep the trip's length when the leaving day moves.
@@ -217,27 +218,6 @@ private fun MomentRow(moment: OutingMoment, error: Boolean, h24: Boolean, tag: S
         Spacer(Modifier.width(ListItemDefaults.SegmentedGap))
         PickerField(Lucide.Clock, clock(moment.minute, h24), error, onTime, Modifier.weight(2f).testTag("$tag.time"), inner)
     }
-}
-
-/** A day in [range] (epoch days) from the M3 date picker. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DayPicker(day: Int, range: IntRange, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
-    val state = rememberDatePickerState(
-        initialSelectedDateMillis = day.coerceIn(range) * DAY_MS,
-        yearRange = formatDay(range.first, "yyyy").toInt()..formatDay(range.last, "yyyy").toInt(),
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long) = (utcTimeMillis / DAY_MS).toInt() in range
-        },
-    )
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton({ state.selectedDateMillis?.let { onPick((it / DAY_MS).toInt()) } ?: onDismiss() }, Modifier.testTag("outing.picker.ok")) { Text("Set") }
-        },
-        modifier = Modifier.testTag("outing.picker.date"),
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-    ) { DatePicker(state, showModeToggle = false) }
 }
 
 /** A time of day (minutes) from the M3 time picker; [hint] is the offered window. */
