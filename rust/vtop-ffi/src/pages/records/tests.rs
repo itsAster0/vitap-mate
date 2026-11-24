@@ -17,6 +17,11 @@ fn semester_names_split() {
     );
 }
 
+use std::collections::HashMap;
+
+use vtop_core::types::{AttendanceData, FullAttendanceData, TimetableData};
+
+use super::attendance::{counted_total, standing};
 use super::*;
 
 // Cases from test/attendance_standing_test.dart.

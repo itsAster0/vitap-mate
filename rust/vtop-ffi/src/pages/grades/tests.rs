@@ -3,6 +3,7 @@ use vtop_core::types::{
     TimetableCourse,
 };
 
+use super::plan::{parse_credits, plan_courses};
 use super::*;
 
 fn record(code: &str, kind: &str, credits: &str, grade: &str, month: &str) -> GradeHistoryRecord {
