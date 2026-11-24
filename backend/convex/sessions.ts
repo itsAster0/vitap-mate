@@ -41,8 +41,10 @@ const ACCOUNT_MISMATCH = "account_mismatch: Your phone is signed in to VTOP as a
 
 // ---- key holders --------------------------------------------------------------------------
 
+export type KeyHolder = { key: Doc<"accessKeys">; account: Doc<"accounts"> };
+
 /** The key's row and its account; null for no such key. */
-async function keyAccount(ctx: QueryCtx, keyHash: string): Promise<{ key: Doc<"accessKeys">; account: Doc<"accounts"> } | null> {
+export async function keyAccount(ctx: QueryCtx, keyHash: string): Promise<KeyHolder | null> {
   const key = await ctx.db
     .query("accessKeys")
     .withIndex("by_keyHash", (q) => q.eq("keyHash", keyHash))
@@ -51,28 +53,40 @@ async function keyAccount(ctx: QueryCtx, keyHash: string): Promise<{ key: Doc<"a
   return key && account ? { key, account } : null;
 }
 
-/** `GET /v1/whoami`: read-only; how a session for this key will be made. Null for no such key. */
+/** How a session for this key will be made: `GET /v1/whoami`, and the extension's live
+ * `extension:key`. `phone` is the key's own phone, the only one its requests go to. */
+export async function keyView(ctx: QueryCtx, { key, account }: KeyHolder) {
+  const doc = await recordOf(ctx, account);
+  const at = now();
+  const vault = doc.usableVault(at);
+  const device = await ctx.db
+    .query("devices")
+    .withIndex("by_deviceId", (q) => q.eq("deviceId", key.deviceId))
+    .unique();
+  const linked = device?.accountId === account._id;
+  return {
+    registrationNumber: doc.id,
+    keyLabel: key.label,
+    keyCreatedAt: key.createdAt,
+    keyLastUsedAt: key.lastUsedAt,
+    keyOutings: key.outings,
+    semesterId: doc.semesterId,
+    settings: doc.settings,
+    phoneLinked: linked,
+    phone: linked ? { label: device.label, notifications: device.fcmToken !== "" } : null,
+    savedCredentials: vault !== null,
+    vaultSavedAt: vault !== null ? doc.vaultSavedAt : null,
+    credentialsRejectedAt: doc.credentialsRejectedAt,
+    cachedSession: doc.cachedSession(at) !== null,
+  };
+}
+
+/** `GET /v1/whoami`: read-only. Null for no such key. */
 export const whoami = internalQuery({
   args: { keyHash: v.string() },
   handler: async (ctx, { keyHash }) => {
     const found = await keyAccount(ctx, keyHash);
-    if (!found) return null;
-    const { key, account } = found;
-    const doc = await recordOf(ctx, account);
-    const vault = doc.usableVault(now());
-    return {
-      registrationNumber: doc.id,
-      keyLabel: key.label,
-      keyCreatedAt: key.createdAt,
-      keyLastUsedAt: key.lastUsedAt,
-      keyOutings: key.outings,
-      semesterId: doc.semesterId,
-      settings: doc.settings,
-      phoneLinked: (await phonesOf(ctx, account._id)).length > 0,
-      savedCredentials: vault !== null,
-      vaultSavedAt: vault !== null ? doc.vaultSavedAt : null,
-      credentialsRejectedAt: doc.credentialsRejectedAt,
-    };
+    return found && (await keyView(ctx, found));
   },
 });
 

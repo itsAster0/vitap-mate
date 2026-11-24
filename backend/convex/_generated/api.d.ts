@@ -13,6 +13,7 @@ import type * as app from "../app.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as devices from "../devices.js";
+import type * as extension from "../extension.js";
 import type * as guides from "../guides.js";
 import type * as http from "../http.js";
 import type * as identity from "../identity.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   crons: typeof crons;
   devices: typeof devices;
+  extension: typeof extension;
   guides: typeof guides;
   http: typeof http;
   identity: typeof identity;

@@ -22,4 +22,7 @@ export const rateLimits = new RateLimiter(components.rateLimiter, {
   oauthRegister: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
   /** Session calls from an account's keys (extension, MCP), by account id. */
   sessionCall: { kind: "fixed window", rate: 60, period: MINUTE },
+  /** Key JWTs for the extension's socket, by account: a client stuck reconnecting can't keep the
+   * backend signing. */
+  keyToken: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 10 },
 });
