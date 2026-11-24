@@ -94,10 +94,7 @@ internal fun odSlide(r: WrappedReport): Slide? {
     return Slide("on_duty", Ink.Warning, tiles = listOf(Tile(Ink.Warning, "${o.classes}", "on OD, ${count(o.days, "day")}"))) {
         val ink = LocalInks.current
         Txt(56) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Big("${o.classes}", 136f)
-                H("on\nOD", modifier = Modifier.padding(bottom = 16.dp))
-            }
+            BigBeside("${o.classes}", 136f, "on\nOD")
         }
         Txt(206) { P("$share of your classes, across ${count(o.days, "day")}", top = 0) }
         // Every counted class: present, OD, absent.
@@ -357,15 +354,8 @@ internal fun closeCallSlide(r: WrappedReport): Slide? {
         val ink = LocalInks.current
         Txt(58) { Label("Close call") }
         Txt(84) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (spare != null) {
-                    Big("$spare", 150f)
-                    H(if (spare == 1) "class\nto spare" else "classes\nto spare", modifier = Modifier.padding(bottom = 20.dp))
-                } else {
-                    Big("${c.percent}%", 120f)
-                    H("your\nlowest", modifier = Modifier.padding(bottom = 16.dp))
-                }
-            }
+            if (spare != null) BigBeside("$spare", 150f, if (spare == 1) "class\nto spare" else "classes\nto spare")
+            else BigBeside("${c.percent}%", 120f, "your\nlowest")
         }
         Txt(252) {
             P(

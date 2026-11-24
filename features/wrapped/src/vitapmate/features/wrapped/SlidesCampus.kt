@@ -45,10 +45,7 @@ internal fun outingsSlide(r: WrappedReport): Slide? {
     return Slide("outings", Ink.Warning, tiles = listOf(Tile(Ink.Warning, count(trips, "trip"), if (o.daysAway > 0) "${count(o.daysAway, "day")} away" else "off campus", span = 3))) {
         val ink = LocalInks.current
         Txt(52) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Big("$trips", 130f)
-                H(if (trips == 1) "trip off\ncampus" else "trips off\ncampus", 30f, Modifier.padding(bottom = 16.dp))
-            }
+            BigBeside("$trips", 130f, if (trips == 1) "trip off\ncampus" else "trips off\ncampus", headingSize = 30f)
         }
         if (o.leaves > 0) Shaped(RoundedCornerShape(30.dp), 24, 206, 190, 60, text = count(o.leaves, "leave"), size = 22f, rotate = -5f, track = -0.03f)
         if (o.weekends > 0) Shaped(
@@ -114,10 +111,7 @@ internal fun hostelSlide(r: WrappedReport): Slide? {
         val ink = LocalInks.current
         Txt(58) { Label("Hostel life") }
         Txt(84) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Big(hours, 112f)
-                H("h", modifier = Modifier.padding(bottom = 12.dp))
-            }
+            BigBeside(hours, 112f, "h", gap = 10)
         }
         Txt(206) { H("out of the hostel on a class day", 26f) }
         // 6 AM to midnight in half hours: runs out in the tone, runs in faint.

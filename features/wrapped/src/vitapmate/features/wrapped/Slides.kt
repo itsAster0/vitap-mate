@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -176,10 +178,22 @@ internal fun Label(text: String, size: Float = 14f) {
     Text(text, color = LocalInks.current.text.copy(alpha = 0.8f), style = type(size, 600, -0.01f, 1.3f))
 }
 
-/** A large number in the base colour. */
+/** A large number in the base colour, shrunk to fit its width. */
 @Composable
 internal fun Big(text: String, size: Float, modifier: Modifier = Modifier) {
-    Text(text, modifier, color = LocalInks.current.shape, style = type(size, 800, -0.06f, 1f), maxLines = 1)
+    Text(
+        text, modifier, color = LocalInks.current.shape, style = type(size, 800, -0.06f, 1f), maxLines = 1,
+        autoSize = TextAutoSize.StepBased(minFontSize = (size * 0.3f).sp, maxFontSize = size.sp),
+    )
+}
+
+/** [number] with [heading] beside it on its last line; the number shrinks so the heading keeps its width. */
+@Composable
+internal fun BigBeside(number: String, size: Float, heading: String, headingSize: Float = 34f, gap: Int = 14) {
+    Row(horizontalArrangement = Arrangement.spacedBy(gap.dp)) {
+        Big(number, size, Modifier.weight(1f, fill = false).alignBy(LastBaseline))
+        H(heading, headingSize, Modifier.alignBy(LastBaseline))
+    }
 }
 
 /** A pill of quiet text. */

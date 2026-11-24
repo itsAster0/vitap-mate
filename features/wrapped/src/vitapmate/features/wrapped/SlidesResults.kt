@@ -92,10 +92,7 @@ internal fun assessmentsSlide(r: WrappedReport): Slide? {
     return Slide("assessments", Ink.Danger, tiles = listOf(Tile(Ink.Danger, "${a.total}", if (a.total == 1) "assessment" else "assessments"))) {
         val ink = LocalInks.current
         Txt(52) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Big("${a.total}", 140f)
-                H(if (a.total == 1) "test\ntaken" else "tests\ntaken", modifier = Modifier.padding(bottom = 18.dp))
-            }
+            BigBeside("${a.total}", 140f, if (a.total == 1) "test\ntaken" else "tests\ntaken")
         }
         val most = a.byKind.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
         Txt(218) {
@@ -141,10 +138,7 @@ internal fun examsSlide(r: WrappedReport): Slide? {
     return Slide("exams", Ink.Danger, tiles = listOf(Tile(Ink.Danger, "$total", if (total == 1) "exam sat" else "exams sat"))) {
         val ink = LocalInks.current
         Txt(58) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Big("$total", 140f)
-                H(if (total == 1) "exam\nsat" else "exams\nsat", modifier = Modifier.padding(bottom = 18.dp))
-            }
+            BigBeside("$total", 140f, if (total == 1) "exam\nsat" else "exams\nsat")
         }
         if (e.cats > 0) Shaped(MaterialShapes.Clover8Leaf.toShape(), 14, 226, 176, text = count(e.cats, "CAT"), size = 30f, track = -0.03f)
         if (e.fats > 0) Shaped(MaterialShapes.Cookie6Sided.toShape(), 186, 296, 150, color = ink.mid, text = count(e.fats, "FAT"), size = 28f, textColor = ink.text, track = -0.03f)
@@ -165,10 +159,7 @@ internal fun crunchSlide(r: WrappedReport): Slide? {
     return Slide("crunch", Ink.Accent, tiles = listOf(Tile(Ink.Accent, "${c.papers}", "exams in one week"))) {
         val ink = LocalInks.current
         Txt(52) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Big("${c.papers}", 140f)
-                H("exams in\none week", modifier = Modifier.padding(bottom = 18.dp))
-            }
+            BigBeside("${c.papers}", 140f, "exams in\none week")
         }
         Txt(212) { P("Your busiest week, ${day(c.firstDay)} to ${day(c.lastDay)}", top = 0) }
         val most = c.byDay.maxOrNull()?.coerceAtLeast(1) ?: 1
