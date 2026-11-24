@@ -414,7 +414,16 @@ pub(crate) fn edge_error(path: &str, error: CallError) -> EdgeError {
         CallError::Closed => EdgeError::Offline,
         CallError::Message(message) => {
             let missing = message.contains("Could not find public function");
-            warn!(path, missing, "server failed");
+            // Only the first line: later ones can quote the arguments (a validator's `Value:`),
+            // which may hold credentials. The first carries the request id when redacted.
+            let reason: String = message
+                .lines()
+                .next()
+                .unwrap_or("")
+                .chars()
+                .take(300)
+                .collect();
+            warn!(path, missing, reason = reason.as_str(), "server failed");
             EdgeError::Status {
                 code: if missing { "not_found" } else { "server_error" }.into(),
                 message: "The server sent an unexpected answer.".into(),

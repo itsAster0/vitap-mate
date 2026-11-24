@@ -58,7 +58,9 @@ object Live {
                         // identity left (signed out, this phone removed) the flow ends.
                         Log.warn("data.live", "$name failed: $code", id, mapOf("message" to message))
                         when (code) {
-                            "unauthenticated" -> {}
+                            // Renewed in Rust; or our own fault, which the student can't act on:
+                            // the log above (and Rust's) has the reason.
+                            "unauthenticated", "server_error", "not_found", "bad_request" -> {}
                             "no_identity" -> close()
                             else -> failing.update {
                                 it + (topic to Problem(ProblemKind.Unexpected, "Live Updates Stopped", message, id, retryable = true, userInitiated = false))
