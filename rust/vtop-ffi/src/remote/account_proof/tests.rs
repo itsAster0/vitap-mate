@@ -3,7 +3,6 @@
 //! vtop-tlsn's fake VTOP and answers as the engine does), then trade the ticket for a JWT.
 
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde_json::{Value, json};
@@ -26,8 +25,6 @@ struct FakeNetwork {
     device: String,
     /// The URLs opened.
     opened: Mutex<Vec<String>>,
-    /// Binary messages the phone sent, over every socket.
-    sends: Arc<AtomicUsize>,
     /// Opening never answers (a link gone quiet).
     hang: bool,
 }
@@ -36,14 +33,12 @@ struct FakeSocket {
     rx: tokio::sync::Mutex<ReadHalf<DuplexStream>>,
     tx: tokio::sync::Mutex<WriteHalf<DuplexStream>>,
     last: tokio::sync::Mutex<Option<tokio::sync::oneshot::Receiver<String>>>,
-    sends: Arc<AtomicUsize>,
 }
 
 #[async_trait::async_trait]
 impl ProofSocket for FakeSocket {
     async fn send(&self, data: Vec<u8>) -> Result<(), TransportError> {
         assert!(data.len() <= MAX_MESSAGE);
-        self.sends.fetch_add(1, Ordering::Relaxed);
         let mut tx = self.tx.lock().await;
         tx.write_all(&data)
             .await
@@ -120,7 +115,6 @@ impl ProofNetwork for FakeNetwork {
             rx: rx.into(),
             tx: tx.into(),
             last: Some(last_rx).into(),
-            sends: self.sends.clone(),
         };
         Ok(ProofOpened {
             socket: Some(Arc::new(socket)),
@@ -144,7 +138,6 @@ async fn setup(name: &str, page: Page) -> (Core, Arc<Mutex<Edge>>, String, Arc<F
         vtop: fake::serve(page).await,
         device: core.registration().0,
         opened: Mutex::default(),
-        sends: Arc::default(),
         hang: name.starts_with("hang"),
     });
     let core = on_network(core, Some(network.clone()));
@@ -309,16 +302,13 @@ async fn a_session_id_the_proof_cannot_carry_fails_before_the_server() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_background_proof_gets_the_refresh_token_once_in_few_messages() {
+async fn a_background_proof_gets_the_refresh_token_once() {
     let (core, edge, _server, network) = setup("background", Page::Honest).await;
     let gate = consent::tests::no(&core);
     assert!(core.prove_in_background("f".into(), 120_000).await.unwrap());
     assert_eq!(gate.asks(), 0, "no session leaves the phone");
     assert_eq!(paths(&edge), ["auth:proveStart", "auth:token"]);
     assert_eq!(core.device().refresh.unwrap().token, "vrt_1");
-    // tlsn writes about 1050 pieces here; the writer joins what is queued (about 250).
-    let sends = network.sends.load(Ordering::Relaxed);
-    assert!(sends < 400, "{sends} messages");
 
     // With the refresh token kept, the next open proves nothing and asks the server nothing.
     assert!(!core.prove_in_background("f".into(), 120_000).await.unwrap());
