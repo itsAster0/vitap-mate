@@ -77,12 +77,24 @@ pub fn log_event(
     msg: String,
     fields: HashMap<String, String>,
 ) {
+    emit(&level, &src, &msg, kotlin_fields(flow, fields));
+}
+
+/// A Kotlin line's fields: all text, so redacted by name as `tracing`'s text fields are.
+fn kotlin_fields(flow: Option<String>, fields: HashMap<String, String>) -> Map<String, Value> {
     let mut extra: Map<String, Value> = flow
         .map(|flow| ("flow".to_string(), flow.into()))
         .into_iter()
         .collect();
-    extra.extend(fields.into_iter().map(|(key, value)| (key, value.into())));
-    emit(&level, &src, &msg, extra);
+    extra.extend(fields.into_iter().map(|(key, value)| {
+        let value = if secret_name(&key) {
+            REDACTED.into()
+        } else {
+            value.into()
+        };
+        (key, value)
+    }));
+    extra
 }
 
 /// The signed-in student's registration number, for every line.
@@ -419,5 +431,25 @@ mod tests {
         assert_eq!(seen["cookies"], 3);
         assert_eq!(seen["password"], REDACTED);
         assert_eq!(seen["message"], "edge refused");
+    }
+
+    #[test]
+    fn kotlin_secret_fields_are_redacted() {
+        let fields = HashMap::from([
+            ("password".to_string(), "hunter2".to_string()),
+            ("otp_code".to_string(), "493817".to_string()),
+            ("session".to_string(), "JSESSIONID=abc".to_string()),
+            ("code".to_string(), "mailbox_not_found".to_string()),
+            ("status".to_string(), "403".to_string()),
+        ]);
+        let seen = kotlin_fields(Some("f-1".into()), fields);
+        let text = Value::Object(seen.clone()).to_string();
+        for secret in ["hunter2", "493817", "JSESSIONID"] {
+            assert!(!text.contains(secret), "{secret} logged: {text}");
+        }
+        assert_eq!(seen["password"], REDACTED);
+        assert_eq!(seen["flow"], "f-1");
+        assert_eq!(seen["code"], "mailbox_not_found");
+        assert_eq!(seen["status"], "403");
     }
 }
