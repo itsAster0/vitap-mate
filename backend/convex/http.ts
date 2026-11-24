@@ -413,7 +413,7 @@ function internalRoute(path: string, token: () => Array<string | undefined>, han
   });
 }
 
-internalRoute("/internal/udp-keys", () => [process.env.GATEWAY_TOKEN, process.env.INTERNAL_TOKEN], async (ctx, req) => {
+internalRoute("/internal/udp-keys", () => [process.env.GATEWAY_TOKEN], async (ctx, req) => {
   const gateway = parseGateway(await jsonBody(req));
   if (!gateway) return error(400, "bad_request", "Expected { host, ports, keys: [{ id, publicKey, from, until }] }.");
   await ctx.runMutation(internal.udp.report, gateway);
@@ -421,9 +421,8 @@ internalRoute("/internal/udp-keys", () => [process.env.GATEWAY_TOKEN, process.en
   return empty();
 });
 
-// The verifier's own token opens these two routes and nothing else; the engine's still does,
-// for an engine that verified proofs itself.
-const verifierTokens = () => [process.env.VERIFIER_TOKEN, process.env.INTERNAL_TOKEN];
+// The verifier's own token opens these two routes and nothing else.
+const verifierTokens = () => [process.env.VERIFIER_TOKEN];
 
 internalRoute("/internal/proof-ticket", verifierTokens, async (ctx, req) => {
   const ticket = str((await jsonBody(req))?.ticket) ?? "";

@@ -9,6 +9,7 @@
 import { fromBase64Url, toBase64Url } from "./base64";
 import { fail } from "./errors";
 import { hashesEqual } from "./crypto";
+import { env } from "./util";
 
 export const AUDIENCE = "vmate";
 export const ACCESS_TTL_SECS = 24 * 3600;
@@ -30,7 +31,7 @@ export async function signAccessJwt(claims: AccessClaims | KeyClaims, nowSecs: n
   const key = await crypto.subtle.importKey("jwk", keyData, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
   const exp = nowSecs + ACCESS_TTL_SECS;
   const header = part({ alg: "ES256", typ: "JWT", ...(kid ? { kid } : {}) });
-  const payload = part({ iss: process.env.JWT_ISSUER, aud: AUDIENCE, iat: nowSecs, exp, ...claims });
+  const payload = part({ iss: env("PUBLIC_URL"), aud: AUDIENCE, iat: nowSecs, exp, ...claims });
   // Web Crypto's ECDSA signature is the raw r‖s that JWS wants.
   const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, utf8.encode(`${header}.${payload}`)));
   return { jwt: `${header}.${payload}.${toBase64Url(sig)}`, expiresAt: exp * 1000 };

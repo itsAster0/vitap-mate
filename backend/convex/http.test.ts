@@ -51,7 +51,9 @@ describe("basics", () => {
     expect((await post(t, "/internal/udp-keys", { host: "x" }, { authorization: `Bearer ${TOKENS.GATEWAY_TOKEN}` })).status).toBe(400);
     // The gateway's token opens nothing else.
     expect((await post(t, "/internal/proof-ticket", { ticket: "0".repeat(32) }, { authorization: `Bearer ${TOKENS.GATEWAY_TOKEN}` })).status).toBe(401);
-    expect((await post(t, "/internal/proof-ticket", { ticket: "0".repeat(32) }, { authorization: `Bearer ${TOKENS.INTERNAL_TOKEN}` })).status).toBe(404);
+    // Nor does the engine's: only the verifier's opens the proof routes.
+    expect((await post(t, "/internal/proof-ticket", { ticket: "0".repeat(32) }, { authorization: `Bearer ${TOKENS.INTERNAL_TOKEN}` })).status).toBe(401);
+    expect((await post(t, "/internal/udp-keys", report, { authorization: `Bearer ${TOKENS.INTERNAL_TOKEN}` })).status).toBe(401);
   });
 
   it("let the verifier's token open the proof routes only", async () => {
@@ -93,7 +95,7 @@ describe("basics", () => {
     engine(() => Response.json({ code: "unavailable" }, { status: 503 }));
     const p = await phone(1);
     const { ticket } = await t.mutation(api.auth.proveStart, await p.signed("auth:proveStart", {}));
-    const auth = { authorization: `Bearer ${TOKENS.INTERNAL_TOKEN}` };
+    const auth = { authorization: `Bearer ${TOKENS.VERIFIER_TOKEN}` };
     await post(t, "/internal/proof-ticket", { ticket }, auth);
     expect((await post(t, "/internal/proof-done", { ticket, regno: REGNO }, auth)).status).toBe(204);
     expect((await t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }))).regno).toBe(REGNO);

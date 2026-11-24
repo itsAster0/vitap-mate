@@ -14,7 +14,7 @@ export const modules = import.meta.glob(["../convex/**/*.ts", "!../convex/**/*.t
 
 export const T0 = 1_800_000_000;
 export const REGNO = "22BCE0001";
-export const TOKENS = { INTERNAL_TOKEN: "internal-test", MAIL_TOKEN: "mail-test", GATEWAY_TOKEN: "gateway-test", ACCOUNT_TOKEN_SECRET: "account-secret-test" };
+export const TOKENS = { INTERNAL_TOKEN: "internal-test", MAIL_TOKEN: "mail-test", GATEWAY_TOKEN: "gateway-test", VERIFIER_TOKEN: "verifier-test", ACCOUNT_TOKEN_SECRET: "account-secret-test" };
 
 export type T = ReturnType<typeof convexTest>;
 
@@ -34,7 +34,6 @@ export async function setup(): Promise<T> {
   for (const [k, v] of Object.entries({
     ...TOKENS,
     JWT_PRIVATE_JWK: jwk,
-    JWT_ISSUER: "https://vmate.test",
     ENGINE_URL: "https://engine.test",
     PUBLIC_URL: "https://vmate.test",
     MAIL_DOMAIN: "vmate.test",

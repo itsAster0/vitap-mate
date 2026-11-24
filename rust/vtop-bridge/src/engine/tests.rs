@@ -28,10 +28,11 @@ fn engine_app_with(
 ) -> (axum::Router, Arc<AppState>) {
     let config = Config::from_lookup(|name| match name {
         "VAULT_KEY" => Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()),
-        "EDGE_URL" => Some("https://edge.example".into()),
+        "CONVEX_URL" => Some("https://edge.example".into()),
         "INTERNAL_TOKEN" => Some(RELAY.into()),
         "GATEWAY_TOKEN" => Some(GATEWAY.into()),
         "OTP_WAIT_SECS" => Some("2".into()),
+        "PORT" => Some("8080".into()),
         _ => None,
     })
     .unwrap();

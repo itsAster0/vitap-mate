@@ -4,24 +4,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use async_trait::async_trait;
 use vtop_core::{SessionState, VtopError};
 use vtop_mcp::bridge::{BridgeClient, Identity, SessionSource};
-use vtop_mcp::config::Config;
 use vtop_mcp::tools::with_retry;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const KEY: &str = "vtm_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-#[test]
-fn config_needs_only_the_bridge_url() {
-    let c = Config::from_lookup(|name| {
-        (name == "BRIDGE_URL").then(|| "https://bridge.example/".to_string())
-    })
-    .unwrap();
-    assert_eq!(c.bridge_url, "https://bridge.example");
-    assert_eq!(c.listen.port(), 8080);
-    assert!(c.listen.is_ipv6());
-    assert!(Config::from_lookup(|_| None).is_err());
-}
 
 struct FakeSource {
     sessions: AtomicUsize,

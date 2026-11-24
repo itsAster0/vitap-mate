@@ -58,37 +58,33 @@ impl Config {
                 "VERIFIER_TOKEN must be at least 32 characters".into(),
             ));
         }
-        let at_least_one = |name: &str, default: usize| match parse(&lookup, name, default)? {
+        let at_least_one = |name: &str| match parse(&lookup, name)? {
             0 => Err(ConfigError(format!("{name} must be at least 1"))),
             value => Ok(value),
         };
         Ok(Self {
             convex_url,
             token,
-            max_proofs: at_least_one("MAX_PROOFS", 4)?,
-            max_queue: parse(&lookup, "MAX_QUEUE", 64)?,
-            queue_wait: Duration::from_secs(parse(&lookup, "QUEUE_WAIT_SECS", 60)?),
-            proxy_hops: at_least_one("PROXY_HOPS", 1)?,
-            listen: SocketAddr::from((
-                std::net::Ipv6Addr::UNSPECIFIED,
-                parse(&lookup, "PORT", 8080)?,
-            )),
+            max_proofs: at_least_one("MAX_PROOFS")?,
+            max_queue: parse(&lookup, "MAX_QUEUE")?,
+            queue_wait: Duration::from_secs(parse(&lookup, "QUEUE_WAIT_SECS")?),
+            proxy_hops: at_least_one("PROXY_HOPS")?,
+            listen: SocketAddr::from((std::net::Ipv6Addr::UNSPECIFIED, parse(&lookup, "PORT")?)),
         })
     }
 }
 
+/// Every setting is required: the deploy's env files hold each value, so there is one place to
+/// read what a service runs with.
 fn parse<T: std::str::FromStr>(
     lookup: &impl Fn(&str) -> Option<String>,
     name: &str,
-    default: T,
 ) -> Result<T, ConfigError> {
-    match lookup(name) {
-        None => Ok(default),
-        Some(raw) => raw
-            .trim()
-            .parse()
-            .map_err(|_| ConfigError(format!("{name} has an invalid value"))),
-    }
+    lookup(name)
+        .ok_or_else(|| ConfigError(format!("{name} is required")))?
+        .trim()
+        .parse()
+        .map_err(|_| ConfigError(format!("{name} has an invalid value")))
 }
 
 #[cfg(test)]
@@ -98,17 +94,24 @@ mod tests {
 
     const TOKEN: &str = "verifier-token-verifier-token-verifier";
 
+    const ALL: [(&str, &str); 7] = [
+        ("CONVEX_URL", "https://convex.example/"),
+        ("VERIFIER_TOKEN", TOKEN),
+        ("MAX_PROOFS", "4"),
+        ("MAX_QUEUE", "64"),
+        ("QUEUE_WAIT_SECS", "60"),
+        ("PROXY_HOPS", "1"),
+        ("PORT", "8080"),
+    ];
+
     fn config(extra: &[(&str, &str)]) -> Result<Config, ConfigError> {
-        let mut vars = HashMap::from([
-            ("CONVEX_URL", "https://convex.example/"),
-            ("VERIFIER_TOKEN", TOKEN),
-        ]);
+        let mut vars = HashMap::from(ALL);
         vars.extend(extra.iter().copied());
         Config::from_lookup(|name| vars.get(name).map(|v| (*v).to_string()))
     }
 
     #[test]
-    fn defaults_and_overrides() {
+    fn reads_every_setting() {
         let c = config(&[]).unwrap();
         assert_eq!(c.convex_url, "https://convex.example");
         assert_eq!(c.token, TOKEN);
@@ -136,7 +139,15 @@ mod tests {
         ] {
             assert!(config(&[(name, value)]).is_err(), "{name}={value}");
         }
-        let missing = Config::from_lookup(|_| None).err().unwrap();
-        assert_eq!(missing.0, "CONVEX_URL is required");
+        for (missing, _) in ALL {
+            let vars: HashMap<&str, &str> = ALL
+                .into_iter()
+                .filter(|(name, _)| *name != missing)
+                .collect();
+            let error = Config::from_lookup(|name| vars.get(name).map(|v| (*v).to_string()))
+                .err()
+                .unwrap();
+            assert_eq!(error.0, format!("{missing} is required"));
+        }
     }
 }

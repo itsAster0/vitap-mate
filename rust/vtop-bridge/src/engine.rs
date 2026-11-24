@@ -71,13 +71,13 @@ pub(crate) fn require_secret(state: &AppState, headers: &HeaderMap) -> Result<()
 }
 
 /// The routes the UDP gateway calls (page fetches and the phone's sign-in)
-/// take its own `GATEWAY_TOKEN` too, or `INTERNAL_TOKEN` from the edge.
+/// take its own `GATEWAY_TOKEN` too, or Convex's `INTERNAL_TOKEN`.
 pub(crate) fn require_gateway(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     check_token(
         headers,
         &[
             Some(&state.config.internal_token),
-            state.config.gateway_token.as_ref(),
+            Some(&state.config.gateway_token),
         ],
     )
 }

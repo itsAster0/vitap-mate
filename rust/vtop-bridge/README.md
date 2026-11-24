@@ -48,17 +48,17 @@ the app.
 
 ## Configuration
 
-Set on the Railway service by `alchemy.run.ts` (`VAULT_KEY`, `EDGE_URL`,
-`INTERNAL_TOKEN`, `RUST_LOG`); the rest keep their defaults:
+Every variable is required, with no defaults in code: the deploy's env files
+(`deploy/hawk/compose.yaml` and the files `deploy/hawk/up.sh` writes) hold each value.
 
-| Variable            | Default | Notes                                        |
-| ------------------- | ------- | -------------------------------------------- |
-| `VAULT_KEY`         | —       | required; base64 of 32 bytes                 |
-| `EDGE_URL`          | —       | required; the edge's public URL              |
-| `INTERNAL_TOKEN`    | —       | required; shared with the edge (bearer, both ways), 32+ characters |
-| `GATEWAY_TOKEN`     | —       | the UDP gateway's own bearer, 32+ characters; taken only on `/engine/fetch*` and `/engine/vtop-login*` |
-| `OTP_WAIT_SECS`     | 45      | wait for the OTP mail (forwarded or Gmail) on sign-in |
-| `PORT`              | 8080    | listens on `[::]`, IPv4 where that fails     |
+| Variable            | Notes                                        |
+| ------------------- | -------------------------------------------- |
+| `VAULT_KEY`         | base64 of 32 bytes                           |
+| `CONVEX_URL`        | Convex's HTTP actions                        |
+| `INTERNAL_TOKEN`    | shared with Convex (bearer, both ways), 32+ characters |
+| `GATEWAY_TOKEN`     | the UDP gateway's own bearer, 32+ characters; taken only on `/engine/fetch*` and `/engine/vtop-login*` |
+| `OTP_WAIT_SECS`     | wait for the OTP mail (forwarded or Gmail) on sign-in, e.g. 45 |
+| `PORT`              | listens on `[::]`, IPv4 where that fails, e.g. 8080 |
 
 Do not rotate `VAULT_KEY` casually: sealed credentials become unreadable,
 are cleared, and the phone is asked again.
@@ -68,8 +68,9 @@ are cleared, and the phone is asked again.
 ```sh
 cd rust
 cargo test -p vtop-bridge
-VAULT_KEY="$(openssl rand -base64 32)" EDGE_URL=http://localhost:8787 \
-  INTERNAL_TOKEN="$(openssl rand -hex 32)" cargo run -p vtop-bridge
+VAULT_KEY="$(openssl rand -base64 32)" CONVEX_URL=http://localhost:3211 \
+  INTERNAL_TOKEN="$(openssl rand -hex 32)" GATEWAY_TOKEN="$(openssl rand -hex 32)" \
+  OTP_WAIT_SECS=45 PORT=8080 cargo run -p vtop-bridge
 ```
 
 Deployed by `bun run deploy` in `deploy/` (`alchemy.run.ts`), which builds

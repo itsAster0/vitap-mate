@@ -6,7 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { randomBytes } from "./crypto";
 import { fail } from "./errors";
-import { now } from "./util";
+import { env, now } from "./util";
 
 export const ID_LEN = 10;
 /** No `l`, `o`, `0` or `1`, so an id read aloud or typed is unambiguous. */
@@ -37,7 +37,7 @@ export function isId(id: string): boolean {
 }
 
 export function mailDomain(): string {
-  return (process.env.MAIL_DOMAIN ?? "vmate.aster0.dev").trim();
+  return env("MAIL_DOMAIN");
 }
 
 export function address(id: string): string {

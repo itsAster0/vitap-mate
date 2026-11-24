@@ -1,14 +1,11 @@
-//! `vtop-gateway`: UDP mode's gateway, on its own host next to an engine
-//! elsewhere.
+//! `vtop-gateway`: UDP mode's gateway, next to the engine on hawk.
 //!
-//! Environment: `ENGINE_URL` (the engine's base URL), `EDGE_URL` (Convex's
-//! HTTP actions),
+//! Environment, every one required (the deploy's compose sets them all):
+//! `ENGINE_URL` (the engine's base URL), `CONVEX_URL` (Convex's HTTP actions),
 //! `GATEWAY_TOKEN` (its own bearer token, which the engine takes for fetches
-//! and sign-ins and the edge for `/internal/udp-keys`; `INTERNAL_TOKEN` is
-//! read when it is unset, for a gateway deployed before it had one),
-//! `UDP_HOST` (the public name the app sends UDP to), `UDP_PORTS`
-//! (comma-separated, default 3478,51820,443), `BIND` (default `0.0.0.0`)
-//! and `GATEWAY_DATA_DIR` (where its keys are kept, default `./data`).
+//! and sign-ins and Convex for `/internal/udp-keys`), `UDP_HOST` (the public
+//! address the app sends UDP to), `UDP_PORTS` (comma-separated), `BIND` (the
+//! address to listen on) and `GATEWAY_DATA_DIR` (where its keys are kept).
 
 use tracing_subscriber::EnvFilter;
 use vtop_gateway::{Config, bind, run};
@@ -29,26 +26,24 @@ async fn main() {
             .ok_or_else(|| format!("{name} is not set"))
     };
     let bound = async {
-        let ports: Vec<u16> = match var("UDP_PORTS") {
-            Ok(p) => p.split(',').filter_map(|s| s.trim().parse().ok()).collect(),
-            Err(_) => vtop_wire::PORTS.to_vec(),
-        };
+        let ports: Vec<u16> = var("UDP_PORTS")?
+            .split(',')
+            .map(|s| {
+                s.trim()
+                    .parse()
+                    .map_err(|_| "UDP_PORTS has an invalid port".to_string())
+            })
+            .collect::<Result<_, _>>()?;
         let config = Config {
             engine_url: var("ENGINE_URL")?,
-            edge_url: var("EDGE_URL")?,
+            edge_url: var("CONVEX_URL")?,
             login_poll: std::time::Duration::from_secs(2),
-            token: var("GATEWAY_TOKEN").or_else(|_| var("INTERNAL_TOKEN"))?,
+            token: var("GATEWAY_TOKEN")?,
             host: var("UDP_HOST")?,
-            data_dir: var("GATEWAY_DATA_DIR")
-                .unwrap_or_else(|_| "./data".into())
-                .into(),
+            data_dir: var("GATEWAY_DATA_DIR")?.into(),
             ports,
         };
-        let sockets = bind(
-            &var("BIND").unwrap_or_else(|_| "0.0.0.0".into()),
-            &config.ports,
-        )
-        .await?;
+        let sockets = bind(&var("BIND")?, &config.ports).await?;
         Ok::<_, String>((config, sockets))
     };
     match bound.await {

@@ -7,7 +7,8 @@ export default {
     {
       type: "customJwt",
       applicationID: "vmate",
-      issuer: process.env.JWT_ISSUER!,
+      // Required like every setting: the same URL the tokens are issued under (lib/jwt.ts).
+      issuer: process.env.PUBLIC_URL!.replace(/\/+$/, ""),
       jwks: process.env.JWT_PUBLIC_JWK!,
       algorithm: "ES256",
     },
