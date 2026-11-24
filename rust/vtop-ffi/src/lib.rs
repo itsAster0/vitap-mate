@@ -1,6 +1,9 @@
 //! The app's core: one signed-in VTOP client, its session and
 //! a JSON cache in the app's data directory, and ready-to-draw records.
 
+// The uniffi::export futures (fetch_pages through traced and with_flow) nest
+// deeper than the default 128 when the compiler proves them Send.
+#![recursion_limit = "256"]
 #![cfg_attr(
     not(test),
     deny(
