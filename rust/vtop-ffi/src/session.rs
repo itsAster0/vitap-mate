@@ -17,28 +17,25 @@ use crate::{
 
 #[uniffi::export]
 impl Core {
-    /// The saved account's registration number.
+    /// The saved account's username; None without a saved password (one restored from
+    /// another phone, which the student types again).
     pub fn signed_in_user(&self, flow: String) -> Option<String> {
-        traced_sync(
-            "signed_in_user",
-            &flow,
-            || Ok(self.read::<Account>(ACCOUNT)),
-        )
-        .ok()
-        .flatten()
-        .map(|account| account.username)
+        traced_sync("signed_in_user", &flow, || Ok(self.read_account()))
+            .ok()
+            .flatten()
+            .filter(|account| !account.password.is_empty())
+            .map(|account| account.username)
     }
 
-    /// The saved username and password, and whether VTOP rejected the password, for the
-    /// Account page (opened behind the phone's screen lock) and Settings' "Needs attention".
-    /// Never logged.
+    /// The saved username and whether VTOP rejected the password, for Settings' "Needs
+    /// attention" and the Gmail sign-in's registration number. The password is
+    /// [`Core::saved_password`]'s.
     pub fn saved_account(&self, flow: String) -> Option<SavedAccount> {
-        traced_sync("saved_account", &flow, || Ok(self.read::<Account>(ACCOUNT)))
+        traced_sync("saved_account", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
             .map(|account| SavedAccount {
                 username: account.username,
-                password: account.password,
                 rejected: account.rejected,
                 // An account saved before this field: the saved session has it.
                 registration_number: account.registration_number.or_else(|| {
@@ -46,6 +43,16 @@ impl Core {
                         .and_then(|saved| saved.registration_number)
                 }),
             })
+    }
+
+    /// The saved password, for the Account page only (it opens behind the phone's screen
+    /// lock, and fills it in); None when absent. Never logged.
+    pub fn saved_password(&self, flow: String) -> Option<String> {
+        traced_sync("saved_password", &flow, || Ok(self.read_account()))
+            .ok()
+            .flatten()
+            .map(|account| account.password)
+            .filter(|password| !password.is_empty())
     }
 
     pub async fn sign_in(
@@ -297,7 +304,7 @@ impl Core {
         // Another student signed in over the saved one ("Sign in again"): the last one's
         // semesters, pick and pages are not theirs.
         if self
-            .read::<Account>(ACCOUNT)
+            .read_account()
             .is_some_and(|saved| saved.username != session.account.username)
         {
             info!("another account signed in: cached pages and forwarding address dropped");
@@ -355,23 +362,10 @@ impl Core {
         }
     }
 
-    /// Writes `account`, keeping the saved registration number when `account` has none (it is
-    /// only known once signed in).
-    pub(crate) fn write_account(&self, account: &Account) {
-        let mut account = account.clone();
-        if account.registration_number.is_none() {
-            account.registration_number = self
-                .read::<Account>(ACCOUNT)
-                .filter(|saved| saved.username == account.username)
-                .and_then(|saved| saved.registration_number);
-        }
-        self.write(ACCOUNT, &account);
-    }
-
     /// Saves `account`'s password over the saved account's when it's the same username
     /// (another username is another account, saved only once signed in).
     pub(crate) fn keep_accepted_password(&self, account: &Account) {
-        if let Some(saved) = self.read::<Account>(ACCOUNT)
+        if let Some(saved) = self.read_account()
             && saved.username == account.username
             && (saved.password != account.password || saved.rejected)
         {

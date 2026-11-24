@@ -26,8 +26,8 @@ use crate::pages::records;
 use crate::remote::edge;
 use crate::store::decoded;
 use crate::{
-    ACCOUNT, ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS,
-    SESSION, Session, Shared, TIMETABLE, traced, traced_sync,
+    ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS, SESSION,
+    Session, Shared, TIMETABLE, traced, traced_sync,
 };
 
 /// The Flutter app's Cookie-Editor domain.
@@ -149,7 +149,7 @@ impl Core {
                     self.install(Some(Arc::new(RwLock::new(fresh))));
                 }
             }
-            self.write(ACCOUNT, &account);
+            self.write_account(&account);
             info!("credentials replaced without signing in");
             Ok(())
         })
@@ -406,6 +406,7 @@ fn remove_dir(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ACCOUNT;
 
     fn core(name: &str) -> (Core, std::path::PathBuf) {
         let dir = std::env::temp_dir().join(format!("vtop-ffi-dev-{name}-{}", std::process::id()));
@@ -610,7 +611,8 @@ mod tests {
         core.write(ACCOUNT, &account);
         // No Debug on SavedAccount, so a failing test never prints the password.
         let saved = core.saved_account("f".into()).unwrap();
-        assert!(saved.username == "22BCE0001" && saved.password == "pw-1" && saved.rejected);
+        assert!(saved.username == "22BCE0001" && saved.rejected);
+        assert_eq!(core.saved_password("f".into()).as_deref(), Some("pw-1"));
     }
 
     #[test]

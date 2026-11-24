@@ -12,6 +12,7 @@ use crate::pages::changes;
 use crate::remote::{consent, forwarding};
 use crate::{Core, PAGES, SELECTED, SEMESTERS};
 
+pub(crate) mod account;
 pub(crate) mod cookies;
 pub(crate) mod decoded;
 

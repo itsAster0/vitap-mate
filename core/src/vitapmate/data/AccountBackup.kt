@@ -16,8 +16,9 @@ import vitapmate.observability.Log
  * The sign-in kept across reinstalls with Play services' Block Store: the saved account
  * (`account.json`) and this phone's server identity (`device.json`), end-to-end encrypted in the
  * Google backup when the phone has a screen lock, and kept on the phone through an uninstall. A
- * reinstall finds them before the core opens, so the student is still signed in and still the
- * same phone to the server. The server identity comes back only on the phone that stored it
+ * reinstall finds them before the core opens, so it is still the same phone to the server. The
+ * account's password is sealed under a Keystore key ([AccountPassword]) that an uninstall drops
+ * and a new phone never has, so after either the student types the password again. The server identity comes back only on the phone that stored it
  * (its `ANDROID_ID`, kept as [OWNER]): Block Store also moves blocks to a new phone, and two phones
  * with one device key are one device to the server, each sign-in revoking the other's. Signing out
  * drops the account. Blocking calls with short timeouts, off the main thread. Log src `backup`:

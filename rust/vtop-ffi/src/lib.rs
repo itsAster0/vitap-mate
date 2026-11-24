@@ -61,6 +61,7 @@ pub use pages::records::{
     ClassKind, ClassSlot, ClassStatus, CourseOutlook, NextClass, Semester, Semesters, Timetable,
     TimetableDay,
 };
+pub use store::account::PasswordCipher;
 pub use store::cookies::SharedCookies;
 
 uniffi::setup_scaffolding!();
@@ -201,10 +202,12 @@ impl From<std::io::Error> for CoreError {
     }
 }
 
-/// Saved sign-in. TODO: move to the Android Keystore.
+/// Saved sign-in; on disk its password is sealed ([`store::account`]).
 #[derive(Clone, Serialize, Deserialize)]
 struct Account {
     username: String,
+    /// Empty when absent: not saved, or saved on another phone ([`store::account`]).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     password: String,
     /// VTOP rejected this password: no sign-in is tried with it again (repeated failures can
     /// lock the VTOP account) until the student signs in with a new one.
@@ -219,7 +222,6 @@ struct Account {
 #[derive(Clone, PartialEq, uniffi::Record)]
 pub struct SavedAccount {
     pub username: String,
-    pub password: String,
     pub rejected: bool,
     /// Known once signed in.
     pub registration_number: Option<String>,
@@ -289,6 +291,8 @@ pub struct Platform {
     pub proof: Arc<dyn remote::account_proof::ProofNetwork>,
     /// Asked before any VTOP session leaves the phone.
     pub cookie_gate: Arc<dyn remote::consent::CookieGate>,
+    /// Seals the saved password (the Android Keystore).
+    pub cipher: Arc<dyn PasswordCipher>,
     pub dev: dev::DevConfig,
     /// The name the server shows for this phone ("OnePlus CPH2573").
     pub device_label: String,
@@ -317,6 +321,8 @@ struct Shared {
     proof: Option<Arc<dyn remote::account_proof::ProofNetwork>>,
     /// This phone's name on the server; `vitapmate` when none was given.
     label: Option<String>,
+    /// Without one (host tests), the password is saved as it is.
+    cipher: Option<Arc<dyn PasswordCipher>>,
     /// The server account proofs are held to, and its roots, in place of VTOP's.
     #[cfg(all(test, feature = "tlsn"))]
     proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
@@ -339,6 +345,7 @@ impl From<Platform> for Shared {
             convex: Some(platform.convex),
             proof: Some(platform.proof),
             label: Some(platform.device_label.trim().chars().take(64).collect()),
+            cipher: Some(platform.cipher),
             ..Self::default()
         };
         shared.consent().gate = Some(platform.cookie_gate);
@@ -435,7 +442,8 @@ impl Core {
             fs::create_dir_all(&core.cache)?;
             remote::route::load(&core);
             remote::consent::load(&core);
-            let Some(account) = core.read::<Account>(ACCOUNT) else {
+            // No password (another phone's, restored from Block Store): signed out.
+            let Some(account) = core.read_account().filter(|a| !a.password.is_empty()) else {
                 return Ok(());
             };
             let session = Session::new(account, &core.shared)?;

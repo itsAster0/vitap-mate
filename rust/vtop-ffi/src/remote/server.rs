@@ -662,8 +662,8 @@ impl Core {
                 return Err(CoreError::ConsentDenied);
             }
         }
-        let account = self
-            .read::<crate::Account>(crate::ACCOUNT)
+        let account = (self.read_account())
+            .filter(|account| !account.password.is_empty())
             .ok_or(CoreError::NotSignedIn)?;
         let otp = if gmail.is_some() {
             "gmail"

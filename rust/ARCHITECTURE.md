@@ -95,8 +95,15 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   the Developer config and the app's pieces live on `Core`, and every VTOP
   client's transport (`Routed`) holds the same `Arc`. Kotlin hands `Core::new`
   one `Platform` record (the HTTP transport, the shared cookie store, the UDP,
-  Convex and proof sockets, the cookie gate, the Developer config and the
-  phone's name), so leaving one out doesn't compile. Decoded copies and the
+  Convex and proof sockets, the cookie gate, the password cipher, the Developer
+  config and the phone's name), so leaving one out doesn't compile.
+- **The saved password** (`store/account.rs`). `account.json` holds it sealed
+  by `PasswordCipher` (Kotlin's `AccountPassword`: an AES-GCM key in the
+  Android Keystore); a plain-text file from an older version is sealed the
+  first time it is read. A copy restored from Block Store on another phone, or
+  after a reinstall, doesn't open: the password is absent and the student signs
+  in again. Kotlin gets the plain text only from `saved_password`, for the
+  Account page. Decoded copies and the
   log pipeline stay process-wide: `obs_init` runs before the core, so Kotlin's
   start-up lines (the Block Store restore, Gmail) reach the log file.
 

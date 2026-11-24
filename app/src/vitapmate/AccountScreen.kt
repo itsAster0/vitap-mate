@@ -112,9 +112,8 @@ fun AccountScreen() {
     // when VTOP rejected it, so the student can see what to correct.
     var savedPassword by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        val account = orNull { coreFlow("account.read", Core::savedAccount) }
-        savedPassword = account?.password
-        if (password.isEmpty()) password = account?.password.orEmpty()
+        savedPassword = orNull { coreFlow("account.read", Core::savedPassword) }
+        if (password.isEmpty()) password = savedPassword.orEmpty()
     }
     val ready = !saving && username.isNotBlank() && password.isNotEmpty()
 

@@ -19,7 +19,7 @@ use vtop_core::sync::RwLock;
 
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
-use crate::{ACCOUNT, Account, Core, CoreError, SignIn, Slot, dev, obs, traced_sync};
+use crate::{Account, Core, CoreError, SignIn, Slot, dev, obs, traced_sync};
 
 /// Not a VTOP registration number, so no student lands here by mistake.
 pub(crate) const USERNAME: &str = "DEMO2026";
@@ -78,7 +78,7 @@ pub(crate) fn refuse(account: &Account) -> Result<(), CoreError> {
 impl Core {
     /// Signed in as the demo account: the app hides what needs a real session or the server.
     pub fn is_demo(&self, flow: String) -> bool {
-        traced_sync("is_demo", &flow, || Ok(self.read::<Account>(ACCOUNT)))
+        traced_sync("is_demo", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
             .is_some_and(|account| is(&account))
