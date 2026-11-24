@@ -156,7 +156,7 @@ fun ConnectionScreen() {
         AppDialog({ asking = null }, "Let the server sign in?", "Use ${route.title()}", { asking = null; choose(route, consented = true) }, icon = Lucide.Server) {
             Text(
                 "With ${route.title()}, the vitapmate server signs in to VTOP for you when your session runs out. " +
-                    "Your username and password are sent to the server each time it signs in; the server uses them for that sign-in only and doesn't keep them. " +
+                    "Your username and password are sent to the server each time it signs in; it keeps them only if you choose to save them in Settings → Server. " +
                     "Your VTOP sign-in cookie goes to the server with each fetch too, and isn't kept. " +
                     "Changing what VTOP holds (outings) and downloads still happen on your phone.",
             )

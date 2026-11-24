@@ -171,7 +171,8 @@ private fun DayContent(
     SectionTitle(
         if (d.isToday) "Classes" else "Schedule",
         when {
-            d.slots.isEmpty() -> "No classes"
+            // Listed but not meeting (an exam day): "No classes" would contradict the list.
+            d.slots.isEmpty() -> if (d.isToday) "None meet today" else "None meet"
             d.isToday && d.remaining in 1 until d.slots.size -> "${d.remaining} of ${d.slots.size} left"
             else -> "${d.slots.size} ${if (d.slots.size == 1) "class" else "classes"}"
         },

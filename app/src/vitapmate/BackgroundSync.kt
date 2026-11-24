@@ -197,7 +197,10 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         val app = applicationContext
         Settings.load(app)
         AppCore.start(app)
-        if (!Settings.backgroundSync) return Result.success()
+        if (!Settings.backgroundSync) {
+            Log.info("sync", "skipped: background sync is off")
+            return Result.success()
+        }
         val prefs = app.getSharedPreferences("sync", Context.MODE_PRIVATE)
         flow("sync.background", unattended = true) { f ->
             MailForwarding.load("sync")
