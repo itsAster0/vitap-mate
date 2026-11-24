@@ -48,7 +48,7 @@ fun CookieConsentDialog() {
     val pending by CookieConsent.pending.collectAsState()
     val request = pending.firstOrNull() ?: return
     var remember by remember(request) { mutableStateOf(true) }
-    val answer = { send: Boolean -> CookieConsent.answer(request, CookieAnswer(send, send && remember)) }
+    val answer = { send: Boolean -> CookieConsent.answer(request, if (send) CookieAnswer.Allow(remember) else CookieAnswer.Deny) }
     val password = if (request.action.contains("password", ignoreCase = true)) ", and your password" else ""
     AppDialog(
         { answer(false) },

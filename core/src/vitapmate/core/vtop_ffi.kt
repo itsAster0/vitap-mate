@@ -2345,7 +2345,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_attended() and 0xFFFF) != 63750) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 19058) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 41334) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_open() and 0xFFFF) != 17439) {
@@ -12824,47 +12824,6 @@ public object FfiConverterTypeContact: FfiConverterRustBuffer<Contact> {
 
 
 
-data class CookieAnswer (
-    val `send`: kotlin.Boolean
-    , 
-    /**
-     * Don't ask again for this kind.
-     */
-    val `remember`: kotlin.Boolean
-    
-){
-    
-
-    
-
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeCookieAnswer: FfiConverterRustBuffer<CookieAnswer> {
-    override fun read(buf: ByteBuffer): CookieAnswer {
-        return CookieAnswer(
-            FfiConverterBoolean.read(buf),
-            FfiConverterBoolean.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: CookieAnswer) = (
-            FfiConverterBoolean.allocationSize(value.`send`) +
-            FfiConverterBoolean.allocationSize(value.`remember`)
-    )
-
-    override fun write(value: CookieAnswer, buf: ByteBuffer) {
-            FfiConverterBoolean.write(value.`send`, buf)
-            FfiConverterBoolean.write(value.`remember`, buf)
-    }
-}
-
-
-
 data class Course (
     val `code`: kotlin.String
     , 
@@ -20383,6 +20342,85 @@ public object FfiConverterTypeContactKind: FfiConverterRustBuffer<ContactKind> {
 
     override fun write(value: ContactKind, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * The student's answer to the dialog. A no is never remembered, so it carries no tick.
+ */
+sealed class CookieAnswer {
+    
+    object Deny : CookieAnswer()
+    
+    
+    data class Allow(
+        /**
+         * Don't ask again for this kind.
+         */
+        val `remember`: kotlin.Boolean) : CookieAnswer()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCookieAnswer : FfiConverterRustBuffer<CookieAnswer>{
+    override fun read(buf: ByteBuffer): CookieAnswer {
+        return when(buf.getInt()) {
+            1 -> CookieAnswer.Deny
+            2 -> CookieAnswer.Allow(
+                FfiConverterBoolean.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: CookieAnswer): ULong = when(value) {
+        is CookieAnswer.Deny -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is CookieAnswer.Allow -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterBoolean.allocationSize(value.`remember`)
+            )
+        }
+    }
+
+    override fun write(value: CookieAnswer, buf: ByteBuffer) {
+        when(value) {
+            is CookieAnswer.Deny -> {
+                buf.putInt(1)
+                Unit
+            }
+            is CookieAnswer.Allow -> {
+                buf.putInt(2)
+                FfiConverterBoolean.write(value.`remember`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 }
 

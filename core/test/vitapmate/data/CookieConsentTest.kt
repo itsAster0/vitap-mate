@@ -48,7 +48,7 @@ class CookieConsentTest {
         while (CookieConsent.pending.value.isEmpty()) yield()
         yield()
         assertEquals(1, CookieConsent.pending.value.size)
-        val yes = CookieAnswer(send = true, remember = false)
+        val yes = CookieAnswer.Allow(remember = false)
         CookieConsent.answer(CookieConsent.pending.value.single(), yes)
         assertEquals(yes, first.await())
         assertEquals(yes, second.await())
@@ -61,7 +61,7 @@ class CookieConsentTest {
         CookieConsent.waitMs = { 10L }
         try {
             val answer = CookieConsent.ask("f", CookieKind.ACCOUNT, "Load connected apps", "vmate.aster0.dev")
-            assertEquals(CookieAnswer(send = false, remember = false), answer)
+            assertEquals(CookieAnswer.Deny, answer)
             assertTrue(CookieConsent.pending.value.isEmpty())
         } finally {
             CookieConsent.waitMs = wait
@@ -74,7 +74,7 @@ class CookieConsentTest {
         val asked = async { CookieConsent.ask("f", CookieKind.HANDOVER, "Give a connected app your VTOP session", "vmate.aster0.dev") }
         while (CookieConsent.pending.value.isEmpty()) yield()
         Foreground.stopped()
-        assertEquals(CookieAnswer(send = false, remember = false), asked.await())
+        assertEquals(CookieAnswer.Deny, asked.await())
         assertTrue(CookieConsent.pending.value.isEmpty())
     }
 
@@ -85,12 +85,12 @@ class CookieConsentTest {
         while (CookieConsent.pending.value.isEmpty()) yield()
         val delete = async { CookieConsent.ask("f2", CookieKind.ACCOUNT, "Delete your account on the server", "vmate.aster0.dev") }
         while (CookieConsent.pending.value.size < 2) yield()
-        val yes = CookieAnswer(send = true, remember = false)
+        val yes = CookieAnswer.Allow(remember = false)
         CookieConsent.answer(CookieConsent.pending.value.first(), yes)
         assertEquals(yes, load.await())
         assertEquals("Delete your account on the server", CookieConsent.pending.value.single().action)
-        CookieConsent.answer(CookieConsent.pending.value.single(), CookieAnswer(send = false, remember = false))
-        assertFalse(delete.await().send)
+        CookieConsent.answer(CookieConsent.pending.value.single(), CookieAnswer.Deny)
+        assertEquals(CookieAnswer.Deny, delete.await())
     }
 
     @Test
@@ -110,7 +110,7 @@ class CookieConsentTest {
         while (CookieConsent.pending.value.isEmpty()) yield()
         yield()
         first.cancelAndJoin()
-        val yes = CookieAnswer(send = true, remember = false)
+        val yes = CookieAnswer.Allow(remember = false)
         CookieConsent.answer(CookieConsent.pending.value.single(), yes)
         assertEquals(yes, second.await())
     }
@@ -118,7 +118,7 @@ class CookieConsentTest {
     @Test
     fun askWhileNotShownAnswersCancelAtOnce() = runBlocking {
         val answer = CookieConsent.ask("f", CookieKind.ACCOUNT, "Load your connected apps", "vmate.aster0.dev")
-        assertFalse(answer.send)
+        assertEquals(CookieAnswer.Deny, answer)
         assertTrue(CookieConsent.pending.value.isEmpty())
     }
 }

@@ -28,7 +28,7 @@ object CookieConsent : CookieGate {
     /** The dialogs to show, oldest first. Thread-safe for updates from Rust / IO threads. */
     val pending: StateFlow<List<Request>> = pendingState.asStateFlow()
 
-    private val no = CookieAnswer(send = false, remember = false)
+    private val no = CookieAnswer.Deny
 
     /** How long a dialog waits; tests shorten it. */
     internal var waitMs = { Settings.tunable(Tunable.CookieAsk) * 1000L }
@@ -58,7 +58,7 @@ object CookieConsent : CookieGate {
     fun answer(request: Request, answer: CookieAnswer) {
         synchronized(this) { pendingState.value = pendingState.value - request }
         if (request.answer.complete(answer)) {
-            Log.info("ui.consent", "answered", request.flow, mapOf("kind" to request.kind.name.lowercase(), "send" to "${answer.send}", "remember" to "${answer.remember}"))
+            Log.info("ui.consent", "answered", request.flow, mapOf("kind" to request.kind.name.lowercase(), "send" to "${answer is CookieAnswer.Allow}", "remember" to "${(answer as? CookieAnswer.Allow)?.remember == true}"))
         }
     }
 

@@ -46,11 +46,72 @@ impl CookieKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct CookieAnswer {
-    pub send: bool,
-    /// Don't ask again for this kind.
-    pub remember: bool,
+/// The student's answer to the dialog. A no is never remembered, so it carries no tick.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum CookieAnswer {
+    Deny,
+    Allow {
+        /// Don't ask again for this kind.
+        remember: bool,
+    },
+}
+
+/// Why [`allowed`] said yes or no; logged as `decision`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConsentDecision {
+    Sent(SentWhy),
+    Denied(DeniedWhy),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SentWhy {
+    /// A background run on the route the student ticked "don't ask again" for.
+    RememberedUnattended,
+    Remembered,
+    /// A yes earlier in the same flow.
+    Flow,
+    Asked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DeniedWhy {
+    NoGate,
+    Unattended,
+    /// A no earlier in the same flow.
+    Flow,
+    /// A call the student didn't start, with nothing remembered.
+    Quiet,
+    Asked,
+    /// The dialog failed.
+    Error,
+}
+
+impl ConsentDecision {
+    pub(crate) fn is_sent(self) -> bool {
+        matches!(self, Self::Sent(_))
+    }
+
+    /// The log's spelling, kept stable for anyone reading old logs.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Sent(SentWhy::RememberedUnattended) => "sent_remembered_unattended",
+            Self::Sent(SentWhy::Remembered) => "sent_remembered",
+            Self::Sent(SentWhy::Flow) => "sent_flow",
+            Self::Sent(SentWhy::Asked) => "sent_asked",
+            Self::Denied(DeniedWhy::NoGate) => "denied_no_gate",
+            Self::Denied(DeniedWhy::Unattended) => "denied_unattended",
+            Self::Denied(DeniedWhy::Flow) => "denied_flow",
+            Self::Denied(DeniedWhy::Quiet) => "denied_quiet",
+            Self::Denied(DeniedWhy::Asked) => "denied_asked",
+            Self::Denied(DeniedWhy::Error) => "denied_error",
+        }
+    }
+}
+
+impl std::fmt::Display for ConsentDecision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Kotlin: whether a flow has the student on screen, and the dialog.
@@ -70,8 +131,10 @@ pub trait CookieGate: Send + Sync {
     ) -> Result<CookieAnswer, CoreError>;
 }
 
-#[derive(Default, Serialize, Deserialize)]
-struct Saved {
+/// [`FILE`] on disk: `{"remembered":["route","account","handover"]}`. The kinds' names are
+/// [`CookieKind`]'s serde names; `stored_format_roundtrips` pins them.
+#[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+struct Stored {
     remembered: BTreeSet<CookieKind>,
 }
 
@@ -85,7 +148,7 @@ pub(crate) struct State {
     /// The answer in a flow, and when (unix seconds).
     answered: BTreeMap<(String, CookieKind), (i64, bool)>,
     /// Waiters for an in-flight `gate.ask` of `(flow, kind)`, so concurrent calls share one prompt.
-    in_flight: BTreeMap<(String, CookieKind), Vec<oneshot::Sender<&'static str>>>,
+    in_flight: BTreeMap<(String, CookieKind), Vec<oneshot::Sender<ConsentDecision>>>,
 }
 
 impl Shared {
@@ -96,7 +159,7 @@ impl Shared {
 
 /// Loads the remembered kinds; called when the core opens.
 pub(crate) fn load(core: &Core) {
-    let remembered = core.read::<Saved>(FILE).unwrap_or_default().remembered;
+    let remembered = core.read::<Stored>(FILE).unwrap_or_default().remembered;
     let mut state = core.shared.consent();
     (state.path, state.remembered) = (Some(core.at(FILE)), remembered);
 }
@@ -109,8 +172,8 @@ pub(crate) fn forget(shared: &Shared) {
 }
 
 fn save_to_disk(path: &Path, remembered: BTreeSet<CookieKind>) {
-    let saved = Saved { remembered };
-    let result = serde_json::to_vec(&saved)
+    let stored = Stored { remembered };
+    let result = serde_json::to_vec(&stored)
         .map_err(std::io::Error::other)
         .and_then(|bytes| fs::write(path, bytes));
     if let Err(error) = result {
@@ -149,8 +212,12 @@ pub(crate) async fn allowed(
     ask: bool,
 ) -> bool {
     let decision = decide(shared, flow, kind, action, server, ask).await;
-    info!(kind = kind.as_str(), decision, "cookie consent");
-    decision.starts_with("sent")
+    info!(
+        kind = kind.as_str(),
+        decision = decision.as_str(),
+        "cookie consent"
+    );
+    decision.is_sent()
 }
 
 async fn decide(
@@ -160,7 +227,8 @@ async fn decide(
     action: &str,
     server: &str,
     ask: bool,
-) -> &'static str {
+) -> ConsentDecision {
+    use ConsentDecision::{Denied, Sent};
     let key = (flow.to_string(), kind);
     loop {
         let gate = {
@@ -169,7 +237,7 @@ async fn decide(
             state.answered.retain(|_, (at, _)| now - *at < FLOW_GRANT_S);
             match &state.gate {
                 Some(gate) if !flow.is_empty() => gate.clone(),
-                _ => return "denied_no_gate",
+                _ => return Denied(DeniedWhy::NoGate),
             }
         };
         let attended = gate.attended(flow.to_string());
@@ -178,23 +246,23 @@ async fn decide(
             if !attended {
                 // Only the route: account checks and handovers always have the student watching.
                 return if kind == CookieKind::Route && state.remembered.contains(&kind) {
-                    "sent_remembered_unattended"
+                    Sent(SentWhy::RememberedUnattended)
                 } else {
-                    "denied_unattended"
+                    Denied(DeniedWhy::Unattended)
                 };
             }
             if state.remembered.contains(&kind) {
-                return "sent_remembered";
+                return Sent(SentWhy::Remembered);
             }
             // Checked before `!ask`: a quiet call rides on a yes earlier in its flow. That holds
             // while one flow sends for one action only.
             match state.answered.get(&key) {
-                Some((_, true)) => return "sent_flow",
-                Some((_, false)) => return "denied_flow",
+                Some((_, true)) => return Sent(SentWhy::Flow),
+                Some((_, false)) => return Denied(DeniedWhy::Flow),
                 None => {}
             }
             if !ask {
-                return "denied_quiet";
+                return Denied(DeniedWhy::Quiet);
             }
             if let Some(waiters) = state.in_flight.get_mut(&key) {
                 let (tx, rx) = oneshot::channel();
@@ -224,15 +292,12 @@ async fn decide(
                 server.to_string(),
             )
             .await;
-        let send = answer.as_ref().is_ok_and(|answer| answer.send);
+        let send = matches!(answer, Ok(CookieAnswer::Allow { .. }));
         let (decision, to_save, waiters) = {
             let mut state = shared.consent();
             state.answered.insert(key.clone(), (unix_now(), send));
             let to_save = match &answer {
-                Ok(CookieAnswer {
-                    send: true,
-                    remember: true,
-                }) => {
+                Ok(CookieAnswer::Allow { remember: true }) => {
                     state.remembered.insert(kind);
                     state
                         .path
@@ -244,13 +309,17 @@ async fn decide(
             let waiters = state.in_flight.remove(&key).unwrap_or_default();
             guard.key = None;
             let decision = match answer {
-                Ok(CookieAnswer { send: true, .. }) => "sent_asked",
-                Ok(_) => "denied_asked",
-                Err(_) => "denied_error",
+                Ok(CookieAnswer::Allow { .. }) => Sent(SentWhy::Asked),
+                Ok(CookieAnswer::Deny) => Denied(DeniedWhy::Asked),
+                Err(_) => Denied(DeniedWhy::Error),
             };
             (decision, to_save, waiters)
         };
-        let waiter_decision = if send { "sent_flow" } else { "denied_flow" };
+        let waiter_decision = if send {
+            Sent(SentWhy::Flow)
+        } else {
+            Denied(DeniedWhy::Flow)
+        };
         for tx in waiters {
             #[expect(
                 clippy::let_underscore_must_use,

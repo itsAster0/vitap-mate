@@ -69,9 +69,10 @@ impl CookieGate for TestGate {
     ) -> Result<CookieAnswer, CoreError> {
         self.asks.fetch_add(1, Ordering::SeqCst);
         let next = self.answers.lock().unwrap().pop_front();
-        Ok(next.unwrap_or(CookieAnswer {
-            send: !self.deny,
-            remember: false,
+        Ok(next.unwrap_or(if self.deny {
+            CookieAnswer::Deny
+        } else {
+            CookieAnswer::Allow { remember: false }
         }))
     }
 }
@@ -136,10 +137,7 @@ fn check(core: &Core, flow: &str, kind: CookieKind, ask: bool) -> bool {
     block_on(allowed(shared, flow, kind, "Test", "vmate.aster0.dev", ask))
 }
 
-const YES_REMEMBER: CookieAnswer = CookieAnswer {
-    send: true,
-    remember: true,
-};
+const YES_REMEMBER: CookieAnswer = CookieAnswer::Allow { remember: true };
 
 #[test]
 fn no_gate_denies() {
@@ -345,10 +343,7 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
             self.asks.fetch_add(1, Ordering::SeqCst);
             self.entered.notify_one();
             self.release.notified().await;
-            Ok(CookieAnswer {
-                send: true,
-                remember: false,
-            })
+            Ok(CookieAnswer::Allow { remember: false })
         }
     }
 
@@ -390,4 +385,55 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
     assert!(first.await.unwrap());
     assert!(second.await.unwrap());
     assert_eq!(gate.asks.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn stored_format_roundtrips() {
+    let json = r#"{"remembered":["route","account","handover"]}"#;
+    let stored: Stored = serde_json::from_str(json).unwrap();
+    assert_eq!(
+        stored.remembered,
+        BTreeSet::from([CookieKind::Route, CookieKind::Account, CookieKind::Handover])
+    );
+    assert_eq!(serde_json::to_string(&stored).unwrap(), json);
+    assert_eq!(
+        serde_json::from_str::<Stored>(r#"{"remembered":[]}"#).unwrap(),
+        Stored::default()
+    );
+}
+
+#[test]
+fn decisions_log_their_old_names_and_only_sent_sends() {
+    use ConsentDecision::{Denied, Sent};
+    let all = [
+        (
+            Sent(SentWhy::RememberedUnattended),
+            "sent_remembered_unattended",
+        ),
+        (Sent(SentWhy::Remembered), "sent_remembered"),
+        (Sent(SentWhy::Flow), "sent_flow"),
+        (Sent(SentWhy::Asked), "sent_asked"),
+        (Denied(DeniedWhy::NoGate), "denied_no_gate"),
+        (Denied(DeniedWhy::Unattended), "denied_unattended"),
+        (Denied(DeniedWhy::Flow), "denied_flow"),
+        (Denied(DeniedWhy::Quiet), "denied_quiet"),
+        (Denied(DeniedWhy::Asked), "denied_asked"),
+        (Denied(DeniedWhy::Error), "denied_error"),
+    ];
+    for (decision, name) in all {
+        assert_eq!(decision.to_string(), name);
+        assert_eq!(decision.is_sent(), name.starts_with("sent"));
+    }
+}
+
+#[test]
+fn a_no_is_not_remembered() {
+    let core = fresh();
+    let gate = yes(&core);
+    gate.answers.lock().unwrap().push_back(CookieAnswer::Deny);
+    assert!(!check(&core, "f1", CookieKind::Account, true));
+    assert!(core.cookie_consent_remembered("f".into()).is_empty());
+    // The next flow asks again (and the script's default says yes).
+    assert!(check(&core, "f2", CookieKind::Account, true));
+    assert_eq!(gate.asks(), 2);
 }
