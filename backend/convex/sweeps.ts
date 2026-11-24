@@ -40,11 +40,18 @@ export const quarter = internalMutation({
   args: {},
   handler: async (ctx) => {
     const at = now();
-    const inbox = await ctx.db
+    const expired = await ctx.db
+      .query("otpInbox")
+      .withIndex("by_expiresAt", (q) => q.gte("expiresAt", 0).lte("expiresAt", at))
+      .take(BATCH);
+    for (const row of expired) await ctx.db.delete(row._id);
+    // Fallback for rows written before `expiresAt` existed; bounded and empty once those expire (24 h).
+    const legacy = await ctx.db
       .query("otpInbox")
       .withIndex("by_receivedAt", (q) => q.lte("receivedAt", at - SEALED_TTL_SECS))
       .take(BATCH);
-    for (const row of inbox) {
+    for (const row of legacy) {
+      if (row.expiresAt !== undefined) continue;
       if (row.kind === "otp" || at - row.receivedAt >= CONFIRMATION_TTL_SECS) await ctx.db.delete(row._id);
     }
     const confirmations = await ctx.db

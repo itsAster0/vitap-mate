@@ -76,6 +76,30 @@ describe("addresses", () => {
     expect(await t.run((ctx) => ctx.db.query("mailboxes").collect())).toHaveLength(0);
     expect(await codeOf(tb.as.mutation(api.mail.remove, { flow: "f", id: box.id }))).toBe("mailbox_not_found");
   });
+
+  it("evicts the least recently seen member when a sixth device joins", async () => {
+    const t = await setup();
+    const phones = [];
+    let boxId = "";
+    for (let n = 1; n <= 5; n++) {
+      const p = await phone(n);
+      const proved = await prove(t, p);
+      boxId = (await proved.as.mutation(api.mail.register, { flow: "f" })).id;
+      phones.push({ p, proved });
+      advance(10);
+    }
+    // Touch the oldest member so the second one becomes least recently seen.
+    advance(3600);
+    await t.action(api.auth.token, await phones[0].p.signed("auth:token", { refreshToken: phones[0].proved.refreshToken }));
+    advance(10);
+    const sixth = await phone(6);
+    const proved6 = await prove(t, sixth);
+    await proved6.as.mutation(api.mail.register, { flow: "f" });
+    const { devices } = await proved6.as.query(api.mail.devices, { flow: "f", id: boxId });
+    expect(devices).toHaveLength(5);
+    expect(devices.map((d) => d.deviceId)).not.toContain(phones[1].p.deviceId);
+    expect(devices.map((d) => d.deviceId)).toContain(sixth.deviceId);
+  });
 });
 
 describe("mail in", () => {

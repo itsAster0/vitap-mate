@@ -112,6 +112,7 @@ async function joinAddress(
         kind: "gmail_confirm",
         sealed,
         receivedAt: mailbox.confirmationAt,
+        expiresAt: mailbox.confirmationAt + CONFIRMATION_TTL_SECS,
         accountId,
       });
     }
@@ -317,6 +318,7 @@ export const deliver = internalMutation({
         kind,
         sealed,
         receivedAt: at,
+        expiresAt: at + (kind === "otp" ? SEALED_TTL_SECS : CONFIRMATION_TTL_SECS),
         accountId: mailbox.accountId,
       });
       // `inbox` stops handing out an OTP after SEALED_TTL_SECS, so it goes then; the 15-minute

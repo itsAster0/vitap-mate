@@ -17,9 +17,11 @@ import {
   type AccountRecord,
   type KeyVia,
   type Plan,
+  type RequestError,
   RequestRecord,
   type SignInRecord,
   keyUse,
+  parseRequestError,
   phonesForKey,
   plan,
   toHeader,
@@ -35,9 +37,18 @@ import { askPhone, insertRequest, pendingRequest, putRequest, requestOf, request
 import { accountId, log, logError, logWarn, now } from "./lib/util";
 import { startLogin } from "./logins";
 
-const PHONE_SESSION_INVALID =
-  "phone_session_invalid: VTOP rejected your phone's session. Open VITAP Mate, refresh your login, and try again.";
-const ACCOUNT_MISMATCH = "account_mismatch: Your phone is signed in to VTOP as a different student.";
+const PHONE_SESSION_INVALID: RequestError = {
+  code: "phone_session_invalid",
+  message: "VTOP rejected your phone's session. Open VITAP Mate, refresh your login, and try again.",
+};
+const ACCOUNT_MISMATCH: RequestError = {
+  code: "account_mismatch",
+  message: "Your phone is signed in to VTOP as a different student.",
+};
+const PHONE_COULD_NOT_REACH: RequestError = {
+  code: "phone_unreachable",
+  message: "Could not reach the phone.",
+};
 
 // ---- key holders --------------------------------------------------------------------------
 
@@ -195,22 +206,26 @@ export const ask = internalMutation({
     } else {
       asked = false;
       if (orFail) request.fail(failure);
-      else request.phoneError = failure;
+      else request.setPhoneError(failure);
     }
     await putRequest(ctx, row, request);
     return asked;
   },
 });
 
-/** Ends a pending request with `error`, or why its phone could not be asked. */
+/** Ends a pending request with `error` (and optional `errorCode`), or why its phone could not be asked. */
 export const failRequest = internalMutation({
-  args: { requestId: v.string(), error: v.optional(v.string()) },
-  handler: async (ctx, { requestId, error }) => {
+  args: { requestId: v.string(), errorCode: v.optional(v.string()), error: v.optional(v.string()) },
+  handler: async (ctx, { requestId, errorCode: code, error }) => {
     const row = await requestRow(ctx, requestId);
     if (!row) return;
     const request = requestOf(row);
     if (!request.pending(now())) return;
-    request.fail(error ?? request.phoneError ?? "phone_unreachable: Could not reach the phone.");
+    if (error !== undefined) {
+      request.fail(code !== undefined ? { code, message: error } : parseRequestError(error));
+    } else {
+      request.fail(request.phoneFailure() ?? PHONE_COULD_NOT_REACH);
+    }
     await putRequest(ctx, row, request);
   },
 });
@@ -434,10 +449,10 @@ export const answer = action({
     switch (checked.status) {
       case "valid":
         if (accountId(checked.registrationNumber ?? "") === check.regno) break;
-        await ctx.runMutation(internal.sessions.failRequest, { requestId, error: ACCOUNT_MISMATCH });
+        await ctx.runMutation(internal.sessions.failRequest, { requestId, errorCode: ACCOUNT_MISMATCH.code, error: ACCOUNT_MISMATCH.message });
         return fail("account_mismatch", "These cookies belong to a different student than the one who asked.");
       case "expired":
-        await ctx.runMutation(internal.sessions.failRequest, { requestId, error: PHONE_SESSION_INVALID });
+        await ctx.runMutation(internal.sessions.failRequest, { requestId, errorCode: PHONE_SESSION_INVALID.code, error: PHONE_SESSION_INVALID.message });
         return fail("session_invalid", "VTOP does not accept these cookies.");
       default:
         logWarn({ flow: args.flow, regno: check.regno }, `account: the engine could not check a phone answer (${String(checked.status)})`);
@@ -487,9 +502,9 @@ export async function loginDone(ctx: MutationCtx, regno: string, requestId: stri
   const at = now();
   const row = await requestRow(ctx, requestId);
   const request = row && row.accountId === account._id ? requestOf(row) : null;
-  // Set when the phone should be asked instead; with the message to end the request with if it
+  // Set when the phone should be asked instead; with the error to end the request with if it
   // cannot be (null: why the phone could not).
-  let fallback: { reason: string | null } | null = null;
+  let fallback: { error: RequestError | null } | null = null;
   let signIn: SignInRecord;
   switch (outcome.status) {
     case "ok":
@@ -501,40 +516,41 @@ export async function loginDone(ctx: MutationCtx, regno: string, requestId: stri
       log({ regno: doc.id }, "account: VTOP rejected saved credentials; dropping them");
       signIn = { at, by: "server", ok: false, reason: "VTOP rejected the saved password" };
       doc.rejectCredentials(at);
-      fallback = { reason: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate." };
+      fallback = { error: { code: "credentials_rejected", message: "VTOP rejected the saved password. Sign in again in VITAP Mate." } };
       break;
     case "forwarding_required":
       // The engine did not ask VTOP (it would have mailed an OTP nobody reads). The
       // credentials stay: the phone sends them again until the server can read the OTP.
       signIn = { at, by: "server", ok: false, reason: "Neither OTP forwarding nor Gmail is set up" };
       fallback = {
-        reason: "forwarding_required: Set up OTP email forwarding or connect Gmail in VITAP Mate to sign in from the server.",
+        error: { code: "forwarding_required", message: "Set up OTP email forwarding or connect Gmail in VITAP Mate to sign in from the server." },
       };
       break;
     case "gmail_revoked":
       log({ regno: doc.id }, "account: Google refused the saved Gmail access; dropping it");
       signIn = { at, by: "server", ok: false, reason: "Google refused the saved Gmail access" };
       doc.dropGmail(outcome.sealedVault);
-      fallback = { reason: "gmail_revoked: Gmail access was revoked. Connect Gmail again in VITAP Mate to sign in from the server." };
+      fallback = { error: { code: "gmail_revoked", message: "Gmail access was revoked. Connect Gmail again in VITAP Mate to sign in from the server." } };
       break;
     case "vault_unusable":
       signIn = { at, by: "server", ok: false, reason: "The saved password can no longer be used" };
       doc.clearVault();
-      fallback = { reason: null };
+      fallback = { error: null };
       break;
     case "failed":
       logWarn({ regno: doc.id }, "account: server sign-in failed for now");
       signIn = { at, by: "server", ok: false, reason: outcome.reason };
       // With no phone to ask (`app:login`), the engine's reason is the answer.
-      fallback = { reason: request?.phones.length === 0 ? outcome.reason : null };
+      fallback = { error: request?.phones.length === 0 ? parseRequestError(outcome.reason) : null };
       break;
   }
   if (fallback && request?.pending(at)) {
     if (!request.phoneAsked) {
       const failure = await askPhone(ctx, doc, request, at);
-      if (failure !== null) request.fail(fallback.reason ?? failure);
-    } else if (request.phoneError !== null) {
-      request.fail(fallback.reason ?? request.phoneError);
+      if (failure !== null) request.fail(fallback.error ?? failure);
+    } else {
+      const phoneFailure = request.phoneFailure();
+      if (phoneFailure !== null) request.fail(fallback.error ?? phoneFailure);
     }
   }
   await saveRecord(ctx, account._id, doc);

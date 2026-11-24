@@ -8,6 +8,7 @@ import type { Id } from "./_generated/dataModel";
 import { guideFiles } from "../dev/guideFiles";
 import { recordSignIn } from "./lib/accounts";
 import { REQUEST_TIMEOUT_SECS, SESSION_CACHE_SECS } from "./lib/accountState";
+import { CONFIRMATION_TTL_SECS, SEALED_TTL_SECS } from "./lib/mailboxes";
 import { sha256Hex } from "./lib/crypto";
 import { GUIDE_FILES } from "./lib/guideFiles";
 import { PACKED_PAGE } from "./vtop";
@@ -379,6 +380,81 @@ describe("sweeps", () => {
     await t.finishInProgressScheduledFunctions();
     expect((await ext.query(api.extension.key, {}))?.cachedSession).toBe(false);
     expect((await as.query(api.screen.view, {})).status?.sessionSavedAt).toBeNull();
+  });
+
+  it("sweeps expired otpInbox rows even behind 500 young gmail_confirm rows", async () => {
+    const t = await setup();
+    const p = await phone(1);
+    const { as, account } = await prove(t, p);
+    const box = await as.mutation(api.mail.register, { flow: "f" });
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date"] });
+    const t0 = Math.floor(Date.now() / 1000);
+    await t.run(async (ctx) => {
+      const accountId = ctx.db.normalizeId("accounts", account)!;
+      for (let i = 0; i < 500; i++) {
+        await ctx.db.insert("otpInbox", {
+          addressId: box.id,
+          deviceId: `dev-${i}`,
+          kind: "gmail_confirm",
+          sealed: "c",
+          receivedAt: t0,
+          expiresAt: t0 + CONFIRMATION_TTL_SECS,
+          accountId,
+        });
+      }
+    });
+    vi.advanceTimersByTime(10_000);
+    await t.mutation(internal.mail.deliver, {
+      addressId: box.id,
+      kind: "otp",
+      sentAt: t0 + 10,
+      plaintext: "123456",
+      boxes: [{ deviceId: p.deviceId, sealed: "o" }],
+    });
+    vi.advanceTimersByTime((SEALED_TTL_SECS + 1) * 1000);
+    await t.mutation(internal.sweeps.quarter, {});
+    const remaining = await t.run((ctx) => ctx.db.query("otpInbox").collect());
+    expect(remaining.filter((r) => r.kind === "otp")).toHaveLength(0);
+    expect(remaining.filter((r) => r.kind === "gmail_confirm")).toHaveLength(500);
+    // After 24h the confirmations expire via `by_expiresAt` as well.
+    vi.advanceTimersByTime((CONFIRMATION_TTL_SECS - SEALED_TTL_SECS) * 1000);
+    await t.mutation(internal.sweeps.quarter, {});
+    expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
+  });
+
+  it("sweeps legacy otpInbox rows without expiresAt via the by_receivedAt fallback", async () => {
+    const t = await setup();
+    const p = await phone(1);
+    const { as, account } = await prove(t, p);
+    const box = await as.mutation(api.mail.register, { flow: "f" });
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date"] });
+    const t0 = Math.floor(Date.now() / 1000);
+    await t.run(async (ctx) => {
+      const accountId = ctx.db.normalizeId("accounts", account)!;
+      await ctx.db.insert("otpInbox", {
+        addressId: box.id,
+        deviceId: p.deviceId,
+        kind: "otp",
+        sealed: "old-otp",
+        receivedAt: t0,
+        accountId,
+      });
+      await ctx.db.insert("otpInbox", {
+        addressId: box.id,
+        deviceId: p.deviceId,
+        kind: "gmail_confirm",
+        sealed: "old-confirm",
+        receivedAt: t0,
+        accountId,
+      });
+    });
+    vi.advanceTimersByTime((SEALED_TTL_SECS + 1) * 1000);
+    await t.mutation(internal.sweeps.quarter, {});
+    const afterOtp = await t.run((ctx) => ctx.db.query("otpInbox").collect());
+    expect(afterOtp.map((r) => r.kind)).toEqual(["gmail_confirm"]);
+    vi.advanceTimersByTime(CONFIRMATION_TTL_SECS * 1000);
+    await t.mutation(internal.sweeps.quarter, {});
+    expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
   });
 });
 

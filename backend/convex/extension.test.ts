@@ -181,4 +181,76 @@ describe("live queries", () => {
     expect(await as.query(api.pair.info, { code: oauthCode })).toEqual({ kind: "browser" });
     expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: oauthCode }))).toBe("pair_expired");
   });
+
+  it("returns unchanged error shapes for structured and legacy sessionRequests rows", async () => {
+    const t = await setup();
+    const { ext, key, as, account } = await withKey(t);
+    engine((path) => (path === "/engine/session" ? Response.json({ status: "expired" }) : undefined));
+    const started = (await (await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${key}` } })).json()) as { requestId: string };
+    expect(
+      await codeOf(
+        as.action(api.sessions.answer, {
+          flow: "f",
+          requestId: started.requestId,
+          cookies: [{ name: "JSESSIONID", value: "expired", domain: "vtop.vitap.ac.in" }],
+        }),
+      ),
+    ).toBe("session_invalid");
+    const stored = await t.run(async (ctx) =>
+      (await ctx.db.query("sessionRequests").collect()).find((r) => r.requestId === started.requestId),
+    );
+    expect(stored?.errorCode).toBe("phone_session_invalid");
+    expect(stored?.error).toBe("VTOP rejected your phone's session. Open VITAP Mate, refresh your login, and try again.");
+    const extView = await ext.query(api.extension.request, { requestId: started.requestId });
+    expect(extView).toEqual({
+      status: "error",
+      code: "phone_session_invalid",
+      error: "VTOP rejected your phone's session. Open VITAP Mate, refresh your login, and try again.",
+      expiresAt: expect.any(Number),
+    });
+    const httpRes = await t.fetch(`/v1/session/requests/${started.requestId}`, { headers: { authorization: `Bearer ${key}` } });
+    expect(httpRes.status).toBe(200);
+    expect(await httpRes.json()).toEqual({
+      status: "error",
+      code: "phone_session_invalid",
+      error: "VTOP rejected your phone's session. Open VITAP Mate, refresh your login, and try again.",
+    });
+    // Legacy row written before `errorCode` existed: still reads cleanly across HTTP, extension, and app queries.
+    const nowSec = Math.floor(Date.now() / 1000);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("sessionRequests", {
+        requestId: "r-legacy",
+        accountId: ctx.db.normalizeId("accounts", account)!,
+        status: "error",
+        cookies: null,
+        csrfToken: null,
+        error: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate.",
+        createdAt: nowSec,
+        expiresAt: nowSec + 120,
+        vaultDueAt: null,
+        vaultStarted: true,
+        phoneAsked: false,
+        phoneError: null,
+        source: null,
+        phones: [],
+      });
+    });
+    expect(await ext.query(api.extension.request, { requestId: "r-legacy" })).toEqual({
+      status: "error",
+      code: "credentials_rejected",
+      error: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate.",
+      expiresAt: (nowSec + 120) * 1000,
+    });
+    const legacyHttp = await t.fetch("/v1/session/requests/r-legacy", { headers: { authorization: `Bearer ${key}` } });
+    expect(await legacyHttp.json()).toEqual({
+      status: "error",
+      code: "credentials_rejected",
+      error: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate.",
+    });
+    expect(await as.query(api.app.loginResult, { requestId: "r-legacy" })).toEqual({
+      status: "error",
+      code: "invalid_credentials",
+      error: "VTOP rejected the saved password.",
+    });
+  });
 });

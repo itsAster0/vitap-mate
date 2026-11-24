@@ -4,12 +4,16 @@
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { type AccountRecord, PHONE_UNREACHABLE, RequestRecord } from "./accountState";
+import { type AccountRecord, PHONE_UNREACHABLE, type RequestError, RequestRecord } from "./accountState";
 import { notify } from "./notify";
 
 export function requestOf(row: Doc<"sessionRequests">): RequestRecord {
   const { _id, _creationTime, requestId, accountId, expired: _expired, ...fields } = row;
-  return Object.assign(new RequestRecord(requestId, row.createdAt), fields);
+  return Object.assign(new RequestRecord(requestId, row.createdAt), {
+    ...fields,
+    errorCode: fields.errorCode ?? null,
+    phoneErrorCode: fields.phoneErrorCode ?? null,
+  });
 }
 
 export function requestFields(r: RequestRecord) {
@@ -17,12 +21,14 @@ export function requestFields(r: RequestRecord) {
     status: r.status,
     cookies: r.cookies,
     csrfToken: r.csrfToken,
+    errorCode: r.errorCode,
     error: r.error,
     createdAt: r.createdAt,
     expiresAt: r.expiresAt,
     vaultDueAt: r.vaultDueAt,
     vaultStarted: r.vaultStarted,
     phoneAsked: r.phoneAsked,
+    phoneErrorCode: r.phoneErrorCode,
     phoneError: r.phoneError,
     source: r.source,
     phones: r.phones,
@@ -59,7 +65,7 @@ export async function pendingRequest(ctx: QueryCtx, accountId: Id<"accounts">, a
 /** Asks each of the request's phones: they see it in `sessions:pending`, and a push wakes a closed
  * app. The first to answer with `sessions:answer` wins. Null once one was asked, else why none
  * could be. */
-export async function askPhone(ctx: MutationCtx, doc: AccountRecord, request: RequestRecord, at: number): Promise<string | null> {
+export async function askPhone(ctx: MutationCtx, doc: AccountRecord, request: RequestRecord, at: number): Promise<RequestError | null> {
   for (const device of request.phones) {
     const fields = { requestId: request.id, wantCredentials: doc.wantCredentials(at) ? "1" : "0" };
     if (await notify(ctx, device, "vtop_cookie_request", fields)) request.phoneAsked = true;

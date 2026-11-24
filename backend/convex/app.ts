@@ -7,7 +7,6 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { type ActionCtx, type QueryCtx, action, internalQuery, mutation, query } from "./_generated/server";
 import { keysOf, phonesOf, saveRecord, signInsOf } from "./lib/accounts";
-import { errorCode } from "./lib/accountState";
 import { fail } from "./lib/errors";
 import { actionCaller, caller, realCaller, recordOf } from "./lib/identity";
 import { address } from "./lib/mailboxes";
@@ -86,9 +85,11 @@ async function loginAnswer(ctx: QueryCtx, accountId: Id<"accounts">, requestId: 
   switch (request.status) {
     case "success":
       return signedIn(account.regno, request.cookies ?? "", request.csrfToken);
-    case "error":
-      if (errorCode(request.error ?? "") === "credentials_rejected") return { status: "error", code: "invalid_credentials", error: "VTOP rejected the saved password." };
-      return { status: "error", code: "server_login_failed", error: request.error ?? "The server could not sign in." };
+    case "error": {
+      const { code, message } = request.failure();
+      if (code === "credentials_rejected") return { status: "error", code: "invalid_credentials", error: "VTOP rejected the saved password." };
+      return { status: "error", code: "server_login_failed", error: message || "The server could not sign in." };
+    }
     default:
       if (request.pending(now())) return { status: "pending", requestId };
       return { status: "error", code: "vtop_timeout", error: "The server did not sign in in time." };

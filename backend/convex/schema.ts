@@ -134,12 +134,14 @@ export default defineSchema({
     status: v.union(v.literal("pending"), v.literal("success"), v.literal("error")),
     cookies: nullable(v.string()),
     csrfToken: nullable(v.string()),
+    errorCode: v.optional(nullable(v.string())),
     error: nullable(v.string()),
     createdAt: v.number(),
     expiresAt: v.number(),
     vaultDueAt: nullable(v.number()),
     vaultStarted: v.boolean(),
     phoneAsked: v.boolean(),
+    phoneErrorCode: v.optional(nullable(v.string())),
     phoneError: nullable(v.string()),
     source: nullable(v.string()),
     phones: v.array(v.string()),
@@ -247,12 +249,14 @@ export default defineSchema({
     kind: v.union(v.literal("otp"), v.literal("gmail_confirm")),
     sealed: v.string(),
     receivedAt: v.number(),
+    expiresAt: v.optional(v.number()),
     accountId: v.id("accounts"),
   })
     .index("by_address_device_kind", ["addressId", "deviceId", "kind"])
     .index("by_device", ["deviceId"])
     .index("by_account", ["accountId"])
-    .index("by_receivedAt", ["receivedAt"]),
+    .index("by_receivedAt", ["receivedAt"])
+    .index("by_expiresAt", ["expiresAt"]),
 
   /** Server sign-ins with saved credentials waiting for VTOP's OTP mail (logins.ts). */
   logins: defineTable({

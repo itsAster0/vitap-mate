@@ -157,12 +157,25 @@ export async function recordSignIn(ctx: MutationCtx, accountId: Id<"accounts">, 
   for (const row of old.slice(MAX_SIGN_INS)) await ctx.db.delete(row._id);
 }
 
+/** Tables whose rows belong to an account and carry a `by_account` index. */
+export const ACCOUNT_OWNED_TABLES = [
+  "accessKeys",
+  "signIns",
+  "sessionRequests",
+  "pairings",
+  "oauthCodes",
+  "oauthRequests",
+  "v2Tokens",
+  "refreshTokens",
+  "otpInbox",
+  "mailboxDevices",
+  "logins",
+] as const;
+
+export type AccountOwnedTable = (typeof ACCOUNT_OWNED_TABLES)[number];
+
 /** Deletes every row of the account in `table` (all are indexed `by_account`). */
-export async function deleteOwned(
-  ctx: MutationCtx,
-  table: "accessKeys" | "signIns" | "sessionRequests" | "pairings" | "oauthCodes" | "oauthRequests" | "v2Tokens" | "refreshTokens" | "otpInbox" | "mailboxDevices" | "logins",
-  accountId: Id<"accounts">,
-): Promise<void> {
+export async function deleteOwned(ctx: MutationCtx, table: AccountOwnedTable, accountId: Id<"accounts">): Promise<void> {
   const rows = await ctx.db
     .query(table)
     .withIndex("by_account", (q) => q.eq("accountId", accountId))

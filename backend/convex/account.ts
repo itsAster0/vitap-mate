@@ -5,7 +5,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { type MutationCtx, action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { deleteOwned, keysOf, phoneOf, phoneRows, phonesOf, saveRecord, unlinkPhone } from "./lib/accounts";
+import { ACCOUNT_OWNED_TABLES, deleteOwned, keysOf, phoneOf, phoneRows, phonesOf, saveRecord, unlinkPhone } from "./lib/accounts";
 import { AccountRecord, SESSION_CACHE_SECS, parseSettings, phoneId, semesterId } from "./lib/accountState";
 import { deleteMailbox } from "./lib/mailboxes";
 import { badRequest, fail } from "./lib/errors";
@@ -183,7 +183,7 @@ export const remove = mutation({
     for (const phone of await phoneRows(ctx, id)) await unlinkPhone(ctx, phone);
     const mailbox = await mailboxOfAccount(ctx, id);
     if (mailbox) await deleteMailbox(ctx, mailbox);
-    for (const table of ["accessKeys", "signIns", "sessionRequests", "pairings", "oauthCodes", "oauthRequests", "v2Tokens", "refreshTokens", "otpInbox", "mailboxDevices", "logins"] as const) {
+    for (const table of ACCOUNT_OWNED_TABLES) {
       await deleteOwned(ctx, table, id);
     }
     await ctx.db.delete(id);

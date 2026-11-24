@@ -4,6 +4,7 @@
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { leastRecent } from "./accountState";
 import { randomBytes } from "./crypto";
 import { fail } from "./errors";
 import { env, now } from "./util";
@@ -232,12 +233,7 @@ export async function addMember(
       at - Math.max(m.seenAt, m.addedAt) < MEMBER_STALE_SECS,
   );
   while (members.length >= MAX_MEMBERS) {
-    let oldest = 0;
-    members.forEach((m, i) => {
-      const old = members[oldest];
-      if (Math.max(m.seenAt, m.addedAt) < Math.max(old.seenAt, old.addedAt))
-        oldest = i;
-    });
+    const oldest = leastRecent(members);
     await ctx.db.delete(members[oldest]._id);
     members.splice(oldest, 1);
   }

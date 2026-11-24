@@ -21,6 +21,7 @@ import {
   keyUse,
   keysToMove,
   leastRecent,
+  parseRequestError,
   parseSettings,
   phoneId,
   phonesForKey,
@@ -72,6 +73,8 @@ describe("settings and ids", () => {
     expect(semesterId("VL 2025")).toBeNull();
     expect(errorCode("phone_unreachable: x")).toBe("phone_unreachable");
     expect(errorCode("plain")).toBe("login_failed");
+    expect(parseRequestError("phone_unreachable: x")).toEqual({ code: "phone_unreachable", message: "x" });
+    expect(parseRequestError("plain")).toEqual({ code: "login_failed", message: "plain" });
   });
 });
 
@@ -279,13 +282,38 @@ describe("session requests", () => {
     expect(r.pollView(NOW).body).toMatchObject({ stage: "server", serverDueAt: null });
     expect(r.pollView(NOW + REQUEST_TIMEOUT_SECS).status).toBe(410);
     r.fail(PHONE_UNREACHABLE);
-    expect(r.pollView(NOW)).toMatchObject({ status: 200, body: { code: "phone_unreachable" } });
+    expect(r.errorCode).toBe("phone_unreachable");
+    expect(r.error).toBe(PHONE_UNREACHABLE.message);
+    expect(r.pollView(NOW)).toEqual({
+      status: 200,
+      body: { status: "error", code: "phone_unreachable", error: PHONE_UNREACHABLE.message },
+    });
     r.succeed("JSESSIONID=a", "phone");
+    expect(r.errorCode).toBeNull();
+    expect(r.error).toBeNull();
     const body = r.pollView(NOW + 1000).body as { status: string; session: { cookies: string }; cookies: { name: string }[] };
     expect(body.status).toBe("ready");
     expect(body.session.cookies).toBe("JSESSIONID=a");
     expect(body.cookies[0].name).toBe("JSESSIONID");
     expect(r.startedView().pollAfterMs).toBe(POLL_AFTER_MS);
+  });
+
+  it("reads both structured and legacy packed error rows identically", () => {
+    const legacy = new RequestRecord("old", NOW);
+    legacy.status = "error";
+    legacy.errorCode = null;
+    legacy.error = "forwarding_required: Set up OTP email forwarding.";
+    legacy.phoneErrorCode = null;
+    legacy.phoneError = "phone_unreachable: Open VITAP Mate.";
+    expect(legacy.failure()).toEqual({
+      code: "forwarding_required",
+      message: "forwarding_required: Set up OTP email forwarding.",
+    });
+    expect(legacy.pollView(NOW)).toEqual({
+      status: 200,
+      body: { status: "error", code: "forwarding_required", error: "forwarding_required: Set up OTP email forwarding." },
+    });
+    expect(legacy.phoneFailure()).toEqual({ code: "phone_unreachable", message: "Open VITAP Mate." });
   });
 
   it("write RFC 3339 dates", () => {

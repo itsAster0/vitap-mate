@@ -7,7 +7,6 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation, query, type QueryCtx } from "./_generated/server";
-import { errorCode } from "./lib/accountState";
 import { rateLimits } from "./lib/rateLimits";
 import { requestOf, requestRow } from "./lib/requests";
 import { now } from "./lib/util";
@@ -70,8 +69,10 @@ export const request = query({
     switch (r.status) {
       case "success":
         return { status: "ready" as const, from: r.source ?? "unknown", expiresAt };
-      case "error":
-        return { status: "error" as const, code: errorCode(r.error ?? ""), error: r.error ?? "", expiresAt };
+      case "error": {
+        const { code, message } = r.failure();
+        return { status: "error" as const, code, error: message, expiresAt };
+      }
       case "pending":
         return {
           status: "pending" as const,

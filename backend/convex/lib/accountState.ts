@@ -29,7 +29,12 @@ export const MAX_KEYS_PER_ACCOUNT = 10;
 export const TOUCH_EVERY_SECS = 60;
 export const MAX_LABEL_CHARS = 60;
 
-export const PHONE_UNREACHABLE = "phone_unreachable: Open VITAP Mate → Connected apps → Reconnect this phone.";
+export type RequestError = { code: string; message: string };
+
+export const PHONE_UNREACHABLE: RequestError = {
+  code: "phone_unreachable",
+  message: "Open VITAP Mate → Connected apps → Reconnect this phone.",
+};
 
 // ---- settings, keys and ids ---------------------------------------------------------
 
@@ -86,10 +91,19 @@ export function semesterId(raw: string): string | null {
   return /^[0-9A-Za-z]{1,40}$/.test(id) ? id : null;
 }
 
-/** The code before the colon of a request error (`code: message`). */
+/** The code before the colon of a legacy request error (`code: message`). */
 export function errorCode(error: string): string {
   const colon = error.indexOf(":");
   return (colon < 0 ? "login_failed" : error.slice(0, colon)).trim();
+}
+
+/** Splits a `"code: message"` string (from an external caller or legacy row) into `{ code, message }`. */
+export function parseRequestError(raw: string): RequestError {
+  const colon = raw.indexOf(":");
+  if (colon < 0) return { code: "login_failed", message: raw };
+  const code = raw.slice(0, colon).trim();
+  const message = raw.slice(colon + 1).trim();
+  return code ? { code, message: message || raw } : { code: "login_failed", message: raw };
 }
 
 // ---- cookies --------------------------------------------------------------------------
@@ -196,11 +210,11 @@ export function phoneId(deviceId: string): string {
   return keyId(sha256HexSync(deviceId));
 }
 
-/** The phone seen least recently, which makes room when one too many links. */
-export function leastRecent(phones: PhoneRecord[]): number {
+/** The entry seen least recently, which makes room when one too many links or joins. */
+export function leastRecent(entries: ReadonlyArray<{ addedAt: number; seenAt: number }>): number {
   let oldest = 0;
-  phones.forEach((p, i) => {
-    const old = phones[oldest];
+  entries.forEach((p, i) => {
+    const old = entries[oldest];
     if (Math.max(p.seenAt, p.addedAt) < Math.max(old.seenAt, old.addedAt)) oldest = i;
   });
   return oldest;
@@ -405,6 +419,7 @@ export class RequestRecord {
   cookies: string | null = null;
   /** Its CSRF token, when the server signed in (the app needs it). */
   csrfToken: string | null = null;
+  errorCode: string | null = null;
   error: string | null = null;
   createdAt: number;
   expiresAt: number;
@@ -414,6 +429,7 @@ export class RequestRecord {
   phoneAsked = false;
   /** Why the phone could not be asked, kept to end the request with if the
    * sign-in fails too. */
+  phoneErrorCode: string | null = null;
   phoneError: string | null = null;
   /** Who made the session, once answered: `phone` or `server`. */
   source: string | null = null;
@@ -437,13 +453,34 @@ export class RequestRecord {
     this.status = "success";
     this.cookies = cookies;
     this.csrfToken = csrfToken;
+    this.errorCode = null;
     this.error = null;
     this.source = source;
   }
 
-  fail(error: string): void {
+  fail(error: RequestError): void {
     this.status = "error";
-    this.error = error;
+    this.errorCode = error.code;
+    this.error = error.message;
+  }
+
+  setPhoneError(error: RequestError): void {
+    this.phoneErrorCode = error.code;
+    this.phoneError = error.message;
+  }
+
+  /** Failure code and message, reading both structured rows and legacy `"code: message"` rows. */
+  failure(): RequestError {
+    const raw = this.error ?? "";
+    if (this.errorCode !== null) return { code: this.errorCode, message: raw };
+    return { code: errorCode(raw), message: raw };
+  }
+
+  /** Stored phone-ask failure, reading both structured and legacy rows. */
+  phoneFailure(): RequestError | null {
+    if (this.phoneError === null) return null;
+    if (this.phoneErrorCode !== null) return { code: this.phoneErrorCode, message: this.phoneError };
+    return parseRequestError(this.phoneError);
   }
 
   /** Who is working on a pending request, for clients to say what they
@@ -481,10 +518,10 @@ export class RequestRecord {
       case "success":
         return { status: 200, body: ready(this.cookies ?? "", sourceView(this.source, null, false)) };
       case "error": {
-        const error = this.error ?? "";
+        const { code, message } = this.failure();
         // A poll that worked, about a request that failed: 200, with the
         // error fields as every error reply has them.
-        return { status: 200, body: { status: "error", ...errorBody(errorCode(error), error) } };
+        return { status: 200, body: { status: "error", ...errorBody(code, message) } };
       }
     }
   }
