@@ -15313,17 +15313,7 @@ public object FfiConverterTypeHttpResponse: FfiConverterRustBuffer<HttpResponse>
  * Keys another phone answers for: they can be moved to this one ([`Core::move_keys`]).
  */
 data class KeyPhone (
-    /**
-     * The phone's short id; None for phones no longer linked (nothing answers for their keys).
-     */
-    val `id`: kotlin.String?
-    , 
-    val `label`: kotlin.String?
-    , 
-    /**
-     * Unix seconds; None for phones no longer linked.
-     */
-    val `seenAt`: kotlin.Long?
+    val `owner`: KeyOwner
     , 
     val `keys`: kotlin.UInt
     
@@ -15342,24 +15332,18 @@ data class KeyPhone (
 public object FfiConverterTypeKeyPhone: FfiConverterRustBuffer<KeyPhone> {
     override fun read(buf: ByteBuffer): KeyPhone {
         return KeyPhone(
-            FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalLong.read(buf),
+            FfiConverterTypeKeyOwner.read(buf),
             FfiConverterUInt.read(buf),
         )
     }
 
     override fun allocationSize(value: KeyPhone) = (
-            FfiConverterOptionalString.allocationSize(value.`id`) +
-            FfiConverterOptionalString.allocationSize(value.`label`) +
-            FfiConverterOptionalLong.allocationSize(value.`seenAt`) +
+            FfiConverterTypeKeyOwner.allocationSize(value.`owner`) +
             FfiConverterUInt.allocationSize(value.`keys`)
     )
 
     override fun write(value: KeyPhone, buf: ByteBuffer) {
-            FfiConverterOptionalString.write(value.`id`, buf)
-            FfiConverterOptionalString.write(value.`label`, buf)
-            FfiConverterOptionalLong.write(value.`seenAt`, buf)
+            FfiConverterTypeKeyOwner.write(value.`owner`, buf)
             FfiConverterUInt.write(value.`keys`, buf)
     }
 }
@@ -17626,21 +17610,9 @@ data class ServerStatus (
     , 
     val `device`: ServerDevice
     , 
-    /**
-     * When the sealed VTOP session was saved, and by whom (`phone` or `server`).
-     */
-    val `sessionSavedAt`: kotlin.Long?
+    val `session`: ServerSession
     , 
-    val `sessionSource`: kotlin.String?
-    , 
-    /**
-     * When the sealed password was saved and when it expires (None: kept until forgotten).
-     */
-    val `vaultSavedAt`: kotlin.Long?
-    , 
-    val `vaultExpiresAt`: kotlin.Long?
-    , 
-    val `vaultGmail`: kotlin.Boolean
+    val `vault`: ServerVault
     , 
     val `credentialsRejectedAt`: kotlin.Long?
     , 
@@ -17676,11 +17648,8 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalTypeServerMailbox.read(buf),
             FfiConverterTypeServerDevice.read(buf),
-            FfiConverterOptionalLong.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalLong.read(buf),
-            FfiConverterOptionalLong.read(buf),
-            FfiConverterBoolean.read(buf),
+            FfiConverterTypeServerSession.read(buf),
+            FfiConverterTypeServerVault.read(buf),
             FfiConverterOptionalLong.read(buf),
             FfiConverterSequenceTypeServerSignIn.read(buf),
             FfiConverterSequenceTypeLinkedPhone.read(buf),
@@ -17697,11 +17666,8 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
             FfiConverterBoolean.allocationSize(value.`forwarding`) +
             FfiConverterOptionalTypeServerMailbox.allocationSize(value.`mailbox`) +
             FfiConverterTypeServerDevice.allocationSize(value.`device`) +
-            FfiConverterOptionalLong.allocationSize(value.`sessionSavedAt`) +
-            FfiConverterOptionalString.allocationSize(value.`sessionSource`) +
-            FfiConverterOptionalLong.allocationSize(value.`vaultSavedAt`) +
-            FfiConverterOptionalLong.allocationSize(value.`vaultExpiresAt`) +
-            FfiConverterBoolean.allocationSize(value.`vaultGmail`) +
+            FfiConverterTypeServerSession.allocationSize(value.`session`) +
+            FfiConverterTypeServerVault.allocationSize(value.`vault`) +
             FfiConverterOptionalLong.allocationSize(value.`credentialsRejectedAt`) +
             FfiConverterSequenceTypeServerSignIn.allocationSize(value.`signIns`) +
             FfiConverterSequenceTypeLinkedPhone.allocationSize(value.`phones`) +
@@ -17717,11 +17683,8 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
             FfiConverterBoolean.write(value.`forwarding`, buf)
             FfiConverterOptionalTypeServerMailbox.write(value.`mailbox`, buf)
             FfiConverterTypeServerDevice.write(value.`device`, buf)
-            FfiConverterOptionalLong.write(value.`sessionSavedAt`, buf)
-            FfiConverterOptionalString.write(value.`sessionSource`, buf)
-            FfiConverterOptionalLong.write(value.`vaultSavedAt`, buf)
-            FfiConverterOptionalLong.write(value.`vaultExpiresAt`, buf)
-            FfiConverterBoolean.write(value.`vaultGmail`, buf)
+            FfiConverterTypeServerSession.write(value.`session`, buf)
+            FfiConverterTypeServerVault.write(value.`vault`, buf)
             FfiConverterOptionalLong.write(value.`credentialsRejectedAt`, buf)
             FfiConverterSequenceTypeServerSignIn.write(value.`signIns`, buf)
             FfiConverterSequenceTypeLinkedPhone.write(value.`phones`, buf)
@@ -20798,6 +20761,97 @@ public object FfiConverterTypeKeyKind: FfiConverterRustBuffer<KeyKind> {
 
 
 /**
+ * Who answers for a [`KeyPhone`]'s keys.
+ */
+sealed class KeyOwner {
+    
+    /**
+     * A linked phone: its short id (which [`Core::move_keys`] takes) and when it was seen
+     * (unix seconds).
+     */
+    data class Phone(
+        val `id`: kotlin.String, 
+        val `label`: kotlin.String?, 
+        val `seenAt`: kotlin.Long) : KeyOwner()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Phones no longer linked, as one entry: nothing answers for their keys.
+     */
+    object Unlinked : KeyOwner()
+    
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeyOwner : FfiConverterRustBuffer<KeyOwner>{
+    override fun read(buf: ByteBuffer): KeyOwner {
+        return when(buf.getInt()) {
+            1 -> KeyOwner.Phone(
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                FfiConverterLong.read(buf),
+                )
+            2 -> KeyOwner.Unlinked
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: KeyOwner): ULong = when(value) {
+        is KeyOwner.Phone -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`id`)
+                + FfiConverterOptionalString.allocationSize(value.`label`)
+                + FfiConverterLong.allocationSize(value.`seenAt`)
+            )
+        }
+        is KeyOwner.Unlinked -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: KeyOwner, buf: ByteBuffer) {
+        when(value) {
+            is KeyOwner.Phone -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`id`, buf)
+                FfiConverterOptionalString.write(value.`label`, buf)
+                FfiConverterLong.write(value.`seenAt`, buf)
+                Unit
+            }
+            is KeyOwner.Unlinked -> {
+                buf.putInt(2)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
  * Why a [`LiveListener`]'s watch failed, as the app acts on it.
  */
 sealed class LiveError {
@@ -21232,6 +21286,210 @@ public object FfiConverterTypeScoreBand: FfiConverterRustBuffer<ScoreBand> {
     override fun allocationSize(value: ScoreBand) = 4UL
 
     override fun write(value: ScoreBand, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * The sealed VTOP session the server keeps for connected apps.
+ */
+sealed class ServerSession {
+    
+    object None : ServerSession()
+    
+    
+    data class Saved(
+        val `at`: kotlin.Long, 
+        val `by`: vitapmate.core.SessionSource) : ServerSession()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerSession : FfiConverterRustBuffer<ServerSession>{
+    override fun read(buf: ByteBuffer): ServerSession {
+        return when(buf.getInt()) {
+            1 -> ServerSession.None
+            2 -> ServerSession.Saved(
+                FfiConverterLong.read(buf),
+                FfiConverterTypeSessionSource.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ServerSession): ULong = when(value) {
+        is ServerSession.None -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is ServerSession.Saved -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterLong.allocationSize(value.`at`)
+                + FfiConverterTypeSessionSource.allocationSize(value.`by`)
+            )
+        }
+    }
+
+    override fun write(value: ServerSession, buf: ByteBuffer) {
+        when(value) {
+            is ServerSession.None -> {
+                buf.putInt(1)
+                Unit
+            }
+            is ServerSession.Saved -> {
+                buf.putInt(2)
+                FfiConverterLong.write(value.`at`, buf)
+                FfiConverterTypeSessionSource.write(value.`by`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * The sealed VTOP password the server keeps to sign in by itself.
+ */
+sealed class ServerVault {
+    
+    object None : ServerVault()
+    
+    
+    /**
+     * `expires_at` None: kept until VTOP rejects it or the student forgets it.
+     */
+    data class Saved(
+        val `at`: kotlin.Long, 
+        val `expiresAt`: kotlin.Long?, 
+        val `gmail`: kotlin.Boolean) : ServerVault()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerVault : FfiConverterRustBuffer<ServerVault>{
+    override fun read(buf: ByteBuffer): ServerVault {
+        return when(buf.getInt()) {
+            1 -> ServerVault.None
+            2 -> ServerVault.Saved(
+                FfiConverterLong.read(buf),
+                FfiConverterOptionalLong.read(buf),
+                FfiConverterBoolean.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ServerVault): ULong = when(value) {
+        is ServerVault.None -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is ServerVault.Saved -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterLong.allocationSize(value.`at`)
+                + FfiConverterOptionalLong.allocationSize(value.`expiresAt`)
+                + FfiConverterBoolean.allocationSize(value.`gmail`)
+            )
+        }
+    }
+
+    override fun write(value: ServerVault, buf: ByteBuffer) {
+        when(value) {
+            is ServerVault.None -> {
+                buf.putInt(1)
+                Unit
+            }
+            is ServerVault.Saved -> {
+                buf.putInt(2)
+                FfiConverterLong.write(value.`at`, buf)
+                FfiConverterOptionalLong.write(value.`expiresAt`, buf)
+                FfiConverterBoolean.write(value.`gmail`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Who saved the server's sealed VTOP session.
+ */
+
+enum class SessionSource {
+    
+    PHONE,
+    SERVER;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSessionSource: FfiConverterRustBuffer<SessionSource> {
+    override fun read(buf: ByteBuffer) = try {
+        SessionSource.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: SessionSource) = 4UL
+
+    override fun write(value: SessionSource, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

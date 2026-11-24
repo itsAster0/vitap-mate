@@ -62,7 +62,10 @@ import vitapmate.core.Core
 import vitapmate.core.CoreException
 import vitapmate.core.ServerOptions
 import vitapmate.core.LiveTopic
+import vitapmate.core.ServerSession
 import vitapmate.core.ServerStatus
+import vitapmate.core.ServerVault
+import vitapmate.core.SessionSource
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
@@ -194,16 +197,17 @@ fun ServerScreen() {
                                             ask("Clear the session?", "The server drops the VTOP session it keeps. Connected apps get a fresh one on their next request.", "Clear", "clear_session", "The server's session is cleared.") { c, f -> c.clearServerSession(f); true }
                                         },
                                         modifier = Modifier.padding(top = 10.dp).testTag("server.clear_session"),
-                                        enabled = s.sessionSavedAt != null,
+                                        enabled = s.session is ServerSession.Saved,
                                         shapes = ButtonDefaults.shapes(),
                                     ) { Text("Clear") }
                                 }
-                                val kept = s.vaultSavedAt != null
+                                val vault = s.vault
+                                val kept = vault is ServerVault.Saved
                                 Tile("Password", "server.password", Lucide.Lock, MaterialShapes.Cookie7Sided.toShape(), passwordText(s), false, Modifier.weight(1f), onClick = if (kept) null else savePassword) {
                                     if (kept) {
                                         FilledTonalButton(
                                             onClick = {
-                                                ask("Forget the saved password?", "The server drops your sealed VTOP password${if (s.vaultGmail) " and Gmail access" else ""}. It can then no longer sign in by itself: connected apps work only while a phone answers.", "Forget", "forget_password", "The server no longer keeps your password.") { c, f -> c.forgetServerPassword(f); true }
+                                                ask("Forget the saved password?", "The server drops your sealed VTOP password${if ((vault as? ServerVault.Saved)?.gmail == true) " and Gmail access" else ""}. It can then no longer sign in by itself: connected apps work only while a phone answers.", "Forget", "forget_password", "The server no longer keeps your password.") { c, f -> c.forgetServerPassword(f); true }
                                             },
                                             modifier = Modifier.padding(top = 10.dp).testTag("server.forget_password"),
                                             shapes = ButtonDefaults.shapes(),
@@ -406,14 +410,20 @@ private fun ttlText(secs: Long?) = when (secs) {
     else -> "${secs / 86_400} days"
 }
 
-private fun sessionText(s: ServerStatus) = s.sessionSavedAt?.let {
-    "Saved ${ago(it)} by ${if (s.sessionSource == "server") "the server" else "a phone"}"
-} ?: "None kept"
+private fun sessionText(s: ServerStatus) = when (val session = s.session) {
+    ServerSession.None -> "None kept"
+    is ServerSession.Saved -> "Saved ${ago(session.at)} by ${when (session.by) {
+        SessionSource.SERVER -> "the server"
+        SessionSource.PHONE -> "a phone"
+    }}"
+}
 
-private fun passwordText(s: ServerStatus): String {
-    val saved = s.vaultSavedAt ?: return "Not kept. Tap to let the server sign in for you"
-    val expires = s.vaultExpiresAt?.let { "expires in ${((it - System.currentTimeMillis() / 1000) / 3600).coerceAtLeast(0)} h" } ?: "kept until VTOP rejects it"
-    return listOfNotNull("Saved ${ago(saved)}", "with Gmail access".takeIf { s.vaultGmail }, expires).joinToString(" · ")
+private fun passwordText(s: ServerStatus): String = when (val vault = s.vault) {
+    ServerVault.None -> "Not kept. Tap to let the server sign in for you"
+    is ServerVault.Saved -> {
+        val expires = vault.expiresAt?.let { "expires in ${((it - System.currentTimeMillis() / 1000) / 3600).coerceAtLeast(0)} h" } ?: "kept until VTOP rejects it"
+        listOfNotNull("Saved ${ago(vault.at)}", "with Gmail access".takeIf { vault.gmail }, expires).joinToString(" · ")
+    }
 }
 
 /** A phone's dates; null for this phone, whose row shows them after a chip ([phoneChip]). */

@@ -33,6 +33,7 @@ import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
 import vitapmate.data.CalendarRefresh
 import vitapmate.data.Histories
+import vitapmate.data.PageActivity
 import vitapmate.data.PageState
 import vitapmate.data.Settings
 import vitapmate.data.rememberPage
@@ -69,7 +70,7 @@ fun AttendanceScreen() {
     // After each fetch of the summary, histories that fell behind it are fetched again in the
     // background, and the calendar when a day old; the refresh spinner doesn't wait. A newer
     // refresh cancels the last run.
-    val fresh = (page.state as? PageState.Ready)?.takeIf { !it.refreshing }?.updatedAt
+    val fresh = (page.state as? PageState.Ready)?.takeIf { it.activity !is PageActivity.Refreshing }?.updatedAt
     var seen by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(fresh) {
         if (fresh == null) return@LaunchedEffect

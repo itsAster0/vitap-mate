@@ -63,12 +63,22 @@ pub struct AccessKey {
 /// Keys another phone answers for: they can be moved to this one ([`Core::move_keys`]).
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct KeyPhone {
-    /// The phone's short id; None for phones no longer linked (nothing answers for their keys).
-    pub id: Option<String>,
-    pub label: Option<String>,
-    /// Unix seconds; None for phones no longer linked.
-    pub seen_at: Option<i64>,
+    pub owner: KeyOwner,
     pub keys: u32,
+}
+
+/// Who answers for a [`KeyPhone`]'s keys.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum KeyOwner {
+    /// A linked phone: its short id (which [`Core::move_keys`] takes) and when it was seen
+    /// (unix seconds).
+    Phone {
+        id: String,
+        label: Option<String>,
+        seen_at: i64,
+    },
+    /// Phones no longer linked, as one entry: nothing answers for their keys.
+    Unlinked,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -99,17 +109,17 @@ fn elsewhere(view: &Value) -> Vec<KeyPhone> {
         .filter_map(|phone| {
             let id = phone["id"].as_str()?;
             Some(KeyPhone {
-                id: Some(id.into()),
-                label: phone["label"].as_str().map(str::to_string),
-                seen_at: phone["seenAt"].as_i64(),
+                owner: KeyOwner::Phone {
+                    id: id.into(),
+                    label: phone["label"].as_str().map(str::to_string),
+                    seen_at: phone["seenAt"].as_i64()?,
+                },
                 keys: count(Some(id)),
             })
         })
         .collect();
     found.push(KeyPhone {
-        id: None,
-        label: None,
-        seen_at: None,
+        owner: KeyOwner::Unlinked,
         keys: count(None),
     });
     found.retain(|phone| phone.keys > 0);

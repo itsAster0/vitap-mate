@@ -47,6 +47,7 @@ import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.Smartphone
+import vitapmate.core.KeyOwner
 import vitapmate.core.KeyPhone
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scan
@@ -188,7 +189,10 @@ fun ConnectedAppsScreen() {
                                     Column(Modifier.weight(1f)) {
                                         Text("Move ${keys(phone)} to this phone", style = MaterialTheme.typography.titleMediumEmphasized, color = MaterialTheme.colorScheme.onSurface)
                                         Text(
-                                            phone.seenAt?.let { "From ${phone.label ?: "another phone"}, seen ${ago(it)}" } ?: "From a phone that is no longer linked",
+                                            when (val owner = phone.owner) {
+                                                is KeyOwner.Phone -> "From ${owner.label ?: "another phone"}, seen ${ago(owner.seenAt)}"
+                                                KeyOwner.Unlinked -> "From a phone that is no longer linked"
+                                            },
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = accent.onSubtle,
                                         )
@@ -212,11 +216,17 @@ fun ConnectedAppsScreen() {
             "Move",
             {
                 moving = null
-                change("Move keys", "move", "Keys moved") { c, f -> c.moveKeys(f, phone.id) }
+                change("Move keys", "move", "Keys moved") { c, f -> c.moveKeys(f, (phone.owner as? KeyOwner.Phone)?.id) }
             },
             icon = Lucide.Smartphone,
             confirmTag = "connected_apps.move.confirm",
-        ) { Text("This phone will answer for ${if (phone.keys == 1u) "it" else "them"}." + if (phone.id != null) " ${phone.label ?: "The other phone"} is unlinked from your account; it can link again." else "") }
+        ) {
+            val unlinks = when (val owner = phone.owner) {
+                is KeyOwner.Phone -> " ${owner.label ?: "The other phone"} is unlinked from your account; it can link again."
+                KeyOwner.Unlinked -> ""
+            }
+            Text("This phone will answer for ${if (phone.keys == 1u) "it" else "them"}.$unlinks")
+        }
     }
     if (pairing) PairSheet(onDone = { pairing = false; load() }, onDismiss = { pairing = false })
     if (newMcp) NewMcpSheet(onDone = { load() }, onDismiss = { newMcp = false })

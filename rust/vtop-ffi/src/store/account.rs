@@ -21,39 +21,75 @@ pub trait PasswordCipher: Send + Sync {
     fn open(&self, sealed: String) -> Option<String>;
 }
 
-/// The file's form: the account, with its password in `sealed` once a cipher is set.
+/// [`ACCOUNT`] on disk. With a cipher the password is in `sealed`; `password` is plain text
+/// only in a file from before the cipher (or in host tests, which have none).
 #[derive(Serialize, Deserialize)]
 struct Stored {
-    #[serde(flatten)]
-    account: Account,
+    username: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    password: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    rejected: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    registration_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     sealed: Option<String>,
 }
 
+/// The saved account as read back. No `Debug`: it holds the password.
+#[derive(Clone)]
+pub(crate) struct Saved {
+    pub(crate) username: String,
+    pub(crate) rejected: bool,
+    pub(crate) registration_number: Option<String>,
+    /// None when this phone can't open it (another phone's key, or the key is gone): the
+    /// student types it again. Never logged.
+    pub(crate) password: Option<String>,
+}
+
+impl Saved {
+    /// The account a sign-in can use; None without a password.
+    pub(crate) fn usable(self) -> Option<Account> {
+        Some(Account {
+            password: self.password?,
+            username: self.username,
+            rejected: self.rejected,
+            registration_number: self.registration_number,
+        })
+    }
+}
+
 impl Core {
-    /// The saved account, its password empty when it can't be opened (another phone's key);
-    /// one saved in plain text is sealed and written back.
-    pub(crate) fn read_account(&self) -> Option<Account> {
-        let Stored {
-            mut account,
-            sealed,
-        } = self.read::<Stored>(ACCOUNT)?;
+    /// The saved account; one saved in plain text is sealed and written back.
+    pub(crate) fn read_account(&self) -> Option<Saved> {
+        let stored = self.read::<Stored>(ACCOUNT)?;
         let cipher = self.shared.cipher.as_ref();
-        match (sealed, cipher) {
+        let plain = stored.password.filter(|password| !password.is_empty());
+        let migrate = stored.sealed.is_none() && cipher.is_some() && plain.is_some();
+        let password = match (stored.sealed, cipher) {
             (Some(sealed), Some(cipher)) => {
-                account.password = cipher.open(sealed).unwrap_or_else(|| {
+                let opened = cipher.open(sealed).filter(|password| !password.is_empty());
+                if opened.is_none() {
                     warn!("saved password not opened (another phone's key): asked again");
-                    String::new()
-                });
+                }
+                opened
             }
-            (Some(_), None) => account.password.clear(),
-            (None, Some(_)) if !account.password.is_empty() => {
-                info!("saved password sealed");
+            (Some(_), None) => None,
+            (None, _) => plain,
+        };
+        let saved = Saved {
+            username: stored.username,
+            rejected: stored.rejected,
+            registration_number: stored.registration_number,
+            password,
+        };
+        if migrate {
+            info!("saved password sealed");
+            if let Some(account) = saved.clone().usable() {
                 self.write_stored(&account);
             }
-            (None, _) => {}
         }
-        Some(account)
+        Some(saved)
     }
 
     /// Writes `account`, keeping the saved registration number when `account` has none (it is
@@ -63,26 +99,32 @@ impl Core {
         if account.registration_number.is_none() {
             account.registration_number = self
                 .read::<Stored>(ACCOUNT)
-                .filter(|saved| saved.account.username == account.username)
-                .and_then(|saved| saved.account.registration_number);
+                .filter(|saved| saved.username == account.username)
+                .and_then(|saved| saved.registration_number);
         }
         self.write_stored(&account);
     }
 
     /// Writes `account` with its password sealed; without a cipher (host tests), as it is.
     fn write_stored(&self, account: &Account) {
-        let mut account = account.clone();
-        let sealed = match &self.shared.cipher {
-            Some(cipher) if !account.password.is_empty() => {
-                let sealed = cipher.seal(std::mem::take(&mut account.password));
+        let (password, sealed) = match &self.shared.cipher {
+            Some(cipher) => {
+                let sealed = cipher.seal(account.password.clone());
                 if sealed.is_none() {
                     warn!("password not sealed: saved without it");
                 }
-                sealed
+                (None, sealed)
             }
-            _ => None,
+            None => (Some(account.password.clone()), None),
         };
-        self.write(ACCOUNT, &Stored { account, sealed });
+        let stored = Stored {
+            username: account.username.clone(),
+            password,
+            rejected: account.rejected,
+            registration_number: account.registration_number.clone(),
+            sealed,
+        };
+        self.write(ACCOUNT, &stored);
     }
 }
 
@@ -136,14 +178,17 @@ mod tests {
         fs::write(core.at(ACCOUNT), plain).unwrap();
 
         let account = core.read_account().unwrap();
-        assert!(account.password == "pw-secret-1" && account.rejected);
+        assert!(account.password.as_deref() == Some("pw-secret-1") && account.rejected);
         let saved = file(&core);
         assert!(
             !saved.contains("pw-secret-1") && !saved.contains("\"password\""),
             "{saved}"
         );
         assert!(saved.contains("1-terces-wp"), "{saved}");
-        assert_eq!(core.read_account().unwrap().password, "pw-secret-1");
+        assert_eq!(
+            core.read_account().unwrap().password.as_deref(),
+            Some("pw-secret-1")
+        );
         let _ = fs::remove_dir_all(&core.dir);
     }
 
@@ -161,7 +206,7 @@ mod tests {
         fs::write(second.at(ACCOUNT), file(&first)).unwrap();
 
         let account = second.read_account().unwrap();
-        assert!(account.password.is_empty());
+        assert!(account.password.is_none());
         assert_eq!(account.registration_number.as_deref(), Some("22BCE0001"));
         let opened = Core::open(
             "f".into(),
@@ -177,5 +222,28 @@ mod tests {
         assert!(opened.current().is_err());
         let _ = fs::remove_dir_all(&first.dir);
         let _ = fs::remove_dir_all(&second.dir);
+    }
+
+    #[test]
+    fn the_stored_form_roundtrips_and_an_empty_password_is_none() {
+        let core = core("stored", "phone-a");
+        core.write_account(&Account {
+            username: "22BCE0001".into(),
+            password: "pw-1".into(),
+            rejected: true,
+            registration_number: Some("22BCE0001".into()),
+        });
+        assert_eq!(
+            file(&core),
+            r#"{"username":"22BCE0001","rejected":true,"registration_number":"22BCE0001","sealed":"phone-a:1-wp"}"#
+        );
+        let saved = core.read_account().unwrap();
+        assert!(saved.rejected && saved.password.as_deref() == Some("pw-1"));
+        // A plain file with an empty password (never sealed) has none, and isn't rewritten.
+        let plain = r#"{"username":"22BCE0001","password":""}"#;
+        fs::write(core.at(ACCOUNT), plain).unwrap();
+        assert!(core.read_account().unwrap().usable().is_none());
+        assert_eq!(file(&core), plain);
+        let _ = fs::remove_dir_all(&core.dir);
     }
 }

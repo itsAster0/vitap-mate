@@ -98,12 +98,15 @@ async fn status_reads_everything_the_server_keeps() {
         }
     );
     assert_eq!(
-        (status.session_saved_at, status.session_source.as_deref()),
-        (Some(9), Some("phone"))
+        status.session,
+        ServerSession::Saved {
+            at: 9,
+            by: SessionSource::Phone
+        }
     );
     assert_eq!(
-        (status.vault_saved_at, status.credentials_rejected_at),
-        (None, Some(3))
+        (status.vault, status.credentials_rejected_at),
+        (ServerVault::None, Some(3))
     );
     assert_eq!(
         status.sign_ins,
@@ -308,4 +311,46 @@ async fn the_password_goes_sealed_only_when_the_server_can_get_the_code() {
     );
     assert!(sent.get("accountToken").is_none());
     assert!(sent.get("session").is_none());
+}
+
+#[test]
+fn the_kept_session_and_password_read_once_into_one_state_each() {
+    let view = |json: Value| serde_json::from_value::<StatusView>(json).unwrap();
+    let none = view(json!({}));
+    assert_eq!(
+        (none.session(), none.vault()),
+        (ServerSession::None, ServerVault::None)
+    );
+    let saved = view(json!({
+        "sessionSavedAt": 7, "sessionSource": "server",
+        "vaultSavedAt": 8, "vaultExpiresAt": 9, "vaultGmail": true,
+    }));
+    assert_eq!(
+        saved.session(),
+        ServerSession::Saved {
+            at: 7,
+            by: SessionSource::Server
+        }
+    );
+    assert_eq!(
+        saved.vault(),
+        ServerVault::Saved {
+            at: 8,
+            expires_at: Some(9),
+            gmail: true
+        }
+    );
+    // A source the server doesn't name (or an older one): a phone's.
+    assert_eq!(
+        view(json!({ "sessionSavedAt": 7 })).session(),
+        ServerSession::Saved {
+            at: 7,
+            by: SessionSource::Phone
+        }
+    );
+    // An expiry or Gmail flag without a saved password is nothing kept.
+    assert_eq!(
+        view(json!({ "vaultExpiresAt": 9, "vaultGmail": true })).vault(),
+        ServerVault::None
+    );
 }

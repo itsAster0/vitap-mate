@@ -206,8 +206,8 @@ impl From<std::io::Error> for CoreError {
 #[derive(Clone, Serialize, Deserialize)]
 struct Account {
     username: String,
-    /// Empty when absent: not saved, or saved on another phone ([`store::account`]).
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    /// Always there: a saved account without one (another phone's) is a
+    /// [`store::account::Saved`], never an `Account`.
     password: String,
     /// VTOP rejected this password: no sign-in is tried with it again (repeated failures can
     /// lock the VTOP account) until the student signs in with a new one.
@@ -536,7 +536,7 @@ impl Core {
             remote::route::load(&core);
             remote::consent::load(&core);
             // No password (another phone's, or key gone): signed out.
-            let Some(account) = core.read_account().filter(|a| !a.password.is_empty()) else {
+            let Some(account) = core.read_account().and_then(store::account::Saved::usable) else {
                 return Ok(());
             };
             let session = Session::new(account, &core.shared)?;

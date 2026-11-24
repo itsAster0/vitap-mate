@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.launch
+import vitapmate.data.PageActivity
 import vitapmate.data.PageState
 import vitapmate.data.ProblemKind
 
@@ -72,7 +73,10 @@ fun <T> PageScaffold(
             try { onRefresh() } finally { busy = false }
             // Pulls and retries only: the student asked, so the result is felt (an OTP prompt is not a failure).
             when (val now = latest) {
-                is PageState.Ready -> now.problem.let { if (it == null) haptics.confirm() else if (it.toasts) haptics.reject() }
+                is PageState.Ready -> when (val a = now.activity) {
+                    is PageActivity.Stale -> if (a.problem.toasts) haptics.reject()
+                    PageActivity.Idle, is PageActivity.Refreshing -> haptics.confirm()
+                }
                 is PageState.Failed -> if (now.problem.toasts) haptics.reject()
                 is PageState.Loading -> {}
             }
@@ -97,8 +101,9 @@ fun <T> PageScaffold(
                     // Only for refreshes the student asked for (unless "Show background errors"); an
                     // OTP is part of signing in, not an error: its prompt handles it (Problem.toasts).
                     val signIn = LocalSignIn.current
-                    LaunchedEffect(s.problem) {
-                        val p = s.problem ?: return@LaunchedEffect
+                    val activity = s.activity
+                    LaunchedEffect((activity as? PageActivity.Stale)?.problem) {
+                        val p = (activity as? PageActivity.Stale)?.problem ?: return@LaunchedEffect
                         val action = when {
                             p.kind == ProblemKind.SignInNeeded && signIn != null -> (if (AccountState.rejected) "Update password" else "Sign in") to signIn
                             p.retryable -> "Retry" to refresh
@@ -106,9 +111,9 @@ fun <T> PageScaffold(
                         }
                         showToast(p, action)
                     }
-                    CompositionLocalProvider(LocalUpdated provides (s.updatedAt to s.refreshing)) {
+                    CompositionLocalProvider(LocalUpdated provides (s.updatedAt to (activity is PageActivity.Refreshing))) {
                         Column(Modifier.fillMaxSize()) {
-                            Waiting(s.waiting)
+                            Waiting((activity as? PageActivity.Refreshing)?.waiting)
                             Box(Modifier.weight(1f)) { if (isEmpty(s.data)) ScrollCentered(content = empty) else content(s.data) }
                         }
                     }

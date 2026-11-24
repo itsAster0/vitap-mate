@@ -62,7 +62,7 @@ class PageHandle<T> internal constructor(
      * Fetches fresh data in a flow `<id>.refresh`; [trigger] says why (`pull`, `button`, `retry`,
      * `open`, `stale`, `otp`, ...); [user] false for automatic ones (their failure is
      * [Problem.userInitiated] false: no toast by default). Never throws (but cancellation): a
-     * failure goes into [PageState.Ready.problem], or [PageState.Failed] with nothing cached. A
+     * failure goes into [PageActivity.Stale], or [PageState.Failed] with nothing cached. A
      * refresh while one runs waits for that one instead of fetching twice.
      */
     suspend fun refresh(trigger: String, user: Boolean = true) {
@@ -86,7 +86,7 @@ class PageHandle<T> internal constructor(
     private suspend fun fetchNow(flow: String, trigger: String, asked: Asked): Throwable? {
         fetching = true
         val before = state
-        if (before is PageState.Ready) set(before.copy(refreshing = true), "refreshing", flow, "trigger" to trigger)
+        if (before is PageState.Ready) set(before.copy(activity = PageActivity.Refreshing()), "refreshing", flow, "trigger" to trigger)
         else set(PageState.Loading(), "fetching", flow, "trigger" to trigger)
         // The fetch itself runs in PageFetches: a tab switch doesn't cancel it, and a handle for the
         // same page and semester (the tab shown again) joins it. It may wait for a lane first (shown
@@ -96,19 +96,19 @@ class PageHandle<T> internal constructor(
         val note = scope.launch { noteWaiting(run.started) }
         return try {
             val fresh = run.result.await()
-            set(PageState.Ready(fresh, updatedAt(fresh), refreshing = false, problem = null), "fresh", flow)
+            set(PageState.Ready(fresh, updatedAt(fresh)), "fresh", flow)
             null
         } catch (e: CancellationException) {
-            (state as? PageState.Ready)?.let { state = it.copy(refreshing = false, waiting = null) }
+            (state as? PageState.Ready)?.let { state = it.copy(activity = it.activity.settled()) }
             throw e
         } catch (_: Dropped) {
             // Waited off screen past Tunable.QueueDrop: the cached copy stays, no problem.
-            (state as? PageState.Ready)?.let { set(it.copy(refreshing = false, waiting = null), "dropped", flow) }
+            (state as? PageState.Ready)?.let { set(it.copy(activity = it.activity.settled()), "dropped", flow) }
             null
         } catch (e: Throwable) {
             val problem = problemOf(e, run.flow).copy(userInitiated = asked.user)
             val now = state
-            if (now is PageState.Ready) set(now.copy(refreshing = false, problem = problem), "stale_kept", flow, "error" to e.kindName(), "user" to "${asked.user}")
+            if (now is PageState.Ready) set(now.copy(activity = PageActivity.Stale(problem)), "stale_kept", flow, "error" to e.kindName(), "user" to "${asked.user}")
             else set(PageState.Failed(problem), "failed", flow, "error" to e.kindName(), "user" to "${asked.user}")
             e
         } finally {
@@ -135,7 +135,7 @@ class PageHandle<T> internal constructor(
     private fun waiting(text: String?) {
         state = when (val s = state) {
             is PageState.Loading -> s.copy(waiting = text)
-            is PageState.Ready -> s.copy(waiting = text)
+            is PageState.Ready -> s.copy(activity = s.activity.waiting(text))
             is PageState.Failed -> s
         }
     }
@@ -185,7 +185,7 @@ class PageHandle<T> internal constructor(
         when (val s = state) {
             is PageState.Ready -> return // a fetch finished first
             // A fetch failed first (e.g. offline): the cache, with its problem.
-            else -> set(PageState.Ready(data, updatedAt(data), refreshing = fetching, problem = (s as? PageState.Failed)?.problem, waiting = (s as? PageState.Loading)?.waiting), "cached", flow)
+            else -> set(PageState.Ready(data, updatedAt(data), PageActivity.cached(s, fetching)), "cached", flow)
         }
     }
 
@@ -222,8 +222,8 @@ class PageHandle<T> internal constructor(
             mapOf(
                 "kind" to s.kindName(),
                 "updatedAt" to (s as? PageState.Ready)?.updatedAt,
-                "refreshing" to ((s as? PageState.Ready)?.refreshing ?: false),
-                "waiting" to ((s as? PageState.Ready)?.waiting ?: (s as? PageState.Loading)?.waiting),
+                "refreshing" to ((s as? PageState.Ready)?.activity is PageActivity.Refreshing),
+                "waiting" to (((s as? PageState.Ready)?.activity as? PageActivity.Refreshing)?.waiting ?: (s as? PageState.Loading)?.waiting),
                 "count" to (s as? PageState.Ready)?.let { count(it.data) },
                 "problem" to s.problem()?.kind?.name,
                 "problemFlow" to s.problem()?.flow,
@@ -240,7 +240,7 @@ private fun PageState<*>.kindName() = when (this) {
 }
 
 private fun PageState<*>.problem() = when (this) {
-    is PageState.Ready -> problem
+    is PageState.Ready -> (activity as? PageActivity.Stale)?.problem
     is PageState.Failed -> problem
     is PageState.Loading -> null
 }
@@ -305,7 +305,7 @@ fun <T> rememberPage(
             stale = page.isStale(),
         ) ?: return@LaunchedEffect
         page.refresh(trigger, user = false)
-        if (page.state.let { it is PageState.Ready && it.problem == null }) fetchedFor = semester
+        if (page.state.let { it is PageState.Ready && it.activity !is PageActivity.Stale }) fetchedFor = semester
     }
     LaunchedEffect(page, OtpPrompt.generation) {
         if (OtpPrompt.generation != otpAtStart) page.refresh(refreshTrigger(PageWake.Otp) ?: return@LaunchedEffect)

@@ -14,15 +14,37 @@ sealed interface PageState<out T> {
      */
     data class Loading(val waiting: String? = null) : PageState<Nothing>
 
-    /**
-     * [data] (cached or fresh) from [updatedAt] (epoch seconds); [refreshing] while a fetch runs,
-     * [waiting] as in [Loading] while it is queued; [problem] = the last refresh failed and [data]
-     * was kept.
-     */
-    data class Ready<T>(val data: T, val updatedAt: Long, val refreshing: Boolean, val problem: Problem?, val waiting: String? = null) : PageState<T>
+    /** [data] (cached or fresh) from [updatedAt] (epoch seconds), and what its refresh is doing. */
+    data class Ready<T>(val data: T, val updatedAt: Long, val activity: PageActivity = PageActivity.Idle) : PageState<T>
 
     /** Nothing cached and the fetch failed. */
     data class Failed(val problem: Problem) : PageState<Nothing>
+}
+
+/** What a [PageState.Ready] page's refresh is doing. (Not `Activity`: that is the run tracker.) */
+sealed interface PageActivity {
+    data object Idle : PageActivity
+
+    /** A fetch runs; [waiting] as in [PageState.Loading] while it is queued. */
+    data class Refreshing(val waiting: String? = null) : PageActivity
+
+    /** The last refresh failed with [problem]; the data was kept. */
+    data class Stale(val problem: Problem) : PageActivity
+
+    /** After a fetch that ended without an answer (cancelled, or dropped from the queue). */
+    fun settled(): PageActivity = if (this is Refreshing) Idle else this
+
+    /** [text] as [Refreshing.waiting]; only a running fetch waits. */
+    fun waiting(text: String?): PageActivity = if (this is Refreshing) Refreshing(text) else this
+
+    companion object {
+        /** A cached copy shown over [before]: still fetching, or the fetch that failed first. */
+        fun cached(before: PageState<*>, fetching: Boolean): PageActivity = when {
+            fetching -> Refreshing((before as? PageState.Loading)?.waiting)
+            before is PageState.Failed -> Stale(before.problem)
+            else -> Idle
+        }
+    }
 }
 
 /**

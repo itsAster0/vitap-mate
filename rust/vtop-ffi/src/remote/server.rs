@@ -89,6 +89,32 @@ pub struct ServerDevice {
     pub registered_at: Option<i64>,
 }
 
+/// Who saved the server's sealed VTOP session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SessionSource {
+    Phone,
+    Server,
+}
+
+/// The sealed VTOP session the server keeps for connected apps.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ServerSession {
+    None,
+    Saved { at: i64, by: SessionSource },
+}
+
+/// The sealed VTOP password the server keeps to sign in by itself.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ServerVault {
+    None,
+    /// `expires_at` None: kept until VTOP rejects it or the student forgets it.
+    Saved {
+        at: i64,
+        expires_at: Option<i64>,
+        gmail: bool,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ServerStatus {
     /// This phone is one of the account's phones; the account's lists are empty when it is not.
@@ -104,13 +130,8 @@ pub struct ServerStatus {
     /// This phone's forwarding address and the phones on it.
     pub mailbox: Option<ServerMailbox>,
     pub device: ServerDevice,
-    /// When the sealed VTOP session was saved, and by whom (`phone` or `server`).
-    pub session_saved_at: Option<i64>,
-    pub session_source: Option<String>,
-    /// When the sealed password was saved and when it expires (None: kept until forgotten).
-    pub vault_saved_at: Option<i64>,
-    pub vault_expires_at: Option<i64>,
-    pub vault_gmail: bool,
+    pub session: ServerSession,
+    pub vault: ServerVault,
     pub credentials_rejected_at: Option<i64>,
     /// Newest first, at most 10.
     pub sign_ins: Vec<ServerSignIn>,
@@ -156,6 +177,33 @@ struct StatusView {
     vault_expires_at: Option<i64>,
     vault_gmail: bool,
     sign_ins: Vec<SignInView>,
+}
+
+impl StatusView {
+    fn session(&self) -> ServerSession {
+        match self.session_saved_at {
+            None => ServerSession::None,
+            Some(at) => ServerSession::Saved {
+                at,
+                // A server that doesn't say: the phone's, as most are.
+                by: match self.session_source.as_deref() {
+                    Some("server") => SessionSource::Server,
+                    _ => SessionSource::Phone,
+                },
+            },
+        }
+    }
+
+    fn vault(&self) -> ServerVault {
+        match self.vault_saved_at {
+            None => ServerVault::None,
+            Some(at) => ServerVault::Saved {
+                at,
+                expires_at: self.vault_expires_at,
+                gmail: self.vault_gmail,
+            },
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -566,11 +614,8 @@ impl Core {
                 push_token: device.push_token,
                 registered_at: device.created_at,
             },
-            session_saved_at: status.session_saved_at,
-            session_source: status.session_source,
-            vault_saved_at: status.vault_saved_at,
-            vault_expires_at: status.vault_expires_at,
-            vault_gmail: status.vault_gmail,
+            session: status.session(),
+            vault: status.vault(),
             credentials_rejected_at: account.credentials_rejected_at,
             sign_ins: status
                 .sign_ins
@@ -664,7 +709,7 @@ impl Core {
             }
         }
         let account = (self.read_account())
-            .filter(|account| !account.password.is_empty())
+            .and_then(crate::store::account::Saved::usable)
             .ok_or(CoreError::NotSignedIn)?;
         let otp = if gmail.is_some() {
             "gmail"

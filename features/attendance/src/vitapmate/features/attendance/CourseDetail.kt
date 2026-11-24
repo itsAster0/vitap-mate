@@ -11,6 +11,7 @@ import com.composables.icons.lucide.Calculator
 import com.composables.icons.lucide.List
 import com.composables.icons.lucide.RefreshCw
 import vitapmate.data.Histories
+import vitapmate.data.PageActivity
 import vitapmate.data.PageState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -101,7 +102,7 @@ internal fun CourseDetail(key: String, title: String? = null) {
     }
     val state = page.state
     val ready = state as? PageState.Ready
-    val busy = state is PageState.Loading || ready?.refreshing == true
+    val busy = state is PageState.Loading || ready?.activity is PageActivity.Refreshing
     // The title, and beside it the refresh (a pull would drag the sheet).
     if (title != null) Row(Modifier.fillMaxWidth().padding(start = Space.xl, end = Space.sm, bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
         Text(

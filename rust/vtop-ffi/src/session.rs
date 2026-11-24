@@ -22,8 +22,8 @@ impl Core {
         traced_sync("signed_in_user", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
-            .filter(|account| !account.password.is_empty())
-            .map(|account| account.username)
+            .filter(|saved| saved.password.is_some())
+            .map(|saved| saved.username)
     }
 
     /// The saved username and whether VTOP rejected the password, for Settings' "Needs
@@ -50,8 +50,7 @@ impl Core {
         traced_sync("saved_password", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
-            .map(|account| account.password)
-            .filter(|password| !password.is_empty())
+            .and_then(|saved| saved.password)
     }
 
     pub async fn sign_in(
@@ -369,7 +368,7 @@ impl Core {
     pub(crate) fn keep_accepted_password(&self, account: &Account) {
         if let Some(saved) = self.read_account()
             && saved.username == account.username
-            && (saved.password != account.password || saved.rejected)
+            && (saved.password.as_ref() != Some(&account.password) || saved.rejected)
         {
             info!("password accepted before the otp: saved");
             self.write_account(account);

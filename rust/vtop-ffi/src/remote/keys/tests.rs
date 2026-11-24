@@ -88,10 +88,22 @@ fn other_phones_with_keys_are_listed() {
     let found = elsewhere(&view);
     assert_eq!(found.len(), 2);
     assert_eq!(
-        (found[0].id.as_deref(), found[0].keys, found[0].seen_at),
-        (Some("old"), 2, Some(5))
+        found,
+        [
+            KeyPhone {
+                owner: KeyOwner::Phone {
+                    id: "old".into(),
+                    label: Some("Pixel".into()),
+                    seen_at: 5
+                },
+                keys: 2
+            },
+            KeyPhone {
+                owner: KeyOwner::Unlinked,
+                keys: 1
+            },
+        ]
     );
-    assert_eq!((found[1].id.as_deref(), found[1].keys), (None, 1));
 }
 
 #[tokio::test]

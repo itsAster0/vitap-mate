@@ -81,7 +81,7 @@ impl Core {
         traced_sync("is_demo", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
-            .is_some_and(|account| is(&account))
+            .is_some_and(|saved| saved.username == USERNAME)
     }
 }
 
