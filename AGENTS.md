@@ -108,8 +108,9 @@ A page or route change reaches more than one place. Check each:
   Expressive and theme colours only.
 - Reuse and move working code, in small diffs. Rust may be refactored for
   better traces, logs and errors.
-- Write the fewest lines that do the job: no single-caller wrappers or
-  pass-through layers, and stubs for parts not built yet.
+- Write the fewest lines that do the job: no pass-through layers that add
+  nothing (Wire/Stored types and a flow's local driver are fine), and stubs
+  for parts not built yet.
 - When something could be done better, ask and say what you will do by
   default, then carry on.
 - Call Rust off the main thread, once per screen state.
@@ -133,6 +134,22 @@ A page or route change reaches more than one place. Check each:
   doesn't matter. `#[expect(lint, reason = "...")]` over `#[allow]`. A
   `// SAFETY:` comment on every `unsafe` block.
 - Comments say why, not what, and carry no session history ("now", "changed to").
+- State has one owner. Server state lives in Convex and is watched live.
+  Domain state (session, identity, pages, forwarding, consent, routes) and
+  every calculation on it (attendance, grades, plans) live in Rust and cross
+  UniFFI as enums and records. Kotlin keeps only temporary UI state (input
+  being typed, a picked day, an open sheet, scroll) and Android-only state
+  (permissions, Keystore, the password manager). A Kotlin screen never copies
+  or recomputes domain state.
+- Make invalid states unrepresentable: model mutually exclusive phases as Rust
+  enums with data (Kotlin sealed classes through UniFFI) and Kotlin sealed
+  interfaces, not parallel booleans, nullable pairs, empty-string sentinels or
+  string-matched codes. Parse untrusted input (VTOP HTML, server JSON, disk
+  files, user input) once at the boundary into domain types; keep wire and
+  disk formats compatible with explicit Wire/Stored types and roundtrip tests,
+  never `#[serde(untagged)]`. Multi-step flows keep transitions pure
+  (`next(state, event)` returning the next state and a small closed Effect
+  type) with a thin local driver, not a shared framework.
 
 ## Setup
 
