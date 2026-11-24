@@ -5,13 +5,38 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.security.KeyStore
+import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import vitapmate.core.PasswordCipher
 import vitapmate.observability.Log
+
+private val atomicWriteSeq = AtomicLong()
+
+/**
+ * Replaces [this] atomically via a unique sibling temp file, fsyncing before rename and removing
+ * the temp file if writing or renaming fails.
+ */
+internal fun File.writeAtomically(bytes: ByteArray) {
+    val parent = parentFile?.apply { mkdirs() }
+    val tmp = File(parent, "$name.${System.nanoTime()}.${atomicWriteSeq.incrementAndGet()}.tmp")
+    var moved = false
+    try {
+        FileOutputStream(tmp).use { out ->
+            out.write(bytes)
+            out.fd.sync()
+        }
+        if (!tmp.renameTo(this)) throw IOException("failed to replace $name")
+        moved = true
+    } finally {
+        if (!moved) tmp.delete()
+    }
+}
 
 /**
  * Small secret files in the app's files dir, sealed with AES-GCM under an Android Keystore key
@@ -22,6 +47,7 @@ object Secrets {
     private const val STORE = "AndroidKeyStore"
     private const val CIPHER = "AES/GCM/NoPadding"
     private const val IV = 12
+    private val keyLock = Any()
 
     fun read(context: Context, name: String): ByteArray? {
         val file = file(context, name).takeIf { it.exists() } ?: return null
@@ -30,10 +56,7 @@ object Secrets {
 
     fun write(context: Context, name: String, plain: ByteArray) {
         val sealed = seal(name, plain)
-        val file = file(context, name)
-        val tmp = File(file.path + ".tmp")
-        tmp.writeBytes(sealed)
-        tmp.renameTo(file)
+        file(context, name).writeAtomically(sealed)
     }
 
     fun delete(context: Context, name: String) {
@@ -56,7 +79,7 @@ object Secrets {
 
     private fun file(context: Context, name: String) = File(context.filesDir, "$name.sealed")
 
-    private fun key(name: String): SecretKey {
+    private fun key(name: String): SecretKey = synchronized(keyLock) {
         val alias = "vitapmate.$name"
         val store = KeyStore.getInstance(STORE).apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
@@ -64,7 +87,7 @@ object Secrets {
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .build()
-        return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, STORE).apply { init(spec) }.generateKey()
+        KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, STORE).apply { init(spec) }.generateKey()
     }
 }
 

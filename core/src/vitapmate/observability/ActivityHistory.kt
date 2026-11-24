@@ -3,6 +3,7 @@ package vitapmate.observability
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
+import vitapmate.data.writeAtomically
 
 /**
  * Finished [Run]s kept after the log files roll over, one JSON object per line in
@@ -33,6 +34,7 @@ object ActivityHistory {
     }
 
     /** Every saved run, newest first. Blocking. */
+    @Synchronized
     fun load(): List<Run> {
         if (!file.exists()) return emptyList()
         return file.readLines().mapNotNull { line -> runCatching { decode(JSONObject(line)) }.getOrNull() }.asReversed()
@@ -46,9 +48,7 @@ object ActivityHistory {
         var size = file.length()
         var from = 0
         while (from < lines.size && size > max) size -= lines[from++].toByteArray().size + 1
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(lines.drop(from).joinToString("") { "$it\n" })
-        tmp.renameTo(file)
+        file.writeAtomically(lines.drop(from).joinToString("") { "$it\n" }.toByteArray())
     }
 
     private fun encode(run: Run) = JSONObject()

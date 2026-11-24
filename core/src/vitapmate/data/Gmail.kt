@@ -1,6 +1,9 @@
 package vitapmate.data
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.util.Base64
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,11 +20,20 @@ import java.net.URL
 import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import vitapmate.core.gmailOtp
@@ -52,6 +64,9 @@ object Gmail {
 
     /** How long the browser sign-in may take. */
     private const val SIGN_IN_MS = 10 * 60_000L
+    private const val REACHABLE_WINDOW_MS = 3 * 60_000L
+    private const val RETRY_BASE_MS = 2_000L
+    private const val RETRY_MAX_MS = 15_000L
 
     /** A Desktop-app OAuth client from Google Cloud's JSON. No `toString`: it holds the secret. */
     class Client(val id: String, val secret: String?, val project: String) {
@@ -95,6 +110,8 @@ object Gmail {
 
     private lateinit var app: Context
     private val lock = Mutex()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var desiredDeleteAfterReading: Boolean? = null
 
     /** Call once at start, then [load] off the main thread. */
     fun init(context: Context) {
@@ -186,7 +203,10 @@ object Gmail {
             verifyGmail(access, flow)
             val ends = tokens.optLong("refresh_token_expires_in", 0).takeIf { it > 0 }?.let { System.currentTimeMillis() + it * 1000 } ?: 0
             val saved = Account(email, client, refresh, access, expiry(tokens), account?.deleteAfterReading ?: true, ends)
-            save(saved)
+            lock.withLock {
+                desiredDeleteAfterReading = null
+                save(saved)
+            }
             Settings.otpSource = OtpSource.Gmail
             // Paused over Gmail: the next run can try again.
             Settings.syncHealth = Settings.syncHealth.resumedIf(PauseReason::gmail)
@@ -201,6 +221,7 @@ object Gmail {
     /** Forgets the account and revokes its grant (best effort). */
     suspend fun disconnect(flow: String) = withContext(Dispatchers.IO) {
         val old = lock.withLock {
+            desiredDeleteAfterReading = null
             account.also {
                 account = null
                 Secrets.delete(app, FILE)
@@ -211,7 +232,17 @@ object Gmail {
     }
 
     fun setDeleteAfterReading(on: Boolean) {
-        account?.let { save(it.copy(deleteAfterReading = on)) }
+        val current = account ?: return
+        desiredDeleteAfterReading = on
+        account = current.copy(deleteAfterReading = on)
+        scope.launch {
+            lock.withLock {
+                val latest = account ?: return@withLock
+                val target = desiredDeleteAfterReading ?: return@withLock
+                runCatching { save(latest.copy(deleteAfterReading = target)) }
+                    .onFailure { Log.warn(SRC, "save failed: ${it::class.simpleName}") }
+            }
+        }
     }
 
     /**
@@ -336,18 +367,72 @@ object Gmail {
         }
     }
 
-    /** Runs [call] again every 2 s for up to 3 min while it fails before reaching Google. */
+    /**
+     * Retries [call] for up to 3 min while it fails before reaching Google, awaiting foreground
+     * return or network availability via [ConnectivityManager] instead of blind polling.
+     */
     private suspend fun <T> untilReachable(flow: String, call: () -> T): T {
-        val deadline = System.currentTimeMillis() + 3 * 60_000
+        val deadline = System.currentTimeMillis() + REACHABLE_WINDOW_MS
         var tries = 1
+        var backoffMs = RETRY_BASE_MS
         while (true) {
             try {
                 return call().also { if (tries > 1) Log.info(SRC, "reached Google", flow, mapOf("tries" to "$tries")) }
             } catch (e: GmailException) {
-                if (e.code != "unreachable" || System.currentTimeMillis() > deadline) throw e
+                val remaining = deadline - System.currentTimeMillis()
+                if (e.code != "unreachable" || remaining <= 0) throw e
+                awaitReachable(remaining, backoffMs)
+                backoffMs = (backoffMs * 2).coerceAtMost(RETRY_MAX_MS)
             }
             tries++
-            kotlinx.coroutines.delay(2_000)
+        }
+    }
+
+    private suspend fun awaitReachable(remainingMs: Long, backoffMs: Long) {
+        if (!Foreground.shown) {
+            withTimeoutOrNull(remainingMs) { Foreground.shownFlow.first { it } }
+            return
+        }
+        val cm = app.getSystemService(ConnectivityManager::class.java)
+        if (cm == null) {
+            delay(backoffMs.coerceAtMost(remainingMs))
+            return
+        }
+        val active = cm.activeNetwork
+        val online = active != null && cm.getNetworkCapabilities(active)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        val waitMs = if (online) backoffMs.coerceAtMost(remainingMs) else remainingMs
+        val skip = if (online) active else null
+        val registered = withTimeoutOrNull(waitMs) { awaitNetwork(cm, skip) }
+        if (registered == false) delay(backoffMs.coerceAtMost(remainingMs))
+    }
+
+    /** True once a network other than [skip] with internet capability became available; false if the callback could not register. */
+    private suspend fun awaitNetwork(cm: ConnectivityManager, skip: Network?): Boolean = suspendCancellableCoroutine { cont ->
+        val done = AtomicBoolean(false)
+        lateinit var callback: ConnectivityManager.NetworkCallback
+        fun wake() {
+            if (done.compareAndSet(false, true)) {
+                runCatching { cm.unregisterNetworkCallback(callback) }
+                cont.resume(true)
+            }
+        }
+        callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                if (network != skip) wake()
+            }
+
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                if (network != skip && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) wake()
+            }
+        }
+        try {
+            cm.registerDefaultNetworkCallback(callback)
+        } catch (_: RuntimeException) {
+            if (done.compareAndSet(false, true)) cont.resume(false)
+            return@suspendCancellableCoroutine
+        }
+        cont.invokeOnCancellation {
+            if (done.compareAndSet(false, true)) runCatching { cm.unregisterNetworkCallback(callback) }
         }
     }
 

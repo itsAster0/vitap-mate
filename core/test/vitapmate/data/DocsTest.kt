@@ -1,7 +1,13 @@
 package vitapmate.data
 
+import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class DocsTest {
     private fun doc(id: String, name: String, added: Long, opened: Long? = null, kind: DocKind = DocKind.Pdf, size: Long = 1) =
@@ -61,5 +67,33 @@ class DocsTest {
         assertEquals(DocKind.Text, DocKind.of("notes.md"))
         assertEquals(DocKind.File, DocKind.of("archive.zip"))
         assertEquals(DocKind.File, DocKind.of("noext"))
+    }
+
+    @Test
+    fun writeAtomicallyReplacesConcurrentlyAndCleansUpOnRenameFailure() {
+        val dir = Files.createTempDirectory("atomic-write").toFile()
+        try {
+            val target = File(dir, "state.json")
+            val payloads = (1..8).map { n -> "payload-$n-" + "x".repeat(64) }
+            val errors = mutableListOf<Throwable>()
+            val threads = payloads.map { body ->
+                thread {
+                    runCatching { repeat(10) { target.writeAtomically(body.toByteArray()) } }
+                        .onFailure { synchronized(errors) { errors += it } }
+                }
+            }
+            threads.forEach { it.join() }
+            assertEquals(emptyList(), errors)
+            assertTrue(target.readText() in payloads)
+            assertEquals(listOf("state.json"), dir.list()?.toList())
+
+            // Rename over a non-empty directory fails and removes its sibling temp file.
+            val blocked = File(dir, "blocked").apply { mkdirs() }
+            File(blocked, "keep").writeText("1")
+            assertFailsWith<IOException> { blocked.writeAtomically("nope".toByteArray()) }
+            assertTrue(dir.listFiles().orEmpty().none { it.name.endsWith(".tmp") })
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 }

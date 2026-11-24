@@ -1,7 +1,10 @@
 package vitapmate.data
 
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Environment
 import android.os.Build
@@ -9,17 +12,20 @@ import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
 import java.io.File
 import java.io.InputStream
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import vitapmate.core.FileLink
@@ -127,10 +133,15 @@ internal object DocIndex {
  * file names.
  */
 object Docs {
+    /** Safety re-check interval in case an OEM removes a cancelled download without broadcasting. */
+    private const val DOWNLOAD_RECHECK_MS = 30_000L
+
     private val state = mutableStateOf<List<Doc>>(emptyList())
     private val sortState = mutableStateOf(DocSort.RecentlyOpened)
     private val lock = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val ready = CompletableDeferred<Unit>()
+    @Volatile private var sortTouched = false
     private var dir: File? = null
     private var app: Context? = null
 
@@ -146,13 +157,18 @@ object Docs {
     var sort: DocSort
         get() = sortState.value
         set(value) {
+            sortTouched = true
             sortState.value = value
-            scope.launch { lock.withLock { write() } }
+            scope.launch {
+                ready.await()
+                lock.withLock { write() }
+            }
         }
 
     /**
-     * Loads the index and the mess timings, moves documents still in app storage (from before)
-     * to the download folder, and resumes VTOP downloads still to copy; later calls do nothing.
+     * Starts loading the index off the main thread, loads mess timings, moves documents still in
+     * app storage (from before) to the download folder, and resumes VTOP downloads still to copy;
+     * later calls do nothing.
      */
     @Synchronized
     fun init(context: Context) {
@@ -162,20 +178,26 @@ object Docs {
         Downloads.init(ctx)
         // Docs follow their files when the student picks another folder.
         Downloads.onMoved = { moves -> scope.launch { remap(moves) } }
-        val d = File(ctx.filesDir, "docs").apply { mkdirs() }
+        val d = File(ctx.filesDir, "docs")
         dir = d
-        // Small; read here so a feature's first [byId] already sees it.
-        val index = File(d, "index.json")
-        if (index.exists()) runCatching { DocIndex.decode(index.readText()) }
-            .onSuccess { (s, list) ->
-                sortState.value = s
-                state.value = list
-            }
-            .onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }
         app = ctx
         scope.launch {
+            try {
+                lock.withLock {
+                    d.mkdirs()
+                    val index = File(d, "index.json")
+                    if (index.exists()) runCatching { DocIndex.decode(index.readText()) }
+                        .onSuccess { (s, list) ->
+                            if (!sortTouched) sortState.value = s
+                            state.value = list
+                        }
+                        .onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }
+                }
+            } finally {
+                ready.complete(Unit)
+            }
             // Where Rust used to stream course files, with any partial ones: nothing writes there now.
-            withContext(Dispatchers.IO) { File(ctx.filesDir, "downloads").deleteRecursively() }
+            File(ctx.filesDir, "downloads").deleteRecursively()
             migrate()
             downloads(ctx).all.forEach { (key, value) ->
                 val saved = value as? String ?: return@forEach
@@ -241,6 +263,7 @@ object Docs {
      * (Flutter's `keepInDocs`), so app-fetched files open offline later. The temporary file goes once saved.
      */
     suspend fun keep(id: String, source: String, flow: String, name: String, mime: String?, reuse: Boolean = true, fetch: suspend () -> File): Pair<Doc, Boolean> {
+        ready.await()
         if (reuse) byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it to true }
         val file = fetch()
         return try {
@@ -259,6 +282,7 @@ object Docs {
      * caller's screen goes.
      */
     suspend fun download(context: Context, id: String, source: String, flow: String, reuse: Boolean, link: suspend () -> FileLink): Pair<Doc, Boolean> {
+        ready.await()
         if (reuse) byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it to true }
         val l = link()
         val fileName = fileNameOf(l.name, l.mime.ifEmpty { null })
@@ -281,7 +305,7 @@ object Docs {
         val downloadId = manager.enqueue(request)
         Log.info("docs", "download queued", flow, mapOf("source" to source, "direct" to "$direct"))
         return scope.async {
-            val done = finished(manager, downloadId)
+            val done = finished(context, manager, downloadId)
             if (direct) {
                 // DownloadManager adds "-1" when the name is taken.
                 val name = done.name.ifEmpty { fileName }
@@ -301,24 +325,50 @@ object Docs {
     /** A finished DownloadManager download: its file's name and size. */
     private class Finished(val name: String, val size: Long)
 
-    /** Waits for DownloadManager download [downloadId]; throws (and removes it) when it failed. */
-    private suspend fun finished(manager: DownloadManager, downloadId: Long): Finished {
-        while (true) {
-            val row = withContext(Dispatchers.IO) {
-                manager.query(DownloadManager.Query().setFilterById(downloadId))?.use { c ->
-                    if (!c.moveToFirst()) return@use null
-                    fun text(column: String) = c.getString(c.getColumnIndexOrThrow(column)).orEmpty()
-                    Triple(c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)), c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)), Finished(Uri.parse(text(DownloadManager.COLUMN_LOCAL_URI)).lastPathSegment.orEmpty(), c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))))
+    private fun queryDownload(manager: DownloadManager, downloadId: Long): Triple<Int, Int, Finished>? =
+        manager.query(DownloadManager.Query().setFilterById(downloadId))?.use { c ->
+            if (!c.moveToFirst()) return@use null
+            fun text(column: String) = c.getString(c.getColumnIndexOrThrow(column)).orEmpty()
+            Triple(
+                c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),
+                c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)),
+                Finished(Uri.parse(text(DownloadManager.COLUMN_LOCAL_URI)).lastPathSegment.orEmpty(), c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))),
+            )
+        }
+
+    /** Waits for DownloadManager download [downloadId] via [DownloadManager.ACTION_DOWNLOAD_COMPLETE]; throws (and removes it) when it failed. */
+    private suspend fun finished(context: Context, manager: DownloadManager, downloadId: Long): Finished {
+        val appContext = context.applicationContext
+        val signalRef = AtomicReference(CompletableDeferred<Unit>())
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                if (intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) == downloadId) {
+                    signalRef.get().complete(Unit)
                 }
             }
-            when (row?.first) {
-                DownloadManager.STATUS_SUCCESSFUL -> return row.third
-                DownloadManager.STATUS_FAILED, null -> {
-                    manager.remove(downloadId)
-                    error("The download failed (${row?.second ?: "cancelled"}).")
+        }
+        ContextCompat.registerReceiver(
+            appContext,
+            receiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+        try {
+            while (true) {
+                val next = CompletableDeferred<Unit>()
+                signalRef.set(next)
+                val row = withContext(Dispatchers.IO) { queryDownload(manager, downloadId) }
+                when (row?.first) {
+                    DownloadManager.STATUS_SUCCESSFUL -> return row.third
+                    DownloadManager.STATUS_FAILED, null -> {
+                        manager.remove(downloadId)
+                        error("The download failed (${row?.second ?: "cancelled"}).")
+                    }
+                    else -> withTimeoutOrNull(DOWNLOAD_RECHECK_MS) { next.await() }
                 }
-                else -> delay(500)
             }
+        } finally {
+            runCatching { appContext.unregisterReceiver(receiver) }
         }
     }
 
@@ -331,11 +381,14 @@ object Docs {
     suspend fun saveView(id: String, page: Int, zoom: Float) = update(id) { it.copy(page = page, zoom = zoom) }
 
     /** Removes [id] from Docs and its file from the download folder. */
-    suspend fun remove(id: String) = lock.withLock {
-        val doc = docs.firstOrNull { it.id == id } ?: return@withLock
-        if (doc.uri.isNotEmpty()) Downloads.delete(uriOf(doc))
-        state.value = docs - doc
-        write()
+    suspend fun remove(id: String) {
+        ready.await()
+        lock.withLock {
+            val doc = docs.firstOrNull { it.id == id } ?: return@withLock
+            if (doc.uri.isNotEmpty()) Downloads.delete(uriOf(doc))
+            state.value = docs - doc
+            write()
+        }
     }
 
     /**
@@ -350,7 +403,7 @@ object Docs {
             flow("docs.download") { f ->
                 val manager = context.getSystemService(DownloadManager::class.java)
                 runCatching {
-                    val done = finished(manager, downloadId)
+                    val done = finished(context, manager, downloadId)
                     val file = manager.getUriForDownloadedFile(downloadId) ?: error("no file")
                     add(name, null, source, "$source:$name", f, done.size) { context.contentResolver.openInputStream(file) ?: error("can't read the file") }
                     manager.remove(downloadId)
@@ -383,6 +436,7 @@ object Docs {
 
     /** The file [fileName] now at [uri] as document [id] (a new one when null), replacing its old file. */
     private suspend fun register(uri: Uri, fileName: String, size: Long, source: String, id: String?, flow: String?): Doc {
+        ready.await()
         return lock.withLock {
             // Saving an [id] again replaces it (a re-download); [keep] is the way to reuse a copy.
             docs.firstOrNull { id != null && it.id == id }?.takeIf { it.uri.isNotEmpty() && it.uri != uri.toString() }?.let { Downloads.delete(uriOf(it)) }
@@ -411,6 +465,7 @@ object Docs {
      * when Docs is opened, never in the background. Log src `docs`: counts only.
      */
     suspend fun refresh() {
+        ready.await()
         val files = withContext(Dispatchers.IO) { Downloads.list() } ?: return
         lock.withLock {
             val byUri = files.associateBy { it.uri }
@@ -442,9 +497,12 @@ object Docs {
     }
 
     /** The folder changed: each document whose file moved points at its new place. */
-    private suspend fun remap(moves: Map<String, String>) = lock.withLock {
-        state.value = docs.map { d -> moves[d.uri]?.let { d.copy(uri = it) } ?: d }
-        write()
+    private suspend fun remap(moves: Map<String, String>) {
+        ready.await()
+        lock.withLock {
+            state.value = docs.map { d -> moves[d.uri]?.let { d.copy(uri = it) } ?: d }
+            write()
+        }
     }
 
     /**
@@ -489,16 +547,17 @@ object Docs {
         }
     }
 
-    private suspend fun update(id: String, change: (Doc) -> Doc) = lock.withLock {
-        if (docs.none { it.id == id }) return@withLock
-        state.value = docs.map { if (it.id == id) change(it) else it }
-        write()
+    private suspend fun update(id: String, change: (Doc) -> Doc) {
+        ready.await()
+        lock.withLock {
+            if (docs.none { it.id == id }) return@withLock
+            state.value = docs.map { if (it.id == id) change(it) else it }
+            write()
+        }
     }
 
     private suspend fun write() = withContext(Dispatchers.IO) {
         val d = dir ?: return@withContext
-        val tmp = File(d, "index.json.tmp")
-        tmp.writeText(DocIndex.encode(sort, docs))
-        tmp.renameTo(File(d, "index.json"))
+        File(d, "index.json").writeAtomically(DocIndex.encode(sort, docs).toByteArray())
     }
 }
