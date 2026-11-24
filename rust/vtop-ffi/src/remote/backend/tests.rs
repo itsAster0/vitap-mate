@@ -233,8 +233,8 @@ impl LiveListener for Heard {
     fn on_change(&self) {
         self.0.lock().unwrap().push("change".into());
     }
-    fn on_error(&self, code: String, _message: String) {
-        self.0.lock().unwrap().push(code);
+    fn on_error(&self, error: LiveError) {
+        self.0.lock().unwrap().push(format!("{error:?}"));
     }
 }
 
@@ -472,4 +472,38 @@ fn renewal_coordinator_coalesces_requests_and_stops_when_watches_drop() {
     drop(held_b);
     assert_eq!(renewal.decide(Some(1_000_000), 0, now), RenewDecision::Stop);
     assert!(!renewal.running);
+}
+
+#[test]
+fn live_errors_say_what_the_app_does_next() {
+    let status = |code, message: &str| EdgeError::Status {
+        code,
+        message: message.into(),
+    };
+    for code in [
+        ServerCode::Unauthenticated,
+        ServerCode::ServerError,
+        ServerCode::NotFound,
+        ServerCode::BadRequest,
+    ] {
+        assert_eq!(LiveError::of(status(code, "x")), LiveError::Transient);
+    }
+    assert_eq!(
+        LiveError::of(status(ServerCode::DeviceRemoved, "Removed.")),
+        LiveError::NoIdentity {
+            message: "Removed.".into()
+        }
+    );
+    assert_eq!(
+        LiveError::of(status(ServerCode::Unknown("mailbox_full".into()), "Full.")),
+        LiveError::Stopped {
+            message: "Full.".into()
+        }
+    );
+    assert_eq!(
+        LiveError::of(EdgeError::Offline),
+        LiveError::Stopped {
+            message: "The server can't be reached.".into()
+        }
+    );
 }

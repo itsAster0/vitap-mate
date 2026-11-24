@@ -11,6 +11,7 @@ use tracing::info;
 use vtop_shared::{device_sig, mail_seal};
 
 use crate::remote::backend::{Kind, Refresh};
+use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, traced, unix_now};
 
 const FILE: &str = "device.json";
@@ -36,15 +37,21 @@ pub(crate) struct Device {
 #[derive(Debug)]
 pub(crate) enum EdgeError {
     Offline,
-    Status { code: String, message: String },
+    Status { code: ServerCode, message: String },
 }
 
 impl EdgeError {
+    /// The code as the server spelt it ("offline" with no answer), for the logs.
     pub(crate) fn code(&self) -> &str {
         match self {
             Self::Offline => "offline",
-            Self::Status { code, .. } => code,
+            Self::Status { code, .. } => code.as_str(),
         }
+    }
+
+    /// Whether the server answered with `code`.
+    pub(crate) fn is(&self, code: &ServerCode) -> bool {
+        matches!(self, Self::Status { code: got, .. } if got == code)
     }
 
     /// What the server said, for the student.
@@ -149,7 +156,7 @@ impl Core {
                 .await
             {
                 // Sent with the device at the next `auth:token`.
-                Err(error) if error.code() == "unauthenticated" => Ok(()),
+                Err(error) if error.is(&ServerCode::Unauthenticated) => Ok(()),
                 sent => sent.map(drop).map_err(CoreError::from),
             }
         })

@@ -34,6 +34,42 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 /// it holds expires. Each new JWT goes once, whatever its lifetime.
 static JWT_SENT: AtomicU64 = AtomicU64::new(0);
 
+/// Why a UDP fetch gave no page, read once from the gateway's answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum UdpFetchError {
+    /// The link worked; VTOP's session ran out and the gateway couldn't renew it.
+    SessionExpired,
+    /// The gateway (or the engine behind it) answered `status` with `code` (`unreadable` when
+    /// the body wasn't JSON).
+    Gateway { status: u16, code: String },
+    /// No answer, or none we could use: the route counts it as a failure.
+    Transport(String),
+}
+
+impl std::fmt::Display for UdpFetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SessionExpired => f.write_str("the UDP gateway answered session_expired"),
+            Self::Gateway { status, code } => {
+                write!(f, "the UDP gateway answered {status} {code}")
+            }
+            Self::Transport(reason) => f.write_str(reason),
+        }
+    }
+}
+
+impl From<String> for UdpFetchError {
+    fn from(reason: String) -> Self {
+        Self::Transport(reason)
+    }
+}
+
+impl From<&str> for UdpFetchError {
+    fn from(reason: &str) -> Self {
+        Self::Transport(reason.to_string())
+    }
+}
+
 /// The next fetch sends the JWT again: the identity changed (sign-out, another student).
 pub(crate) fn forget_jwt_sent() {
     JWT_SENT.store(0, Ordering::Relaxed);
@@ -152,10 +188,40 @@ impl Gateway {
     }
 }
 
+/// The gateway's answer to page `name` as its `data`, or why there is none.
+fn page_answer(name: &str, answer: &WirePageResponse) -> Result<Value, UdpFetchError> {
+    let status = answer.status;
+    if status != 200 {
+        let body = serde_json::from_slice::<Value>(&answer.body).ok();
+        let code = body.as_ref().map_or("unreadable", |body| {
+            body.get("code")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+        });
+        return Err(match code {
+            "session_expired" => UdpFetchError::SessionExpired,
+            code => UdpFetchError::Gateway {
+                status,
+                code: code.to_string(),
+            },
+        });
+    }
+    let unreadable = || UdpFetchError::Transport("unreadable page from UDP".to_string());
+    if answer.packed {
+        return unpacked(name, &answer.body).ok_or_else(unreadable);
+    }
+    let mut body: Value = serde_json::from_slice(&answer.body).map_err(|_| unreadable())?;
+    Ok(body.get_mut("data").map(Value::take).unwrap_or_default())
+}
+
 impl Core {
-    /// Page `request`'s parsed `data`, fetched through the UDP gateway; `Err(reason)` on any
-    /// failure, for the route to fall back.
-    pub(crate) async fn udp_page(&self, flow: &str, request: &PageFetch) -> Result<Value, String> {
+    /// Page `request`'s parsed `data`, fetched through the UDP gateway; an error on any failure,
+    /// for the route to fall back.
+    pub(crate) async fn udp_page(
+        &self,
+        flow: &str,
+        request: &PageFetch,
+    ) -> Result<Value, UdpFetchError> {
         let page = WirePageRequest {
             request_id: Some(flow.to_string()),
             name: request.name.clone(),
@@ -176,7 +242,7 @@ impl Core {
         flow: &str,
         mut page: WirePageRequest,
         session: String,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, UdpFetchError> {
         let deadline = Instant::now() + TIMEOUT;
         // A renewed session belongs to the student signed in now, not to whoever is by the time
         // the answer comes.
@@ -220,7 +286,7 @@ impl Core {
                     gateway = self.udp_gateway(&server, flow).await?;
                     continue;
                 }
-                Err(error) => return Err(error.to_string()),
+                Err(error) => return Err(UdpFetchError::Transport(error.to_string())),
             };
             info!(
                 page = page.name.as_str(),
@@ -251,19 +317,7 @@ impl Core {
             if let Some(renewed) = answer.session.as_deref().filter(|_| answer.status == 200) {
                 self.adopt_renewed(renewed, started.as_ref()).await;
             }
-            let unreadable = || format!("unreadable page from UDP (HTTP {})", answer.status);
-            if answer.packed && answer.status == 200 {
-                return unpacked(&page.name, &answer.body).ok_or_else(unreadable);
-            }
-            let mut body: Value = serde_json::from_slice(&answer.body).map_err(|_| unreadable())?;
-            if answer.status != 200 {
-                let code = body
-                    .get("code")
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown");
-                return Err(format!("the UDP gateway answered {} {code}", answer.status));
-            }
-            return Ok(body.get_mut("data").map(Value::take).unwrap_or_default());
+            return page_answer(&page.name, &answer);
         }
     }
 

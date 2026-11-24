@@ -352,5 +352,52 @@ async fn live_udp() {
         started.elapsed()
     );
     let error = page.unwrap_err();
-    assert!(error.starts_with("the UDP gateway answered"), "{error}");
+    assert!(
+        matches!(
+            error,
+            UdpFetchError::Gateway { .. } | UdpFetchError::SessionExpired
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn gateway_answers_parse_once_into_errors() {
+    let answer = |status: u16, body: &[u8]| WirePageResponse {
+        status,
+        packed: false,
+        body: body.to_vec(),
+        session: None,
+    };
+    assert_eq!(
+        page_answer("marks", &answer(200, br#"{"data":{"a":1}}"#)),
+        Ok(json!({ "a": 1 }))
+    );
+    assert_eq!(
+        page_answer("marks", &answer(401, br#"{"code":"session_expired"}"#)),
+        Err(UdpFetchError::SessionExpired)
+    );
+    let gone = page_answer("marks", &answer(404, b"<html>"));
+    assert_eq!(
+        gone,
+        Err(UdpFetchError::Gateway {
+            status: 404,
+            code: "unreadable".into()
+        })
+    );
+    assert_eq!(
+        gone.unwrap_err().to_string(),
+        "the UDP gateway answered 404 unreadable"
+    );
+    assert_eq!(
+        page_answer("marks", &answer(502, b"{}")),
+        Err(UdpFetchError::Gateway {
+            status: 502,
+            code: "unknown".into()
+        })
+    );
+    assert!(matches!(
+        page_answer("marks", &answer(200, b"not json")),
+        Err(UdpFetchError::Transport(_))
+    ));
 }

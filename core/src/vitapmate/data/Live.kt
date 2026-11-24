@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEmpty
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.Dispatchers
+import vitapmate.core.LiveError
 import vitapmate.core.LiveListener
 import vitapmate.core.LiveTopic
 import vitapmate.observability.Log
@@ -52,17 +53,15 @@ object Live {
                         trySend(Unit)
                     }
 
-                    override fun onError(code: String, message: String) {
-                        // A refused JWT is renewed in Rust and the next change follows; with no
-                        // identity left (signed out, this phone removed) the flow ends.
-                        Log.warn("data.live", "$name failed: $code", id, mapOf("message" to message))
-                        when (code) {
-                            // Renewed in Rust; or our own fault, which the student can't act on:
-                            // the log above (and Rust's) has the reason.
-                            "unauthenticated", "server_error", "not_found", "bad_request" -> {}
-                            "no_identity" -> close()
-                            else -> failing.update {
-                                it + (topic to Problem(ProblemKind.Unexpected, "Live Updates Stopped", message, id, retryable = true, userInitiated = false))
+                    override fun onError(error: LiveError) {
+                        // Rust's log has the server's code; Transient is a refused JWT renewed in
+                        // Rust (the next change follows) or our own fault the student can't act on.
+                        Log.warn("data.live", "$name failed: ${error::class.simpleName}", id)
+                        when (error) {
+                            LiveError.Transient -> {}
+                            is LiveError.NoIdentity -> close()
+                            is LiveError.Stopped -> failing.update {
+                                it + (topic to Problem(ProblemKind.Unexpected, "Live Updates Stopped", error.message, id, retryable = true, userInitiated = false))
                             }
                         }
                     }

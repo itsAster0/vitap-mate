@@ -26,6 +26,7 @@ use vtop_shared::device_sig;
 use crate::convex::{CallError, ConvexClient, SubscriptionId};
 use crate::device::EdgeError;
 use crate::remote::account_token;
+use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, Shared, unix_now};
 
 use auth::{AuthMachine, Blocked, Effect, Grant, Stamp, Step, StepInput};
@@ -114,9 +115,42 @@ pub enum LiveTopic {
 pub trait LiveListener: Send + Sync {
     /// The server's data changed (and once at first): read it again.
     fn on_change(&self);
-    /// The query failed with `code` and the server's `message` for the student
-    /// (`unauthenticated` renews the JWT; the next change follows).
-    fn on_error(&self, code: String, message: String);
+    /// The watch failed; what follows is in `error`.
+    fn on_error(&self, error: LiveError);
+}
+
+/// Why a [`LiveListener`]'s watch failed, as the app acts on it.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum LiveError {
+    /// Renewed here (a refused JWT; the next change follows), or our own fault the student
+    /// can't act on (the log has the reason).
+    Transient,
+    /// No identity left (signed out, this phone removed): the watch ends.
+    NoIdentity { message: String },
+    /// The server stopped following it for a reason the student may see.
+    Stopped { message: String },
+}
+
+impl LiveError {
+    fn of(error: EdgeError) -> Self {
+        match error {
+            EdgeError::Status {
+                code:
+                    ServerCode::Unauthenticated
+                    | ServerCode::ServerError
+                    | ServerCode::NotFound
+                    | ServerCode::BadRequest,
+                ..
+            } => Self::Transient,
+            EdgeError::Status {
+                code: ServerCode::DeviceRemoved,
+                message,
+            } => Self::NoIdentity { message },
+            error => Self::Stopped {
+                message: error.message().to_string(),
+            },
+        }
+    }
 }
 
 /// One [`Core::live_watch`]; stopping or dropping it unsubscribes.
@@ -228,30 +262,22 @@ impl Core {
                 }
                 Err(error) => {
                     let error = edge_error(path, error);
-                    let code = error.code().to_string();
-                    let message = error.message().to_string();
-                    match (code.as_str(), core.upgrade()) {
-                        ("unauthenticated", Some(core)) => {
+                    if let Some(core) = core.upgrade() {
+                        if error.is(&ServerCode::Unauthenticated) {
                             let failed_epoch = seen_jwt_epoch.load(Ordering::Relaxed);
                             core.on_jwt_rejected(Some(failed_epoch));
                             core.request_watch_renewal(&renew_flow, listener.clone());
                         }
                         // Removed on another phone: only act if this watch belongs to the current
                         // identity generation, so a late error never wipes a newer refresh token.
-                        ("device_removed", Some(core)) => {
-                            if core.on_device_removed(watch_gen) {
-                                warn!(path, gen = watch_gen, "this install was removed on the server");
-                                listener.on_error(NO_IDENTITY.into(), message);
+                        if error.is(&ServerCode::DeviceRemoved) {
+                            if !core.on_device_removed(watch_gen) {
+                                return;
                             }
-                            return;
+                            warn!(path, gen = watch_gen, "this install was removed on the server");
                         }
-                        ("device_removed", None) => {
-                            listener.on_error(NO_IDENTITY.into(), message);
-                            return;
-                        }
-                        _ => {}
                     }
-                    listener.on_error(code, message);
+                    listener.on_error(LiveError::of(error));
                 }
             };
             let id = backend.watch(path, args, Box::new(on_update));
@@ -269,9 +295,6 @@ impl Core {
 
 /// How often the live-watch renewal coordinator checks again while waiting.
 const KEEP_CHECK: Duration = Duration::from_secs(30);
-
-/// What a [`LiveListener`] hears when its watch can't follow any more.
-const NO_IDENTITY: &str = "no_identity";
 
 /// Phase of the single live-watch JWT renewal coordinator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -495,10 +518,9 @@ fn run_renewal_coordinator(core: std::sync::Weak<Core>, shared: Arc<Shared>) {
                             .finish(&renewed, Instant::now());
                         drop(strong);
                         for listener in notify {
-                            listener.on_error(
-                                NO_IDENTITY.into(),
-                                "Sign in again to follow changes.".into(),
-                            );
+                            listener.on_error(LiveError::NoIdentity {
+                                message: "Sign in again to follow changes.".into(),
+                            });
                         }
                         if stop {
                             return;
@@ -554,22 +576,10 @@ const PROOF_BUDGET: Duration = Duration::from_secs(150);
 /// The last student's refresh token, set aside at a switch ([`Core::set_aside_identity`]).
 pub(crate) const LAST_STUDENT: &str = "server_last_student.json";
 
-/// Whether a sign-out answered `code` because there is nothing left to sign out of.
-pub(crate) fn signed_out_already(code: &str) -> bool {
-    TOKEN_REFUSED.contains(&code) || code == "unauthenticated"
+/// Whether a sign-out failed because there is nothing left to sign out of.
+pub(crate) fn signed_out_already(error: &EdgeError) -> bool {
+    matches!(error, EdgeError::Status { code, .. } if code.is_signed_out_already())
 }
-
-/// Codes `auth:token` answers a refresh or v2 token it won't take with: the token is dropped
-/// and the next source is tried. Any other failure (offline, a server fault) keeps it, so a
-/// passing fault never costs a new proof.
-const TOKEN_REFUSED: [&str; 6] = [
-    "device_removed",
-    "refresh_reused",
-    "refresh_invalid",
-    "refresh_expired",
-    "token_invalid",
-    "token_expired",
-];
 
 impl Shared {
     fn backend_state(&self) -> std::sync::MutexGuard<'_, State> {
@@ -603,19 +613,26 @@ pub(crate) fn edge_error(path: &str, error: CallError) -> EdgeError {
                 .collect();
             warn!(path, missing, reason = reason.as_str(), "server failed");
             EdgeError::Status {
-                code: if missing { "not_found" } else { "server_error" }.into(),
+                code: if missing {
+                    ServerCode::NotFound
+                } else {
+                    ServerCode::ServerError
+                },
                 message: "The server sent an unexpected answer.".into(),
             }
         }
         CallError::Convex { message, data } => {
             let text = |key| data.get(key).and_then(Value::as_str).map(str::to_string);
-            let code = text("code").unwrap_or_else(|| "server_error".into());
+            let code =
+                text("code").map_or(ServerCode::ServerError, |code| ServerCode::parse(&code));
             let message = text("error").unwrap_or(message);
             // These answer the phone's own state (an expired JWT, a removed phone, the demo):
             // the caller handles them. Any other code is worth a look.
             if matches!(
-                code.as_str(),
-                "unauthenticated" | "device_removed" | "demo_unavailable"
+                code,
+                ServerCode::Unauthenticated
+                    | ServerCode::DeviceRemoved
+                    | ServerCode::DemoUnavailable
             ) {
                 info!(
                     path,
@@ -818,15 +835,18 @@ impl Core {
             let stamp = self.ensure_identity(flow, action, ask).await?;
             let answer = self.run(flow, kind, path, args.clone()).await;
             let code = match &answer {
-                Err(CallError::Convex { data, .. }) => data.get("code").and_then(Value::as_str),
+                Err(CallError::Convex { data, .. }) => data
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .map(ServerCode::parse),
                 _ => None,
             };
             match code {
-                Some("unauthenticated") if attempt == 0 => {
+                Some(ServerCode::Unauthenticated) if attempt == 0 => {
                     info!(path, jwt_epoch = stamp.jwt_epoch, "jwt refused: renewing");
                     self.on_jwt_rejected(Some(stamp.jwt_epoch));
                 }
-                Some("device_removed") => {
+                Some(ServerCode::DeviceRemoved) => {
                     warn!(path, gen = stamp.generation, "this install was removed on the server");
                     self.on_device_removed(stamp.generation);
                     return Ok(answer.map_err(|error| edge_error(path, error)));
@@ -849,12 +869,12 @@ impl Core {
         match self.account_call(flow, kind, path, path, false, args).await {
             Ok(answer) => answer,
             Err(CoreError::ConsentDenied | CoreError::NotSignedIn) => Err(EdgeError::Status {
-                code: "unauthenticated".into(),
+                code: ServerCode::Unauthenticated,
                 message: "This phone hasn't proved who you are to the server yet.".into(),
             }),
             Err(CoreError::Offline) => Err(EdgeError::Offline),
             Err(error) => Err(EdgeError::Status {
-                code: "identity_failed".into(),
+                code: ServerCode::IdentityFailed,
                 message: error.to_string(),
             }),
         }
@@ -1056,7 +1076,7 @@ impl Core {
                         .shared
                         .backend_state()
                         .auth
-                        .on_token_refused(source, error.code());
+                        .on_token_refused(source, &error);
                     if retry {
                         warn!(
                             source = source.as_str(),
@@ -1165,7 +1185,7 @@ impl Core {
         };
         if auth::normalize_server(&last.server) != auth::normalize_server(&self.forwarding_server())
         {
-            self.forget(&[LAST_STUDENT]);
+            self.remove_file(LAST_STUDENT);
             return;
         }
         // The socket goes with their JWT for this one call: no other identity can be taken
@@ -1177,9 +1197,9 @@ impl Core {
             .await
         {
             Ok(issued) => issued,
-            Err(error) if signed_out_already(error.code()) => {
+            Err(error) if signed_out_already(&error) => {
                 info!(code = error.code(), "last student already signed out here");
-                self.forget(&[LAST_STUDENT]);
+                self.remove_file(LAST_STUDENT);
                 return;
             }
             Err(error) => {
@@ -1217,7 +1237,7 @@ impl Core {
         match signed_out {
             Ok(_) => {
                 info!("signed out of the last student's account");
-                self.forget(&[LAST_STUDENT]);
+                self.remove_file(LAST_STUDENT);
             }
             Err(error) => {
                 let code = edge_error("auth:signOut", error).code().to_owned();

@@ -693,7 +693,7 @@ internal interface UniffiCallbackInterfaceLiveListenerMethod0 : com.sun.jna.Call
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceLiveListenerMethod1 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`code`: RustBuffer.ByValue,`message`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+    fun callback(`uniffiHandle`: Long,`error`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceCookieGateMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiOutReturn`: ByteByReference,uniffiCallStatus: UniffiRustCallStatus,)
@@ -1687,7 +1687,7 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_livelistener_on_change(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_method_livelistener_on_error(`ptr`: Long,`code`: RustBuffer.ByValue,`message`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_method_livelistener_on_error(`ptr`: Long,`error`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_clone_livewatch(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -2336,7 +2336,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_change() and 0xFFFF) != 22824) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_error() and 0xFFFF) != 8059) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_error() and 0xFFFF) != 1281) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_livewatch_stop() and 0xFFFF) != 58521) {
@@ -8478,10 +8478,9 @@ public interface LiveListener {
     fun `onChange`()
     
     /**
-     * The query failed with `code` and the server's `message` for the student
-     * (`unauthenticated` renews the JWT; the next change follows).
+     * The watch failed; what follows is in `error`.
      */
-    fun `onError`(`code`: kotlin.String, `message`: kotlin.String)
+    fun `onError`(`error`: LiveError)
     
     companion object
 }
@@ -8607,17 +8606,15 @@ open class LiveListenerImpl: Disposable, AutoCloseable, LiveListener
 
     
     /**
-     * The query failed with `code` and the server's `message` for the student
-     * (`unauthenticated` renews the JWT; the next change follows).
-     */override fun `onError`(`code`: kotlin.String, `message`: kotlin.String)
+     * The watch failed; what follows is in `error`.
+     */override fun `onError`(`error`: LiveError)
         = 
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_vtop_ffi_fn_method_livelistener_on_error(
         it,
         
-        FfiConverterString.lower(`code`),
-        FfiConverterString.lower(`message`),_status)
+        FfiConverterTypeLiveError.lower(`error`),_status)
 }
     }
     
@@ -8653,12 +8650,11 @@ internal object uniffiCallbackInterfaceLiveListener {
         }
     }
     internal object `onError`: UniffiCallbackInterfaceLiveListenerMethod1 {
-        override fun callback(`uniffiHandle`: Long,`code`: RustBuffer.ByValue,`message`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+        override fun callback(`uniffiHandle`: Long,`error`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
             val uniffiObj = FfiConverterTypeLiveListener.handleMap.get(uniffiHandle)
             val makeCall = { ->
                 uniffiObj.`onError`(
-                    FfiConverterString.lift(`code`),
-                    FfiConverterString.lift(`message`),
+                    FfiConverterTypeLiveError.lift(`error`),
                 )
             }
             val writeReturn = { _: Unit -> Unit }
@@ -20794,6 +20790,116 @@ public object FfiConverterTypeKeyKind: FfiConverterRustBuffer<KeyKind> {
 
     override fun write(value: KeyKind, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Why a [`LiveListener`]'s watch failed, as the app acts on it.
+ */
+sealed class LiveError {
+    
+    /**
+     * Renewed here (a refused JWT; the next change follows), or our own fault the student
+     * can't act on (the log has the reason).
+     */
+    object Transient : LiveError()
+    
+    
+    /**
+     * No identity left (signed out, this phone removed): the watch ends.
+     */
+    data class NoIdentity(
+        val `message`: kotlin.String) : LiveError()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * The server stopped following it for a reason the student may see.
+     */
+    data class Stopped(
+        val `message`: kotlin.String) : LiveError()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLiveError : FfiConverterRustBuffer<LiveError>{
+    override fun read(buf: ByteBuffer): LiveError {
+        return when(buf.getInt()) {
+            1 -> LiveError.Transient
+            2 -> LiveError.NoIdentity(
+                FfiConverterString.read(buf),
+                )
+            3 -> LiveError.Stopped(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: LiveError): ULong = when(value) {
+        is LiveError.Transient -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is LiveError.NoIdentity -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`message`)
+            )
+        }
+        is LiveError.Stopped -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`message`)
+            )
+        }
+    }
+
+    override fun write(value: LiveError, buf: ByteBuffer) {
+        when(value) {
+            is LiveError.Transient -> {
+                buf.putInt(1)
+                Unit
+            }
+            is LiveError.NoIdentity -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`message`, buf)
+                Unit
+            }
+            is LiveError.Stopped -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`message`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 }
 

@@ -24,6 +24,7 @@ use vtop_tlsn::session::{MAX_MESSAGE, Phase};
 
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
+use crate::remote::server_code::ServerCode;
 use crate::transport::{Header, TransportError};
 use crate::{Core, CoreError};
 
@@ -101,7 +102,7 @@ fn refusal(body: &[u8]) -> CoreError {
     match (text("code"), text("error")) {
         ("", _) => failed("the server sent an unexpected answer"),
         (code, message) => EdgeError::Status {
-            code: code.into(),
+            code: ServerCode::parse(code),
             message: message.into(),
         }
         .into(),

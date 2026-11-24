@@ -16,6 +16,7 @@ use vtop_shared::wire_page::{BATCH, WirePageRequest, batch_args};
 
 use super::plan::ServerError;
 use super::{Route, page_data};
+use crate::remote::udp::UdpFetchError;
 use crate::{Core, CoreError, SEMESTERS, SemesterData, traced};
 
 /// The pages a batch takes, by their engine names: those whose fetch caches the page as it
@@ -182,19 +183,19 @@ impl Core {
                     self.shared.used(Route::Udp);
                     return answers(data, count).map(Some);
                 }
-                Err(reason) if reason.ends_with(" session_expired") => {
+                Err(UdpFetchError::SessionExpired) => {
                     self.shared.used(Route::Udp);
                     return Err(ServerError::Expired);
                 }
                 // An older gateway or engine, or a batch too large for UDP: the link is fine.
-                Err(reason)
-                    if ["answered 404", "answered 413", "(HTTP 404)"]
-                        .iter()
-                        .any(|status| reason.contains(status)) =>
-                {
-                    info!(reason, "batch not over UDP");
+                Err(
+                    error @ UdpFetchError::Gateway {
+                        status: 404 | 413, ..
+                    },
+                ) => {
+                    info!(reason = %error, "batch not over UDP");
                 }
-                Err(reason) => self.shared.failed(Route::Udp, &reason),
+                Err(error) => self.shared.failed(Route::Udp, &error.to_string()),
             }
         }
         let body = serde_json::to_value(request).unwrap_or_default();

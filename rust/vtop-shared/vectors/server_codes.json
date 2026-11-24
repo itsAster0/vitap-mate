@@ -1,0 +1,24 @@
+{
+  "_comment": "The error codes the app matches (vtop-ffi's ServerCode). backend: thrown by backend/convex; engine: the engine's, passed through Convex; phone: made on the phone. Cargo and vitest tests keep this, the enum and the backend in step.",
+  "backend": [
+    "unauthenticated",
+    "device_removed",
+    "refresh_reused",
+    "refresh_invalid",
+    "token_invalid",
+    "token_expired",
+    "not_found",
+    "bad_request",
+    "demo_unavailable",
+    "proxy_unavailable",
+    "mailbox_not_found",
+    "key_limit",
+    "pair_expired",
+    "key_not_found",
+    "phone_not_found",
+    "session_invalid",
+    "vtop_unreachable"
+  ],
+  "engine": ["session_expired", "invalid_credentials", "authentication_failed"],
+  "phone": ["server_error", "identity_failed"]
+}

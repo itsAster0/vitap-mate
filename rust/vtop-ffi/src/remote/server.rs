@@ -11,6 +11,7 @@ use crate::device::EdgeError;
 use crate::remote::backend::Kind;
 use crate::remote::consent::{self, CookieKind};
 use crate::remote::keys::{AccessKey, KeyView, refused};
+use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, traced};
 
 /// This phone's name on the server: its model, or `vitapmate` when the app gave none.
@@ -192,7 +193,7 @@ fn unexpected(_: serde_json::Error) -> CoreError {
 /// The server has no such function (it predates it): `Ok(false)`.
 fn supported(answer: Result<Value, EdgeError>, path: &str) -> Result<bool, CoreError> {
     match answer {
-        Err(error) if error.code() == "not_found" => {
+        Err(error) if error.is(&ServerCode::NotFound) => {
             info!(path, "not on this server yet");
             Ok(false)
         }
@@ -335,7 +336,7 @@ impl Core {
                     .await
                 {
                     Ok(_) => self.forget_forwarding(&id),
-                    Err(error) if error.code() == crate::remote::forwarding::GONE => {
+                    Err(error) if error.is(&ServerCode::MailboxNotFound) => {
                         self.forget_forwarding(&id);
                     }
                     Err(error) => info!(code = error.code(), "address left at sign-out: queued"),
@@ -350,7 +351,7 @@ impl Core {
                     info!(everywhere, "signed out of the server");
                     self.forget_identity();
                 }
-                Err(error) if crate::remote::backend::signed_out_already(error.code()) => {
+                Err(error) if crate::remote::backend::signed_out_already(&error) => {
                     info!(code = error.code(), "already signed out of the server");
                     self.forget_identity();
                 }

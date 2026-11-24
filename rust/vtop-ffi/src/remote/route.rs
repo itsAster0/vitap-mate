@@ -36,6 +36,8 @@ use vtop_shared::page_dictionary;
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
 use crate::remote::consent::{self, CookieKind};
+use crate::remote::server_code::ServerCode;
+use crate::remote::udp::UdpFetchError;
 use crate::{Core, CoreError, Shared, Slot, traced_sync, transport, unix_now};
 
 use plan::{Next, Outcome, RoutePlan, ServerError, ServerFetch};
@@ -223,7 +225,7 @@ impl Core {
                 self.write_plain(PROXY_FILE, &proxy);
                 self.shared.routes().proxy = Some(proxy);
             }
-            Err(error) if error.code() == "proxy_unavailable" => {
+            Err(error) if error.is(&ServerCode::ProxyUnavailable) => {
                 self.shared.failed(Route::Proxy, "the server has no proxy");
             }
             // A URL kept from before stays in use until the server can be asked.
@@ -386,7 +388,10 @@ impl Transport for Routed {
 impl From<EdgeError> for ServerError {
     fn from(error: EdgeError) -> Self {
         match error {
-            EdgeError::Status { code, .. } if code == "session_expired" => Self::Expired,
+            EdgeError::Status {
+                code: ServerCode::SessionExpired,
+                ..
+            } => Self::Expired,
             EdgeError::Offline => Self::Failed("server unreachable".into()),
             EdgeError::Status { code, message } => Self::Failed(format!("{code}: {message}")),
         }
@@ -500,11 +505,11 @@ impl Core {
                     return Ok(data);
                 }
                 // The link worked; the session ran out (the caller signs in again).
-                Err(reason) if reason.ends_with(" session_expired") => {
+                Err(UdpFetchError::SessionExpired) => {
                     self.shared.used(Route::Udp);
                     return Err(ServerError::Expired);
                 }
-                Err(reason) => self.shared.failed(Route::Udp, &reason),
+                Err(error) => self.shared.failed(Route::Udp, &error.to_string()),
             }
         }
         let body = serde_json::to_value(request).unwrap_or_default();
@@ -550,7 +555,10 @@ impl Core {
         });
         let login = self.signed_call(flow, Kind::Action, "vtop:login", &body);
         let answer = match login.await {
-            Err(EdgeError::Status { code, .. }) if code == "invalid_credentials" => {
+            Err(EdgeError::Status {
+                code: ServerCode::InvalidCredentials,
+                ..
+            }) => {
                 // As on the phone: clear cookies and stop signing in with it.
                 warn!("VTOP rejected the saved password on the server; no more sign-ins with it");
                 session.mark_password_rejected();
@@ -634,9 +642,10 @@ impl Core {
             .signed_call(flow, Kind::Action, path, &body)
             .await
             .map_err(|error| match error {
-                EdgeError::Status { code, message } if code == "authentication_failed" => {
-                    CoreError::OtpRejected { reason: message }
-                }
+                EdgeError::Status {
+                    code: ServerCode::AuthenticationFailed,
+                    message,
+                } => CoreError::OtpRejected { reason: message },
                 error => error.into(),
             })?;
         if !self.is_current(slot) {

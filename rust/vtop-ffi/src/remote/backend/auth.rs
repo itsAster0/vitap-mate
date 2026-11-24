@@ -11,7 +11,9 @@
 
 use tracing::info;
 
-use super::{RENEW_AHEAD_MS, Refresh, TOKEN_REFUSED};
+use super::{RENEW_AHEAD_MS, Refresh};
+use crate::device::EdgeError;
+use crate::remote::server_code::ServerCode;
 
 /// Normalises a server URL so a trailing `/` never hides a kept refresh token.
 pub(crate) fn normalize_server(url: &str) -> String {
@@ -325,20 +327,26 @@ impl AuthMachine {
         (stamp, effects)
     }
 
-    /// Handles an error code from `auth:token`. Returns `(should_retry, effects)`.
-    /// Only codes in [`TOKEN_REFUSED`] (on non-proof grants) drop the rejected grant and retry;
-    /// transient errors (offline, 5xx) keep the refresh token untouched.
+    /// Handles a failed `auth:token`. Returns `(should_retry, effects)`.
+    /// Only a refused token ([`ServerCode::is_token_refused`], on non-proof grants) drops the
+    /// rejected grant and retries; transient errors (offline, 5xx) keep the refresh token.
     pub(crate) fn on_token_refused(
         &mut self,
         source: GrantKind,
-        code: &str,
+        error: &EdgeError,
     ) -> (bool, Vec<Effect>) {
-        if !TOKEN_REFUSED.contains(&code) || source == GrantKind::Proof {
+        let code = match error {
+            EdgeError::Status { code, .. } if code.is_token_refused() => code,
+            _ => return (false, Vec::new()),
+        };
+        if source == GrantKind::Proof {
             return (false, Vec::new());
         }
         let from = self.phase.name();
         let mut effects = Vec::new();
-        match (source, code) {
+        let removed = *code == ServerCode::DeviceRemoved;
+        let code = code.as_str();
+        match (source, removed) {
             (GrantKind::V2, _) => {
                 effects.push(Effect::ForgetV2Token);
                 info!(
@@ -352,7 +360,7 @@ impl AuthMachine {
                     "auth transition"
                 );
             }
-            (_, "device_removed") => {
+            (_, true) => {
                 self.clear_identity("token_refused", code, true, &mut effects);
             }
             _ => {
@@ -668,22 +676,33 @@ mod tests {
     #[test]
     fn transient_token_error_keeps_refresh_while_refused_drops_it() {
         let mut machine = AuthMachine::new();
-        let (retry, effects) = machine.on_token_refused(GrantKind::Refresh, "server_error");
+        let refused = |code| EdgeError::Status {
+            code,
+            message: String::new(),
+        };
+        let (retry, effects) =
+            machine.on_token_refused(GrantKind::Refresh, &refused(ServerCode::ServerError));
         assert!(!retry);
         assert!(effects.is_empty());
 
-        let (retry, effects) = machine.on_token_refused(GrantKind::Refresh, "refresh_reused");
+        let (retry, effects) =
+            machine.on_token_refused(GrantKind::Refresh, &refused(ServerCode::RefreshReused));
         assert!(retry);
         assert!(effects.contains(&Effect::SaveRefresh(None)));
         assert!(!effects.contains(&Effect::ForgetForwarding));
 
-        let (retry, effects) = machine.on_token_refused(GrantKind::Refresh, "device_removed");
+        let (retry, effects) =
+            machine.on_token_refused(GrantKind::Refresh, &refused(ServerCode::DeviceRemoved));
         assert!(retry);
         assert!(effects.contains(&Effect::SaveRefresh(None)));
         assert!(effects.contains(&Effect::ForgetForwarding));
 
         // Proof refusal never retries in a loop.
-        let (retry, effects) = machine.on_token_refused(GrantKind::Proof, "device_removed");
+        let (retry, effects) =
+            machine.on_token_refused(GrantKind::Proof, &refused(ServerCode::DeviceRemoved));
+        assert!(!retry);
+        assert!(effects.is_empty());
+        let (retry, effects) = machine.on_token_refused(GrantKind::Refresh, &EdgeError::Offline);
         assert!(!retry);
         assert!(effects.is_empty());
     }

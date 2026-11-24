@@ -11,6 +11,7 @@ use tracing::info;
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
 use crate::remote::consent::CookieKind;
+use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, dev, traced};
 
 /// The label of a key made by pairing the browser extension; [`KeyKind`] is read from it.
@@ -215,14 +216,17 @@ fn cookie_list(header: &str) -> Vec<Value> {
 
 /// The server's refusals in the student's words.
 pub(crate) fn refused(error: EdgeError) -> CoreError {
-    let reason = match error.code() {
-        "key_limit" => "Revoke a key first: this account has the most keys allowed.",
-        "pair_expired" => "That code has expired. Start connecting again in the app.",
-        "bad_request" => "Check the code: it's the 10 characters the extension shows.",
-        "key_not_found" => "That key is already gone.",
-        "phone_not_found" => "That phone is already gone.",
-        "session_invalid" => "VTOP didn't accept this phone's session. Try again.",
-        "vtop_unreachable" => "The server couldn't reach VTOP. Try again in a minute.",
+    let EdgeError::Status { code, .. } = &error else {
+        return error.into();
+    };
+    let reason = match code {
+        ServerCode::KeyLimit => "Revoke a key first: this account has the most keys allowed.",
+        ServerCode::PairExpired => "That code has expired. Start connecting again in the app.",
+        ServerCode::BadRequest => "Check the code: it's the 10 characters the extension shows.",
+        ServerCode::KeyNotFound => "That key is already gone.",
+        ServerCode::PhoneNotFound => "That phone is already gone.",
+        ServerCode::SessionInvalid => "VTOP didn't accept this phone's session. Try again.",
+        ServerCode::VtopUnreachable => "The server couldn't reach VTOP. Try again in a minute.",
         _ => return error.into(),
     };
     CoreError::Other {
@@ -364,7 +368,7 @@ impl Core {
                 .device_call(&flow, Kind::Query, "sessions:pending", json!({}))
                 .await;
             let requests = match answer {
-                Err(error) if error.code() == "unauthenticated" => Vec::new(),
+                Err(error) if error.is(&ServerCode::Unauthenticated) => Vec::new(),
                 answer => serde_json::from_value(answer.map_err(refused)?).map_err(|_| {
                     CoreError::Other {
                         reason: "The server sent an unexpected answer.".into(),
