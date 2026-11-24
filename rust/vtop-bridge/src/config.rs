@@ -20,10 +20,6 @@ pub struct Config {
     pub gateway_token: Option<String>,
     /// How long a sign-in waits for the forwarded OTP mail.
     pub otp_wait: Duration,
-    /// Proxies in front that each append the address they saw to `X-Forwarded-For`
-    /// (`PROXY_HOPS`): 1 for hawk's Caddy alone, 2 with Railway's edge behind it. The phone's
-    /// address is that many entries from the end; earlier ones it may have made up.
-    pub proxy_hops: usize,
     pub listen: SocketAddr,
 }
 
@@ -86,17 +82,12 @@ impl Config {
 
         let otp_wait = Duration::from_secs(parse(&lookup, "OTP_WAIT_SECS", 45)?);
         let port: u16 = parse(&lookup, "PORT", 8080)?;
-        let proxy_hops: usize = parse(&lookup, "PROXY_HOPS", 1)?;
-        if proxy_hops == 0 {
-            return Err(ConfigError("PROXY_HOPS must be at least 1".into()));
-        }
         Ok(Self {
             vault_key,
             edge_url,
             internal_token,
             gateway_token,
             otp_wait,
-            proxy_hops,
             listen: SocketAddr::from((std::net::Ipv6Addr::UNSPECIFIED, port)),
         })
     }
@@ -140,7 +131,6 @@ mod tests {
         assert_eq!(c.edge_url, "https://edge.example");
         assert_eq!(c.otp_wait, Duration::from_secs(45));
         assert_eq!(c.listen.port(), 8080);
-        assert_eq!(c.proxy_hops, 1);
         assert!(c.gateway_token.is_none());
     }
 

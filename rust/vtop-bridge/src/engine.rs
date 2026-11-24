@@ -9,15 +9,12 @@
 //!
 //! Routes (`Authorization: Bearer $INTERNAL_TOKEN`):
 //! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
-//! and `/engine/fetch-batch` (in `fetch`), `GET /engine/proof` (in `proof`; the phone's own
-//! `GET /proof` there takes no token), and
+//! and `/engine/fetch-batch` (in `fetch`),
 //! [`MAIL_OWNER`](vtop_shared::engine::MAIL_OWNER) (whose a session is, as
-//! an owner hash).
+//! an owner hash) and [`OWNER_HASH`] (a proved regno's owner hash).
 
 use std::sync::Arc;
-use std::time::Duration;
 
-use async_trait::async_trait;
 use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -38,89 +35,7 @@ use crate::AppState;
 use crate::error::ApiError;
 use crate::gmail::{GmailCodes, RefreshError};
 use crate::login::{LoginError, Started};
-use crate::proof::{PROOF_DONE, PROOF_TICKET, ProofDone};
 use crate::verify::VerifyError;
-
-/// What the engine asks of the edge (or of Convex, which serves the same internal routes).
-#[async_trait]
-pub trait EdgeLink: Send + Sync {
-    /// Uses up a proof ticket: the device it was issued to, or `None` when it is unknown,
-    /// used or expired.
-    async fn proof_ticket(&self, ticket: &str) -> Result<Option<String>, EdgeError>;
-    /// The verdict on a ticket's proof.
-    async fn proof_done(&self, done: &ProofDone) -> Result<(), EdgeError>;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EdgeError {
-    Unavailable(String),
-    /// Convex is at its proof cap for everyone (429).
-    Busy,
-}
-
-/// The edge over HTTPS, with `Authorization: Bearer $INTERNAL_TOKEN`.
-pub struct HttpEdge {
-    pub http: reqwest::Client,
-    pub base_url: String,
-    pub token: String,
-}
-
-impl HttpEdge {
-    async fn post(
-        &self,
-        path: &str,
-        body: &impl Serialize,
-    ) -> Result<reqwest::Response, EdgeError> {
-        self.http
-            .post(format!("{}{path}", self.base_url))
-            .bearer_auth(&self.token)
-            .timeout(Duration::from_secs(40))
-            .json(body)
-            .send()
-            .await
-            .map_err(|error| EdgeError::Unavailable(error.without_url().to_string()))
-    }
-}
-
-#[async_trait]
-impl EdgeLink for HttpEdge {
-    async fn proof_ticket(&self, ticket: &str) -> Result<Option<String>, EdgeError> {
-        #[derive(Deserialize)]
-        struct Ticketed {
-            device: String,
-        }
-        let response = self
-            .post(PROOF_TICKET, &json!({ "ticket": ticket }))
-            .await?;
-        match response.status().as_u16() {
-            404 => return Ok(None),
-            429 => return Err(EdgeError::Busy),
-            _ => {}
-        }
-        succeeded(&response)?;
-        let body: Ticketed = response
-            .json()
-            .await
-            .map_err(|error| EdgeError::Unavailable(error.without_url().to_string()))?;
-        Ok(Some(body.device))
-    }
-
-    async fn proof_done(&self, done: &ProofDone) -> Result<(), EdgeError> {
-        let response = self.post(PROOF_DONE, done).await?;
-        succeeded(&response)
-    }
-}
-
-fn succeeded(response: &reqwest::Response) -> Result<(), EdgeError> {
-    if response.status().is_success() {
-        Ok(())
-    } else {
-        Err(EdgeError::Unavailable(format!(
-            "edge answered {}",
-            response.status()
-        )))
-    }
-}
 
 /// Mail dates come from VTOP's clock; allow it to run a little behind.
 const CLOCK_SLACK_SECS: u64 = 120;
@@ -521,6 +436,31 @@ fn signed_in(
             LoginOutcome::Failed { reason }
         }
     }
+}
+
+/// Convex: the owner hash of a regno the verifier (`vtop-verifier`) proved, `{registrationNumber}`
+/// → `{ownerHash}`. Convex never holds `VAULT_KEY`, which keys the hash and seals the vaults.
+pub const OWNER_HASH: &str = "/engine/owner-hash";
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnerHashBody {
+    registration_number: String,
+}
+
+/// `POST` [`OWNER_HASH`].
+pub async fn owner_hash_of(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<OwnerHashBody>, JsonRejection>,
+) -> Result<Response, ApiError> {
+    require_secret(&state, &headers)?;
+    let Json(body) = body.map_err(|_| bad_request("Invalid JSON body."))?;
+    let account = account_id(&body.registration_number);
+    if account.is_empty() || account.len() > 20 {
+        return Err(bad_request("registrationNumber is required."));
+    }
+    Ok(Json(json!({ "ownerHash": owner_hash(&state.config.vault_key, &account) })).into_response())
 }
 
 #[derive(Deserialize)]

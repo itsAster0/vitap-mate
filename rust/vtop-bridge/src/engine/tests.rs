@@ -13,35 +13,15 @@ const RELAY: &str = "relay-secret-relay-secret-relay-secret";
 const GATEWAY: &str = "gateway-secret-gateway-secret-gateway";
 const REG: &str = "22BCE0001";
 
-/// Convex as far as the routes tested here need it: nothing.
-#[derive(Default)]
-struct FakeEdge;
-
-#[async_trait]
-impl EdgeLink for FakeEdge {
-    async fn proof_ticket(&self, _: &str) -> Result<Option<String>, EdgeError> {
-        Ok(None)
-    }
-
-    async fn proof_done(&self, _: &ProofDone) -> Result<(), EdgeError> {
-        Ok(())
-    }
+fn engine_app(login: FakeLogin) -> (axum::Router, Arc<AppState>) {
+    engine_app_on(login, vtop_core::VtopConfig::default())
 }
 
-fn engine_app(edge: Arc<FakeEdge>, login: FakeLogin) -> (axum::Router, Arc<AppState>) {
-    engine_app_on(edge, login, vtop_core::VtopConfig::default())
-}
-
-fn engine_app_on(
-    edge: Arc<FakeEdge>,
-    login: FakeLogin,
-    vtop: vtop_core::VtopConfig,
-) -> (axum::Router, Arc<AppState>) {
-    engine_app_with(edge, Arc::new(login), Arc::default(), vtop)
+fn engine_app_on(login: FakeLogin, vtop: vtop_core::VtopConfig) -> (axum::Router, Arc<AppState>) {
+    engine_app_with(Arc::new(login), Arc::default(), vtop)
 }
 
 fn engine_app_with(
-    edge: Arc<FakeEdge>,
     login: Arc<FakeLogin>,
     gmail: Arc<FakeRefresher>,
     vtop: vtop_core::VtopConfig,
@@ -61,7 +41,6 @@ fn engine_app_with(
             Parts {
                 forwarded_login: login,
                 verifier: Arc::new(FakeVerifier),
-                edge,
                 gmail,
             },
         )
@@ -89,7 +68,7 @@ async fn post(app: &axum::Router, uri: &str, auth: &str, body: Value) -> (Status
 
 #[tokio::test]
 async fn every_route_needs_the_shared_secret() {
-    let (app, _) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, _) = engine_app(FakeLogin::default());
     for uri in [
         vtop_shared::engine::SESSION,
         vtop_shared::engine::SEAL,
@@ -103,7 +82,7 @@ async fn every_route_needs_the_shared_secret() {
 
 #[tokio::test]
 async fn fresh_cookies_name_their_owner_and_come_back_sealed() {
-    let (app, state) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, state) = engine_app(FakeLogin::default());
     let (status, body) = post(
         &app,
         vtop_shared::engine::SESSION,
@@ -142,9 +121,36 @@ async fn fresh_cookies_name_their_owner_and_come_back_sealed() {
     assert!(body.get("cookies").is_none());
 }
 
+/// Convex asks for a proved regno's owner hash: the same hash the session check gives, so the
+/// accounts' stored hashes keep matching.
+#[tokio::test]
+async fn a_proved_regno_gets_the_owner_hash_of_its_sessions() {
+    let (app, state) = engine_app(FakeLogin::default());
+    let ask = |regno: &str| json!({ "registrationNumber": regno });
+    let (status, body) = post(&app, OWNER_HASH, RELAY, ask(" 23abc4567 ")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["ownerHash"],
+        owner_hash(&state.config.vault_key, "23ABC4567")
+    );
+    // Pinned for the all-zero test key, as Convex stores it.
+    assert_eq!(
+        body["ownerHash"],
+        "943f2cf09a99e88ac7f3a1da32010f9709b1cf3b523708eabe6dc7eeaab5cd62"
+    );
+    assert_eq!(
+        post(&app, OWNER_HASH, RELAY, ask(" ")).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        post(&app, OWNER_HASH, GATEWAY, ask("23ABC4567")).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
 #[tokio::test]
 async fn dead_and_unreachable_sessions() {
-    let (app, state) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, state) = engine_app(FakeLogin::default());
     let (_, body) = post(
         &app,
         vtop_shared::engine::SESSION,
@@ -208,7 +214,6 @@ fn done(body: Value) -> LoginOutcome {
 async fn a_forwarded_sign_in_stops_at_the_otp_and_resumes_with_the_mail() {
     let login = Arc::new(FakeLogin::default());
     let (app, state) = engine_app_with(
-        Arc::default(),
         login.clone(),
         Arc::default(),
         vtop_core::VtopConfig::default(),
@@ -265,17 +270,14 @@ async fn a_forwarded_sign_in_stops_at_the_otp_and_resumes_with_the_mail() {
 
 #[tokio::test]
 async fn rejected_and_foreign_credentials() {
-    let (app, _) = engine_app(
-        Arc::default(),
-        FakeLogin::answering(Err(LoginError::InvalidCredentials)),
-    );
+    let (app, _) = engine_app(FakeLogin::answering(Err(LoginError::InvalidCredentials)));
     let vault = sealed_vault(&app, REG).await;
     let body = json!({"account": REG, "sealedVault": vault, "forwarding": true});
     assert!(done(step(&app, body).await) == LoginOutcome::InvalidCredentials);
 
     // Credentials sealed for one account do not open for another, and
     // ones that sign in someone else are not used.
-    let (app, _) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, _) = engine_app(FakeLogin::default());
     let other = sealed_vault(&app, "23ABC4567").await;
     let body = json!({"account": REG, "sealedVault": other, "forwarding": true});
     assert!(done(step(&app, body).await) == LoginOutcome::VaultUnusable);
@@ -291,7 +293,7 @@ async fn rejected_and_foreign_credentials() {
 
 #[tokio::test]
 async fn owner_check_names_the_owner_by_hash() {
-    let (app, state) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, state) = engine_app(FakeLogin::default());
     let (status, body) = post(
         &app,
         vtop_shared::engine::MAIL_OWNER,
@@ -317,7 +319,7 @@ async fn owner_check_names_the_owner_by_hash() {
 
 #[tokio::test]
 async fn old_vaults_keep_their_gmail_grant() {
-    let (_, state) = engine_app(Arc::default(), FakeLogin::default());
+    let (_, state) = engine_app(FakeLogin::default());
     let old = json!({"username": "u", "password": "p",
         "gmail": {"refresh_token": "r", "client_id": "c"}});
     let sealed = state.accounts_sealer().seal_json("accounts/A", &old);
@@ -357,7 +359,7 @@ fn opened(state: &AppState, sealed: &str) -> Vault {
 
 #[tokio::test]
 async fn gmail_access_is_sealed_with_the_credentials() {
-    let (app, state) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, state) = engine_app(FakeLogin::default());
     let sealed = gmail_vault(
         &app,
         json!({"refreshToken": " r ", "clientId": "c", "clientSecret": "s", "deleteAfterReading": true}),
@@ -378,12 +380,7 @@ async fn sign_in_once(
     grant: Option<Value>,
     forwarding: bool,
 ) -> (Value, Arc<AppState>) {
-    let (app, state) = engine_app_with(
-        Arc::default(),
-        login,
-        gmail,
-        vtop_core::VtopConfig::default(),
-    );
+    let (app, state) = engine_app_with(login, gmail, vtop_core::VtopConfig::default());
     let vault = match grant {
         Some(grant) => gmail_vault(&app, grant).await,
         None => sealed_vault(&app, REG).await,
@@ -427,7 +424,6 @@ async fn gmail_picked_on_the_phone_skips_forwarding() {
     let gmail = Arc::new(FakeRefresher::default());
     let login = Arc::new(FakeLogin::answering(Err(LoginError::InvalidCredentials)));
     let (app, state) = engine_app_with(
-        Arc::default(),
         login.clone(),
         gmail.clone(),
         vtop_core::VtopConfig::default(),
@@ -484,11 +480,7 @@ async fn neither_forwarding_nor_gmail_means_no_server_sign_in() {
 // ---- phone sign-in and fetches (`vtop_login`, `fetch`) ----------------
 
 fn phone_app() -> axum::Router {
-    engine_app(
-        Arc::default(),
-        FakeLogin::answering(Err(LoginError::InvalidCredentials)),
-    )
-    .0
+    engine_app(FakeLogin::answering(Err(LoginError::InvalidCredentials))).0
 }
 
 fn signed_in() -> Value {
@@ -619,7 +611,6 @@ async fn vtop_with_semesters() -> (wiremock::MockServer, axum::Router) {
         ..Default::default()
     };
     let app = engine_app_on(
-        Arc::default(),
         FakeLogin::answering(Err(LoginError::InvalidCredentials)),
         config,
     )
@@ -777,7 +768,7 @@ async fn access_line(headers: &[(&str, &str)]) -> String {
             .expect("no other test sets a global subscriber");
     });
     CAPTURED.with_borrow_mut(|captured| *captured = Some(Vec::new()));
-    let (app, _) = engine_app(Arc::default(), FakeLogin::default());
+    let (app, _) = engine_app(FakeLogin::default());
     let mut request = Request::builder().uri("/healthz");
     for (name, value) in headers {
         request = request.header(*name, *value);

@@ -1,0 +1,14 @@
+# The TLSNotary verifier (vtop-verifier), with this folder as context. Stateless: it needs
+# CONVEX_URL and VERIFIER_TOKEN, and serves the phone's `GET /proof?ticket=` WebSocket.
+FROM rust:1.98-slim-bookworm AS build
+WORKDIR /src
+COPY . .
+RUN cargo build --locked --profile server --package vtop-verifier --bin vtop-verifier \
+    && cp target/server/vtop-verifier /vtop-verifier
+
+FROM debian:bookworm-slim
+# TLS uses rustls with built-in roots: no system certificates needed.
+COPY --from=build /vtop-verifier /usr/local/bin/vtop-verifier
+ENV PORT=8080 RUST_LOG=info
+EXPOSE 8080
+CMD ["vtop-verifier"]

@@ -8,7 +8,6 @@ use std::time::Duration;
 
 use tracing_subscriber::EnvFilter;
 use vtop_bridge::config::Config;
-use vtop_bridge::engine::HttpEdge;
 use vtop_bridge::gmail::{DEFAULT_TOKEN_URL, GoogleOAuthRefresher};
 use vtop_bridge::login::CoreLogin;
 use vtop_bridge::verify::CoreVerifier;
@@ -32,11 +31,6 @@ async fn main() {
         }
     };
     let listen = config.listen;
-    let edge = Arc::new(HttpEdge {
-        http: https(),
-        base_url: config.edge_url.clone(),
-        token: config.internal_token.clone(),
-    });
     // The MCP tools run here too, with sessions from the edge under each
     // caller's own key; the edge sends `/mcp` on to this service.
     // Sessions are kept a few minutes, so a run of tool calls asks the edge
@@ -58,7 +52,6 @@ async fn main() {
             verifier: Arc::new(CoreVerifier {
                 config: vtop_core::VtopConfig::default(),
             }),
-            edge,
             gmail: Arc::new(GoogleOAuthRefresher::new(https(), DEFAULT_TOKEN_URL.into())),
         },
     ));

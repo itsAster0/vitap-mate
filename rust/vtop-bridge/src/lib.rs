@@ -12,7 +12,6 @@ pub mod gmail;
 pub mod login;
 pub mod page_pack;
 pub mod pages;
-pub mod proof;
 pub mod vault;
 pub mod verify;
 pub mod vtop_login;
@@ -31,7 +30,6 @@ use tower_http::compression::predicate::{DefaultPredicate, NotForContentType, Pr
 use tracing::Instrument;
 
 use config::Config;
-use engine::EdgeLink;
 use gmail::GmailRefresher;
 use login::ForwardedLogin;
 use vault::Sealer;
@@ -41,7 +39,6 @@ use verify::SessionVerifier;
 pub struct Parts {
     pub forwarded_login: Arc<dyn ForwardedLogin>,
     pub verifier: Arc<dyn SessionVerifier>,
-    pub edge: Arc<dyn EdgeLink>,
     pub gmail: Arc<dyn GmailRefresher>,
 }
 
@@ -49,17 +46,10 @@ pub struct AppState {
     pub config: Config,
     pub verifier: Arc<dyn SessionVerifier>,
     pub forwarded_login: Arc<dyn ForwardedLogin>,
-    pub edge: Arc<dyn EdgeLink>,
     /// Turns saved Gmail access into access tokens.
     pub gmail: Arc<dyn GmailRefresher>,
     /// The VTOP that phone sign-ins and fetches go to.
     pub vtop: vtop_core::VtopConfig,
-    /// The server account proofs are held to and dialed.
-    pub proof: proof::ProofTarget,
-    /// Slots for proofs running at once.
-    pub proofs: Arc<tokio::sync::Semaphore>,
-    /// Proofs started per client address.
-    pub proof_gate: proof::ProofGate,
     sealer: Sealer,
 }
 
@@ -69,12 +59,8 @@ impl AppState {
             sealer: Sealer::new(config.vault_key),
             verifier: parts.verifier,
             forwarded_login: parts.forwarded_login,
-            edge: parts.edge,
             gmail: parts.gmail,
             vtop: vtop_core::VtopConfig::default(),
-            proof: proof::ProofTarget::vtop(),
-            proofs: Arc::new(tokio::sync::Semaphore::new(proof::MAX_PROOFS)),
-            proof_gate: proof::ProofGate::default(),
             config,
         }
     }
@@ -82,12 +68,6 @@ impl AppState {
     /// Sends phone sign-ins and fetches to another VTOP (a mock, in tests).
     pub fn with_vtop(mut self, vtop: vtop_core::VtopConfig) -> Self {
         self.vtop = vtop;
-        self
-    }
-
-    /// Holds account proofs to another server (a fake VTOP, in tests).
-    pub fn with_proof(mut self, target: proof::ProofTarget) -> Self {
-        self.proof = target;
         self
     }
 
@@ -104,8 +84,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
-        .route(vtop_shared::engine::PROOF_VERIFY, get(proof::verify))
-        .route(proof::PROOF_PUBLIC, get(proof::public))
+        .route(engine::OWNER_HASH, post(engine::owner_hash_of))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::FETCH_BATCH, post(fetch::fetch_batch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))

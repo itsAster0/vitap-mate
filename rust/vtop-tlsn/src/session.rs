@@ -3,9 +3,9 @@
 //! transcript against the statement.
 //!
 //! The verifier is handed its statement before it reads a byte from the
-//! prover: its caller (the engine) builds it from the device and challenge the
-//! edge checked and consumed (see `backend/API.md`, "Account proof"), never from
-//! anything the prover sends. A relay that swaps provers gets a statement
+//! prover: its caller (vtop-verifier) builds it from the ticket and the device
+//! Convex gave it for that ticket (see `backend/API.md`, "Account proof"), never
+//! from anything the prover sends. A relay that swaps provers gets a statement
 //! whose binding the other prover's request does not carry, so the proof fails.
 //!
 //! Neither side spawns tasks or uses a runtime's timers: each runs its session
@@ -24,7 +24,7 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Sink, SinkExt, Stream, StreamExt,
-    future::{Either, join, select},
+    future::{Either, join, select, try_join},
 };
 use tlsn::{
     Session, SessionDriver,
@@ -36,6 +36,7 @@ use tlsn::{
     verifier::{VerifierCommitStart, VerifierOutput},
     webpki::{CertificateDer, RootCertStore},
 };
+use tracing::Instrument;
 
 use crate::statement::{Plan, Proven, Statement};
 
@@ -56,8 +57,26 @@ pub const MAX_SERVER_IO: u64 = 1 << 20;
 /// verifier does the ZK work for them.
 pub const MAX_REVEAL_SENT: usize = 4 << 10;
 pub const MAX_REVEAL_RECV: usize = 16 << 10;
-/// The largest message [`Pipe`] sends; a Worker's WebSocket takes up to 1 MiB.
-const MAX_MESSAGE: usize = 64 << 10;
+/// The largest message [`Pipe`] sends, and the most a writer that joins its
+/// messages puts in one; a Worker's WebSocket takes up to 1 MiB.
+pub const MAX_MESSAGE: usize = 64 << 10;
+/// How long a prover gives one proof: the verifier's [`TIMEOUT`] plus the
+/// minute a verifier may queue a connection before it reads (sending nothing
+/// meanwhile), which the prover cannot tell from a slow link.
+pub const PROVER_TIMEOUT: Duration = Duration::from_secs(150);
+
+/// The prover's steps, as [`prove_phased`] reports each one done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Phase {
+    /// The session's setup with the verifier (its OT), before the server is dialed.
+    Setup,
+    /// The TLS exchange with the server, the response read to its end.
+    Tls,
+    /// The ZK proof of the revealed ranges.
+    Prove,
+    /// The prover's close.
+    Close,
+}
 
 /// Mozilla's roots plus the intermediate VTOP leaves out of its chain.
 pub fn vtop_roots() -> Result<RootCertStore> {
@@ -270,12 +289,28 @@ where
     S: AsyncRead + AsyncWrite + Send + Unpin,
     F: Future<Output = ()>,
 {
+    prove_phased(verifier, stmt, fill, roots, sleep, |_| {}).await
+}
+
+/// [`prove`], calling `done` as each [`Phase`] is done (for the caller's timings).
+pub async fn prove_phased<S, F>(
+    verifier: S,
+    stmt: &Statement,
+    fill: &Fill<'_>,
+    roots: RootCertStore,
+    sleep: impl Fn(Duration) -> F,
+    done: impl FnMut(Phase),
+) -> Result<Proved>
+where
+    S: AsyncRead + AsyncWrite + Send + Unpin,
+    F: Future<Output = ()>,
+{
     let request = stmt.render(&fill.values)?;
     // Fail before any traffic when the values do not fit the pattern.
     crate::pattern::match_plain(&request, &stmt.request)
         .context("request does not fit the statement")?;
     let plan = |s: &[u8], r: &[u8]| stmt.plan(s, r);
-    prove_raw(verifier, &stmt.host, request, roots, plan, sleep).await
+    run_prover(verifier, &stmt.host, request, roots, plan, sleep, done).await
 }
 
 /// Context on a prover error when the prover refused the page itself (it read the page and
@@ -308,6 +343,25 @@ where
     S: AsyncRead + AsyncWrite + Send + Unpin,
     F: Future<Output = ()>,
 {
+    run_prover(verifier, host, request, roots, plan, sleep, |_| {}).await
+}
+
+async fn run_prover<S, F>(
+    verifier: S,
+    host: &str,
+    request: Vec<u8>,
+    roots: RootCertStore,
+    plan: impl FnOnce(&[u8], &[u8]) -> Result<Plan>,
+    sleep: impl Fn(Duration) -> F,
+    mut done: impl FnMut(Phase),
+) -> Result<Proved>
+where
+    S: AsyncRead + AsyncWrite + Send + Unpin,
+    F: Future<Output = ()>,
+{
+    // The shared driver gives a session [`TIMEOUT`]; a prover's also covers the verifier's
+    // queue.
+    let sleep = |d| sleep(if d == TIMEOUT { PROVER_TIMEOUT } else { d });
     let (driver, mut handle) = Session::new(verifier).split();
     let work = async {
         let out = async {
@@ -319,6 +373,7 @@ where
                         .build()?,
                 )
                 .await?;
+            done(Phase::Setup);
             let (mut tls, prover) = prover.connect(
                 TlsClientConfig::builder()
                     .server_name(ServerName::Dns(host.try_into()?))
@@ -342,6 +397,7 @@ where
             };
             let (prover, response) = join(prover.into_future(), exchange).await;
             let (mut prover, response) = (prover?, response?);
+            done(Phase::Tls);
             ensure!(
                 response.len() as u64 <= MAX_SERVER_IO,
                 "response is over {MAX_SERVER_IO} bytes"
@@ -381,7 +437,9 @@ where
                 b.reveal_recv(r)?;
             }
             prover.prove(&b.build()?).await?;
+            done(Phase::Prove);
             prover.close().await?;
+            done(Phase::Close);
             Ok(Proved {
                 plan,
                 status,
@@ -404,10 +462,21 @@ fn seen(bytes: &[u8], authed: impl Fn(usize) -> bool) -> Vec<Option<u8>> {
         .collect()
 }
 
+/// Runs `work` in a span named `phase` and logs how long it took, so a slow proof's log shows
+/// which step was slow.
+pub async fn phase<T>(name: &'static str, work: impl Future<Output = T>) -> T {
+    let started = std::time::Instant::now();
+    let out = work.instrument(tracing::info_span!("phase", name)).await;
+    let ms = started.elapsed().as_millis() as u64;
+    tracing::info!(phase = name, ms, "proof: {name} took {ms} ms");
+    out
+}
+
 /// Runs the verifier for one prover against `stmt`, which its caller built
 /// before calling (so a refused challenge costs nothing here). `dial` opens
 /// the TCP connection to the statement's host (`host:443` in production);
-/// the prover never chooses it.
+/// the prover never chooses it. It runs beside the prover's setup, so the
+/// connection is there when the TLS relay starts.
 pub async fn verify<S, D, T, F>(
     prover: S,
     stmt: &Statement,
@@ -424,48 +493,55 @@ where
     let (driver, mut handle) = Session::new(Capped::new(prover, MAX_PROVER_IO)).split();
     let work = async {
         let out = async {
-            let config = VerifierConfig::builder().root_store(roots).build()?;
-            let verifier = match handle.new_verifier(config)?.commit().await? {
-                VerifierCommitStart::Mpc(v) => {
-                    v.reject(Some("proxy mode only")).await?;
-                    bail!("prover asked for MPC-TLS");
-                }
-                VerifierCommitStart::Proxy(v) => {
-                    if v.config().server_name().as_str() != stmt.host {
-                        v.reject(Some("unexpected server name")).await?;
-                        bail!("prover asked for another server");
+            let setup = phase("setup", async {
+                let config = VerifierConfig::builder().root_store(roots).build()?;
+                match handle.new_verifier(config)?.commit().await? {
+                    VerifierCommitStart::Mpc(v) => {
+                        v.reject(Some("proxy mode only")).await?;
+                        bail!("prover asked for MPC-TLS");
                     }
-                    v.accept().await?
+                    VerifierCommitStart::Proxy(v) => {
+                        if v.config().server_name().as_str() != stmt.host {
+                            v.reject(Some("unexpected server name")).await?;
+                            bail!("prover asked for another server");
+                        }
+                        Ok(v.accept().await?)
+                    }
                 }
-            };
-            let server = dial.await.context("dialing the server")?;
-            let verifier = verifier.run(Capped::new(server, MAX_SERVER_IO)).await?;
-            let verifier = verifier.verify().await?;
-            let req = verifier.request();
-            let shape_ok = req.server_identity()
-                && req.transcript_commit().is_none()
-                && req
-                    .reveal()
-                    .is_some_and(|(s, r)| s.len() <= MAX_REVEAL_SENT && r.len() <= MAX_REVEAL_RECV);
-            if !shape_ok {
-                let v = verifier
-                    .reject(Some(
-                        "expecting the server name and a small reveal, nothing else",
-                    ))
-                    .await?;
-                v.close().await?;
-                bail!("prover's proof request is not the expected shape");
-            }
-            let (
-                VerifierOutput {
-                    server_name,
-                    transcript,
-                    ..
-                },
-                verifier,
-            ) = verifier.accept().await?;
-            verifier.close().await?;
-            anyhow::Ok((server_name, transcript))
+            });
+            let dial = phase("dial", async { dial.await.context("dialing the server") });
+            let (verifier, server) = try_join(setup, dial).await?;
+            let server = Capped::new(server, MAX_SERVER_IO);
+            let verifier = phase("tls_relay", verifier.run(server)).await?;
+            phase("verify", async {
+                let verifier = verifier.verify().await?;
+                let req = verifier.request();
+                let shape_ok = req.server_identity()
+                    && req.transcript_commit().is_none()
+                    && req.reveal().is_some_and(|(s, r)| {
+                        s.len() <= MAX_REVEAL_SENT && r.len() <= MAX_REVEAL_RECV
+                    });
+                if !shape_ok {
+                    let v = verifier
+                        .reject(Some(
+                            "expecting the server name and a small reveal, nothing else",
+                        ))
+                        .await?;
+                    v.close().await?;
+                    bail!("prover's proof request is not the expected shape");
+                }
+                let (
+                    VerifierOutput {
+                        server_name,
+                        transcript,
+                        ..
+                    },
+                    verifier,
+                ) = verifier.accept().await?;
+                verifier.close().await?;
+                anyhow::Ok((server_name, transcript))
+            })
+            .await
         }
         .await;
         handle.close();

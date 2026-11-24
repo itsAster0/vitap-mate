@@ -4607,6 +4607,7 @@ dependencies = [
  "futures-core",
  "futures-io",
  "futures-sink",
+ "futures-util",
  "libc",
  "pin-project-lite",
  "tokio",
@@ -5087,8 +5088,6 @@ dependencies = [
  "serde_json",
  "sha2 0.11.1",
  "tokio",
- "tokio-tungstenite",
- "tokio-util",
  "tower",
  "tower-http 0.7.1",
  "tracing",
@@ -5097,7 +5096,6 @@ dependencies = [
  "vtop-core",
  "vtop-mcp",
  "vtop-shared",
- "vtop-tlsn",
  "wiremock",
 ]
 
@@ -5221,7 +5219,29 @@ dependencies = [
  "tlsn",
  "tokio",
  "tokio-util",
+ "tracing",
  "vtop-tlsn",
+]
+
+[[package]]
+name = "vtop-verifier"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "vtop-core",
+ "vtop-shared",
+ "vtop-tlsn",
+ "wiremock",
 ]
 
 [[package]]
