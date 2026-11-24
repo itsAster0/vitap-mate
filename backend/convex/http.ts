@@ -159,8 +159,8 @@ post("/register", async (ctx, req) => {
   const body = await jsonBody(req);
   if (!body) return cors(oauthError("invalid_client_metadata", "The body must be a JSON object."));
   const uris = body.redirect_uris;
-  if (!Array.isArray(uris) || uris.length === 0 || uris.length > 5 || !uris.every((u) => typeof u === "string" && redirectUriOk(u))) {
-    return cors(oauthError("invalid_redirect_uri", "redirect_uris must be 1 to 5 https, loopback http or app-scheme URIs without a fragment."));
+  if (!Array.isArray(uris) || uris.length === 0 || uris.length > 20 || !uris.every((u) => typeof u === "string" && redirectUriOk(u))) {
+    return cors(oauthError("invalid_redirect_uri", "redirect_uris must be 1 to 20 https, loopback http or app-scheme URIs without a fragment."));
   }
   const grants = body.grant_types;
   if (grants !== undefined && (!Array.isArray(grants) || !grants.includes("authorization_code"))) {
@@ -217,7 +217,7 @@ get("/authorize", async (ctx, req) => {
   if (params.get("code_challenge_method") !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(codeChallenge)) {
     return back("invalid_request", "PKCE with code_challenge_method=S256 is required.");
   }
-  if (state !== null && state.length > 512) return back("invalid_request", "state is too long.");
+  if (state !== null && state.length > 4096) return back("invalid_request", "state is too long.");
   const resource = params.get("resource");
   if (resource !== null && !resourceOk(resource)) return back("invalid_target", "Unknown resource.");
   const code = Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => ALPHABET[b & 31]).join("");

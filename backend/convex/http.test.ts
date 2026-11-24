@@ -215,6 +215,10 @@ describe("OAuth for MCP clients", () => {
     expect(reg.status).toBe(201);
     const { client_id } = (await reg.json()) as { client_id: string };
     expect((await post(t, "/register", { redirect_uris: ["http://evil.test/cb"] })).status).toBe(400);
+    const six = Array.from({ length: 6 }, (_, i) => `https://oauth-redirect.googleusercontent.com/r/${i}`);
+    expect((await post(t, "/register", { redirect_uris: six, client_name: "Gemini" })).status).toBe(201);
+    const tooMany = Array.from({ length: 21 }, (_, i) => `https://a.test/cb/${i}`);
+    expect((await post(t, "/register", { redirect_uris: tooMany })).status).toBe(400);
     const verifier = "v".repeat(43);
     const query = new URLSearchParams({
       response_type: "code",
@@ -280,6 +284,12 @@ describe("OAuth for MCP clients", () => {
     const back = await t.fetch(`/authorize?client_id=${client_id}&redirect_uri=https://a.test/cb&response_type=token`);
     expect(back.status).toBe(302);
     expect(new URL(back.headers.get("location")!).searchParams.get("error")).toBe("unsupported_response_type");
+    const longState = "s".repeat(760);
+    const okLong = await t.fetch(`/authorize?${new URLSearchParams({ response_type: "code", client_id, redirect_uri: "https://a.test/cb", code_challenge: await s256("v".repeat(43)), code_challenge_method: "S256", state: longState })}`);
+    expect(okLong.status).toBe(200);
+    const tooLong = await t.fetch(`/authorize?${new URLSearchParams({ response_type: "code", client_id, redirect_uri: "https://a.test/cb", code_challenge: await s256("v".repeat(43)), code_challenge_method: "S256", state: "s".repeat(4097) })}`);
+    expect(tooLong.status).toBe(302);
+    expect(new URL(tooLong.headers.get("location")!).searchParams.get("error")).toBe("invalid_request");
   });
 });
 
