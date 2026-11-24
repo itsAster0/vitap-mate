@@ -21,7 +21,6 @@ use rmcp::transport::streamable_http_server::session::never::NeverSessionManager
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 
 use bridge::SessionSource;
-use config::Config;
 use tools::{Caller, VtopTools};
 
 /// Key checks answered by the bridge, kept for a while so each tool call
@@ -116,16 +115,11 @@ async fn require_bearer(
 }
 
 /// Key checks are cached for five minutes.
-pub fn router(config: &Config, source: Arc<dyn SessionSource>) -> Router {
-    router_with_cache(config, source, Duration::from_secs(300))
+pub fn router(source: Arc<dyn SessionSource>) -> Router {
+    router_with_cache(source, Duration::from_secs(300))
 }
 
-pub fn router_with_cache(
-    config: &Config,
-    source: Arc<dyn SessionSource>,
-    key_ttl: Duration,
-) -> Router {
-    let _ = config;
+pub fn router_with_cache(source: Arc<dyn SessionSource>, key_ttl: Duration) -> Router {
     Router::new()
         .route(
             "/health",

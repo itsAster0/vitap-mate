@@ -17,7 +17,7 @@ use vtop_core::client::CourseFile;
 use vtop_core::course_pages::plain_id;
 use vtop_core::dates::{civil_date, day_number};
 use vtop_core::inputs::{BiometricDate, CourseFilePath, CourseId, CourseType, SemesterId};
-use vtop_core::spec::{self, Query};
+use vtop_core::spec::{self, PageSpec, Query};
 use vtop_core::types::StudentProfile;
 use vtop_core::{VtopClient, VtopError, VtopResult};
 
@@ -320,6 +320,31 @@ impl VtopTools {
         }
     }
 
+    /// [`Self::fetch`] for a page that takes only the semester.
+    async fn fetch_semester<T>(
+        &self,
+        parts: &Parts,
+        spec: &'static PageSpec<T>,
+        semester_id: &str,
+    ) -> CallToolResult
+    where
+        T: Serialize + Send + 'static,
+    {
+        let semester = match input(SemesterId::parse(semester_id)) {
+            Ok(value) => value,
+            Err(error) => return error,
+        };
+        self.fetch(parts, |client| {
+            let semester = semester.clone();
+            async move {
+                client
+                    .fetch(spec, &Query::for_semester(semester.as_str()))
+                    .await
+            }
+        })
+        .await
+    }
+
     /// [`Self::fetch`] for a download, handed over as an embedded resource.
     async fn fetch_file<F, Fut>(&self, parts: &Parts, uri: &str, call: F) -> CallToolResult
     where
@@ -375,19 +400,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(&spec::ATTENDANCE, &Query::for_semester(semester.as_str()))
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::ATTENDANCE, &args.semester_id)
+            .await
     }
 
     #[tool(
@@ -439,19 +453,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(&spec::TIMETABLE, &Query::for_semester(semester.as_str()))
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::TIMETABLE, &args.semester_id)
+            .await
     }
 
     #[tool(
@@ -463,19 +466,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(&spec::MARKS, &Query::for_semester(semester.as_str()))
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::MARKS, &args.semester_id)
+            .await
     }
 
     #[tool(
@@ -487,22 +479,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(
-                        &spec::EXAM_SCHEDULE,
-                        &Query::for_semester(semester.as_str()),
-                    )
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::EXAM_SCHEDULE, &args.semester_id)
+            .await
     }
 
     #[tool(
@@ -514,19 +492,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(&spec::GRADES, &Query::for_semester(semester.as_str()))
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::GRADES, &args.semester_id)
+            .await
     }
 
     #[tool(
@@ -681,22 +648,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(
-                        &spec::ACADEMIC_CALENDAR,
-                        &Query::for_semester(semester.as_str()),
-                    )
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::ACADEMIC_CALENDAR, &args.semester_id)
+            .await
     }
 
     #[tool(
@@ -708,22 +661,8 @@ impl VtopTools {
         Parameters(args): Parameters<SemesterArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let semester = match input(SemesterId::parse(&args.semester_id)) {
-            Ok(value) => value,
-            Err(error) => return error,
-        };
-        self.fetch(&parts, |client| {
-            let semester = semester.clone();
-            async move {
-                client
-                    .fetch(
-                        &spec::COURSE_PAGE_COURSES,
-                        &Query::for_semester(semester.as_str()),
-                    )
-                    .await
-            }
-        })
-        .await
+        self.fetch_semester(&parts, &spec::COURSE_PAGE_COURSES, &args.semester_id)
+            .await
     }
 
     #[tool(

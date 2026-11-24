@@ -8,7 +8,6 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use vtop_core::SessionState;
 use vtop_mcp::bridge::{Identity, SessionSource};
-use vtop_mcp::config::Config;
 use vtop_mcp::router;
 
 const KEY: &str = "vtm_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -45,16 +44,6 @@ impl SessionSource for RecordingSource {
     }
 }
 
-fn config() -> Config {
-    Config::from_lookup(|name| match name {
-        "BRIDGE_URL" => Some("https://bridge.example".to_string()),
-        "BRIDGE_SERVICE_KEY" => Some("0123456789abcdef0123456789abcdef".to_string()),
-        "MCP_KEYS" => Some(format!("{KEY}=22bce0001")),
-        _ => None,
-    })
-    .unwrap()
-}
-
 fn rpc(method: &str, params: Value) -> String {
     let mut params = params;
     params["_meta"] = json!({
@@ -83,7 +72,7 @@ async fn call(
     if let Some(bearer) = bearer {
         request = request.header("authorization", format!("Bearer {bearer}"));
     }
-    let response = router(&config(), source)
+    let response = router(source)
         .oneshot(request.body(Body::from(body)).unwrap())
         .await
         .unwrap();
@@ -103,7 +92,7 @@ async fn call(
 
 #[tokio::test]
 async fn health_needs_no_key() {
-    let response = router(&config(), Arc::new(RecordingSource::default()))
+    let response = router(Arc::new(RecordingSource::default()))
         .oneshot(Request::get("/health").body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -211,7 +200,7 @@ async fn tools_use_the_callers_account_and_report_bridge_errors() {
 /// Older clients: initialize, then plain requests without a session id.
 #[tokio::test]
 async fn legacy_protocol_clients_work_without_sessions() {
-    let app = router(&config(), Arc::new(RecordingSource::default()));
+    let app = router(Arc::new(RecordingSource::default()));
     let post = |body: Value| {
         Request::post("/mcp")
             .header("content-type", "application/json")
@@ -263,11 +252,7 @@ async fn legacy_protocol_clients_work_without_sessions() {
 #[tokio::test]
 async fn key_checks_are_cached_and_a_revoked_key_fails_after_the_cache_expires() {
     let source = Arc::new(RecordingSource::default());
-    let app = vtop_mcp::router_with_cache(
-        &config(),
-        source.clone(),
-        std::time::Duration::from_millis(50),
-    );
+    let app = vtop_mcp::router_with_cache(source.clone(), std::time::Duration::from_millis(50));
     let list = || {
         Request::post("/mcp")
             .header("content-type", "application/json")
@@ -320,12 +305,12 @@ async fn key_in_the_url_path_works_without_a_header() {
             ))
             .unwrap()
     };
-    let ok = router(&config(), source.clone())
+    let ok = router(source.clone())
         .oneshot(request(format!("/mcp/{KEY}")))
         .await
         .unwrap();
     assert_eq!(ok.status(), StatusCode::OK);
-    let wrong = router(&config(), source)
+    let wrong = router(source)
         .oneshot(request("/mcp/vtm_wrong".into()))
         .await
         .unwrap();
