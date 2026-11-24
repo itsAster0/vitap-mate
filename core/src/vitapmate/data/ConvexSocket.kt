@@ -88,7 +88,7 @@ class SocketProofNetwork internal constructor(
                 inbox.close()
             }
         }
-        val socket = WebSocket(url, events, scope, tls, cleartext, headers.map { it.name to it.value })
+        val socket = WebSocket(url, events, scope, tls, cleartext, headers.map { it.name to it.value }, PROOF_IDLE_MS)
         socket.start()
         val answer = withTimeoutOrNull(timeoutMs.toLong()) { upgrade.await() }
             ?: run {

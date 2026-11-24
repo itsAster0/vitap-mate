@@ -111,7 +111,10 @@ fun App() {
                     if (yes) {
                         // After a sign-in or on opening signed in, while the session is likely live.
                         // The address may have moved: what Settings shows is read again after.
-                        LaunchedEffect(Unit) { AppCore.keepForwarding { MailForwarding.load("keep") } }
+                        LaunchedEffect(Unit) {
+                            AppCore.keepForwarding { MailForwarding.load("keep") }
+                            AppCore.proveInBackground()
+                        }
                         when {
                             !semesterRead -> {}
                             SemesterChoice.selected == null -> {

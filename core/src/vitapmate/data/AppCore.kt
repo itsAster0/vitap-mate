@@ -3,6 +3,7 @@ package vitapmate.data
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.util.Base64
 import java.io.File
@@ -10,6 +11,7 @@ import java.security.KeyStore
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -39,6 +41,8 @@ object AppCore {
     private val core = CompletableDeferred<Core>()
 
     private var started = false
+    private var app: Context? = null
+    private var proving: Job? = null
 
     /**
      * Starts creating the core, attaches the Inspector to the log files and, in debuggable
@@ -49,6 +53,7 @@ object AppCore {
         started = true
         Log.catchUncaught()
         val app = context.applicationContext
+        this.app = app
         Inspector.attach(app)
         StateDump.register(app, Settings::snapshot)
         Docs.init(app)
@@ -107,6 +112,35 @@ object AppCore {
                 .onFailure { Log.warn("forwarding", "keep failed: ${it::class.simpleName}") }
             then()
         }
+    }
+
+    /**
+     * Proves who the student is to the server in the background (Rust's `proveInBackground`),
+     * so Connected apps, forwarding and the server routes find the identity ready: called after
+     * a sign-in and on each open signed in, it does nothing once there is one. Only on an
+     * unmetered network, or a validated one that isn't mobile data (unless
+     * [Tunable.ProofOnCellular]); gives up after [Tunable.ProofTimeout]; one at a time.
+     */
+    fun proveInBackground() {
+        val context = app ?: return
+        if (proving?.isActive == true || !proofNetworkOk(context)) return
+        proving = AppScope.launch {
+            runCatching {
+                flow("account.prove_background", unattended = true) { f ->
+                    val ms = Settings.tunable(Tunable.ProofTimeout) * 1000
+                    withContext(Dispatchers.IO) { await().proveInBackground(f, ms.toUInt()) }
+                }
+            }.onFailure { Log.info("account", "background proof not done: ${it::class.simpleName}") }
+        }
+    }
+
+    private fun proofNetworkOk(context: Context): Boolean {
+        val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
+        val caps = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+        val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        val cellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) ||
+            validated && (!cellular || Settings.tunable(Tunable.ProofOnCellular) == 1)
     }
 
     /**

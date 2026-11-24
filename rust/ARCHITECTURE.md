@@ -6,7 +6,7 @@ rust/                    Cargo workspace
 ├── vtop-proto/          parsers, types and HTTP shapes as page machines, with no I/O
 ├── vtop-core/           the VTOP client: runs vtop-proto's machines over a Transport, no FFI
 ├── vtop-shared/         formats shared by app, engine and edge (wire_page, mail_seal, ...)
-├── vtop-bridge/         the Engine: axum service over vtop-core, Railway service engine-v2
+├── vtop-bridge/         the Engine: axum service over vtop-core, on hawk
 ├── vtop-mcp/            MCP tools served by the Engine behind the edge's /mcp
 ├── vtop-tlsn/           TLSNotary proofs of VTOP's /vtop/content (the account proof): prover for the app, verifier for the Engine
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
@@ -150,8 +150,17 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   linked. The app keeps it (`account_token.json`) and sends it in place of
   the session. Without one (or after a refused or expired one) it gets one
   from the account proof below, so the session never goes and no consent is
-  asked; a call nobody started (`ask` false) never proves and stays
-  `ConsentDenied`. Saving the password goes with the token too: asked, the
+  asked; any other call nobody started (`ask` false) never proves and
+  stays `ConsentDenied`. The one unasked proof is the background one
+  (`Core::prove_in_background`, Kotlin's `AppCore.proveInBackground`, an
+  unattended flow): after a sign-in and at each open signed in, while the
+  install has no refresh or v2 token, it proves so the identity is there
+  before Connected apps, forwarding or a server route needs it. It runs
+  only on an unmetered network or a validated one that isn't mobile data
+  (Developer's "Background proof on mobile data" allows that), gives up
+  after "Background proof timeout" (90 s) and tries again at the next
+  open, and holds the identity's turn, so a call started meanwhile waits
+  for its JWT instead of proving again. Saving the password goes with the token too: asked, the
   Server screen's dialog is the consent; unasked, it needs a remembered
   `Account` yes. A connected app's session and the routes still send the
   session. Dropped on sign-out,
@@ -179,8 +188,20 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   the socket (`ProofNetwork`, set with `set_proof_network`). tlsn's
   sessions end on its mux's close handshake, not on EOF, and it does not
   always flush, so both ends' pipe sinks are channels drained by a writer
-  loop (`vtop_tlsn::session::Pipe`). vtop-ffi builds it behind the `tlsn`
-  feature (on by default).
+  loop (`vtop_tlsn::session::Pipe`); the phone's writer joins what the
+  prover queued meanwhile into one message of at most 64 KiB, so a proof
+  is a few hundred frames, not a thousand. The phone checks VTOP's session
+  (`verify_session`, signing in again when it expired) while it gets the
+  ticket and opens the socket. The verifier may queue a socket for up to a
+  minute before it starts (pinging, sending nothing), so the prover's own
+  limit is `PROVER_TIMEOUT` (150 s), the socket's idle timeout 90 s, and a
+  proof someone started has 150 s from the ticket to the verdict. Each
+  proof logs one "proof timings" line (ms per step: verify_session,
+  prove_start, ws_open, tlsn_setup, tls, zk_prove, close; messages and
+  bytes each way), and "server identity" has `auth:token`'s `token_ms`.
+  The crypto crates (tlsn, mpz, aes, sha2, blake3, the curves) build at
+  opt-level 3 in the release profile; the rest of the .so stays at "z".
+  vtop-ffi builds it behind the `tlsn` feature (on by default).
 
 The edge also serves `POST /v1/app/status` (signed by the phone, with the
 registration number, no VTOP cookies): the sealed session's and password's ages,
@@ -199,8 +220,8 @@ Connected apps → Pair a browser; the app makes an access key with that
 ## UDP mode
 
 ```
-phone ──UDP (vtop-wire)──► gateway ──HTTPS──► Engine /engine/fetch ──► VTOP
-             (Linode, Chennai)              (Railway, Singapore)
+phone ──UDP (vtop-wire)──► gateway ──HTTP──► Engine /engine/fetch ──► VTOP
+             (hawk, Chennai: the same compose, over NetBird)
 ```
 
 The app's Udp route sends read pages over UDP, for slow, lossy networks.
@@ -249,13 +270,18 @@ $INTERNAL_TOKEN`. The gateway, on a public VPS, has its own `GATEWAY_TOKEN`:
 the engine takes it only on the fetch and sign-in routes, the edge only on
 `/internal/udp-keys`, so it can't ask whose a session is or wait for OTPs.
 
-Deploy: the engine (nest, with Railway `engine-v2` as a standby), the gateway
-and the mail and proxy Workers with `bun run deploy` in `deploy/`
-(`alchemy.run.ts`), which then deploys the Convex functions, from a laptop; CI
-deploys nothing. Convex itself runs on hawk at vmate.aster0.dev.
-The gateway image is built for x86, pushed to GHCR and run on the Linode
-`fedora-in-maa` (172.232.115.40, UDP 3478-3481) over SSH, with host networking, `rust/vps/resolv.conf` as its resolvers
-and `~/vitapmate-gateway/data` for the keys.
+Deploy: `bun run deploy` in `deploy/` (`alchemy.run.ts`), from a laptop; CI deploys
+nothing. Convex, the engine and the gateway run on hawk, the Linode `fedora-in-maa`
+(172.232.115.40, 2 GB), from one compose, `deploy/hawk/compose.yaml` in `/opt/vmate`;
+Convex is served at vmate.aster0.dev. The engine listens on hawk's NetBird address
+(`ENGINE_URL` http://100.126.178.2:8090) for Convex and the gateway. Caddy sends `/proof`
+to the verifier on hawk (`127.0.0.1:8091`), else to its standby on nest
+(`100.126.222.47:8091`); the verifier's one secret is `VERIFIER_TOKEN`, which Convex
+holds too (`bunx convex env set VERIFIER_TOKEN`) and the deploy reads from there. The engine and
+gateway images are built for x86 on nest and pushed to GHCR. The gateway uses host
+networking (UDP 3478-3481), `rust/vps/resolv.conf` as its resolvers and
+`~/vitapmate-gateway/data` for the keys. The same deploy updates the mail and proxy
+Workers and then the Convex functions.
 
 ## Tests
 

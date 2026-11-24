@@ -371,6 +371,10 @@ struct Issued {
     regno: String,
 }
 
+/// How long a proof someone started may take, the ticket to the verdict: the verifier may queue
+/// it for a minute before it starts (keeping the socket alive, sending nothing).
+const PROOF_BUDGET: Duration = Duration::from_secs(150);
+
 /// The last student's refresh token, set aside at a switch ([`Core::set_aside_identity`]).
 pub(crate) const LAST_STUDENT: &str = "server_last_student.json";
 
@@ -709,11 +713,25 @@ impl Core {
         action: &str,
         ask: bool,
     ) -> Result<(), CoreError> {
-        if self.take_identity(flow, action, ask).await? {
+        self.identity_within(flow, action, ask.then_some(PROOF_BUDGET))
+            .await
+            .map(drop)
+    }
+
+    /// [`Self::identity`], proving within `prove` when it must (None: never); true when it got
+    /// a new JWT.
+    async fn identity_within(
+        &self,
+        flow: &str,
+        action: &str,
+        prove: Option<Duration>,
+    ) -> Result<bool, CoreError> {
+        let taken = self.take_identity(flow, action, prove).await?;
+        if taken {
             self.leave_queued(flow).await;
             self.semester_to_server(flow).await;
         }
-        Ok(())
+        Ok(taken)
     }
 
     /// The refresh token and v2 account token [`Core::take_identity`] may use for `regno`
@@ -741,7 +759,12 @@ impl Core {
             .saturating_mul(1000)
     }
 
-    async fn take_identity(&self, flow: &str, action: &str, ask: bool) -> Result<bool, CoreError> {
+    async fn take_identity(
+        &self,
+        flow: &str,
+        action: &str,
+        prove: Option<Duration>,
+    ) -> Result<bool, CoreError> {
         let _turn = self.shared.identity_turn.lock().await;
         let regno = self.signed_in_regno().await;
         let now_ms = self.server_now_ms();
@@ -770,9 +793,11 @@ impl Core {
                     "v2",
                     json!({ "v2AccountToken": v2.token, "device": self.device_info() }),
                 )
-            } else if ask && regno.is_some() {
+            } else if let Some(budget) = prove
+                && regno.is_some()
+            {
                 info!(action, "no identity: proving");
-                let ticket = self.prove_account(flow).await?;
+                let ticket = self.prove_account(flow, budget).await?;
                 (
                     "proof",
                     json!({ "ticket": ticket, "device": self.device_info() }),
@@ -783,16 +808,18 @@ impl Core {
                     signed_in = regno.is_some(),
                     "no identity: not proving"
                 );
-                return Err(if ask {
+                return Err(if prove.is_some() {
                     CoreError::NotSignedIn
                 } else {
                     CoreError::ConsentDenied
                 });
             };
-            let issued = match self
+            let asked = std::time::Instant::now();
+            let issued = self
                 .signed_call(flow, Kind::Action, "auth:token", &payload)
-                .await
-            {
+                .await;
+            let token_ms = asked.elapsed().as_millis() as u64;
+            let issued = match issued {
                 Ok(issued) => issued,
                 Err(error) if TOKEN_REFUSED.contains(&error.code()) && source != "proof" => {
                     warn!(source, code = error.code(), "token refused");
@@ -833,6 +860,7 @@ impl Core {
             }
             info!(
                 source,
+                token_ms,
                 expires_in_s = (expires_at - now_ms) / 1000,
                 "server identity"
             );
@@ -941,9 +969,41 @@ impl Core {
     }
 }
 
+#[uniffi::export]
+impl Core {
+    /// Proves who the student is in the background, so the refresh token is there before
+    /// Connected apps, forwarding or a server route needs it: right after a sign-in, and again
+    /// at each app open until it worked. Only when this install has no identity to use (no
+    /// refresh or v2 token, no live JWT) and is signed in; it gives up after `timeout_ms` and
+    /// the next open tries again. It takes the identity's turn, so a call someone starts
+    /// meanwhile waits for it and uses its JWT instead of proving again. No session leaves the
+    /// phone in a proof, so no consent is asked. Kotlin runs it in an unattended flow, on an
+    /// unmetered or validated non-cellular network unless Developer allows mobile data. True
+    /// when it proved.
+    pub async fn prove_in_background(
+        &self,
+        flow: String,
+        timeout_ms: u32,
+    ) -> Result<bool, CoreError> {
+        crate::traced("prove_in_background", &flow, async {
+            let Some(regno) = self.signed_in_regno().await else {
+                return Ok(false);
+            };
+            let (refresh, v2) = self.kept_tokens(Some(&regno));
+            if regno == crate::demo::USERNAME || refresh.is_some() || v2.is_some() {
+                return Ok(false);
+            }
+            let budget = Duration::from_millis(timeout_ms.into());
+            self.identity_within(&flow, "Background proof", Some(budget))
+                .await
+        })
+        .await
+    }
+}
+
 #[cfg(not(feature = "tlsn"))]
 impl Core {
-    async fn prove_account(&self, _: &str) -> Result<String, CoreError> {
+    async fn prove_account(&self, _: &str, _: Duration) -> Result<String, CoreError> {
         Err(CoreError::Other {
             reason: "This build cannot prove who you are to the server.".into(),
         })

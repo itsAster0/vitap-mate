@@ -230,6 +230,8 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
     CampusFetchGap("dev_campus_gap_s", "Campus fetch gap", "s", 3, 0..30, "Pause between biometric days in the Wrapped fetch"),
     CampusFetchAtOnce("dev_campus_at_once", "Campus fetch at once", "days", 2, 1..3, "Biometric days the Wrapped fetch asks VTOP for at the same time"),
     WrappedRefetch("dev_wrapped_refetch_h", "Wrapped refetch age", "h", 12, 1..168, "Pages with nothing posted yet fetch again for Wrapped when this old"),
+    ProofTimeout("dev_proof_bg_timeout_s", "Background proof timeout", "s", 90, 20..300, "The account proof after sign-in gives up after this long and tries again at the next open"),
+    ProofOnCellular("dev_proof_cellular", "Background proof on mobile data", "on", 0, 0..1, "1: the account proof after sign-in (about 1.5 MB) may run on mobile data too"),
 }
 
 /** The background sync intervals on offer, in hours. */

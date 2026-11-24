@@ -3,6 +3,7 @@
 //! vtop-tlsn's fake VTOP and answers as the engine does), then trade the ticket for a JWT.
 
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde_json::{Value, json};
@@ -25,17 +26,24 @@ struct FakeNetwork {
     device: String,
     /// The URLs opened.
     opened: Mutex<Vec<String>>,
+    /// Binary messages the phone sent, over every socket.
+    sends: Arc<AtomicUsize>,
+    /// Opening never answers (a link gone quiet).
+    hang: bool,
 }
 
 struct FakeSocket {
     rx: tokio::sync::Mutex<ReadHalf<DuplexStream>>,
     tx: tokio::sync::Mutex<WriteHalf<DuplexStream>>,
     last: tokio::sync::Mutex<Option<tokio::sync::oneshot::Receiver<String>>>,
+    sends: Arc<AtomicUsize>,
 }
 
 #[async_trait::async_trait]
 impl ProofSocket for FakeSocket {
     async fn send(&self, data: Vec<u8>) -> Result<(), TransportError> {
+        assert!(data.len() <= MAX_MESSAGE);
+        self.sends.fetch_add(1, Ordering::Relaxed);
         let mut tx = self.tx.lock().await;
         tx.write_all(&data)
             .await
@@ -71,6 +79,9 @@ impl ProofNetwork for FakeNetwork {
     ) -> Result<ProofOpened, TransportError> {
         self.opened.lock().unwrap().push(url.clone());
         assert!(headers.is_empty(), "the ticket is the only credential");
+        if self.hang {
+            return std::future::pending().await;
+        }
         let ticket = url.split_once("/proof?ticket=").map(|(_, t)| t.to_string());
         if ticket.as_deref() != Some(CHALLENGE) {
             let body = json!({ "code": "challenge_invalid", "error": "Start again." });
@@ -109,6 +120,7 @@ impl ProofNetwork for FakeNetwork {
             rx: rx.into(),
             tx: tx.into(),
             last: Some(last_rx).into(),
+            sends: self.sends.clone(),
         };
         Ok(ProofOpened {
             socket: Some(Arc::new(socket)),
@@ -133,6 +145,8 @@ async fn setup(name: &str, page: Page) -> (Core, Arc<Mutex<Edge>>, String, Arc<F
         vtop: fake::serve(page).await,
         device: core.registration().0,
         opened: Mutex::default(),
+        sends: Arc::default(),
+        hang: name.starts_with("hang"),
     });
     set_proof_network(network.clone());
     (core, edge, server, network)
@@ -279,4 +293,77 @@ async fn a_session_id_the_proof_cannot_carry_fails_before_the_server() {
     );
     assert!(network.opened.lock().unwrap().is_empty());
     assert!(paths(&edge).is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_background_proof_gets_the_refresh_token_once_in_few_messages() {
+    let (core, edge, _server, network) = setup("background", Page::Honest).await;
+    let gate = consent::tests::no(&core);
+    assert!(core.prove_in_background("f".into(), 120_000).await.unwrap());
+    assert_eq!(gate.asks(), 0, "no session leaves the phone");
+    assert_eq!(paths(&edge), ["auth:proveStart", "auth:token"]);
+    assert_eq!(core.device().refresh.unwrap().token, "vrt_1");
+    // tlsn writes about 1050 pieces here; the writer joins what is queued (about 250).
+    let sends = network.sends.load(Ordering::Relaxed);
+    assert!(sends < 400, "{sends} messages");
+
+    // With the refresh token kept, the next open proves nothing and asks the server nothing.
+    assert!(!core.prove_in_background("f".into(), 120_000).await.unwrap());
+    assert_eq!(network.opened.lock().unwrap().len(), 1);
+    assert_eq!(paths(&edge).len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_background_proof_with_a_token_kept_does_nothing() {
+    let (core, edge, server, network) = setup("background-kept", Page::Honest).await;
+    crate::test_edge::keep_token(&core, &server);
+    assert!(!core.prove_in_background("f".into(), 120_000).await.unwrap());
+    assert!(network.opened.lock().unwrap().is_empty());
+    assert!(paths(&edge).is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_background_proof_out_of_time_fails_and_keeps_nothing() {
+    let (core, edge, _server, network) = setup("hang-background", Page::Honest).await;
+    let error = core.prove_in_background("f".into(), 0).await.unwrap_err();
+    assert!(error.to_string().contains("took too long"), "{error}");
+    assert_eq!(network.opened.lock().unwrap().len(), 1);
+    assert_eq!(paths(&edge), ["auth:proveStart"]);
+    assert!(core.device().refresh.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_call_started_during_a_background_proof_waits_for_its_jwt() {
+    let (core, edge, _server, network) = setup("background-wait", Page::Honest).await;
+    view(&edge);
+    let (background, call) = futures::join!(
+        core.prove_in_background("f".into(), 120_000),
+        core.connected_apps("g".into())
+    );
+    call.unwrap();
+    // Whichever took the turn first proved; the other used its JWT.
+    let _ = background.unwrap();
+    assert_eq!(network.opened.lock().unwrap().len(), 1);
+    assert_eq!(
+        paths(&edge),
+        ["auth:proveStart", "auth:token", "account:view"]
+    );
+}
+
+#[test]
+fn queued_pieces_join_into_messages_of_at_most_the_cap() {
+    let (tx, mut rx) = mpsc::unbounded::<Vec<u8>>();
+    for _ in 0..3 {
+        tx.unbounded_send(vec![1; 30 << 10]).unwrap();
+    }
+    tx.unbounded_send(vec![2; 10]).unwrap();
+    let (mut message, mut held) = (rx.try_recv().unwrap(), None);
+    join_ready(&mut rx, &mut message, &mut held);
+    assert_eq!(message.len(), 60 << 10);
+    let mut message = held.take().unwrap();
+    join_ready(&mut rx, &mut message, &mut held);
+    assert_eq!(message.len(), (30 << 10) + 10);
+    assert!(held.is_none());
+    drop(tx);
+    assert!(rx.try_recv().is_err());
 }

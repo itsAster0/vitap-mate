@@ -157,6 +157,7 @@ fun AccountScreen() {
                         flow("account.semesters") { SemesterChoice.readCache(it) }
                         // The last student's Mailbox would keep sending this phone their OTPs.
                         AppCore.leaveOldForwarding()
+                        AppCore.proveInBackground()
                         // Their Gmail grant and the sync built on it aren't this student's.
                         Gmail.disconnect(flowId)
                         Settings.forgetStudent()

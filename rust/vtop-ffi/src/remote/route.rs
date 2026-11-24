@@ -720,8 +720,10 @@ mod tests {
     #[tokio::test]
     async fn relogin_password_never_leaves_when_denied() {
         let (_core, edge) = denied("relogin", Route::Server).await;
+        // A server re-login is the `vtop:login` action; denied, nothing goes at all.
         let edge = edge.lock().unwrap();
-        assert!(!edge.requests.iter().any(|r| r.path == "/v1/vtop/login"));
+        assert!(!edge.requests.iter().any(|r| r.path == "vtop:login"));
+        assert!(edge.requests.is_empty());
     }
 
     #[tokio::test]

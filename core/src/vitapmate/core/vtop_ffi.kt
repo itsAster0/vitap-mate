@@ -1190,6 +1190,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_live_watch(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_prove_in_background(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remember_cookie_consent(
@@ -1511,6 +1513,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_has_server_identity(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_live_watch(`ptr`: Long,`flow`: RustBuffer.ByValue,`topic`: RustBuffer.ByValue,`listener`: Long,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_prove_in_background(`ptr`: Long,`flow`: RustBuffer.ByValue,`timeoutMs`: Int,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2158,6 +2162,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_live_watch() and 0xFFFF) != 14389) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_prove_in_background() and 0xFFFF) != 53203) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 55337) {
@@ -4823,6 +4830,19 @@ public interface CoreInterface {
     suspend fun `liveWatch`(`flow`: kotlin.String, `topic`: LiveTopic, `listener`: LiveListener): LiveWatch
     
     /**
+     * Proves who the student is in the background, so the refresh token is there before
+     * Connected apps, forwarding or a server route needs it: right after a sign-in, and again
+     * at each app open until it worked. Only when this install has no identity to use (no
+     * refresh or v2 token, no live JWT) and is signed in; it gives up after `timeout_ms` and
+     * the next open tries again. It takes the identity's turn, so a call someone starts
+     * meanwhile waits for it and uses its JWT instead of proving again. No session leaves the
+     * phone in a proof, so no consent is asked. Kotlin runs it in an unattended flow, on an
+     * unmetered or validated non-cellular network unless Developer allows mobile data. True
+     * when it proved.
+     */
+    suspend fun `proveInBackground`(`flow`: kotlin.String, `timeoutMs`: kotlin.UInt): kotlin.Boolean
+    
+    /**
      * The kinds the student ticked "don't ask again" for.
      */
     fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind>
@@ -6744,6 +6764,40 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_u64(future) },
         // lift function
         { FfiConverterTypeLiveWatch.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Proves who the student is in the background, so the refresh token is there before
+     * Connected apps, forwarding or a server route needs it: right after a sign-in, and again
+     * at each app open until it worked. Only when this install has no identity to use (no
+     * refresh or v2 token, no live JWT) and is signed in; it gives up after `timeout_ms` and
+     * the next open tries again. It takes the identity's turn, so a call someone starts
+     * meanwhile waits for it and uses its JWT instead of proving again. No session leaves the
+     * phone in a proof, so no consent is asked. Kotlin runs it in an unattended flow, on an
+     * unmetered or validated non-cellular network unless Developer allows mobile data. True
+     * when it proved.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `proveInBackground`(`flow`: kotlin.String, `timeoutMs`: kotlin.UInt) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_prove_in_background(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterUInt.lower(`timeoutMs`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )

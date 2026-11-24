@@ -43,6 +43,12 @@ private const val HANDSHAKE_READ_MS = 10_000
 /** A backstop only: Rust drops a socket silent for 30 s (Convex pings every ~15 s). */
 private const val IDLE_MS = 60_000
 
+/**
+ * The account proof's: its verifier may queue the socket for a minute before it starts, pinging
+ * but sending nothing; Rust's deadline ends the proof.
+ */
+internal const val PROOF_IDLE_MS = 90_000
+
 /** How long a close waits for the other side's close before the socket is shut. */
 internal const val CLOSE_WAIT_MS = 5_000L
 
@@ -81,6 +87,7 @@ internal class WebSocket(
     private val tlsFactory: SSLSocketFactory,
     private val cleartext: (String) -> Boolean,
     private val headers: List<Pair<String, String>> = emptyList(),
+    private val idleMs: Int = IDLE_MS,
 ) : ConvexSocket {
     private val outbox = Channel<ByteArray>(Channel.UNLIMITED)
     private val closing = AtomicBoolean()
@@ -129,7 +136,7 @@ internal class WebSocket(
             output.write(upgradeRequest(uri, key, headers).encodeToByteArray())
             output.flush()
             checkUpgrade(readHead(input), key, input)
-            socket.soTimeout = IDLE_MS
+            socket.soTimeout = idleMs
             writer = scope.launch {
                 try {
                     for (frame in outbox) {
