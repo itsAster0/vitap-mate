@@ -3,8 +3,6 @@
 //! [`crate::remote::backend`]), then dropped. Kept in [`FILE`] for the signed-in student;
 //! dropped on sign-out and another student too. The token itself is never logged.
 
-use std::fs;
-
 use serde::{Deserialize, Serialize};
 
 use crate::Core;
@@ -23,17 +21,14 @@ pub(crate) struct Saved {
 
 impl Core {
     pub(crate) fn forget_account_token(&self) {
-        match fs::remove_file(self.at(FILE)) {
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                tracing::warn!(%error, "account token not removed");
-            }
-            _ => {}
-        }
+        self.remove_file(FILE);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     #[test]

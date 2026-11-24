@@ -24,7 +24,7 @@ use vtop_core::sync::RwLock;
 
 use crate::pages::records;
 use crate::remote::edge;
-use crate::store::decoded;
+use crate::store::{self, decoded};
 use crate::{
     ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS, SESSION,
     Session, Shared, TIMETABLE, traced, traced_sync,
@@ -102,7 +102,7 @@ impl Core {
             let slot = self.current()?;
             let mut session = slot.write().await;
             session.restart(&self.shared)?;
-            remove(&self.at(SESSION));
+            self.remove_file(SESSION);
             info!("session dropped; the next fetch signs in again");
             Ok(())
         })
@@ -186,7 +186,7 @@ impl Core {
     /// Forgets the semester pick (pages stay cached per semester): the app asks for one again.
     pub fn dev_reset_semester(&self, flow: String) -> Result<(), CoreError> {
         traced_sync("dev_reset_semester", &flow, || {
-            remove(&self.at(SELECTED));
+            self.remove_file(SELECTED);
             info!("semester pick forgotten");
             Ok(())
         })
@@ -326,7 +326,6 @@ impl Core {
         url: Option<String>,
     ) -> Result<(), CoreError> {
         traced_sync("dev_set_forwarding_server", &flow, || {
-            let path = self.at(edge::SERVER_FILE);
             match url
                 .as_deref()
                 .map(|url| url.trim().trim_end_matches('/'))
@@ -338,11 +337,12 @@ impl Core {
                             reason: "the server must start with http:// or https://".to_string(),
                         });
                     }
-                    fs::write(&path, format!("{url}\n"))?;
+                    let line = format!("{url}\n");
+                    store::write_atomic(&self.at(edge::SERVER_FILE), line.as_bytes())?;
                     info!(server = url, "forwarding server set");
                 }
                 None => {
-                    remove(&path);
+                    self.remove_file(edge::SERVER_FILE);
                     info!("forwarding server back to the default");
                 }
             }
@@ -395,15 +395,6 @@ fn cookie_editor(header: &str) -> Vec<serde_json::Value> {
             })
         })
         .collect()
-}
-
-fn remove(path: &Path) {
-    if let Err(error) = fs::remove_file(path)
-        && error.kind() != ErrorKind::NotFound
-    {
-        warn!(%error, "not removed");
-    }
-    decoded::forget(path);
 }
 
 fn remove_dir(path: &Path) {
