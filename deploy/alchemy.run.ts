@@ -3,17 +3,14 @@
 // Needs the variables in .env.example (in .env here); CI deploys nothing. State lives in the account's Alchemy
 // state-store Worker.
 //
-// - Convex: self-hosted on hawk (infra repo, services/vmate-convex), served at
-//   vmate.aster0.dev by hawk's Caddy. Its env holds the v3 secrets, and the
-//   resources below read theirs from it (`convexEnv`), so there is one copy.
-// - Engine: built on nest and pushed to GHCR, run on hawk (127.0.0.1:8090) and on
-//   nest (its NetBird address) as a standby. hawk's Caddy sends Convex, the gateway
-//   and /proof to hawk's engine, else nest's (`ENGINE_URL`, the infra repo's
-//   Caddyfile). Railway `engine-v2` is kept up to date as a second standby.
-// - Gateway: the UDP gateway on hawk (the Linode fedora-in-maa), built on nest,
-//   pushed to GHCR and run over SSH as `vitapmate-gateway`. It reaches Convex on
-//   the same machine and the engine over NetBird. Caddy holds UDP 443 there and
-//   nginx 50000-50200, so it takes 3478-3481 (open in the Linode and host firewalls).
+// - Convex's env holds the v3 secrets, and the resources below read theirs from it
+//   (`convexEnv`), so there is one copy. It is served at vmate.aster0.dev by hawk's Caddy.
+// - hawk (the Linode fedora-in-maa): Convex, the engine, the verifier and the UDP gateway in one
+//   compose, hawk/compose.yaml, which hawk/up.sh copies to /opt/vmate and starts. The
+//   engine, verifier and gateway images are built on nest and pushed to GHCR; hawk logs in
+//   only for the pull. Convex's ENGINE_URL is the engine on hawk's NetBird address.
+// - Verifier standby on nest (its NetBird address): hawk's Caddy sends /proof to hawk's
+//   verifier, else nest's (the infra repo's Caddyfile).
 // - Mail: the `vmate-mail` Worker, which hands forwarded OTP mail to Convex,
 //   with its retry queue.
 // - Proxy: the `vmate-proxy` Worker on vmate-proxy.aster0.dev (the Proxy route).
@@ -27,9 +24,9 @@
 import { execFileSync } from "node:child_process";
 import * as Alchemy from "alchemy";
 import { adopt } from "alchemy/AdoptPolicy";
+import * as Command from "alchemy/Command";
 import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Docker from "@alchemy.run/docker";
-import * as Railway from "@alchemy.run/railway";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -37,13 +34,12 @@ import * as Redacted from "effect/Redacted";
 
 const DOMAIN = "vmate.aster0.dev";
 const CONVEX_URL = `https://${DOMAIN}`;
-/** nest's NetBird address: its standby engine is published there only. */
-const NEST_IP = "100.126.222.47";
 const HAWK_IP = "172.232.115.40";
-/** hawk's Caddy on its NetBird address: hawk's engine, else nest's. Set as Convex's ENGINE_URL too. */
-const ENGINE_URL = "http://100.126.178.2:8095";
-/** The engine's GHCR image, public like the gateway's, as hawk pulls without a login. */
+/** nest's NetBird address: the verifier's standby is published there only. */
+const NEST_IP = "100.126.222.47";
+/** The GHCR images; hawk logs in only to pull them (hawk/up.sh). */
 const ENGINE_IMAGE = "ghcr.io/itsaster0/vitapmate-engine";
+const VERIFIER_IMAGE = "ghcr.io/itsaster0/vitapmate-verifier";
 
 /** A secret from the Convex deployment's env (`bunx convex env get`, with ../backend/.env.local). */
 const convexEnv = (name: string) =>
@@ -76,13 +72,6 @@ const nest = Effect.gen(function* () {
   });
 });
 
-const hawk = Effect.gen(function* () {
-  return yield* Docker.Context("Linode", {
-    name: "fedora-in-maa",
-    docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault(`ssh://root@${HAWK_IP}`))}`,
-  });
-});
-
 const ghcr = Effect.gen(function* () {
   return {
     server: "ghcr.io",
@@ -91,64 +80,55 @@ const ghcr = Effect.gen(function* () {
   };
 });
 
-export const Engine = Effect.gen(function* () {
-  const builder = yield* nest;
-  const image = yield* Docker.Image("NestEngineImage", {
-    context: builder,
+/** The engine image, built on nest and pushed to GHCR for hawk. */
+const EngineImage = Effect.gen(function* () {
+  return yield* Docker.Image("NestEngineImage", {
+    context: yield* nest,
     name: ENGINE_IMAGE,
     registry: yield* ghcr,
     build: { context: "../rust", dockerfile: "Dockerfile.engine", platform: "linux/amd64" },
   });
-  // Both behind hawk's Caddy, one hop, so X-Forwarded-For's last entry is the phone.
-  const environment = { ...(yield* engineEnv), PROXY_HOPS: "1" };
-  const common = {
-    environment,
-    start: true,
-    restart: "unless-stopped",
-    logDriver: "json-file",
-    logOptions: { "max-size": "10m", "max-file": "3" },
-  } as const;
-  const standby = yield* Docker.Container("NestEngine", {
-    ...common,
-    context: builder,
-    name: "vmate-engine",
-    image,
-    ports: [{ external: `${NEST_IP}:8090`, internal: 8080 }],
-  }).pipe(adopt(true));
-  const host = yield* hawk;
-  // Built on nest, so hawk has only the tag it pulled last: pulled each deploy, as the gateway.
-  const pulled = yield* Docker.RemoteImage("HawkEnginePull", {
-    context: host,
-    name: image.name,
-    tag: image.tag,
-    platform: "linux/amd64",
-  });
-  // Capped so a heavy proof kills the engine (and Caddy falls back to nest), never Convex beside it.
-  const main = yield* Docker.Container("HawkEngine", {
-    ...common,
-    context: host,
-    name: "vmate-engine",
-    image: pulled,
-    ports: [{ external: "127.0.0.1:8090", internal: 8080 }],
-    memory: "500m",
-    memorySwap: "500m",
-  }).pipe(adopt(true));
-  return { main, standby };
 });
 
-export const RailwayEngine = Effect.gen(function* () {
-  const project = yield* Railway.Project("Vitapmate", { name: "vitapmate" }).pipe(adopt(true));
-  // "Engine" was its id when it was the only engine: kept, so it is updated, not replaced.
-  return yield* Railway.Service("Engine", {
-    project,
-    name: "engine-v2",
-    context: "../rust",
-    dockerfilePath: "Dockerfile.engine",
-    port: 8080,
-    // Behind hawk's Caddy and Railway's own proxy: the phone is second from the end.
-    env: { ...(yield* engineEnv), PROXY_HOPS: "2" },
-  }).pipe(adopt(true));
+type Image = Effect.Success<typeof EngineImage>;
+
+/** The account proof's verifier image, built on nest and pushed to GHCR for hawk. */
+const VerifierImage = Effect.gen(function* () {
+  return yield* Docker.Image("VerifierImage", {
+    context: yield* nest,
+    name: VERIFIER_IMAGE,
+    registry: yield* ghcr,
+    build: { context: "../rust", dockerfile: "Dockerfile.verifier", platform: "linux/amd64" },
+  });
 });
+
+/** The verifier's standby on nest: hawk's Caddy sends /proof here while hawk's is down. nest has
+ * the cores, so it takes more proofs at once. Its only secret is VERIFIER_TOKEN. */
+const NestVerifier = (image: Image) =>
+  Effect.gen(function* () {
+    return yield* Docker.Container("NestVerifier", {
+      context: yield* nest,
+      name: "vmate-verifier",
+      image,
+      ports: [{ external: `${NEST_IP}:8091`, internal: 8080 }],
+      environment: {
+        CONVEX_URL,
+        PORT: "8080",
+        VERIFIER_TOKEN: yield* convexEnv("VERIFIER_TOKEN"),
+        MAX_PROOFS: "6",
+        MAX_QUEUE: "64",
+        QUEUE_WAIT_SECS: "60",
+        // Behind hawk's Caddy: one hop.
+        PROXY_HOPS: "1",
+        RUST_LOG: "warn,vtop_verifier=info",
+      },
+      memory: "1g",
+      start: true,
+      restart: "unless-stopped",
+      logDriver: "json-file",
+      logOptions: { "max-size": "10m", "max-file": "3" },
+    }).pipe(adopt(true));
+  });
 
 export const Mail = Effect.gen(function* () {
   const queue = yield* Cloudflare.Queues.Queue("MailQueue", { name: "vmate-mail-retry" }).pipe(adopt(true));
@@ -185,69 +165,56 @@ export const Proxy = Cloudflare.Worker("Proxy", {
   observability: { enabled: true, logs: { enabled: true, invocationLogs: false } },
 }).pipe(adopt(true));
 
-/** Where the gateway's files live on hawk: its Noise keys (./data) and resolvers. */
-const GATEWAY_DIR = "/root/vitapmate-gateway";
-
-export const Gateway = Effect.gen(function* () {
-  const host = yield* hawk;
-  const image = yield* Docker.Image("GatewayImage", {
-    context: yield* nest,
-    // With the host, or Alchemy pushes the bare name to Docker Hub.
-    name: "ghcr.io/itsaster0/vitapmate-gateway",
-    registry: yield* ghcr,
-    build: { context: "../rust", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
+/** Convex, the engine, the verifier and the gateway on hawk (hawk/compose.yaml). Runs again when
+ * an image, a secret or a file in hawk/ changes. */
+const Hawk = (engine: Image, verifier: Image) =>
+  Effect.gen(function* () {
+    const gateway = yield* Docker.Image("GatewayImage", {
+      context: yield* nest,
+      // With the host, or Alchemy pushes the bare name to Docker Hub.
+      name: "ghcr.io/itsaster0/vitapmate-gateway",
+      registry: yield* ghcr,
+      build: { context: "../rust", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
+    });
+    const env = yield* engineEnv;
+    const registry = yield* ghcr;
+    return yield* Command.Exec("Hawk", {
+      command: "./hawk/up.sh",
+      memo: { include: ["hawk/**"] },
+      timeout: "10 minutes",
+      env: {
+        HAWK: yield* Config.String("GATEWAY_SSH").pipe(
+          Config.map((url) => url.replace(/^ssh:\/\//, "")),
+          Config.withDefault(`root@${HAWK_IP}`),
+        ),
+        ENGINE_IMAGE: engine.repoDigest ?? engine.imageRef,
+        GATEWAY_IMAGE: gateway.repoDigest ?? gateway.imageRef,
+        VERIFIER_IMAGE: verifier.repoDigest ?? verifier.imageRef,
+        CONVEX_URL: env.CONVEX_URL,
+        INTERNAL_TOKEN: env.INTERNAL_TOKEN,
+        GATEWAY_TOKEN: env.GATEWAY_TOKEN,
+        VAULT_KEY: env.VAULT_KEY,
+        VERIFIER_TOKEN: yield* convexEnv("VERIFIER_TOKEN"),
+        // hawk logs in for the pull only (hawk/up.sh), so the images need not be public.
+        GHCR_USERNAME: registry.username,
+        GHCR_TOKEN: registry.password,
+      },
+    });
   });
-  // The image is built on nest, so hawk has only the tag it pulled last: a container made from
-  // `image` would run that stale binary. Pulled on the host each deploy.
-  const pulled = yield* Docker.RemoteImage("GatewayPull", {
-    context: host,
-    name: image.name,
-    tag: image.tag,
-    platform: "linux/amd64",
-  });
-  return yield* Docker.Container("Gateway", {
-    context: host,
-    name: "vitapmate-gateway",
-    image: pulled,
-    // The gateway sees each phone's real address (its Noise sessions are keyed
-    // by it), with no Docker NAT in the UDP path.
-    networkMode: "host",
-    volumes: [
-      { hostPath: `${GATEWAY_DIR}/resolv.conf`, containerPath: "/etc/resolv.conf", readOnly: true },
-      { hostPath: `${GATEWAY_DIR}/data`, containerPath: "/data" },
-    ],
-    environment: {
-      ENGINE_URL,
-      // Convex's HTTP actions on the same machine: its OTP polls never leave hawk.
-      EDGE_URL: "http://127.0.0.1:3411",
-      GATEWAY_TOKEN: yield* convexEnv("GATEWAY_TOKEN"),
-      UDP_HOST: HAWK_IP,
-      BIND: "0.0.0.0",
-      UDP_PORTS: "3478,3479,3480,3481",
-      RUST_LOG: "warn,vtop_gateway=info",
-    },
-    start: true,
-    restart: "unless-stopped",
-    logDriver: "json-file",
-    logOptions: { "max-size": "10m", "max-file": "3" },
-  }).pipe(adopt(true));
-});
 
 export default Alchemy.Stack(
   "vmate",
   {
-    providers: Layer.mergeAll(Cloudflare.providers(), Railway.providers(), Docker.providers()),
+    providers: Layer.mergeAll(Cloudflare.providers(), Docker.providers()),
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
-    const engine = yield* Engine;
-    const railway = yield* RailwayEngine;
+    const engine = yield* EngineImage;
+    const verifier = yield* VerifierImage;
+    yield* Hawk(engine, verifier);
+    const standby = yield* NestVerifier(verifier);
     const mail = yield* Mail;
     const proxy = yield* Proxy;
-    const out = { engine: engine.main.name, railway: railway.url, mail: mail.workerName, proxy: proxy.url };
-    // SKIP_GATEWAY=1 deploys without it.
-    if (yield* Config.Boolean("SKIP_GATEWAY").pipe(Config.withDefault(false))) return out;
-    const gateway = yield* Gateway;
-    return { ...out, gateway: gateway.name };
+    return { verifierStandby: standby.name, mail: mail.workerName, proxy: proxy.url };
   }),
 );

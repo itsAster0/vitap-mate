@@ -1,0 +1,107 @@
+# Everything of vitapmate's on hawk (the Linode fedora-in-maa, 2 GB), in /opt/vmate. `bun run deploy`
+# copies this file, writes the env files and runs `docker compose up -d` (hawk/up.sh). hawk's
+# Caddy (infra repo, services/edge) publishes Convex on vmate.aster0.dev and sends /proof to the
+# verifier here, else to its standby on nest. Each service is capped so a spike kills only itself;
+# the caps add up past 2 GB, but none of them sits near its cap for long.
+name: vmate
+
+services:
+  # Convex (backend v3), SQLite in the volume made under its old compose. convex.env (host only)
+  # holds INSTANCE_SECRET.
+  # Admin key: docker compose exec backend ./generate_admin_key.sh
+  backend:
+    image: ghcr.io/convex/convex-backend:latest
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:3410:3210"
+      - "127.0.0.1:3411:3211"
+    volumes:
+      - data:/convex/data
+    env_file: convex.env
+    environment:
+      CONVEX_CLOUD_ORIGIN: https://vmate.aster0.dev
+      CONVEX_SITE_ORIGIN: https://vmate.aster0.dev
+      INSTANCE_NAME: vmate
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+      DOCUMENT_RETENTION_DELAY: "172800"
+      REDACT_LOGS_TO_CLIENT: "true"
+      RUST_LOG: info
+    healthcheck:
+      test: curl -f http://localhost:3210/version
+      interval: 10s
+      start_period: 20s
+
+  # The engine (rust/vtop-bridge), on hawk's NetBird address only: Convex's container (its
+  # ENGINE_URL) and the gateway reach it there.
+  engine:
+    image: ${ENGINE_IMAGE:?}
+    restart: unless-stopped
+    mem_limit: 500m
+    memswap_limit: 500m
+    ports:
+      - "100.126.178.2:8090:8080"
+    env_file: engine.env
+    environment:
+      PORT: "8080"
+      OTP_WAIT_SECS: "45"
+      RUST_LOG: warn,vtop_bridge=info
+    logging: &logs
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+  # The account proof's verifier (rust/vtop-verifier): stateless, it relays the phone's TLS to
+  # VTOP and reports the verdict to Convex with VERIFIER_TOKEN (verifier.env), the only secret it
+  # gets. It reaches Convex's HTTP actions over this compose's network. A proof takes about 140 MB
+  # and a few seconds of CPU, so two at once on hawk's one vCPU; more wait in its queue (pinged
+  # every 10 s). Only Caddy reaches it. Behind Caddy, one hop.
+  verifier:
+    image: ${VERIFIER_IMAGE:?}
+    restart: unless-stopped
+    mem_limit: 400m
+    memswap_limit: 400m
+    cpus: 0.8
+    ports:
+      - "127.0.0.1:8091:8080"
+    env_file: verifier.env
+    environment:
+      CONVEX_URL: http://backend:3211
+      PORT: "8080"
+      MAX_PROOFS: "2"
+      MAX_QUEUE: "32"
+      QUEUE_WAIT_SECS: "60"
+      PROXY_HOPS: "1"
+      RUST_LOG: warn,vtop_verifier=info
+    logging: *logs
+
+  # The UDP gateway (rust/vtop-gateway): host networking, so it sees each phone's real address
+  # (its Noise sessions are keyed by it). Caddy holds UDP 443 and nginx 50000-50200, so it takes
+  # 3478-3481 (open in the Linode and host firewalls).
+  gateway:
+    image: ${GATEWAY_IMAGE:?}
+    restart: unless-stopped
+    mem_limit: 100m
+    memswap_limit: 100m
+    network_mode: host
+    volumes:
+      - /root/vitapmate-gateway/resolv.conf:/etc/resolv.conf:ro
+      - /root/vitapmate-gateway/data:/data
+    environment:
+      ENGINE_URL: http://100.126.178.2:8090
+      # Convex's HTTP actions on the same machine: its OTP polls never leave hawk.
+      CONVEX_URL: http://127.0.0.1:3411
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:?}
+      UDP_HOST: 172.232.115.40
+      BIND: 0.0.0.0
+      UDP_PORTS: 3478,3479,3480,3481
+      GATEWAY_DATA_DIR: /data
+      RUST_LOG: warn,vtop_gateway=info
+    logging: *logs
+
+volumes:
+  data:
+    external: true
+    name: vmate-convex_data

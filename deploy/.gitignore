@@ -1,3 +1,5 @@
 node_modules/
 .env
 .alchemy/
+# Secrets the hawk compose reads; they live on hawk only (hawk/up.sh writes them there).
+hawk/*.env

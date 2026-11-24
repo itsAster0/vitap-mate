@@ -16,7 +16,7 @@ engine use.
 
 - The connected real phone holds the user's own cache and accounts: never
   clear its data, uninstall, sign out or roll pages back on it. Use the emulator.
-- Deploying prod (`bun run deploy`, Railway, the gateway) without an explicit OK
+- Deploying prod (`bun run deploy`, hawk, the Workers) without an explicit OK
   for that step.
 - Renaming a spec's name, args or file (`rust/vtop-proto/tests/spec_contract.txt`
   only grows at its end).
@@ -49,12 +49,12 @@ rust/                 Cargo workspace
   vtop-tlsn/          TLSNotary account proof of /vtop/content (prover in the app, verifier in the engine)
   vtop-wire/          vm1, Noise IK over UDP for slow, lossy links
   vtop-gateway/       UDP gateway on the Linode fedora-in-maa
-  vtop-bridge/        the engine: sign-in, CAPTCHA, fetch and parse; Railway service engine-v2
+  vtop-bridge/        the engine: sign-in, CAPTCHA, fetch and parse; on hawk (deploy/hawk)
   vtop-mcp/           MCP tools the engine serves behind the backend's /mcp
 backend/              self-hosted Convex (TypeScript, bun): all server state; the phone's one socket
 mail/                 Cloudflare Email Worker: hands forwarded mail to the backend, keeps nothing
 proxy/                Cloudflare Worker vmate-proxy: VTOP behind a compressing proxy (the Proxy route)
-deploy/               alchemy.run.ts: deploys the engine, gateway, Workers, then Convex
+deploy/               alchemy.run.ts: hawk's compose (hawk/), Workers, then Convex
 extension/            Chrome and Firefox extension (Svelte, bun)
 fastlane/             Play Store lanes and release notes
 keystore/             release keystore (gitignored; never read or print it)
@@ -94,9 +94,9 @@ A page or route change reaches more than one place. Check each:
 - spec: a `PageSpec` in `rust/vtop-proto/src/spec.rs`: name, args, cache file, machine.
 - page: one VTOP page, fetched by its spec and cached on the phone per semester.
 - backend: the self-hosted Convex the phone talks to over one WebSocket (`backend/`);
-  the app and the mail Worker default to vmate.aster0.dev; the test one is
-  vmate3.aster0.dev (Settings → Developer → Server on a debug build).
-- engine: `rust/vtop-bridge`, Railway `engine-v2`: signs in and fetches for the server routes.
+  the app and the mail Worker use vmate.aster0.dev (prod; there is no test
+  deployment, so point a debug build at a local Convex from Settings → Developer → Server).
+- engine: `rust/vtop-bridge`, on hawk: signs in and fetches for the server routes.
 - gateway: `rust/vtop-gateway`, the UDP end of vm1 on the Linode.
 - vm1: Noise IK over UDP for slow, lossy links (`rust/vtop-wire`).
 - consent kinds: `CookieKind::Route` (a server route fetching), `Account` (the server
@@ -166,7 +166,7 @@ mise run notes [since]       # draft the release notes from the commits since th
 
 cd rust && cargo fmt && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 cd backend && bunx tsc -p . --noEmit && bunx vitest run
-cd backend && bunx convex deploy -y && bun run smoke   # vmate3 only; prod needs an OK
+cd backend && bunx convex deploy -y && bun run smoke   # prod: needs an OK
 cd extension && bun run test && bun run build
 mise run check               # all of what CI runs; or check-rust, check-kotlin, check-backend, check-workers, check-deploy, check-ext
 ```
@@ -176,13 +176,13 @@ Run `mise run check` (or the part you touched) before saying you're done.
 
 Deploy only when asked, and only from a laptop: CI builds the app and the
 extension but deploys nothing. `bun run deploy` in `deploy/` deploys, from
-`alchemy.run.ts`: the engine on nest (container `vmate-engine`, with Railway
-`engine-v2` kept up to date as a standby), the UDP gateway (pushed to GHCR, run on
-hawk as `vitapmate-gateway`), and the mail and proxy Workers; then the Convex
-functions (`bunx convex deploy` in `backend/`). The v3 secrets come from the Convex
-deployment's env, the rest from `deploy/.env` (`.env.example` lists them). The gateway needs `GHCR_TOKEN` (a GitHub
-token with `write:packages`); `SKIP_GATEWAY=1` deploys without it. Convex itself,
-Caddy and DNS are in the infra repo. The README lists the CI workflows.
+`alchemy.run.ts`: hawk's one compose, `deploy/hawk/compose.yaml` (Convex, the engine, the
+proof verifier and the UDP gateway, in `/opt/vmate`; their images are built on nest and
+pushed to GHCR), the verifier's standby on nest (hawk's Caddy falls back to it for
+`/proof`), and the mail and proxy Workers; then the Convex functions
+(`bunx convex deploy` in `backend/`). The v3 secrets come from the Convex
+deployment's env, the rest from `deploy/.env` (`.env.example` lists them). The images need `GHCR_TOKEN`
+(a GitHub token with `write:packages`); hawk logs in with it only for the pull. Caddy and DNS are in the infra repo. The README lists the CI workflows.
 
 Never print or commit `.env*` files (`extension/.env` is the one tracked
 exception, and it holds only the server URL), `keystore/`,

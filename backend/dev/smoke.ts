@@ -1,8 +1,8 @@
-// Smoke test against a deployment (default: the vmate3 test box): the demo token, a refresh and
+// Smoke test against a deployment (default: prod, vmate.aster0.dev): the demo token, a refresh and
 // its reuse, a full proof (ticket → engine's internal calls → token), mail in and out, an access
 // key, and a few queries. Reads the test tokens from .env.test.local and prints none of them.
 //
-//   bun dev/smoke.ts [https://vmate3.aster0.dev]
+//   bun dev/smoke.ts [https://vmate.aster0.dev]
 
 import { ConvexHttpClient } from "convex/browser";
 import { ConvexError } from "convex/values";
@@ -10,7 +10,7 @@ import { anyApi } from "convex/server";
 
 declare const Bun: { file(path: string): { text(): Promise<string> } };
 
-const base = process.env.SMOKE_URL ?? "https://vmate3.aster0.dev";
+const base = process.env.SMOKE_URL ?? "https://vmate.aster0.dev";
 const env: Record<string, string> = {};
 for (const line of (await Bun.file(new URL("../.env.test.local", import.meta.url).pathname).text()).split("\n")) {
   const at = line.indexOf("=");
@@ -100,12 +100,12 @@ async function proveAs(p: Awaited<ReturnType<typeof phone>>, regno: string, firs
     check("auth:proveStart", /^[0-9a-f]{32}$/.test(ticket));
     check("token before the proof", (await code(open.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device })))) === "proof_pending");
   }
-  const taken = await internalPost("/internal/proof-ticket", env.INTERNAL_TOKEN, { ticket });
+  const taken = await internalPost("/internal/proof-ticket", env.VERIFIER_TOKEN, { ticket });
   if (first) {
     check("/internal/proof-ticket", taken.status === 200);
-    check("/internal/proof-ticket twice", (await internalPost("/internal/proof-ticket", env.INTERNAL_TOKEN, { ticket })).status === 404);
+    check("/internal/proof-ticket twice", (await internalPost("/internal/proof-ticket", env.VERIFIER_TOKEN, { ticket })).status === 404);
   }
-  const done = await internalPost("/internal/proof-done", env.INTERNAL_TOKEN, { ticket, regno, ownerHash: "owner-smoke" });
+  const done = await internalPost("/internal/proof-done", env.VERIFIER_TOKEN, { ticket, regno, ownerHash: "owner-smoke" });
   if (first) check("/internal/proof-done", done.status === 204);
   const tokens = (await open.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }))) as { jwt: string; regno: string };
   const client = new ConvexHttpClient(base);

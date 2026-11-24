@@ -11,7 +11,7 @@ use crate::{Core, CoreError};
 /// `adb reverse`), read when the server's client is made; an address keeps the server it was
 /// made on.
 pub(crate) const SERVER_FILE: &str = "forwarding_server";
-/// The server (`backend/`, Convex). Point a debug build at the test one (vmate3) from
+/// The server (`backend/`, Convex). Point a debug build at a local one from
 /// Settings → Developer → Server.
 pub(crate) const DEFAULT_SERVER: &str = "https://vmate.aster0.dev";
 
