@@ -67,7 +67,7 @@ private const val GMAIL_FILTERS = "https://mail.google.com/mail/u/0/#settings/fi
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () -> Unit) {
+internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: () -> Unit, onOff: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val context = LocalContext.current
@@ -129,10 +129,10 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
             }
         }
     }
-    // Ticks only for what the app can tell: Gmail's confirmation (or forwarding on) means steps 1
-    // and 2 are done, a forwarded OTP means the filter works too.
+    // Steps 1 and 2 are done once Gmail's confirmation arrives (or forwarding is on); step 3 is
+    // done once an OTP comes through or the student marks setup done.
     val added = on || status.confirmation != null
-    val filtered = status.lastOtpAt != null
+    val filtered = on || status.lastOtpAt != null
     fun state(done: Boolean, current: Boolean) = if (done) StepState.Done else if (current) StepState.Current else StepState.Plain
     Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings", state = state(added, true)) {
         "In the Gmail where VTOP's mail arrives (usually @vitapstudent.ac.in): Add a forwarding address, paste yours, then Next → Proceed → OK. " +
@@ -143,6 +143,13 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
     }
     Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
         "Reload Gmail first. Then create a new filter with From ${status.sender}, tick Forward it to and pick your address, then Create filter."
+    }
+    if (!on && status.confirmation != null) {
+        Button(
+            if (MailForwarding.busy != null) null else onDone,
+            Modifier.fillMaxWidth().testTag("forwarding.done"),
+            prefix = Lucide.Check,
+        ) { Text("I've created the filter") }
     }
     var guide by remember { mutableStateOf(false) }
     OutlinedButton({ guide = true }, Modifier.fillMaxWidth().testTag("forwarding.guide.open")) {

@@ -50,9 +50,13 @@ async fn sets_up_checks_fetches_and_turns_off() {
     core.set_up_forwarding("f".into()).await.unwrap();
     assert_eq!(edge.lock().unwrap().requests.len(), 2);
 
-    // Nothing forwarded yet.
+    // Nothing forwarded yet: cannot mark done before confirmation arrives.
     let checked = core.check_forwarding("f".into()).await.unwrap();
     assert_eq!(checked.state, ForwardingState::Waiting);
+    assert_eq!(
+        core.mark_forwarding_done("f".into()).state,
+        ForwardingState::Waiting
+    );
     assert_eq!(
         edge.lock().unwrap().requests.last().unwrap().body,
         json!({ "id": ID })
@@ -181,6 +185,24 @@ async fn check_shows_the_confirmation_the_edge_kept() {
         Some("981234567")
     );
     assert_eq!(checked.last_otp_at, None);
+
+    // Once Gmail's confirmation arrived, the student can mark setup done without waiting for an
+    // OTP; the server's 24h kept confirmation doesn't re-appear on the next check.
+    let done = core.mark_forwarding_done("f".into());
+    assert_eq!(done.state, ForwardingState::On);
+    assert!(done.confirmation.is_none());
+    assert_eq!(done.last_otp_at, None);
+    edge.lock().unwrap().canned.insert(
+        inbox.clone(),
+        [(
+            200,
+            json!({ "sealed": null, "confirmation": kept, "lastOtpAt": null }),
+        )]
+        .into(),
+    );
+    let checked = core.check_forwarding("f".into()).await.unwrap();
+    assert_eq!(checked.state, ForwardingState::On);
+    assert!(checked.confirmation.is_none());
 
     // An OTP forwarded to the address before shows it works.
     edge.lock().unwrap().canned.insert(

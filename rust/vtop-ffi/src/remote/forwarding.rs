@@ -9,7 +9,8 @@
 //!
 //! Only two kinds of mail are relayed: VTOP's OTP and Gmail's forwarding confirmation (sent once,
 //! when the student adds the address in Gmail). That confirmation reaching the phone proves the
-//! address works.
+//! address receives mail; once it arrives, the student can mark setup done without waiting for
+//! VTOP's next OTP.
 
 use std::fs;
 use std::sync::{Mutex, PoisonError};
@@ -47,9 +48,10 @@ static LEAVE_LOCK: Mutex<()> = Mutex::new(());
 pub enum ForwardingState {
     /// No address on this phone.
     Off,
-    /// An address, but no mail has reached it yet (Gmail not set up).
+    /// An address, not finished setting up in Gmail yet.
     Waiting,
-    /// Mail reached the address: Gmail's confirmation or an OTP.
+    /// Forwarding is set up: an OTP came through, or the student marked setup done after
+    /// Gmail's confirmation arrived.
     On,
 }
 
@@ -126,8 +128,8 @@ struct Saved {
     /// from the v2 edge isn't, until [`Core::keep_forwarding`] proves the student and rejoins it.
     #[serde(default)]
     joined: bool,
-    /// Forwarding works: an OTP came through (now or, as the server says, before). Gmail's
-    /// confirmation alone doesn't count.
+    /// Forwarding works: an OTP came through (now or, as the server says, before), or the
+    /// student marked setup done after Gmail's confirmation arrived.
     #[serde(default)]
     ready: bool,
     #[serde(default)]
@@ -277,13 +279,35 @@ impl Core {
     }
 
     /// Pulls the latest forwarded mail (the server keeps it 5 minutes): Gmail's confirmation while
-    /// setting up, or an OTP. Either one proves the address works.
+    /// setting up, or an OTP.
     pub async fn check_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("check_forwarding", &flow, async {
             self.pull(&flow).await?;
             Ok(self.forwarding_view())
         })
         .await
+    }
+
+    /// Marks forwarding set up once Gmail's confirmation has reached the address: VTOP doesn't
+    /// send an OTP on every sign-in, so the app can't verify the Gmail filter right away. Does
+    /// nothing before confirmation (or without an address). No network.
+    pub fn mark_forwarding_done(&self, flow: String) -> Forwarding {
+        traced_sync("mark_forwarding_done", &flow, || {
+            {
+                let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+                if let Some(mut saved) = self.read::<Saved>(FILE)
+                    && !saved.ready
+                    && (saved.confirmation.is_some() || saved.last_mail_at.is_some())
+                {
+                    saved.ready = true;
+                    saved.confirmation = None;
+                    self.write(FILE, &saved);
+                    info!("forwarding marked done");
+                }
+            }
+            Ok(self.forwarding_view())
+        })
+        .unwrap_or_else(|_| view(None))
     }
 
     /// The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
@@ -670,15 +694,19 @@ impl Core {
             return;
         };
         let before = saved.clone();
+        let prev_mail_at = saved.last_mail_at;
         let sent_at = payload.sent_at();
         // Gmail's confirmation mail only shows the address was added; forwarding works once
-        // Gmail forwards VTOP's mail, after the student confirmed and made the filter.
+        // Gmail forwards VTOP's mail or the student marks setup done.
         saved.ready |= matches!(payload, Payload::Otp { .. });
         saved.last_mail_at = saved.last_mail_at.max(Some(sent_at));
         match payload {
             Payload::Otp { .. } => saved.last_otp_at = saved.last_otp_at.max(Some(sent_at)),
-            // Older than an OTP that already came: forwarding works, so it isn't shown again.
-            Payload::GmailConfirm { sent_at, .. } if saved.last_otp_at >= Some(*sent_at) => {}
+            // Older than an OTP that already came, or a confirmation the student already marked
+            // done (the server keeps it 24 h until an OTP arrives): don't show it again.
+            Payload::GmailConfirm { sent_at, .. }
+                if saved.last_otp_at >= Some(*sent_at)
+                    || (saved.ready && prev_mail_at >= Some(*sent_at)) => {}
             Payload::GmailConfirm {
                 code,
                 link,

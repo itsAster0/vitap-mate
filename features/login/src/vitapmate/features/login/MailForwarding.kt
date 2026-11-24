@@ -22,7 +22,7 @@ import vitapmate.ui.showToast
 
 /**
  * This phone's mail-forwarding address (Rust's `forwarding.rs`), for Settings → Account → Mail
- * forwarding, its sheet and the OTP prompt's auto-fill. Flows `forwarding.status/setup/check/off`,
+ * forwarding, its sheet and the OTP prompt's auto-fill. Flows `forwarding.status/setup/check/done/off`,
  * lines `ui.forwarding`, reported to [StateRegistry] as `forwarding`. Never logs the address's
  * keys, codes or mail.
  */
@@ -30,7 +30,7 @@ object MailForwarding {
     var status by mutableStateOf<Forwarding?>(null)
         private set
 
-    /** The action running: `setup`, `check` or `off`. */
+    /** The action running: `setup`, `check`, `done` or `off`. */
     var busy by mutableStateOf<String?>(null)
         private set
 
@@ -69,6 +69,11 @@ object MailForwarding {
         if (!quiet && after.state == ForwardingState.WAITING && after.lastMailAt == before?.lastMailAt) {
             showToast("Nothing yet", "No mail has reached your address in the last 5 minutes. Gmail can take a minute.")
         }
+    }
+
+    /** Marks setup done once Gmail's confirmation arrived; no network. */
+    fun markDone() {
+        AppScope.launch { run("done") { id -> AppCore.await().markForwardingDone(id) } }
     }
 
     /** Takes this phone off the address; runs on after the sheet closes. */

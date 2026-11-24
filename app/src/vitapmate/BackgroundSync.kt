@@ -57,12 +57,12 @@ object BackgroundSync {
     private val debugRegistered = AtomicBoolean(false)
 
     /**
-     * Whether it can be turned on: OTP auto-fill is set up and working; for mail forwarding, an
-     * OTP got through already, since nobody is there to finish Gmail's setup.
+     * Whether it can be turned on: OTP auto-fill is set up and ready; for mail forwarding, an OTP
+     * got through or Gmail's confirmation arrived (the student may also mark setup done).
      */
     fun available(): Boolean = when (OtpAutofill.inUse()) {
         null -> false
-        OtpSource.Forwarding -> MailForwarding.status?.state == ForwardingState.ON
+        OtpSource.Forwarding -> MailForwarding.status?.let { it.state == ForwardingState.ON || it.lastMailAt != null } == true
         OtpSource.Gmail -> true
     }
 

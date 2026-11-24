@@ -80,7 +80,12 @@ internal fun ForwardingContent() {
     when {
         status == null -> Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator() }
         status.state == ForwardingState.OFF -> ForwardingIntro(MailForwarding::setUp)
-        else -> ForwardingSetup(status, onCheck = { scope.launch { MailForwarding.check() } }, onOff = { confirmOff = true })
+        else -> ForwardingSetup(
+            status,
+            onCheck = { scope.launch { MailForwarding.check() } },
+            onDone = MailForwarding::markDone,
+            onOff = { confirmOff = true },
+        )
     }
     if (confirmOff) {
         AppDialog(
