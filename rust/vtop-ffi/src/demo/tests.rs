@@ -101,7 +101,8 @@ async fn edge_demo_signs_in_and_every_page_reads() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-edge-demo-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     let data = dir.to_string_lossy().to_string();
-    let core = Core::new("demo-new".into(), data, crate::tests::shared_cache()).unwrap();
+    let cache = crate::tests::shared_cache();
+    let core = Core::open("demo-new".into(), data, cache, crate::Shared::default()).unwrap();
     let account = Account {
         username: USERNAME.into(),
         password: PASSWORD.into(),

@@ -10,8 +10,8 @@
 //! Kotlin carries the WebSocket ([`ProofNetwork`]), as it carries VTOP's hops (`transport.rs`);
 //! without one, proving fails. The session id and ticket are never logged.
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use futures::future::{Either, join, join3, select};
@@ -75,29 +75,6 @@ pub trait ProofSocket: Send + Sync {
     async fn receive(&self) -> Result<Option<ProofFrame>, TransportError>;
     /// Closes the socket (not `close`: UniFFI objects already have one).
     fn shutdown(&self);
-}
-
-#[cfg(not(test))]
-fn network() -> &'static Mutex<Option<Arc<dyn ProofNetwork>>> {
-    static NETWORK: Mutex<Option<Arc<dyn ProofNetwork>>> = Mutex::new(None);
-    &NETWORK
-}
-
-/// Per test thread, so tests running at once don't share one.
-#[cfg(test)]
-fn network() -> &'static Mutex<Option<Arc<dyn ProofNetwork>>> {
-    thread_local!(static NETWORK: &'static Mutex<Option<Arc<dyn ProofNetwork>>> =
-        Box::leak(Box::new(Mutex::new(None))));
-    NETWORK.with(|n| *n)
-}
-
-/// Opens account proofs' WebSockets through `network`; call before [`crate::Core::new`].
-#[uniffi::export]
-pub fn set_proof_network(network: Arc<dyn ProofNetwork>) {
-    info!("proof network: foreign");
-    *self::network()
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner) = Some(network);
 }
 
 /// The engine's last message when it proved.
@@ -242,12 +219,8 @@ impl Core {
     }
 
     async fn prove_with(&self, flow: &str, stats: &Stats) -> Result<String, CoreError> {
-        let network = network()
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone();
-        let network =
-            network.ok_or_else(|| failed("this app cannot open the proof's connection"))?;
+        let network = (self.shared.proof.clone())
+            .ok_or_else(|| failed("this app cannot open the proof's connection"))?;
         {
             // A session id of another shape can never be proved: fail before the server.
             let slot = self.current()?;
@@ -451,7 +424,7 @@ impl Core {
             .shared
             .proof_target
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
         {
             return Ok(target);

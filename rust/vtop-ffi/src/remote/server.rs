@@ -3,8 +3,6 @@
 //! call goes as the student this install proved to be ([`Core::account_call`]); the student
 //! comes from the JWT, never from the arguments. Cookies are never logged.
 
-use std::sync::OnceLock;
-
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tracing::info;
@@ -15,22 +13,9 @@ use crate::remote::consent::{self, CookieKind};
 use crate::remote::keys::{AccessKey, KeyView, refused};
 use crate::{Core, CoreError, traced};
 
-/// The name the server shows for this phone, set by the app at start.
-static LABEL: OnceLock<String> = OnceLock::new();
-
-/// This phone's name on the server: its model, or `vitapmate` before the app set it.
-pub(crate) fn label() -> &'static str {
-    LABEL.get().map_or("vitapmate", String::as_str)
-}
-
-/// Sets the name the server shows for this phone ("OnePlus CPH2573"); the first call wins.
-#[uniffi::export]
-pub fn set_device_label(label: String) {
-    #[expect(
-        clippy::let_underscore_must_use,
-        reason = "set once; a later call keeps the first label"
-    )]
-    let _ = LABEL.set(label.trim().chars().take(64).collect());
+/// This phone's name on the server: its model, or `vitapmate` when the app gave none.
+pub(crate) fn label(shared: &crate::Shared) -> &str {
+    shared.label.as_deref().unwrap_or("vitapmate")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -573,7 +558,9 @@ impl Core {
             mailbox,
             device: ServerDevice {
                 id: id.map(|id| id.chars().take(8).collect()),
-                label: device.label.unwrap_or_else(|| label().to_string()),
+                label: device
+                    .label
+                    .unwrap_or_else(|| label(&self.shared).to_string()),
                 // What the server holds: a token the phone has but never sent can't wake it.
                 push_token: device.push_token,
                 registered_at: device.created_at,
@@ -697,7 +684,7 @@ impl Core {
                 }),
             );
         }
-        let body = json!({ "label": label(), "credentials": credentials });
+        let body = json!({ "label": label(&self.shared), "credentials": credentials });
         let path = "account:saveCredentials";
         let answer = self
             .account_call(flow, Kind::Action, path, action, ask, body)

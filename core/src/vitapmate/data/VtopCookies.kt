@@ -6,7 +6,7 @@ import vitapmate.observability.Log
 
 /**
  * The app's one cookie store for VTOP: the web view's [CookieManager], so Rust's requests and the
- * VTOP web view are one session and nothing is copied (`set_shared_cookies`). Rust reads the
+ * VTOP web view are one session and nothing is copied (`Platform.cookies`). Rust reads the
  * Cookie header here before each hop and stores each hop's Set-Cookie here, so a redirect's
  * cookies land before the next hop. The app's web view only shows VTOP, so [clear] removes every
  * cookie. Called off the main thread; a failure must not reach Rust (it would abort), so it is

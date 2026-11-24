@@ -91,12 +91,14 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   skips and the steps of a server fetch (consent, the fetch, one sign-in
   again) are pure: no I/O and no clock, the caller passes `now`.
   `remote/route.rs` runs its steps on the core's plan.
-- **Per-core state** (`Shared` in `lib.rs`). The route plan, cookie consent
-  and the Developer config live on `Core`, and every VTOP client's transport
-  (`Routed`) holds the same `Arc`. Kotlin calls `set_cookie_gate` and
-  `dev_configure` before it makes the one `Core`, which copies them in. The
-  HTTP and UDP transports, the shared cookie store, decoded copies and the log
-  pipeline stay process-wide: each is the app's one of its kind.
+- **Per-core state** (`Shared` in `lib.rs`). The route plan, cookie consent,
+  the Developer config and the app's pieces live on `Core`, and every VTOP
+  client's transport (`Routed`) holds the same `Arc`. Kotlin hands `Core::new`
+  one `Platform` record (the HTTP transport, the shared cookie store, the UDP,
+  Convex and proof sockets, the cookie gate, the Developer config and the
+  phone's name), so leaving one out doesn't compile. Decoded copies and the
+  log pipeline stay process-wide: `obs_init` runs before the core, so Kotlin's
+  start-up lines (the Block Store restore, Gmail) reach the log file.
 
 ## VTOP from the phone
 
@@ -185,7 +187,7 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   received) and sends its verdict (regno, owner hash) as the last text
   message; the edge mints the token as after a cookie check and sends the
   phone `{ accountToken, expiresAt, registrationNumber }`. Kotlin carries
-  the socket (`ProofNetwork`, set with `set_proof_network`). tlsn's
+  the socket (`ProofNetwork`, `Platform::proof`). tlsn's
   sessions end on its mux's close handshake, not on EOF, and it does not
   always flush, so both ends' pipe sinks are channels drained by a writer
   loop (`vtop_tlsn::session::Pipe`); the phone's writer joins what the

@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, MutexGuard, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
@@ -89,21 +89,6 @@ impl Shared {
     pub(crate) fn consent(&self) -> MutexGuard<'_, State> {
         self.consent.lock().unwrap_or_else(PoisonError::into_inner)
     }
-}
-
-/// What [`set_cookie_gate`] set, for [`Core::new`] to take a copy of.
-static GATE: Mutex<Option<Arc<dyn CookieGate>>> = Mutex::new(None);
-
-/// Asks `gate` before any VTOP session leaves the phone; call before [`crate::Core::new`].
-#[uniffi::export]
-pub fn set_cookie_gate(gate: Arc<dyn CookieGate>) {
-    info!("cookie gate: foreign");
-    *GATE.lock().unwrap_or_else(PoisonError::into_inner) = Some(gate);
-}
-
-/// The gate [`set_cookie_gate`] set, for a new core.
-pub(crate) fn handed() -> Option<Arc<dyn CookieGate>> {
-    GATE.lock().unwrap_or_else(PoisonError::into_inner).clone()
 }
 
 /// Loads the remembered kinds; called when the core opens.

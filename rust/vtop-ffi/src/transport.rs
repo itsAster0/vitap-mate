@@ -5,9 +5,8 @@
 
 use std::cell::RefCell;
 use std::future::poll_fn;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 
-use tracing::info;
 use vtop_core::client::{Hop, HopFuture, HopResponse, Transport};
 
 use crate::Shared;
@@ -121,7 +120,7 @@ pub trait HttpTransport: Send + Sync {
     async fn send(&self, request: HttpRequest) -> Result<HttpResponse, TransportError>;
 }
 
-struct Foreign(Arc<dyn HttpTransport>);
+pub(crate) struct Foreign(pub(crate) Arc<dyn HttpTransport>);
 
 impl std::fmt::Debug for Foreign {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -170,24 +169,11 @@ impl Transport for Foreign {
     }
 }
 
-static TRANSPORT: Mutex<Option<Arc<dyn Transport>>> = Mutex::new(None);
-
-/// Sends VTOP clients made after this through `transport`; call before [`crate::Core::new`].
-#[uniffi::export]
-pub fn set_http_transport(transport: Arc<dyn HttpTransport>) {
-    info!("http transport: foreign");
-    *TRANSPORT.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::new(Foreign(transport)));
-}
-
-/// The transport set by [`set_http_transport`] (process-wide: the app's one HTTP stack), else vtop-core's default (none in the app
+/// The app's transport ([`crate::Platform::http`]), else vtop-core's default (none in the app
 /// build: vtop-core comes without reqwest), behind the route switch ([`crate::remote::route::Routed`]).
 pub(crate) fn current(shared: &Arc<Shared>) -> vtop_core::VtopResult<Arc<dyn Transport>> {
-    let set = TRANSPORT
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone();
-    let inner = match set {
-        Some(transport) => transport,
+    let inner = match &shared.http {
+        Some(transport) => transport.clone(),
         None => vtop_core::client::default_transport(&crate::dev::vtop_config(shared))?,
     };
     Ok(Arc::new(crate::remote::route::Routed(

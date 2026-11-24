@@ -1004,8 +1004,6 @@ internal object IntegrityCheckingUniffiLib {
     }
 
     internal fun ensureInitialized() = Unit
-    external fun uniffi_vtop_ffi_checksum_func_dev_configure(
-    ): Int
     external fun uniffi_vtop_ffi_checksum_func_log_event(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_obs_init(
@@ -1024,25 +1022,11 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_general_return_last_day(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_proof_network(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_convex_network(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_cookie_gate(
-    ): Int
     external fun uniffi_vtop_ffi_checksum_func_default_server(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_pair_code(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_batched_pages(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_device_label(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_udp_network(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_shared_cookies(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_func_set_http_transport(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_vtop_intermediate_ca(
     ): Int
@@ -1368,7 +1352,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_free_core(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_constructor_core_new(`flow`: RustBuffer.ByValue,`dataDir`: RustBuffer.ByValue,`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_constructor_core_new(`flow`: RustBuffer.ByValue,`dataDir`: RustBuffer.ByValue,`cacheDir`: RustBuffer.ByValue,`platform`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_semesters(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1724,8 +1708,6 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_httptransport_send(`ptr`: Long,`request`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_func_dev_configure(`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     external fun uniffi_vtop_ffi_fn_func_log_event(`level`: RustBuffer.ByValue,`src`: RustBuffer.ByValue,`flow`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,`fields`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_obs_init(`dataDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1744,26 +1726,12 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_general_return_last_day(`day`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
-    external fun uniffi_vtop_ffi_fn_func_set_proof_network(`network`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_convex_network(`network`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_cookie_gate(`gate`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     external fun uniffi_vtop_ffi_fn_func_default_server(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_pair_code(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_batched_pages(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_func_set_device_label(`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_udp_network(`network`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_shared_cookies(`cookies`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_vtop_ffi_fn_func_set_http_transport(`transport`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     external fun uniffi_vtop_ffi_fn_func_vtop_intermediate_ca(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun ffi_vtop_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1885,9 +1853,6 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
-    if ((lib.uniffi_vtop_ffi_checksum_func_dev_configure() and 0xFFFF) != 30902) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_vtop_ffi_checksum_func_log_event() and 0xFFFF) != 39318) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1915,15 +1880,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_general_return_last_day() and 0xFFFF) != 52181) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_proof_network() and 0xFFFF) != 64856) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_convex_network() and 0xFFFF) != 37052) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_cookie_gate() and 0xFFFF) != 6109) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_vtop_ffi_checksum_func_default_server() and 0xFFFF) != 56080) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1931,18 +1887,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_batched_pages() and 0xFFFF) != 25254) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_device_label() and 0xFFFF) != 51682) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_udp_network() and 0xFFFF) != 13460) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_shared_cookies() and 0xFFFF) != 13447) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_func_set_http_transport() and 0xFFFF) != 30478) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_vtop_intermediate_ca() and 0xFFFF) != 39519) {
@@ -2377,7 +2321,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_httptransport_send() and 0xFFFF) != 72) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_constructor_core_new() and 0xFFFF) != 5238) {
+    if ((lib.uniffi_vtop_ffi_checksum_constructor_core_new() and 0xFFFF) != 36026) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -5127,9 +5071,9 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     }
     /**
      * Opens the cache in `data_dir`, the change inbox in `cache_dir`, and
-     * restores the saved session.
+     * restores the saved session, reaching the world through `platform`.
      */
-    constructor(`flow`: kotlin.String, `dataDir`: kotlin.String, `cacheDir`: kotlin.String) :
+    constructor(`flow`: kotlin.String, `dataDir`: kotlin.String, `cacheDir`: kotlin.String, `platform`: Platform) :
         this(UniffiWithHandle, 
     uniffiRustCallWithError(CoreException) { _status ->
     UniffiLib.uniffi_vtop_ffi_fn_constructor_core_new(
@@ -5137,7 +5081,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`dataDir`),
-        FfiConverterString.lower(`cacheDir`),_status)
+        FfiConverterString.lower(`cacheDir`),
+        FfiConverterTypePlatform.lower(`platform`),_status)
 }
     )
 
@@ -13078,7 +13023,8 @@ public object FfiConverterTypeDetailSection: FfiConverterRustBuffer<DetailSectio
 
 
 /**
- * How the client is set up, read before [`Core::new`] (changes apply from the next launch).
+ * How the client is set up, handed to [`Core::new`] (changes apply from the next launch).
+ * (Developer → Inspect Traffic is the app's HTTP stack's: Rust sends nothing itself.)
  */
 data class DevConfig (
     /**
@@ -16267,6 +16213,114 @@ public object FfiConverterTypePlannedCourse: FfiConverterRustBuffer<PlannedCours
     override fun write(value: PlannedCourse, buf: ByteBuffer) {
             FfiConverterDouble.write(value.`credits`, buf)
             FfiConverterString.write(value.`grade`, buf)
+    }
+}
+
+
+
+/**
+ * What the app hands [`Core::new`]: its HTTP stack, cookie store, sockets, consent prompt,
+ * Developer config and this phone's name. One record, so the app can't leave a piece out.
+ */
+data class Platform (
+    /**
+     * Carries VTOP's (and the Proxy route's) hops.
+     */
+    var `http`: HttpTransport
+    , 
+    /**
+     * Android's `CookieManager`, shared with the web view.
+     */
+    var `cookies`: SharedCookies
+    , 
+    /**
+     * The UDP route's sockets.
+     */
+    var `udp`: UdpNetwork
+    , 
+    /**
+     * The server's WebSocket.
+     */
+    var `convex`: ConvexNetwork
+    , 
+    /**
+     * Account proofs' WebSockets.
+     */
+    var `proof`: ProofNetwork
+    , 
+    /**
+     * Asked before any VTOP session leaves the phone.
+     */
+    var `cookieGate`: CookieGate
+    , 
+    var `dev`: DevConfig
+    , 
+    /**
+     * The name the server shows for this phone ("OnePlus CPH2573").
+     */
+    var `deviceLabel`: kotlin.String
+    
+): Disposable{
+    
+
+    
+
+    
+    @Suppress("UNNECESSARY_SAFE_CALL") // codegen is much simpler if we unconditionally emit safe calls here
+    override fun destroy() {
+        
+    Disposable.destroy(
+        this.`http`,
+        this.`cookies`,
+        this.`udp`,
+        this.`convex`,
+        this.`proof`,
+        this.`cookieGate`,
+        this.`dev`,
+        this.`deviceLabel`
+    )
+    }
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePlatform: FfiConverterRustBuffer<Platform> {
+    override fun read(buf: ByteBuffer): Platform {
+        return Platform(
+            FfiConverterTypeHttpTransport.read(buf),
+            FfiConverterTypeSharedCookies.read(buf),
+            FfiConverterTypeUdpNetwork.read(buf),
+            FfiConverterTypeConvexNetwork.read(buf),
+            FfiConverterTypeProofNetwork.read(buf),
+            FfiConverterTypeCookieGate.read(buf),
+            FfiConverterTypeDevConfig.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Platform) = (
+            FfiConverterTypeHttpTransport.allocationSize(value.`http`) +
+            FfiConverterTypeSharedCookies.allocationSize(value.`cookies`) +
+            FfiConverterTypeUdpNetwork.allocationSize(value.`udp`) +
+            FfiConverterTypeConvexNetwork.allocationSize(value.`convex`) +
+            FfiConverterTypeProofNetwork.allocationSize(value.`proof`) +
+            FfiConverterTypeCookieGate.allocationSize(value.`cookieGate`) +
+            FfiConverterTypeDevConfig.allocationSize(value.`dev`) +
+            FfiConverterString.allocationSize(value.`deviceLabel`)
+    )
+
+    override fun write(value: Platform, buf: ByteBuffer) {
+            FfiConverterTypeHttpTransport.write(value.`http`, buf)
+            FfiConverterTypeSharedCookies.write(value.`cookies`, buf)
+            FfiConverterTypeUdpNetwork.write(value.`udp`, buf)
+            FfiConverterTypeConvexNetwork.write(value.`convex`, buf)
+            FfiConverterTypeProofNetwork.write(value.`proof`, buf)
+            FfiConverterTypeCookieGate.write(value.`cookieGate`, buf)
+            FfiConverterTypeDevConfig.write(value.`dev`, buf)
+            FfiConverterString.write(value.`deviceLabel`, buf)
     }
 }
 
@@ -24834,20 +24888,6 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 
 
         /**
-         * Sets [`DevConfig`]; call before the core is made. (Developer → Inspect Traffic is the app's
-         * HTTP stack's: Rust sends nothing itself.)
-         */ fun `devConfigure`(`config`: DevConfig)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_dev_configure(
-    
-        
-        FfiConverterTypeDevConfig.lower(`config`),_status)
-}
-    
-    
-
-        /**
          * Writes one line from Kotlin into the same file and logcat, in order.
          */ fun `logEvent`(`level`: kotlin.String, `src`: kotlin.String, `flow`: kotlin.String?, `msg`: kotlin.String, `fields`: Map<kotlin.String, kotlin.String>)
         = 
@@ -24995,45 +25035,6 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
 
         /**
-         * Opens account proofs' WebSockets through `network`; call before [`crate::Core::new`].
-         */ fun `setProofNetwork`(`network`: ProofNetwork)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_proof_network(
-    
-        
-        FfiConverterTypeProofNetwork.lower(`network`),_status)
-}
-    
-    
-
-        /**
-         * Opens the server's WebSocket through `network`; call before [`crate::Core::new`].
-         */ fun `setConvexNetwork`(`network`: ConvexNetwork)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_convex_network(
-    
-        
-        FfiConverterTypeConvexNetwork.lower(`network`),_status)
-}
-    
-    
-
-        /**
-         * Asks `gate` before any VTOP session leaves the phone; call before [`crate::Core::new`].
-         */ fun `setCookieGate`(`gate`: CookieGate)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_cookie_gate(
-    
-        
-        FfiConverterTypeCookieGate.lower(`gate`),_status)
-}
-    
-    
-
-        /**
          * [`DEFAULT_SERVER`], for the app's plain HTTP reads on the same host (the help pages).
          */ fun `defaultServer`(): kotlin.String {
             return FfiConverterString.lift(
@@ -25074,58 +25075,6 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 }
     )
     }
-    
-
-        /**
-         * Sets the name the server shows for this phone ("OnePlus CPH2573"); the first call wins.
-         */ fun `setDeviceLabel`(`label`: kotlin.String)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_device_label(
-    
-        
-        FfiConverterString.lower(`label`),_status)
-}
-    
-    
-
-        /**
-         * Sends the UDP route through `network`; without one the route fails and falls back to HTTPS.
-         */ fun `setUdpNetwork`(`network`: UdpNetwork)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_udp_network(
-    
-        
-        FfiConverterTypeUdpNetwork.lower(`network`),_status)
-}
-    
-    
-
-        /**
-         * Keeps VTOP cookies in `cookies` (the web view's store); call before [`crate::Core::new`].
-         */ fun `setSharedCookies`(`cookies`: SharedCookies)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_shared_cookies(
-    
-        
-        FfiConverterTypeSharedCookies.lower(`cookies`),_status)
-}
-    
-    
-
-        /**
-         * Sends VTOP clients made after this through `transport`; call before [`crate::Core::new`].
-         */ fun `setHttpTransport`(`transport`: HttpTransport)
-        = 
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_func_set_http_transport(
-    
-        
-        FfiConverterTypeHttpTransport.lower(`transport`),_status)
-}
-    
     
 
         /**

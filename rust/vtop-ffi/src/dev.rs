@@ -5,7 +5,7 @@
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use serde_json::json;
@@ -33,7 +33,8 @@ use crate::{
 /// The Flutter app's Cookie-Editor domain.
 pub(crate) const COOKIE_DOMAIN: &str = "vtop.vitap.ac.in";
 
-/// How the client is set up, read before [`Core::new`] (changes apply from the next launch).
+/// How the client is set up, handed to [`Core::new`] (changes apply from the next launch).
+/// (Developer → Inspect Traffic is the app's HTTP stack's: Rust sends nothing itself.)
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DevConfig {
     /// A saved session older than this (minutes since its sign-in) is not restored; 0 = any age.
@@ -46,31 +47,7 @@ pub struct DevConfig {
     pub debuggable: bool,
 }
 
-/// What [`dev_configure`] set, for [`Core::new`] to take a copy of.
-static CONFIG: Mutex<Option<DevConfig>> = Mutex::new(None);
-
-/// Sets [`DevConfig`]; call before the core is made. (Developer → Inspect Traffic is the app's
-/// HTTP stack's: Rust sends nothing itself.)
-#[uniffi::export]
-pub fn dev_configure(config: DevConfig) {
-    info!(
-        session_reuse_minutes = config.session_reuse_minutes,
-        request_timeout_s = config.request_timeout_s,
-        debuggable = config.debuggable,
-        "dev config"
-    );
-    *CONFIG.lock().unwrap_or_else(PoisonError::into_inner) = Some(config);
-}
-
-/// The config [`dev_configure`] set, for a new core.
-pub(crate) fn handed() -> Option<DevConfig> {
-    CONFIG
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .clone()
-}
-
-/// Whether [`dev_configure`] said the app is debuggable; false when it wasn't called.
+/// Whether the app said it is debuggable; false without a platform (host tests).
 pub(crate) fn debuggable(shared: &Shared) -> bool {
     shared.dev.as_ref().is_some_and(|c| c.debuggable)
 }

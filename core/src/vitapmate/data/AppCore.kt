@@ -17,15 +17,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.DevConfig
-import vitapmate.core.devConfigure
+import vitapmate.core.Platform
 import vitapmate.core.obsInit
-import vitapmate.core.setCookieGate
-import vitapmate.core.setDeviceLabel
-import vitapmate.core.setHttpTransport
-import vitapmate.core.setSharedCookies
-import vitapmate.core.setConvexNetwork
-import vitapmate.core.setProofNetwork
-import vitapmate.core.setUdpNetwork
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
 import vitapmate.observability.StateDump
@@ -59,7 +52,7 @@ object AppCore {
         Docs.init(app)
         Gmail.init(app)
         val dir = context.filesDir.path
-        // Its state list is made here, on the main thread: made on core-init (setCookieGate)
+        // Its state list is made here, on the main thread: made on core-init (the Platform)
         // while the first frame composes, the shell's dialog can't read it and the app crashes.
         CookieConsent.pending.size
         thread(name = "core-init") {
@@ -76,17 +69,19 @@ object AppCore {
                 runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
                 // Debuggable: Developer → Chat's servers may apply (never in a release build).
                 val debuggable = app.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-                devConfigure(DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt(), debuggable))
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
-                setHttpTransport(if (engine) VtopHttpEngine(app) else inspectedHttp(app))
                 Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "urlconnection"))
-                setUdpNetwork(VtopUdp(app))
-                setConvexNetwork(SocketConvexNetwork())
-                setProofNetwork(SocketProofNetwork())
-                setCookieGate(CookieConsent)
-                setSharedCookies(VtopCookies)
-                setDeviceLabel(if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}")
-                runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path) } }
+                val platform = Platform(
+                    http = if (engine) VtopHttpEngine(app) else inspectedHttp(app),
+                    cookies = VtopCookies,
+                    udp = VtopUdp(app),
+                    convex = SocketConvexNetwork(),
+                    proof = SocketProofNetwork(),
+                    cookieGate = CookieConsent,
+                    dev = DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt(), debuggable),
+                    deviceLabel = if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}",
+                )
+                runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path, platform) } }
             }.fold(core::complete) { e ->
                 Log.error("core", "init failed: $e")
                 core.completeExceptionally(e)

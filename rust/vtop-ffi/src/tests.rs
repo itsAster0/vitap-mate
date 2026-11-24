@@ -32,7 +32,8 @@ async fn calls_log_ms_and_outcome_without_secrets() {
     fs::write(dir.join(SESSION), session).unwrap();
     fs::create_dir_all(dir.join(PAGES).join("AP1")).unwrap();
     fs::write(dir.join(SELECTED), r#""AP1""#).unwrap();
-    let core = Core::new("f-new".into(), dir.to_string_lossy().into(), shared_cache()).unwrap();
+    let dir_s = dir.to_string_lossy().into();
+    let core = Core::open("f-new".into(), dir_s, shared_cache(), Shared::default()).unwrap();
 
     // Both fail before any network call.
     let signed_in = core
@@ -508,7 +509,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
 
 #[tokio::test]
 async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
-    let memory = cookies::tests::with_shared();
+    let (memory, cookies) = cookies::tests::with_shared();
     let vtop = format!("{}/vtop", vtop_core::config::DEFAULT_BASE_URL);
     let dir = std::env::temp_dir().join(format!("vtop-ffi-jar-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -527,7 +528,13 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
         rejected: false,
         registration_number: None,
     };
-    let core = Core::for_test(&dir);
+    let core = Core::for_test_on(
+        &dir,
+        Shared {
+            cookies,
+            ..Shared::default()
+        },
+    );
     let launch = || {
         let session = Session::new(account.clone(), &core.shared).unwrap();
         core.restore(&session, core.read(SESSION));
@@ -571,7 +578,7 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
 
 #[tokio::test]
 async fn clearing_the_session_empties_the_shared_store() {
-    let memory = cookies::tests::with_shared();
+    let (memory, cookies) = cookies::tests::with_shared();
     let vtop = format!("{}/vtop", vtop_core::config::DEFAULT_BASE_URL);
     let dir = std::env::temp_dir().join(format!("vtop-ffi-jar-clear-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -582,9 +589,15 @@ async fn clearing_the_session_empties_the_shared_store() {
         rejected: false,
         registration_number: None,
     };
-    let core = Core::for_test(&dir);
+    let core = Core::for_test_on(
+        &dir,
+        Shared {
+            cookies,
+            ..Shared::default()
+        },
+    );
     let session = Session::new(account, &core.shared).unwrap();
-    session.cookies.activate(false);
+    session.cookies.activate(&core.shared.cookies, false);
     memory.set_cookies(vtop.clone(), vec!["JSESSIONID=live; Path=/vtop".into()]);
     core.install(Some(Arc::new(RwLock::new(session))));
     assert_eq!(
@@ -774,12 +787,8 @@ fn sign_out_forgets_the_connection_choice() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-route-out-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
-    let core = Core::new(
-        "route-new".into(),
-        dir.to_string_lossy().into(),
-        shared_cache(),
-    )
-    .unwrap();
+    let dir_s = dir.to_string_lossy().into();
+    let core = Core::open("route-new".into(), dir_s, shared_cache(), Shared::default()).unwrap();
     core.set_route("route-set".into(), route::Route::Server)
         .unwrap();
     assert!(dir.join(route::FILE).exists());

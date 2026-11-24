@@ -140,7 +140,6 @@ async fn setup(name: &str, page: Page) -> (Core, Arc<Mutex<Edge>>, String, Arc<F
     let server = serve(edge.clone()).await;
     std::fs::write(dir.join(crate::remote::edge::SERVER_FILE), &server).unwrap();
     let core = signed_in(&dir, server.clone());
-    *core.shared.proof_target.lock().unwrap() = Some((fake::HOST.into(), fake::roots()));
     let network = Arc::new(FakeNetwork {
         vtop: fake::serve(page).await,
         device: core.registration().0,
@@ -148,8 +147,22 @@ async fn setup(name: &str, page: Page) -> (Core, Arc<Mutex<Edge>>, String, Arc<F
         sends: Arc::default(),
         hang: name.starts_with("hang"),
     });
-    set_proof_network(network.clone());
+    let core = on_network(core, Some(network.clone()));
     (core, edge, server, network)
+}
+
+/// `core` with its proofs going through `network` to the fake VTOP (the server state starts
+/// over: the session and the files stay).
+fn on_network(core: Core, network: Option<Arc<FakeNetwork>>) -> Core {
+    let shared = crate::Shared {
+        proof: network.map(|n| n as Arc<dyn ProofNetwork>),
+        proof_target: Mutex::new(Some((fake::HOST.into(), fake::roots()))),
+        ..Default::default()
+    };
+    Core {
+        shared: Arc::new(shared),
+        ..core
+    }
 }
 
 fn can(edge: &Arc<Mutex<Edge>>, path: &str, status: u16, body: Value) {
@@ -259,7 +272,7 @@ async fn the_engines_refusal_and_a_missing_network_are_clear_errors() {
     let error = core.connected_apps("f".into()).await.unwrap_err();
     assert_eq!(error.to_string(), "Start again.");
 
-    *network().lock().unwrap() = None;
+    let core = on_network(core, None);
     let error = core.connected_apps("f".into()).await.unwrap_err();
     assert!(error.to_string().contains("cannot open"), "{error}");
     assert!(core.device().refresh.is_none());

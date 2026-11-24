@@ -3,7 +3,7 @@
 //! over it; vtop-core reads the `Cookie` header from it before each hop and stores each hop's
 //! `Set-Cookie` in it, so a redirect's cookies land before the next hop.
 //!
-//! The store is process-wide, sessions are not: a sign-in runs on a jar of its own until it is
+//! The store is the core's (the app's one), sessions are not: a sign-in runs on a jar of its own until it is
 //! installed (a rejected password leaves the signed-in session alone), and a replaced session
 //! sees no cookies at all, so it can neither use nor clear the new one's. Without a shared
 //! store set (host tests), every session keeps its own jar. Values are never logged.
@@ -26,39 +26,37 @@ pub trait SharedCookies: Send + Sync {
     fn flush(&self);
 }
 
-struct Global {
+/// The core's cookie store (none in host tests: every session keeps its own jar) and the
+/// session whose cookies are its.
+#[derive(Default)]
+pub(crate) struct Shared {
     store: Option<Arc<dyn SharedCookies>>,
-    /// The session whose cookies are the store's.
-    active: Weak<SessionCookies>,
+    active: Mutex<Weak<SessionCookies>>,
 }
 
-const NONE: Global = Global {
-    store: None,
-    active: Weak::new(),
-};
+impl Shared {
+    pub(crate) fn new(store: Arc<dyn SharedCookies>) -> Self {
+        info!("cookies: shared");
+        Self {
+            store: Some(store),
+            active: Mutex::default(),
+        }
+    }
 
-#[cfg(not(test))]
-fn global<R>(work: impl FnOnce(&mut Global) -> R) -> R {
-    static GLOBAL: Mutex<Global> = Mutex::new(NONE);
-    work(&mut lock(&GLOBAL))
-}
-
-/// Per test thread, so tests running at once don't share a store.
-#[cfg(test)]
-fn global<R>(work: impl FnOnce(&mut Global) -> R) -> R {
-    thread_local!(static GLOBAL: Mutex<Global> = const { Mutex::new(NONE) });
-    GLOBAL.with(|global| work(&mut lock(global)))
+    /// Signed out: no session has the shared store, and its VTOP cookies go.
+    pub(crate) fn sign_out(&self) {
+        let before = std::mem::take(&mut *lock(&self.active));
+        if let Some(before) = before.upgrade() {
+            *lock(&before.0) = Place::Gone;
+        }
+        if let Some(store) = &self.store {
+            store.clear();
+        }
+    }
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-/// Keeps VTOP cookies in `cookies` (the web view's store); call before [`crate::Core::new`].
-#[uniffi::export]
-pub fn set_shared_cookies(cookies: Arc<dyn SharedCookies>) {
-    info!("cookies: shared");
-    global(|global| global.store = Some(cookies));
 }
 
 /// Where one session's cookies are.
@@ -95,18 +93,16 @@ impl SessionCookies {
     /// With `carry`, the store's VTOP cookies are replaced by what this session has collected
     /// (a sign-in, or a `session.json` from before the shared store, migrated once); else the
     /// store's stay (they are this session's, restored at launch). No shared store: nothing.
-    pub(crate) fn activate(self: &Arc<Self>, carry: bool) {
-        let store = global(|global| {
-            let store = global.store.clone()?;
-            if let Some(before) = global.active.upgrade()
-                && !Arc::ptr_eq(&before, self)
-            {
-                *lock(&before.0) = Place::Gone;
-            }
-            global.active = Arc::downgrade(self);
-            Some(store)
-        });
-        let Some(store) = store else { return };
+    pub(crate) fn activate(self: &Arc<Self>, shared: &Shared, carry: bool) {
+        let Some(store) = shared.store.clone() else {
+            return;
+        };
+        let before = std::mem::replace(&mut *lock(&shared.active), Arc::downgrade(self));
+        if let Some(before) = before.upgrade()
+            && !Arc::ptr_eq(&before, self)
+        {
+            *lock(&before.0) = Place::Gone;
+        }
         let mut place = lock(&self.0);
         if let Place::Own(jar) = &*place
             && carry
@@ -139,20 +135,6 @@ impl SessionCookies {
             Place::Shared(store) => Some(store.clone()),
             _ => None,
         }
-    }
-}
-
-/// Signed out: no session has the shared store, and its VTOP cookies go.
-pub(crate) fn sign_out() {
-    let store = global(|global| {
-        if let Some(before) = global.active.upgrade() {
-            *lock(&before.0) = Place::Gone;
-        }
-        global.active = Weak::new();
-        global.store.clone()
-    });
-    if let Some(store) = store {
-        store.clear();
     }
 }
 
@@ -216,19 +198,17 @@ pub(crate) mod tests {
         fn flush(&self) {}
     }
 
-    /// Sets a fresh shared store for this test thread.
-    pub(crate) fn with_shared() -> Arc<Memory> {
+    /// A fresh shared store, and the core state that holds it.
+    pub(crate) fn with_shared() -> (Arc<Memory>, Shared) {
         let memory = Arc::new(Memory::default());
-        global(|global| *global = NONE);
-        set_shared_cookies(memory.clone());
-        memory
+        (memory.clone(), Shared::new(memory))
     }
 
     const VTOP: &str = "https://vtop.example.in/vtop/content";
 
     #[test]
     fn only_the_active_session_uses_the_shared_store() {
-        let memory = with_shared();
+        let (memory, shared) = with_shared();
         memory
             .jar
             .add_cookie_str("JSESSIONID=web; Path=/vtop", VTOP);
@@ -243,7 +223,7 @@ pub(crate) mod tests {
 
         // Restored at launch: the store's cookies stay and are this session's.
         let restored = SessionCookies::new();
-        restored.activate(false);
+        restored.activate(&shared, false);
         assert!(restored.is_shared());
         assert_eq!(restored.header_for(VTOP).as_deref(), Some("JSESSIONID=web"));
         restored.set_cookies(VTOP, &["SERVERID=s1; Path=/"]);
@@ -254,7 +234,7 @@ pub(crate) mod tests {
 
         // The sign-in is installed: its cookies replace the store's, the one before sees none
         // and can no longer clear or overwrite them.
-        signing_in.activate(true);
+        signing_in.activate(&shared, true);
         assert_eq!(
             memory.cookie(VTOP.into()).as_deref(),
             Some("JSESSIONID=new")
@@ -268,7 +248,7 @@ pub(crate) mod tests {
             Some("JSESSIONID=new")
         );
 
-        sign_out();
+        shared.sign_out();
         assert_eq!(memory.cookie(VTOP.into()), None);
         assert!(!signing_in.is_shared());
     }
@@ -276,7 +256,7 @@ pub(crate) mod tests {
     #[test]
     fn without_a_shared_store_a_session_keeps_its_own_jar() {
         let cookies = SessionCookies::new();
-        cookies.activate(true);
+        cookies.activate(&Shared::default(), true);
         cookies.set_cookies(VTOP, &["JSESSIONID=a; Path=/vtop"]);
         assert!(!cookies.is_shared());
         assert_eq!(cookies.header_for(VTOP).as_deref(), Some("JSESSIONID=a"));

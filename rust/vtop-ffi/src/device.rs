@@ -124,7 +124,7 @@ impl Core {
         let mut info = json!({
             "sealKey": device.seal_key,
             "platform": "android",
-            "label": crate::remote::server::label(),
+            "label": crate::remote::server::label(&self.shared),
         });
         if let Some(token) = &device.push_token {
             crate::json_set(&mut info, "fcmToken", json!(token));

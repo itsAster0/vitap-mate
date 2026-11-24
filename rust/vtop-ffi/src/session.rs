@@ -10,7 +10,6 @@ use vtop_core::sync::RwLock;
 use vtop_core::types::PersistedVtopSession;
 
 use crate::remote::route;
-use crate::store::cookies;
 use crate::{
     ACCOUNT, Account, Core, CoreError, SESSION, STUDENT_FILES, SavedAccount, Session, SignIn, Slot,
     demo, obs, traced, traced_sync, unix_now,
@@ -81,7 +80,7 @@ impl Core {
                 self.keep_accepted_password(&session.account);
             }
             // Accepted: its cookies become the app's (and the web view's).
-            session.cookies.activate(true);
+            session.cookies.activate(&self.shared.cookies, true);
             let slot = Arc::new(RwLock::new(session));
             self.install(Some(slot.clone()));
             if outcome == SignIn::Done {
@@ -199,7 +198,7 @@ impl Core {
             self.install(None);
             // Left on the edge by `leave_old_forwarding`, which the app calls next.
             self.queue_leave();
-            cookies::sign_out();
+            self.shared.cookies.sign_out();
             self.forget(&[&STUDENT_FILES[..], &[ACCOUNT, SESSION, route::FILE]].concat());
             route::forget(&self.shared);
             obs::set_regno(None);
@@ -345,7 +344,7 @@ impl Core {
                 Err(error) => warn!(%error, "saved session not restored"),
             }
         }
-        session.cookies.activate(carry);
+        session.cookies.activate(&self.shared.cookies, carry);
         if let Some(mut saved) = saved
             && saved.cookies.is_some()
             && session.cookies.is_shared()

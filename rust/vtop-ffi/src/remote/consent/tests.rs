@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::fmt::Write as _;
 use std::future::Future;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use tracing::field::{Field, Visit};

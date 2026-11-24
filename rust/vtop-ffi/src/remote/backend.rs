@@ -11,7 +11,7 @@
 //! Every call carries the flow id (`flow`). Arguments, answers, tokens and JWTs are never
 //! logged.
 
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, PoisonError};
 use std::time::Duration;
 
 use futures::future::{BoxFuture, Either, select};
@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use tracing::{info, warn};
 use vtop_shared::device_sig;
 
-use crate::convex::{CallError, ConvexClient, ConvexNetwork, SubscriptionId};
+use crate::convex::{CallError, ConvexClient, SubscriptionId};
 use crate::device::EdgeError;
 use crate::remote::account_token;
 use crate::{Core, CoreError, Shared, unix_now};
@@ -327,15 +327,6 @@ fn renew(core: Arc<Core>, flow: String, listener: Arc<dyn LiveListener>) {
     }
 }
 
-static NETWORK: Mutex<Option<Arc<dyn ConvexNetwork>>> = Mutex::new(None);
-
-/// Opens the server's WebSocket through `network`; call before [`crate::Core::new`].
-#[uniffi::export]
-pub fn set_convex_network(network: Arc<dyn ConvexNetwork>) {
-    info!("convex network: foreign");
-    *NETWORK.lock().unwrap_or_else(PoisonError::into_inner) = Some(network);
-}
-
 /// The JWT the client goes with. No `Debug`: it holds the token.
 pub(crate) struct Jwt {
     /// Unix ms.
@@ -493,14 +484,10 @@ impl Core {
             state.backend = Some(fake.clone());
             return Ok(fake);
         }
-        let network = NETWORK
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-            .ok_or_else(|| {
-                warn!("no convex network set");
-                EdgeError::Offline
-            })?;
+        let network = self.shared.convex.clone().ok_or_else(|| {
+            warn!("no convex network set");
+            EdgeError::Offline
+        })?;
         let shared = Arc::downgrade(&self.shared);
         let client = ConvexClient::new(&self.forwarding_server(), network, move || {
             if let Some(shared) = shared.upgrade() {

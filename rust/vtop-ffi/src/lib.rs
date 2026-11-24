@@ -264,7 +264,7 @@ impl Session {
     /// half-finished login, cookies, CSRF token or OTP wait.
     fn restart(&mut self, shared: &Arc<Shared>) -> Result<(), CoreError> {
         let fresh = Self::new(self.account.clone(), shared)?;
-        fresh.cookies.activate(true);
+        fresh.cookies.activate(&shared.cookies, true);
         (self.client, self.cookies, self.otp) = (fresh.client, fresh.cookies, None);
         self.server_otp = false;
         Ok(())
@@ -273,8 +273,31 @@ impl Session {
 
 type Slot = RwLock<Session>;
 
-/// The core's state that every VTOP client shares: the route plan, cookie consent and the
-/// Developer config. Each client's transport ([`remote::route::Routed`]) holds the same `Arc`.
+/// What the app hands [`Core::new`]: its HTTP stack, cookie store, sockets, consent prompt,
+/// Developer config and this phone's name. One record, so the app can't leave a piece out.
+#[derive(uniffi::Record)]
+pub struct Platform {
+    /// Carries VTOP's (and the Proxy route's) hops.
+    pub http: Arc<dyn transport::HttpTransport>,
+    /// Android's `CookieManager`, shared with the web view.
+    pub cookies: Arc<dyn SharedCookies>,
+    /// The UDP route's sockets.
+    pub udp: Arc<dyn remote::udp::UdpNetwork>,
+    /// The server's WebSocket.
+    pub convex: Arc<dyn convex::ConvexNetwork>,
+    /// Account proofs' WebSockets.
+    pub proof: Arc<dyn remote::account_proof::ProofNetwork>,
+    /// Asked before any VTOP session leaves the phone.
+    pub cookie_gate: Arc<dyn remote::consent::CookieGate>,
+    pub dev: dev::DevConfig,
+    /// The name the server shows for this phone ("OnePlus CPH2573").
+    pub device_label: String,
+}
+
+/// The core's state that every VTOP client shares: the route plan, cookie consent, the
+/// Developer config and what the app handed over ([`Platform`]). Each client's transport
+/// ([`remote::route::Routed`]) holds the same `Arc`. The platform's pieces are optional only so
+/// host tests can leave out what they don't use; the app always sets every one.
 #[derive(Default)]
 struct Shared {
     route: Mutex<remote::route::State>,
@@ -283,21 +306,42 @@ struct Shared {
     /// One identity fetch at a time ([`remote::backend`]): a refresh token works once.
     identity_turn: futures::lock::Mutex<()>,
     consent: Mutex<remote::consent::State>,
-    /// What [`dev::dev_configure`] set before the core was made.
     dev: Option<dev::DevConfig>,
+    /// Without one (host tests), vtop-core's own.
+    http: Option<Arc<dyn vtop_core::client::Transport>>,
+    /// The shared cookie store and which session's cookies it holds.
+    cookies: store::cookies::Shared,
+    /// Without one, the UDP route fails and falls back to HTTPS.
+    udp: Option<Arc<dyn remote::udp::UdpNetwork>>,
+    convex: Option<Arc<dyn convex::ConvexNetwork>>,
+    proof: Option<Arc<dyn remote::account_proof::ProofNetwork>>,
+    /// This phone's name on the server; `vitapmate` when none was given.
+    label: Option<String>,
     /// The server account proofs are held to, and its roots, in place of VTOP's.
     #[cfg(all(test, feature = "tlsn"))]
     proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
 }
 
-impl Shared {
-    /// With what Kotlin set before making the core: the cookie gate and the Developer config.
-    fn handed() -> Self {
+impl From<Platform> for Shared {
+    fn from(platform: Platform) -> Self {
+        let dev = &platform.dev;
+        info!(
+            session_reuse_minutes = dev.session_reuse_minutes,
+            request_timeout_s = dev.request_timeout_s,
+            debuggable = dev.debuggable,
+            "platform: foreign"
+        );
         let shared = Self {
-            dev: dev::handed(),
+            dev: Some(platform.dev),
+            http: Some(Arc::new(transport::Foreign(platform.http))),
+            cookies: store::cookies::Shared::new(platform.cookies),
+            udp: Some(platform.udp),
+            convex: Some(platform.convex),
+            proof: Some(platform.proof),
+            label: Some(platform.device_label.trim().chars().take(64).collect()),
             ..Self::default()
         };
-        shared.consent().gate = remote::consent::handed();
+        shared.consent().gate = Some(platform.cookie_gate);
         shared
     }
 }
@@ -316,33 +360,15 @@ pub struct Core {
 #[uniffi::export]
 impl Core {
     /// Opens the cache in `data_dir`, the change inbox in `cache_dir`, and
-    /// restores the saved session.
+    /// restores the saved session, reaching the world through `platform`.
     #[uniffi::constructor]
-    pub fn new(flow: String, data_dir: String, cache_dir: String) -> Result<Arc<Self>, CoreError> {
-        obs::obs_init(cache_dir.clone());
-        let core = Self {
-            dir: PathBuf::from(data_dir),
-            cache: PathBuf::from(cache_dir),
-            slot: Mutex::new(None),
-            shared: Arc::new(Shared::handed()),
-        };
-        traced_sync("new", &flow, || {
-            fs::create_dir_all(&core.dir)?;
-            fs::create_dir_all(&core.cache)?;
-            remote::route::load(&core);
-            remote::consent::load(&core);
-            let Some(account) = core.read::<Account>(ACCOUNT) else {
-                return Ok(());
-            };
-            let session = Session::new(account, &core.shared)?;
-            let saved = core
-                .read::<PersistedVtopSession>(SESSION)
-                .filter(|saved| dev::reusable(&core.shared, saved));
-            core.restore(&session, saved);
-            core.install(Some(Arc::new(RwLock::new(session))));
-            Ok(())
-        })?;
-        Ok(Arc::new(core))
+    pub fn new(
+        flow: String,
+        data_dir: String,
+        cache_dir: String,
+        platform: Platform,
+    ) -> Result<Arc<Self>, CoreError> {
+        Self::open(flow, data_dir, cache_dir, platform.into())
     }
 
     /// The cached semester list with the selected one, if a list was fetched.
@@ -390,15 +416,54 @@ impl Core {
 }
 
 impl Core {
-    /// A core on `dir` (its cache folder too), signed out, with nothing set by Kotlin.
+    /// [`Core::new`] on `shared` (host tests leave the platform out).
+    fn open(
+        flow: String,
+        data_dir: String,
+        cache_dir: String,
+        shared: Shared,
+    ) -> Result<Arc<Self>, CoreError> {
+        obs::obs_init(cache_dir.clone());
+        let core = Self {
+            dir: PathBuf::from(data_dir),
+            cache: PathBuf::from(cache_dir),
+            slot: Mutex::new(None),
+            shared: Arc::new(shared),
+        };
+        traced_sync("new", &flow, || {
+            fs::create_dir_all(&core.dir)?;
+            fs::create_dir_all(&core.cache)?;
+            remote::route::load(&core);
+            remote::consent::load(&core);
+            let Some(account) = core.read::<Account>(ACCOUNT) else {
+                return Ok(());
+            };
+            let session = Session::new(account, &core.shared)?;
+            let saved = core
+                .read::<PersistedVtopSession>(SESSION)
+                .filter(|saved| dev::reusable(&core.shared, saved));
+            core.restore(&session, saved);
+            core.install(Some(Arc::new(RwLock::new(session))));
+            Ok(())
+        })?;
+        Ok(Arc::new(core))
+    }
+
+    /// A core on `dir` (its cache folder too), signed out, with no platform.
     #[cfg(test)]
     fn for_test(dir: impl Into<PathBuf>) -> Self {
+        Self::for_test_on(dir, Shared::default())
+    }
+
+    /// [`Core::for_test`] with the platform pieces set in `shared`.
+    #[cfg(test)]
+    fn for_test_on(dir: impl Into<PathBuf>, shared: Shared) -> Self {
         let dir = dir.into();
         Self {
             cache: dir.clone(),
             dir,
             slot: Mutex::new(None),
-            shared: Arc::default(),
+            shared: Arc::new(shared),
         }
     }
 

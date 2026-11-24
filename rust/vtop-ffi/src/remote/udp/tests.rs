@@ -1,4 +1,5 @@
 use std::net::UdpSocket as StdSocket;
+use std::sync::Mutex;
 
 use serde_json::json;
 use vtop_shared::engine::BatchPage;
@@ -10,6 +11,18 @@ use crate::test_edge::{Edge, serve};
 
 /// Kotlin's part, on blocking std sockets.
 struct StdNetwork;
+
+/// A core on `dir` whose UDP goes through [`StdNetwork`].
+fn with_network(dir: &std::path::Path) -> Core {
+    let udp = Some(Arc::new(StdNetwork) as Arc<dyn UdpNetwork>);
+    Core::for_test_on(
+        dir,
+        crate::Shared {
+            udp,
+            ..Default::default()
+        },
+    )
+}
 
 #[async_trait::async_trait]
 impl UdpNetwork for StdNetwork {
@@ -106,7 +119,7 @@ async fn fetches_a_page_over_udp() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let core = Core::for_test(&dir);
+    let core = with_network(&dir);
     let (port, public) = spawn_gateway();
     let now = unix_now();
     core.write_plain(
@@ -126,7 +139,6 @@ async fn fetches_a_page_over_udp() {
         args: Default::default(),
         dictionary: Some("d1c7".into()),
     };
-    set_udp_network(Arc::new(StdNetwork));
     let page = core.udp_page("0f10d00e", &request).await;
     assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
     let page = core.udp_page("0f10d00e", &request).await;
@@ -161,7 +173,7 @@ async fn gateway_key_uses_server_adjusted_time_when_clock_is_skewed() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-skew-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let core = Core::for_test(&dir);
+    let core = with_network(&dir);
     // Unreachable edge: proves udp_page stays on the cache using local `fetched` age.
     core.dev_set_forwarding_server("f".into(), Some("http://127.0.0.1:1".into()))
         .unwrap();
@@ -205,7 +217,6 @@ async fn gateway_key_uses_server_adjusted_time_when_clock_is_skewed() {
         args: Default::default(),
         dictionary: Some("d1c7".into()),
     };
-    set_udp_network(Arc::new(StdNetwork));
     let page = core.udp_page("skew-slow", &request).await;
     assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
 
@@ -254,7 +265,7 @@ async fn udp_keys_come_from_the_server_and_go_by_its_clock() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-udp-keys-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let core = Core::for_test(&dir);
+    let core = with_network(&dir);
     let (udp_port, public) = spawn_gateway();
     // The phone's clock an hour slow, as a signed call's `stale_time` taught it.
     let skew = 3600;
@@ -272,7 +283,6 @@ async fn udp_keys_come_from_the_server_and_go_by_its_clock() {
         args: Default::default(),
         dictionary: Some("d1c7".into()),
     };
-    set_udp_network(Arc::new(StdNetwork));
     let page = core.udp_page("keys-flow", &request).await;
     assert_eq!(page.unwrap(), json!({ "page": "attendance" }));
     {
@@ -323,8 +333,7 @@ async fn live_udp() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-live-udp-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let core = Core::for_test(&dir);
-    set_udp_network(Arc::new(StdNetwork));
+    let core = with_network(&dir);
     let gateway = core.udp_gateway(&core.forwarding_server(), "live").await;
     let gateway = gateway.unwrap();
     println!("gateway {} {:?}", gateway.host, gateway.ports);

@@ -31,7 +31,7 @@ import vitapmate.core.TransportException
 import vitapmate.core.vtopIntermediateCa
 
 /**
- * VTOP's HTTP hops over the platform's [HttpURLConnection], for Rust (`set_http_transport`). Rust
+ * VTOP's HTTP hops over the platform's [HttpURLConnection], for Rust (`Platform.http`). Rust
  * adds and stores the cookies (in [VtopCookies]), follows redirects and decides retries, so this
  * client has no cookie jar and follows nothing; a body is streamed with a fixed length, so the
  * platform never sends it twice. A download's body goes straight to the file Rust names

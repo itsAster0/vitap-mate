@@ -6,8 +6,8 @@
 
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -71,15 +71,6 @@ pub trait UdpSocket: Send + Sync {
     async fn receive(&self, timeout_ms: u32) -> Result<Option<Datagram>, TransportError>;
     /// Closes the socket (not `close`: UniFFI objects already have one).
     fn shutdown(&self);
-}
-
-static NETWORK: Mutex<Option<Arc<dyn UdpNetwork>>> = Mutex::new(None);
-
-/// Sends the UDP route through `network`; without one the route fails and falls back to HTTPS.
-#[uniffi::export]
-pub fn set_udp_network(network: Arc<dyn UdpNetwork>) {
-    info!("udp network: foreign");
-    *NETWORK.lock().unwrap_or_else(PoisonError::into_inner) = Some(network);
 }
 
 struct Foreign(Arc<dyn UdpNetwork>);
@@ -190,11 +181,7 @@ impl Core {
         // A renewed session belongs to the student signed in now, not to whoever is by the time
         // the answer comes.
         let started = self.current().ok();
-        let network = NETWORK
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone();
-        let net = Foreign(network.ok_or("no UDP network set")?);
+        let net = Foreign(self.shared.udp.clone().ok_or("no UDP network set")?);
         let server = self.forwarding_server();
         let now = unix_now();
         let server_now = now.saturating_add(self.device().clock_offset);
