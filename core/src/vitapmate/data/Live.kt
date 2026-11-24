@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -45,7 +44,7 @@ object Live {
      */
     fun changes(topic: LiveTopic): Flow<Unit> = callbackFlow {
         val name = "live.${topic.name.lowercase()}"
-        val watch = try {
+        val watch = attempt {
             flow(name) { id ->
                 AppCore.await().liveWatch(id, topic, object : LiveListener {
                     override fun onChange() {
@@ -69,12 +68,7 @@ object Live {
                     }
                 })
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // flow() logged it; an empty flow means "read once".
-            null
-        }
+        }.getOrNull() // flow() logged a failure; an empty flow means "read once".
         if (watch == null) close() else awaitClose {
             watch.stop()
             failing.update { it - topic }

@@ -70,14 +70,21 @@ fun askedOtp(e: Throwable): Boolean {
     return true
 }
 
-/** [block]'s value, or null when it fails; a cancellation still cancels (unlike `runCatching`). */
-inline fun <T> orNull(block: () -> T): T? = try {
-    block()
+/**
+ * [block]'s value or failure, like `runCatching`, but a cancellation still cancels: a
+ * cancelled coroutine has to stop, not count as a failed call. Inline, so [block] may suspend
+ * and return from its caller.
+ */
+inline fun <T> attempt(block: () -> T): Result<T> = try {
+    Result.success(block())
 } catch (e: CancellationException) {
     throw e
-} catch (_: Throwable) {
-    null
+} catch (e: Throwable) {
+    Result.failure(e)
 }
+
+/** [block]'s value, or null when it fails; a cancellation still cancels (unlike `runCatching`). */
+inline fun <T> orNull(block: () -> T): T? = attempt(block).getOrNull()
 
 /**
  * [cause] of a call to our server in [flow], as the Server and Connected apps screens get it

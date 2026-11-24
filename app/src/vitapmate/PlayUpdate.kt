@@ -17,7 +17,6 @@ import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.delay
@@ -27,6 +26,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.data.AppScope
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.data.attempt
 
 /** What the update pill above the nav bar shows. */
 sealed interface UpdatePill {
@@ -164,11 +164,9 @@ object PlayUpdate {
     }
 
     /** A new [AppUpdateInfo] (each starts one flow only); null when Play doesn't answer. */
-    private suspend fun fresh(manager: AppUpdateManager, f: String): AppUpdateInfo? = try {
+    private suspend fun fresh(manager: AppUpdateManager, f: String): AppUpdateInfo? = attempt {
         withTimeoutOrNull(5_000) { manager.appUpdateInfo.await() }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
+    }.getOrElse { e ->
         Log.info("update", "play unavailable", f, mapOf("error" to "${e::class.simpleName}"))
         null
     }

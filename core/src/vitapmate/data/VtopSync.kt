@@ -42,11 +42,7 @@ object VtopSync {
         unattended: Boolean = false,
         otp: suspend (CoreException.OtpRequired, String) -> Boolean,
     ): Result = flow(flowName, unattended) { f ->
-        val core = try {
-            AppCore.await()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
+        val core = attempt { AppCore.await() }.getOrElse { e ->
             Log.warn("sync", "no core: ${e::class.simpleName}", f)
             return@flow Result(Outcome.Failed, 0, 0)
         }

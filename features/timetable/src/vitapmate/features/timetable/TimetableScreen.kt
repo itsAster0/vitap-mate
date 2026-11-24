@@ -26,7 +26,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CalendarX
 import com.composables.icons.lucide.Lucide
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,6 +52,7 @@ import vitapmate.ui.is24Hour
 import vitapmate.ui.isoWeekday
 import vitapmate.ui.mondayOf
 import vitapmate.ui.rememberNow
+import vitapmate.data.attempt
 
 /** Days read with the timetable: this week, next week (Sunday's grid) and four more to look ahead. */
 private const val WINDOW = 42
@@ -190,11 +190,9 @@ private fun TimetableContent(tt: Timetable) {
 private suspend fun loadExtra(flow: String, tt: Timetable, today: Int): Extra {
     val core = AppCore.await()
     val from = mondayOf(today)
-    val days = try {
+    val days = attempt {
         core.timetableDays(flow, from, WINDOW).takeIf { it.size >= 14 } ?: error("only some days")
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
+    }.getOrElse { e ->
         Log.warn("ui.timetable", "agenda days unavailable, timetable only", flow, mapOf("error" to e.toString().take(200)))
         (0 until WINDOW).map { i ->
             val d = from + i

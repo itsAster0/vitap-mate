@@ -54,7 +54,6 @@ import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.User
 import com.composables.icons.lucide.Zap
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,6 +85,7 @@ import vitapmate.ui.ProblemView
 import vitapmate.ui.ProofProgress
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /** Route id of Settings → Account → Server. */
 const val SERVER = "server"
@@ -484,11 +484,9 @@ private fun keyText(key: AccessKey) =
 /** One call as flow `server.<name>`, off the main thread; a failure is logged, toasted and returned as a [ServerFailure]. */
 private suspend fun <T> run(name: String, call: suspend (Core, String) -> T): Result<T> {
     var flowId = ""
-    return try {
+    return attempt {
         Result.success(flow("server.$name") { f -> flowId = f; withContext(Dispatchers.IO) { call(AppCore.await(), f) } })
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
+    }.getOrElse { e ->
         Log.warn("ui.server", "$name failed: ${e::class.simpleName}", flowId)
         when (e) {
             is CoreException.OtpRequired -> OtpPrompt.ask(e.reason)

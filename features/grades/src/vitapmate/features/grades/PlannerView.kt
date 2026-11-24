@@ -52,7 +52,6 @@ import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 import vitapmate.core.Core
 import vitapmate.core.GpaPlan
@@ -74,6 +73,7 @@ import vitapmate.ui.Space
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.nums
 import vitapmate.ui.tappable
+import vitapmate.data.attempt
 
 /**
  * The GPA planner: planned courses (this semester's from the saved timetable to start) give the
@@ -94,13 +94,8 @@ internal fun PlannerView(planner: Planner, history: GradeHistory?, list: LazyLis
         if (planner.completed.isEmpty()) planner.completed = history.creditsRegistered
     }
     LaunchedEffect(SemesterChoice.selected) {
-        try {
-            planner.semester = coreFlow("grades.plan.courses", Core::plannerCourses)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // In the log already.
-        }
+        // A failure is in the log already.
+        attempt { planner.semester = coreFlow("grades.plan.courses", Core::plannerCourses) }
         if (!planner.autoLoaded && planner.untouched && planner.semester.isNotEmpty()) {
             planner.autoLoaded = true
             planner.loadSemester()

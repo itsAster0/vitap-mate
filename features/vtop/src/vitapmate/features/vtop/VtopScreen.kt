@@ -50,7 +50,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.composables.icons.lucide.LogIn
 import com.composables.icons.lucide.Lucide
 import kotlin.coroutines.resume
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.drop
@@ -68,6 +67,7 @@ import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 private const val SRC = VtopBrowser.SRC
 private const val PREFS = "settings"
@@ -128,7 +128,7 @@ internal fun VtopScreen() {
                     prepare.job?.cancel()
                     prepare.job = scope.launch {
                         var id = ""
-                        try {
+                        attempt {
                             flow(effect.flowName) { flowId ->
                                 id = flowId
                                 browser.flow = flowId
@@ -137,9 +137,7 @@ internal fun VtopScreen() {
                                 Log.info(SRC, "session ready", flowId, mapOf("force" to effect.force.toString()))
                                 dispatch(VtopWebEvent.PrepareSucceeded(effect.requestId, fresh))
                             }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
+                        }.onFailure { e ->
                             askedOtp(e)
                             val problem = problemOf(e, id)
                             Log.warn(SRC, "not opened: ${e::class.simpleName}", id)

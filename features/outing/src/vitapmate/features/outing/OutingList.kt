@@ -49,6 +49,7 @@ import vitapmate.ui.SectionHeader
 import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /** What both lists show. */
 private class Summary(val open: Boolean, val notice: String, val facts: List<OutingFact>, val requests: List<OutingRequest>)
@@ -149,15 +150,13 @@ private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> 
                             if (passLoading == null) scope.launch {
                                 passLoading = r.key
                                 try {
-                                    flow("outing.pass") { id ->
-                                        Log.info("ui.outing", "pass", id, mapOf("kind" to kind.key))
-                                        passDoc(context, kind, passId, id)
-                                    }
-                                    openDetail.open("${kind.key}:$passId", "Outing pass")
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Throwable) {
-                                    if (!askedOtp(e)) showToast("Couldn't get the pass", failureOf(e, ""))
+                                    attempt {
+                                        flow("outing.pass") { id ->
+                                            Log.info("ui.outing", "pass", id, mapOf("kind" to kind.key))
+                                            passDoc(context, kind, passId, id)
+                                        }
+                                        openDetail.open("${kind.key}:$passId", "Outing pass")
+                                    }.onFailure { e -> if (!askedOtp(e)) showToast("Couldn't get the pass", failureOf(e, "")) }
                                 } finally {
                                     passLoading = null
                                 }
@@ -179,17 +178,13 @@ private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> 
             val cancelId = r.cancelId ?: return@CancelDialog
             cancelling = cancelling + r.key
             AppScope.launch {
-                try {
+                attempt {
                     val result = flow("outing.cancel") { id ->
                         Log.info("ui.outing", "cancel", id, mapOf("kind" to kind.key))
                         withContext(Dispatchers.IO) { AppCore.await().cancelOuting(id, kind, cancelId) }
                     }
                     showToast(if (result.done) "Request cancelled" else "Couldn't cancel", result.message)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    if (!askedOtp(e)) showToast("Couldn't cancel", failureOf(e, ""))
-                }
+                }.onFailure { e -> if (!askedOtp(e)) showToast("Couldn't cancel", failureOf(e, "")) }
                 // Sent or maybe sent: show what VTOP has now, then let the row go.
                 refreshAfterWrite(page, "cancel")
                 cancelling = cancelling - r.key

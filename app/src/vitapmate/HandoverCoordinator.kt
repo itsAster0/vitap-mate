@@ -1,7 +1,6 @@
 package vitapmate
 
 import java.util.concurrent.atomic.AtomicReference
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +10,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import vitapmate.data.attempt
 
 /** Per-request lifecycle for a connected app's VTOP session handover (`vtop_cookie_request`). */
 sealed interface HandoverState {
@@ -235,13 +235,7 @@ class HandoverCoordinator(
                 outcome.set(Result.success(Unit))
                 return@launch
             }
-            val result = try {
-                Result.success(answer(null))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                Result.failure(e)
-            }
+            val result = attempt { answer(null) }
             // Synchronous claim with no suspension point after answer(null) returns: if it finished
             // right as the timeout fired, complete() wins before cancelAndJoin() returns.
             if (complete(requestId, attemptId)) {
@@ -257,15 +251,7 @@ class HandoverCoordinator(
             if (!finishedInTime) {
                 workJob.cancelAndJoin()
                 if (timeout(requestId, attemptId)) {
-                    outcome.set(
-                        try {
-                            Result.success(withContext(dispatcher) { answer(timeoutError) })
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Throwable) {
-                            Result.failure(e)
-                        },
-                    )
+                    outcome.set(attempt { withContext(dispatcher) { answer(timeoutError) } })
                 }
             }
             outcome.get() ?: Result.success(Unit)

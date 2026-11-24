@@ -2,7 +2,6 @@ package vitapmate.features.grades
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateMapOf
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.core.GradeDetails
@@ -13,6 +12,7 @@ import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /**
  * Each course's mark breakdown, by `<semester>/<course id>`, as the Flutter grades page keeps
@@ -43,21 +43,21 @@ internal class Details {
         if (key in loading) return
         loading[key] = Unit
         try {
-            val fresh = Activity.track("Refreshing grade details", id) {
-                withContext(Dispatchers.IO) { AppCore.await().fetchGradeDetails(id, semester, courseId) }
+            attempt {
+                val fresh = Activity.track("Refreshing grade details", id) {
+                    withContext(Dispatchers.IO) { AppCore.await().fetchGradeDetails(id, semester, courseId) }
+                }
+                loaded[key] = fresh
+                failed.remove(key)
+                Log.info("ui.grades", "details fresh", id, mapOf("course" to courseId, "trigger" to trigger, "sections" to "${fresh.sections.size}"))
+            }.onFailure { e ->
+                failed[key] = Unit
+                askedOtp(e)
+                val problem = problemOf(e, id).copy(userInitiated = trigger == "button")
+                Log.warn("ui.grades", "details not fetched", id, mapOf("course" to courseId, "trigger" to trigger, "kind" to problem.kind.name))
+                // Only for the button (or with "Show background errors"); never for an OTP request.
+                showToast(problem)
             }
-            loaded[key] = fresh
-            failed.remove(key)
-            Log.info("ui.grades", "details fresh", id, mapOf("course" to courseId, "trigger" to trigger, "sections" to "${fresh.sections.size}"))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            failed[key] = Unit
-            askedOtp(e)
-            val problem = problemOf(e, id).copy(userInitiated = trigger == "button")
-            Log.warn("ui.grades", "details not fetched", id, mapOf("course" to courseId, "trigger" to trigger, "kind" to problem.kind.name))
-            // Only for the button (or with "Show background errors"); never for an OTP request.
-            showToast(problem)
         } finally {
             loading.remove(key)
         }

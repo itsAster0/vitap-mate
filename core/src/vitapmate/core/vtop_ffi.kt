@@ -1220,6 +1220,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_mark_forwarding_done(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_up_forwarding(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding(
@@ -1551,6 +1553,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_leave_old_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_mark_forwarding_done(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_set_up_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -2167,7 +2171,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent() and 0xFFFF) != 23504) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 2595) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 10239) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 44213) {
@@ -2180,6 +2184,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding() and 0xFFFF) != 64678) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_forwarding_done() and 0xFFFF) != 49022) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 7277) {
@@ -4860,7 +4867,7 @@ public interface CoreInterface {
     
     /**
      * Pulls the latest forwarded mail (the server keeps it 5 minutes): Gmail's confirmation while
-     * setting up, or an OTP. Either one proves the address works.
+     * setting up, or an OTP.
      */
     suspend fun `checkForwarding`(`flow`: kotlin.String): Forwarding
     
@@ -4891,6 +4898,13 @@ public interface CoreInterface {
      * join. Best effort: an address not left yet stays queued for the next call.
      */
     suspend fun `leaveOldForwarding`(`flow`: kotlin.String)
+    
+    /**
+     * Marks forwarding set up once Gmail's confirmation has reached the address: VTOP doesn't
+     * send an OTP on every sign-in, so the app can't verify the Gmail filter right away. Does
+     * nothing before confirmation (or without an address). No network.
+     */
+    fun `markForwardingDone`(`flow`: kotlin.String): Forwarding
     
     /**
      * Gives this phone a forwarding address. A student who already has one (made on another
@@ -6867,7 +6881,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Pulls the latest forwarded mail (the server keeps it 5 minutes): Gmail's confirmation while
-     * setting up, or an OTP. Either one proves the address works.
+     * setting up, or an OTP.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -6992,6 +7006,25 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         CoreException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Marks forwarding set up once Gmail's confirmation has reached the address: VTOP doesn't
+     * send an OTP on every sign-in, so the app can't verify the Gmail filter right away. Does
+     * nothing before confirmation (or without an address). No network.
+     */override fun `markForwardingDone`(`flow`: kotlin.String): Forwarding {
+            return FfiConverterTypeForwarding.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_forwarding_done(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -11407,32 +11440,32 @@ public object FfiConverterTypeUdpSocket: FfiConverter<UdpSocket, Long> {
  * The semester calendar, ready to draw.
  */
 data class AcademicCalendar (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * Today in India, days since 1970-01-01; `days_left` counts from it.
      */
-    var `today`: kotlin.Int
+    val `today`: kotlin.Int
     , 
     /**
      * Every month from the first listed day's to the last's.
      */
-    var `months`: List<CalendarMonth>
+    val `months`: List<CalendarMonth>
     , 
     /**
      * Instructional days after today.
      */
-    var `daysLeft`: kotlin.Int
+    val `daysLeft`: kotlin.Int
     , 
     /**
      * The next weekday holiday from today on (Sundays are always off).
      */
-    var `nextHoliday`: CalendarDay?
+    val `nextHoliday`: CalendarDay?
     
 ){
     
@@ -11483,25 +11516,25 @@ data class AccessKey (
     /**
      * The short id the server revokes it by.
      */
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
-    var `kind`: KeyKind
+    val `kind`: KeyKind
     , 
     /**
      * Whether it may apply for and cancel outings.
      */
-    var `outings`: kotlin.Boolean
+    val `outings`: kotlin.Boolean
     , 
-    var `createdAt`: kotlin.Long
+    val `createdAt`: kotlin.Long
     , 
-    var `lastUsedAt`: kotlin.Long?
+    val `lastUsedAt`: kotlin.Long?
     , 
     /**
      * Newest first, at most 10.
      */
-    var `uses`: List<KeyUse>
+    val `uses`: List<KeyUse>
     
 ){
     
@@ -11555,9 +11588,9 @@ public object FfiConverterTypeAccessKey: FfiConverterRustBuffer<AccessKey> {
  * One address as a line of text ("Current", "2nd Floor, ..., Amaravati, Andhra Pradesh 522000, India").
  */
 data class Address (
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
-    var `text`: kotlin.String
+    val `text`: kotlin.String
     
 ){
     
@@ -11593,51 +11626,51 @@ public object FfiConverterTypeAddress: FfiConverterRustBuffer<Address> {
 
 
 data class Assessment (
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * None until posted.
      */
-    var `scored`: kotlin.Double?
+    val `scored`: kotlin.Double?
     , 
-    var `max`: kotlin.Double
+    val `max`: kotlin.Double
     , 
     /**
      * The share of the course's 100 it counts for; none when VTOP gives 0.
      */
-    var `weightage`: kotlin.Double?
+    val `weightage`: kotlin.Double?
     , 
     /**
      * What it adds to the course's total: VTOP's, else worked out.
      */
-    var `weighted`: kotlin.Double?
+    val `weighted`: kotlin.Double?
     , 
     /**
      * `scored / max`, 0–100.
      */
-    var `percent`: kotlin.Double?
+    val `percent`: kotlin.Double?
     , 
-    var `band`: ScoreBand
+    val `band`: ScoreBand
     , 
     /**
      * VTOP's status ("Present", "Absent", ...).
      */
-    var `status`: kotlin.String
+    val `status`: kotlin.String
     , 
     /**
      * VTOP's remark; empty when it only repeats the score.
      */
-    var `remark`: kotlin.String
+    val `remark`: kotlin.String
     , 
     /**
      * Re-marks an earlier assessment of the same title.
      */
-    var `reevaluation`: kotlin.Boolean
+    val `reevaluation`: kotlin.Boolean
     , 
     /**
      * When the app first saw it posted, Unix seconds.
      */
-    var `postedAt`: kotlin.Long?
+    val `postedAt`: kotlin.Long?
     
 ){
     
@@ -11700,14 +11733,14 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
 
 
 data class Attendance (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
-    var `courses`: List<AttendanceCourse>
+    val `courses`: List<AttendanceCourse>
     
 ){
     
@@ -11755,64 +11788,64 @@ data class AttendanceCourse (
      * `<code>.theory` or `<code>.lab`: the course's key in the app and in
      * [`AttendanceDetail`] calls.
      */
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
     /**
      * VTOP's ids for the per-class history page.
      */
-    var `courseId`: kotlin.String
+    val `courseId`: kotlin.String
     , 
-    var `courseType`: kotlin.String
+    val `courseType`: kotlin.String
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `kind`: ClassKind
+    val `kind`: ClassKind
     , 
-    var `category`: kotlin.String
+    val `category`: kotlin.String
     , 
-    var `faculty`: kotlin.String
+    val `faculty`: kotlin.String
     , 
-    var `attended`: kotlin.Int
+    val `attended`: kotlin.Int
     , 
-    var `total`: kotlin.Int
+    val `total`: kotlin.Int
     , 
     /**
      * The classes VTOP's percentage is over: `total` less the classes held
      * but not posted yet, which VTOP's total counts and its percentage does
      * not.
      */
-    var `counted`: kotlin.Int
+    val `counted`: kotlin.Int
     , 
     /**
      * VTOP's rounded figure when it sends one, else computed.
      */
-    var `percent`: kotlin.Double
+    val `percent`: kotlin.Double
     , 
-    var `safe`: kotlin.Boolean
+    val `safe`: kotlin.Boolean
     , 
-    var `canSkip`: kotlin.Int
+    val `canSkip`: kotlin.Int
     , 
-    var `mustAttend`: kotlin.Int
+    val `mustAttend`: kotlin.Int
     , 
     /**
      * "Can skip 3", "Attend 2 labs", "Don't skip" or "No classes yet".
      */
-    var `advice`: kotlin.String
+    val `advice`: kotlin.String
     , 
-    var `debarred`: kotlin.Boolean
+    val `debarred`: kotlin.Boolean
     , 
     /**
      * What VTOP's debar status says, when it debars.
      */
-    var `debar`: Debar?
+    val `debar`: Debar?
     , 
     /**
      * The debarment in one line: "Debarred for CAT-II · Permitted · Clear
      * for FAT", or "… · Clear for FAT at 3 more" while below 75%.
      */
-    var `debarLine`: kotlin.String?
+    val `debarLine`: kotlin.String?
     
 ){
     
@@ -11905,43 +11938,43 @@ data class AttendanceDetail (
     /**
      * The course as the saved attendance has it.
      */
-    var `course`: AttendanceCourse
+    val `course`: AttendanceCourse
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * Newest first; a lab session is one class.
      */
-    var `classes`: List<AttendedClass>
+    val `classes`: List<AttendedClass>
     , 
     /**
      * Posted classes by status.
      */
-    var `present`: kotlin.Int
+    val `present`: kotlin.Int
     , 
-    var `onDuty`: kotlin.Int
+    val `onDuty`: kotlin.Int
     , 
-    var `absent`: kotlin.Int
+    val `absent`: kotlin.Int
     , 
     /**
      * Present or on duty in a row, back from the newest posted class;
      * only an absence breaks it, and a cancelled class is skipped.
      */
-    var `streak`: kotlin.Int
+    val `streak`: kotlin.Int
     , 
     /**
      * The day of the newest absence.
      */
-    var `lastMissed`: kotlin.Int?
+    val `lastMissed`: kotlin.Int?
     , 
     /**
      * Until the next exam (when one comes before the last class day), then
      * until the semester's end; none without a saved academic calendar.
      */
-    var `plans`: List<AttendancePlan>
+    val `plans`: List<AttendancePlan>
     
 ){
     
@@ -12005,51 +12038,51 @@ data class AttendancePlan (
     /**
      * The exam's name ("CAT-II", "FAT"), or empty for the semester's end.
      */
-    var `until`: kotlin.String
+    val `until`: kotlin.String
     , 
     /**
      * The day counting stops before (the exam's first day, or the day after
      * the last class day).
      */
-    var `untilDay`: kotlin.Int
+    val `untilDay`: kotlin.Int
     , 
     /**
      * Attended and held as VTOP's percentage counts them.
      */
-    var `attended`: kotlin.Int
+    val `attended`: kotlin.Int
     , 
-    var `held`: kotlin.Int
+    val `held`: kotlin.Int
     , 
     /**
      * Classes still to come from now, by the timetable and calendar.
      */
-    var `upcoming`: kotlin.Int
+    val `upcoming`: kotlin.Int
     , 
     /**
      * Held but not posted yet (VTOP's total less what its percentage counts).
      */
-    var `unposted`: kotlin.Int
+    val `unposted`: kotlin.Int
     , 
     /**
      * Of `upcoming + unposted`, how many can be missed to finish at 75%.
      */
-    var `canMiss`: kotlin.Int
+    val `canMiss`: kotlin.Int
     , 
     /**
      * How many must be attended to finish at 75%; none when even all of
      * them are not enough.
      */
-    var `mustAttend`: kotlin.Int?
+    val `mustAttend`: kotlin.Int?
     , 
     /**
      * The percentage when every one left is attended.
      */
-    var `bestPercent`: kotlin.Double
+    val `bestPercent`: kotlin.Double
     , 
     /**
      * The days of `upcoming`, oldest first, with how many classes each holds.
      */
-    var `days`: List<PlanDay>
+    val `days`: List<PlanDay>
     
 ){
     
@@ -12112,34 +12145,34 @@ data class AttendedClass (
     /**
      * Days since 1970-01-01.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
     /**
      * 0 = Monday.
      */
-    var `weekday`: kotlin.Int
+    val `weekday`: kotlin.Int
     , 
     /**
      * "A1", or "L10+L11" for a lab.
      */
-    var `slot`: kotlin.String
+    val `slot`: kotlin.String
     , 
     /**
      * Minutes since midnight, when VTOP gives the time.
      */
-    var `start`: kotlin.Int?
+    val `start`: kotlin.Int?
     , 
-    var `end`: kotlin.Int?
+    val `end`: kotlin.Int?
     , 
     /**
      * None until VTOP posts it.
      */
-    var `status`: ClassStatus?
+    val `status`: ClassStatus?
     , 
     /**
      * VTOP's remark ("Medical", "No punch found ...").
      */
-    var `remark`: kotlin.String
+    val `remark`: kotlin.String
     
 ){
     
@@ -12193,27 +12226,27 @@ data class BiometricDay (
     /**
      * Days since 1970-01-01, in India.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * Fetched after the day ended in India: VTOP adds no more punches, so
      * a range serves it from the cache.
      */
-    var `complete`: kotlin.Boolean
+    val `complete`: kotlin.Boolean
     , 
     /**
      * Newest first.
      */
-    var `punches`: List<Punch>
+    val `punches`: List<Punch>
     , 
-    var `entries`: kotlin.Int
+    val `entries`: kotlin.Int
     , 
-    var `exits`: kotlin.Int
+    val `exits`: kotlin.Int
     
 ){
     
@@ -12264,31 +12297,31 @@ data class CalendarDay (
     /**
      * Days since 1970-01-01.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
     /**
      * `YYYY-MM-DD`.
      */
-    var `date`: kotlin.String
+    val `date`: kotlin.String
     , 
     /**
      * The most notable entry's kind (exam over Lab FAT over holiday over
      * class day); none when the calendar does not list the day.
      */
-    var `kind`: CalendarKind?
+    val `kind`: CalendarKind?
     , 
-    var `mark`: CalendarMark?
+    val `mark`: CalendarMark?
     , 
     /**
      * "Deepavali", "CAT-II", "Lab FAT", "No instructional day"; empty when
      * not listed.
      */
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * VTOP's text for every entry of the day: "Holiday (Deepavali)".
      */
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     
 ){
     
@@ -12343,31 +12376,31 @@ data class CalendarEvent (
     /**
      * Days since 1970-01-01, ends included.
      */
-    var `first`: kotlin.Int
+    val `first`: kotlin.Int
     , 
-    var `last`: kotlin.Int
+    val `last`: kotlin.Int
     , 
     /**
      * `YYYY-MM-DD`.
      */
-    var `firstDate`: kotlin.String
+    val `firstDate`: kotlin.String
     , 
-    var `lastDate`: kotlin.String
+    val `lastDate`: kotlin.String
     , 
-    var `kind`: CalendarKind
+    val `kind`: CalendarKind
     , 
-    var `mark`: CalendarMark
+    val `mark`: CalendarMark
     , 
     /**
      * The row's name; "3 days off" for days off with different reasons.
      */
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * The reasons inside a run of days off, each over its own days (one
      * part when they all have the same reason).
      */
-    var `parts`: List<CalendarEventPart>
+    val `parts`: List<CalendarEventPart>
     
 ){
     
@@ -12421,13 +12454,13 @@ public object FfiConverterTypeCalendarEvent: FfiConverterRustBuffer<CalendarEven
 
 
 data class CalendarEventPart (
-    var `first`: kotlin.Int
+    val `first`: kotlin.Int
     , 
-    var `last`: kotlin.Int
+    val `last`: kotlin.Int
     , 
-    var `mark`: CalendarMark
+    val `mark`: CalendarMark
     , 
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     
 ){
     
@@ -12472,18 +12505,18 @@ data class CalendarMonth (
     /**
      * `YYYY-MM`.
      */
-    var `month`: kotlin.String
+    val `month`: kotlin.String
     , 
     /**
      * Every day of the month, listed or not, from the 1st.
      */
-    var `days`: List<CalendarDay>
+    val `days`: List<CalendarDay>
     , 
     /**
      * The rows touching this month, in date order; a run from a
      * neighbouring month is included whole.
      */
-    var `events`: List<CalendarEvent>
+    val `events`: List<CalendarEvent>
     
 ){
     
@@ -12525,36 +12558,36 @@ public object FfiConverterTypeCalendarMonth: FfiConverterRustBuffer<CalendarMont
  * One change, for the inbox and notifications.
  */
 data class Change (
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `kind`: ChangeKind
+    val `kind`: ChangeKind
     , 
     /**
      * When it was found (ms since 1970).
      */
-    var `atMs`: kotlin.Long
+    val `atMs`: kotlin.Long
     , 
     /**
      * What it is about: "Digital Image Processing (Theory)", "General outing".
      */
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * What happened: "Attendance posted · 2 classes present, now 84%".
      */
-    var `body`: kotlin.String
+    val `body`: kotlin.String
     , 
     /**
      * The attendance course it is about ("CSE4007.theory"), for opening it.
      */
-    var `courseKey`: kotlin.String?
+    val `courseKey`: kotlin.String?
     , 
-    var `semester`: kotlin.String
+    val `semester`: kotlin.String
     , 
     /**
      * Bad news the student should act on (below 75%, an outing rejected).
      */
-    var `urgent`: kotlin.Boolean
+    val `urgent`: kotlin.Boolean
     
 ){
     
@@ -12611,33 +12644,33 @@ data class ClassSlot (
     /**
      * 0 = Monday.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
     /**
      * Minutes since midnight.
      */
-    var `start`: kotlin.Int
+    val `start`: kotlin.Int
     , 
-    var `end`: kotlin.Int
+    val `end`: kotlin.Int
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `kind`: ClassKind
+    val `kind`: ClassKind
     , 
-    var `room`: kotlin.String
+    val `room`: kotlin.String
     , 
-    var `block`: kotlin.String
+    val `block`: kotlin.String
     , 
     /**
      * "A1", or "L1+L2" for a merged lab.
      */
-    var `slot`: kotlin.String
+    val `slot`: kotlin.String
     , 
-    var `faculty`: kotlin.String
+    val `faculty`: kotlin.String
     , 
-    var `credits`: kotlin.Double?
+    val `credits`: kotlin.Double?
     
 ){
     
@@ -12703,14 +12736,14 @@ data class ConnectedApps (
     /**
      * This phone is one of the account's phones (it made a key, or linked before).
      */
-    var `linked`: kotlin.Boolean
+    val `linked`: kotlin.Boolean
     , 
-    var `keys`: List<AccessKey>
+    val `keys`: List<AccessKey>
     , 
     /**
      * The other phones with keys, most keys first; the unlinked ones as one entry.
      */
-    var `elsewhere`: List<KeyPhone>
+    val `elsewhere`: List<KeyPhone>
     
 ){
     
@@ -12749,11 +12782,11 @@ public object FfiConverterTypeConnectedApps: FfiConverterRustBuffer<ConnectedApp
 
 
 data class Contact (
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
-    var `value`: kotlin.String
+    val `value`: kotlin.String
     , 
-    var `kind`: ContactKind
+    val `kind`: ContactKind
     
 ){
     
@@ -12792,12 +12825,12 @@ public object FfiConverterTypeContact: FfiConverterRustBuffer<Contact> {
 
 
 data class CookieAnswer (
-    var `send`: kotlin.Boolean
+    val `send`: kotlin.Boolean
     , 
     /**
      * Don't ask again for this kind.
      */
-    var `remember`: kotlin.Boolean
+    val `remember`: kotlin.Boolean
     
 ){
     
@@ -12833,13 +12866,13 @@ public object FfiConverterTypeCookieAnswer: FfiConverterRustBuffer<CookieAnswer>
 
 
 data class Course (
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `kind`: ClassKind
+    val `kind`: ClassKind
     , 
-    var `credits`: kotlin.Double?
+    val `credits`: kotlin.Double?
     
 ){
     
@@ -12881,14 +12914,14 @@ public object FfiConverterTypeCourse: FfiConverterRustBuffer<Course> {
 
 
 data class CourseGroup (
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * Theory, lab, project..., in VTOP's order.
      */
-    var `parts`: List<CoursePart>
+    val `parts`: List<CoursePart>
     
 ){
     
@@ -12930,9 +12963,9 @@ public object FfiConverterTypeCourseGroup: FfiConverterRustBuffer<CourseGroup> {
  * One course's [`AttendancePlan`] for the list, by [`AttendanceCourse::key`].
  */
 data class CourseOutlook (
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
-    var `plan`: AttendancePlan
+    val `plan`: AttendancePlan
     
 ){
     
@@ -12968,17 +13001,17 @@ public object FfiConverterTypeCourseOutlook: FfiConverterRustBuffer<CourseOutloo
 
 
 data class CoursePage (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * By code, in VTOP's order.
      */
-    var `groups`: List<CourseGroup>
+    val `groups`: List<CourseGroup>
     
 ){
     
@@ -13020,18 +13053,18 @@ data class CoursePart (
     /**
      * What [`Core::fetch_course_view`] takes.
      */
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * "Theory", "Lab", "Project", "Soft skills", else VTOP's type.
      */
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
-    var `lab`: kotlin.Boolean
+    val `lab`: kotlin.Boolean
     
 ){
     
@@ -13076,26 +13109,26 @@ public object FfiConverterTypeCoursePart: FfiConverterRustBuffer<CoursePart> {
 
 
 data class CoursePlan (
-    var `classId`: kotlin.String
+    val `classId`: kotlin.String
     , 
     /**
      * What [`Core::download_course_file`] takes; empty when none.
      */
-    var `syllabusPath`: kotlin.String
+    val `syllabusPath`: kotlin.String
     , 
-    var `generalMaterialsPath`: kotlin.String
+    val `generalMaterialsPath`: kotlin.String
     , 
-    var `allMaterialsPath`: kotlin.String
+    val `allMaterialsPath`: kotlin.String
     , 
     /**
      * [`Core::download_course_plan`] has a sheet.
      */
-    var `hasCoursePlan`: kotlin.Boolean
+    val `hasCoursePlan`: kotlin.Boolean
     , 
     /**
      * In VTOP's order (by date).
      */
-    var `lectures`: List<Lecture>
+    val `lectures`: List<Lecture>
     
 ){
     
@@ -13143,18 +13176,18 @@ public object FfiConverterTypeCoursePlan: FfiConverterRustBuffer<CoursePlan> {
 
 
 data class CourseSection (
-    var `classId`: kotlin.String
+    val `classId`: kotlin.String
     , 
-    var `faculty`: kotlin.String
+    val `faculty`: kotlin.String
     , 
-    var `school`: kotlin.String
+    val `school`: kotlin.String
     , 
-    var `slot`: kotlin.String
+    val `slot`: kotlin.String
     , 
     /**
      * The student's own, by the timetable.
      */
-    var `mine`: kotlin.Boolean
+    val `mine`: kotlin.Boolean
     
 ){
     
@@ -13205,22 +13238,22 @@ data class CourseView (
     /**
      * Unix seconds; the older of the sections and the plan.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
-    var `course`: CoursePart
+    val `course`: CoursePart
     , 
-    var `sections`: List<CourseSection>
+    val `sections`: List<CourseSection>
     , 
     /**
      * The class id shown: the one asked for, else the student's, else the
      * only one. None: the student picks.
      */
-    var `selected`: kotlin.String?
+    val `selected`: kotlin.String?
     , 
     /**
      * The selected section's plan.
      */
-    var `plan`: CoursePlan?
+    val `plan`: CoursePlan?
     
 ){
     
@@ -13268,11 +13301,11 @@ public object FfiConverterTypeCourseView: FfiConverterRustBuffer<CourseView> {
  * One datagram received; `ip` without a scope.
  */
 data class Datagram (
-    var `ip`: kotlin.String
+    val `ip`: kotlin.String
     , 
-    var `port`: kotlin.UShort
+    val `port`: kotlin.UShort
     , 
-    var `data`: kotlin.ByteArray
+    val `data`: kotlin.ByteArray
     
 ){
     
@@ -13311,19 +13344,19 @@ public object FfiConverterTypeDatagram: FfiConverterRustBuffer<Datagram> {
 
 
 data class DayClass (
-    var `slot`: ClassSlot
+    val `slot`: ClassSlot
     , 
-    var `state`: ClassDay
+    val `state`: ClassDay
     , 
     /**
      * The course's last class of the semester.
      */
-    var `lastClass`: kotlin.Boolean
+    val `lastClass`: kotlin.Boolean
     , 
     /**
      * What the attendance history says, once posted.
      */
-    var `posted`: ClassStatus?
+    val `posted`: ClassStatus?
     
 ){
     
@@ -13373,17 +13406,17 @@ data class Debar (
      * "CAT-I", "CAT-II", "FAT" (the calendar's names), or VTOP's text;
      * empty when VTOP names none.
      */
-    var `exam`: kotlin.String
+    val `exam`: kotlin.String
     , 
     /**
      * VTOP's "Debarred & Permitted": let in after all.
      */
-    var `permitted`: kotlin.Boolean
+    val `permitted`: kotlin.Boolean
     , 
     /**
      * The exam attendance is checked for next ("FAT" after "CAT-II").
      */
-    var `nextExam`: kotlin.String?
+    val `nextExam`: kotlin.String?
     
 ){
     
@@ -13425,11 +13458,11 @@ data class DetailSection (
     /**
      * "Personal details", "Education".
      */
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
-    var `groups`: List<FieldGroup>
+    val `groups`: List<FieldGroup>
     , 
-    var `count`: kotlin.Int
+    val `count`: kotlin.Int
     
 ){
     
@@ -13475,19 +13508,19 @@ data class DevConfig (
     /**
      * A saved session older than this (minutes since its sign-in) is not restored; 0 = any age.
      */
-    var `sessionReuseMinutes`: kotlin.UInt
+    val `sessionReuseMinutes`: kotlin.UInt
     , 
     /**
      * Upper bound for one VTOP request, seconds; 0 = vtop-core's default.
      */
-    var `requestTimeoutS`: kotlin.UInt
+    val `requestTimeoutS`: kotlin.UInt
     , 
     /**
      * The app is debuggable (`FLAG_DEBUGGABLE`): demo pages may be recorded
      * (`demo_record.json`). The .so is always a release build, so this comes from the app, not
      * `debug_assertions`.
      */
-    var `debuggable`: kotlin.Boolean
+    val `debuggable`: kotlin.Boolean
     
 ){
     
@@ -13529,12 +13562,12 @@ data class ExamGroup (
     /**
      * "CAT-I", "FAT".
      */
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
     /**
      * By day and start; papers without a date last.
      */
-    var `papers`: List<ScheduledPaper>
+    val `papers`: List<ScheduledPaper>
     
 ){
     
@@ -13570,16 +13603,16 @@ public object FfiConverterTypeExamGroup: FfiConverterRustBuffer<ExamGroup> {
 
 
 data class ExamPaper (
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `course`: kotlin.String
+    val `course`: kotlin.String
     , 
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
     /**
      * Minutes since midnight.
      */
-    var `start`: kotlin.Int?
+    val `start`: kotlin.Int?
     
 ){
     
@@ -13621,9 +13654,9 @@ public object FfiConverterTypeExamPaper: FfiConverterRustBuffer<ExamPaper> {
 
 
 data class ExamStart (
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     
 ){
     
@@ -13659,25 +13692,25 @@ public object FfiConverterTypeExamStart: FfiConverterRustBuffer<ExamStart> {
 
 
 data class Exams (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * The exam that happens first, first: by its first paper's day and
      * start; exams not dated yet last, CAT-I, CAT-II, ..., FAT among them.
      * Only exams with papers.
      */
-    var `groups`: List<ExamGroup>
+    val `groups`: List<ExamGroup>
     , 
     /**
      * The group to open on: the first with a paper to come or not dated
      * yet, else the last with dates (as of now in India).
      */
-    var `opens`: kotlin.Int
+    val `opens`: kotlin.Int
     
 ){
     
@@ -13722,22 +13755,22 @@ data class Field (
     /**
      * In sentence case: "Date of birth".
      */
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
     /**
      * In title case, as shown.
      */
-    var `value`: kotlin.String
+    val `value`: kotlin.String
     , 
     /**
      * VTOP's value, for copying.
      */
-    var `raw`: kotlin.String
+    val `raw`: kotlin.String
     , 
     /**
      * An Aadhaar number: shown masked until tapped.
      */
-    var `secret`: kotlin.Boolean
+    val `secret`: kotlin.Boolean
     
 ){
     
@@ -13782,9 +13815,9 @@ data class FieldGroup (
     /**
      * VTOP's sub-heading; empty for a section's first group.
      */
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
-    var `fields`: List<Field>
+    val `fields`: List<Field>
     
 ){
     
@@ -13825,13 +13858,13 @@ public object FfiConverterTypeFieldGroup: FfiConverterRustBuffer<FieldGroup> {
  * VTOP's name for it (else a name from the link) and its type ("application/pdf").
  */
 data class FileLink (
-    var `url`: kotlin.String
+    val `url`: kotlin.String
     , 
-    var `cookie`: kotlin.String
+    val `cookie`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `mime`: kotlin.String
+    val `mime`: kotlin.String
     
 ){
     
@@ -13873,29 +13906,29 @@ public object FfiConverterTypeFileLink: FfiConverterRustBuffer<FileLink> {
 
 
 data class Forwarding (
-    var `state`: ForwardingState
+    val `state`: ForwardingState
     , 
-    var `address`: kotlin.String?
+    val `address`: kotlin.String?
     , 
     /**
      * What the Gmail filter matches in From.
      */
-    var `sender`: kotlin.String
+    val `sender`: kotlin.String
     , 
     /**
      * The latest Gmail confirmation that arrived, while setting up.
      */
-    var `confirmation`: GmailConfirmation?
+    val `confirmation`: GmailConfirmation?
     , 
     /**
      * Unix seconds of the latest forwarded mail of either kind.
      */
-    var `lastMailAt`: kotlin.Long?
+    val `lastMailAt`: kotlin.Long?
     , 
     /**
      * Unix seconds of the latest forwarded OTP.
      */
-    var `lastOtpAt`: kotlin.Long?
+    val `lastOtpAt`: kotlin.Long?
     
 ){
     
@@ -13946,48 +13979,48 @@ data class GeneralOuting (
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * VTOP takes applications.
      */
-    var `open`: kotlin.Boolean
+    val `open`: kotlin.Boolean
     , 
     /**
      * VTOP's reason while it does not; may be empty.
      */
-    var `notice`: kotlin.String
+    val `notice`: kotlin.String
     , 
     /**
      * "MH-2 · Room 911" while open.
      */
-    var `hostel`: kotlin.String?
+    val `hostel`: kotlin.String?
     , 
-    var `rules`: GeneralOutingRules
+    val `rules`: GeneralOutingRules
     , 
     /**
      * Apply, Leave, Back by.
      */
-    var `facts`: List<OutingFact>
+    val `facts`: List<OutingFact>
     , 
     /**
      * "6:00 AM – 10:00 PM", for the fields.
      */
-    var `outWindow`: kotlin.String?
+    val `outWindow`: kotlin.String?
     , 
-    var `inWindow`: kotlin.String?
+    val `inWindow`: kotlin.String?
     , 
     /**
      * The days the leaving date can be on (epoch days, India).
      */
-    var `firstDay`: kotlin.Int
+    val `firstDay`: kotlin.Int
     , 
-    var `lastDay`: kotlin.Int
+    val `lastDay`: kotlin.Int
     , 
     /**
      * Newest first.
      */
-    var `requests`: List<OutingRequest>
+    val `requests`: List<OutingRequest>
     
 ){
     
@@ -14054,15 +14087,15 @@ public object FfiConverterTypeGeneralOuting: FfiConverterRustBuffer<GeneralOutin
  * times are fine.
  */
 data class GeneralOutingCheck (
-    var `place`: kotlin.String?
+    val `place`: kotlin.String?
     , 
-    var `purpose`: kotlin.String?
+    val `purpose`: kotlin.String?
     , 
-    var `leaving`: kotlin.String?
+    val `leaving`: kotlin.String?
     , 
-    var `returning`: kotlin.String?
+    val `returning`: kotlin.String?
     , 
-    var `away`: kotlin.String?
+    val `away`: kotlin.String?
     
 ){
     
@@ -14110,13 +14143,13 @@ public object FfiConverterTypeGeneralOutingCheck: FfiConverterRustBuffer<General
  * A general outing to apply for.
  */
 data class GeneralOutingForm (
-    var `place`: kotlin.String
+    val `place`: kotlin.String
     , 
-    var `purpose`: kotlin.String
+    val `purpose`: kotlin.String
     , 
-    var `leaving`: OutingMoment
+    val `leaving`: OutingMoment
     , 
-    var `returning`: OutingMoment
+    val `returning`: OutingMoment
     
 ){
     
@@ -14165,17 +14198,17 @@ data class GeneralOutingRules (
      * Hours (24 h) offered for leaving and for coming back; the last one
      * only at :00. Empty: any time.
      */
-    var `outHours`: kotlin.ByteArray
+    val `outHours`: kotlin.ByteArray
     , 
-    var `inHours`: kotlin.ByteArray
+    val `inHours`: kotlin.ByteArray
     , 
-    var `placeMaxLength`: kotlin.UInt
+    val `placeMaxLength`: kotlin.UInt
     , 
-    var `purposeMaxLength`: kotlin.UInt
+    val `purposeMaxLength`: kotlin.UInt
     , 
-    var `maxDaysAhead`: kotlin.UInt
+    val `maxDaysAhead`: kotlin.UInt
     , 
-    var `maxDaysAway`: kotlin.UInt
+    val `maxDaysAway`: kotlin.UInt
     
 ){
     
@@ -14226,9 +14259,9 @@ public object FfiConverterTypeGeneralOutingRules: FfiConverterRustBuffer<General
  * The form's starting times: just over a day ahead, in the offered hours.
  */
 data class GeneralOutingTimes (
-    var `leaving`: OutingMoment
+    val `leaving`: OutingMoment
     , 
-    var `returning`: OutingMoment
+    val `returning`: OutingMoment
     
 ){
     
@@ -14267,25 +14300,25 @@ public object FfiConverterTypeGeneralOutingTimes: FfiConverterRustBuffer<General
  * Gmail's "confirm forwarding" mail: the code to type in Gmail, or the link to open.
  */
 data class GmailConfirmation (
-    var `code`: kotlin.String?
+    val `code`: kotlin.String?
     , 
-    var `link`: kotlin.String?
+    val `link`: kotlin.String?
     , 
     /**
      * The Gmail address asking to forward.
      */
-    var `requester`: kotlin.String?
+    val `requester`: kotlin.String?
     , 
     /**
      * Unix seconds.
      */
-    var `sentAt`: kotlin.Long
+    val `sentAt`: kotlin.Long
     , 
     /**
      * Whether `requester` is an address on the student's saved VTOP profile; None without a
      * requester or a saved profile. Anyone who knows the address can make Gmail send one.
      */
-    var `requesterKnown`: kotlin.Boolean?
+    val `requesterKnown`: kotlin.Boolean?
     
 ){
     
@@ -14334,13 +14367,13 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
  * student's own Google client, from OTP auto-fill).
  */
 data class GmailGrant (
-    var `refreshToken`: kotlin.String
+    val `refreshToken`: kotlin.String
     , 
-    var `clientId`: kotlin.String
+    val `clientId`: kotlin.String
     , 
-    var `clientSecret`: kotlin.String?
+    val `clientSecret`: kotlin.String?
     , 
-    var `deleteAfterReading`: kotlin.Boolean
+    val `deleteAfterReading`: kotlin.Boolean
     
 ){
     
@@ -14385,43 +14418,43 @@ data class GpaPlan (
     /**
      * 0 without credits.
      */
-    var `semesterGpa`: kotlin.Double
+    val `semesterGpa`: kotlin.Double
     , 
-    var `credits`: kotlin.Double
+    val `credits`: kotlin.Double
     , 
     /**
      * The CGPA typed in, when it reads as 0–10.
      */
-    var `current`: kotlin.Double?
+    val `current`: kotlin.Double?
     , 
     /**
      * The CGPA after the semester; none without a current one.
      */
-    var `projected`: kotlin.Double?
+    val `projected`: kotlin.Double?
     , 
     /**
      * `projected - current`.
      */
-    var `delta`: kotlin.Double
+    val `delta`: kotlin.Double
     , 
     /**
      * The target given, else the next quarter point above the current CGPA
      * (9 without one).
      */
-    var `target`: kotlin.Double
+    val `target`: kotlin.Double
     , 
     /**
      * The semester GPA the target needs; none without a current CGPA or
      * credits.
      */
-    var `needed`: kotlin.Double?
+    val `needed`: kotlin.Double?
     , 
-    var `outlook`: TargetOutlook?
+    val `outlook`: TargetOutlook?
     , 
     /**
      * The letter nearest the semester GPA (for its colour).
      */
-    var `letter`: kotlin.String
+    val `letter`: kotlin.String
     
 ){
     
@@ -14481,12 +14514,12 @@ data class GradeComponent (
     /**
      * "Theory component", "Lab component", "Project component".
      */
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
     /**
      * When its result was declared, as VTOP gives it.
      */
-    var `declared`: kotlin.String
+    val `declared`: kotlin.String
     
 ){
     
@@ -14525,9 +14558,9 @@ public object FfiConverterTypeGradeComponent: FfiConverterRustBuffer<GradeCompon
  * A grade and how many courses got it.
  */
 data class GradeCount (
-    var `grade`: kotlin.String
+    val `grade`: kotlin.String
     , 
-    var `count`: kotlin.Int
+    val `count`: kotlin.Int
     
 ){
     
@@ -14566,31 +14599,31 @@ data class GradeCourse (
     /**
      * VTOP's class id, for [`Core::fetch_grade_details`].
      */
-    var `courseId`: kotlin.String
+    val `courseId`: kotlin.String
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * "Embedded Theory and Lab", "Theory Only", ...
      */
-    var `courseType`: kotlin.String
+    val `courseType`: kotlin.String
     , 
     /**
      * "RG" (relative) or "AG" (absolute); may be empty.
      */
-    var `gradingType`: kotlin.String
+    val `gradingType`: kotlin.String
     , 
     /**
      * VTOP's grand total, as given.
      */
-    var `total`: kotlin.String
+    val `total`: kotlin.String
     , 
     /**
      * Uppercase; empty or "-" when none.
      */
-    var `grade`: kotlin.String
+    val `grade`: kotlin.String
     
 ){
     
@@ -14644,12 +14677,12 @@ data class GradeCutoff (
     /**
      * Uppercase.
      */
-    var `grade`: kotlin.String
+    val `grade`: kotlin.String
     , 
     /**
      * ">=83 and <88" → "83–88", ">=88" → "≥88", "<50" → "<50".
      */
-    var `range`: kotlin.String
+    val `range`: kotlin.String
     
 ){
     
@@ -14688,23 +14721,23 @@ public object FfiConverterTypeGradeCutoff: FfiConverterRustBuffer<GradeCutoff> {
  * A course's grade cut-offs and marks by section.
  */
 data class GradeDetails (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
-    var `courseId`: kotlin.String
+    val `courseId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
-    var `cutoffs`: List<GradeCutoff>
+    val `cutoffs`: List<GradeCutoff>
     , 
-    var `sections`: List<MarkSection>
+    val `sections`: List<MarkSection>
     , 
     /**
      * A cut-off came as VTOP's "#" placeholder: fetch again when opened.
      */
-    var `placeholder`: kotlin.Boolean
+    val `placeholder`: kotlin.Boolean
     
 ){
     
@@ -14758,40 +14791,40 @@ data class GradeHistory (
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `regNo`: kotlin.String
+    val `regNo`: kotlin.String
     , 
     /**
      * VTOP's, as given ("9.12").
      */
-    var `cgpa`: kotlin.String
+    val `cgpa`: kotlin.String
     , 
     /**
      * "10", "10.5".
      */
-    var `creditsEarned`: kotlin.String
+    val `creditsEarned`: kotlin.String
     , 
-    var `creditsRegistered`: kotlin.String
+    val `creditsRegistered`: kotlin.String
     , 
     /**
      * VTOP's grade counts, S to N, without zeros.
      */
-    var `mix`: List<GradeCount>
+    val `mix`: List<GradeCount>
     , 
     /**
      * The grades the courses have, with how many: S to N, then others.
      */
-    var `filters`: List<GradeCount>
+    val `filters`: List<GradeCount>
     , 
-    var `courseCount`: kotlin.Int
+    val `courseCount`: kotlin.Int
     , 
     /**
      * By exam session, in VTOP's order.
      */
-    var `sessions`: List<GradeSession>
+    val `sessions`: List<GradeSession>
     
 ){
     
@@ -14851,22 +14884,22 @@ public object FfiConverterTypeGradeHistory: FfiConverterRustBuffer<GradeHistory>
 
 
 data class GradeMark (
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
-    var `scored`: kotlin.String
+    val `scored`: kotlin.String
     , 
-    var `max`: kotlin.String
+    val `max`: kotlin.String
     , 
-    var `weighted`: kotlin.String
+    val `weighted`: kotlin.String
     , 
-    var `weightage`: kotlin.String
+    val `weightage`: kotlin.String
     , 
     /**
      * `scored / max`, 0–100.
      */
-    var `percent`: kotlin.Double?
+    val `percent`: kotlin.Double?
     , 
-    var `band`: ScoreBand
+    val `band`: ScoreBand
     
 ){
     
@@ -14920,24 +14953,24 @@ data class GradeSession (
     /**
      * VTOP's "Jan-2025"; empty for courses without one.
      */
-    var `month`: kotlin.String
+    val `month`: kotlin.String
     , 
     /**
      * "Jan 2025", "Other".
      */
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
     /**
      * "Jan '25", for the GPA trend.
      */
-    var `short`: kotlin.String
+    val `short`: kotlin.String
     , 
     /**
      * The session's credit-weighted GPA; P and N left out.
      */
-    var `gpa`: kotlin.Double?
+    val `gpa`: kotlin.Double?
     , 
-    var `courses`: List<HistoryCourse>
+    val `courses`: List<HistoryCourse>
     
 ){
     
@@ -14982,17 +15015,17 @@ public object FfiConverterTypeGradeSession: FfiConverterRustBuffer<GradeSession>
 
 
 data class Grades (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * By VTOP's serial.
      */
-    var `courses`: List<GradeCourse>
+    val `courses`: List<GradeCourse>
     
 ){
     
@@ -15034,9 +15067,9 @@ public object FfiConverterTypeGrades: FfiConverterRustBuffer<Grades> {
  * One header; a name can repeat (`Set-Cookie`).
  */
 data class Header (
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `value`: kotlin.String
+    val `value`: kotlin.String
     
 ){
     
@@ -15075,28 +15108,28 @@ data class HistoryCourse (
     /**
      * Unique in the history.
      */
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * "PC", "UE", ...
      */
-    var `distribution`: kotlin.String
+    val `distribution`: kotlin.String
     , 
-    var `credits`: kotlin.Double?
+    val `credits`: kotlin.Double?
     , 
     /**
      * Uppercase.
      */
-    var `grade`: kotlin.String
+    val `grade`: kotlin.String
     , 
     /**
      * The theory, lab and project parts of an embedded course.
      */
-    var `components`: List<GradeComponent>
+    val `components`: List<GradeComponent>
     
 ){
     
@@ -15150,9 +15183,9 @@ public object FfiConverterTypeHistoryCourse: FfiConverterRustBuffer<HistoryCours
  * "MH-2 · Room 101" over "4 Bed AC · Non-Veg Mess".
  */
 data class Hostel (
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
-    var `line`: kotlin.String?
+    val `line`: kotlin.String?
     
 ){
     
@@ -15192,26 +15225,26 @@ public object FfiConverterTypeHostel: FfiConverterRustBuffer<Hostel> {
  * `Debug`: headers carry cookies, the body a password or OTP.
  */
 data class HttpRequest (
-    var `method`: kotlin.String
+    val `method`: kotlin.String
     , 
-    var `url`: kotlin.String
+    val `url`: kotlin.String
     , 
-    var `headers`: List<Header>
+    val `headers`: List<Header>
     , 
-    var `body`: kotlin.ByteArray
+    val `body`: kotlin.ByteArray
     , 
     /**
      * The whole hop, body included.
      */
-    var `timeoutMs`: kotlin.UInt
+    val `timeoutMs`: kotlin.UInt
     , 
-    var `connectTimeoutMs`: kotlin.UInt
+    val `connectTimeoutMs`: kotlin.UInt
     , 
     /**
      * A download: write the body to this file (created or truncated) and answer with
      * [`HttpResponse::saved_size`] and no body.
      */
-    var `downloadTo`: kotlin.String?
+    val `downloadTo`: kotlin.String?
     
 ){
     
@@ -15266,18 +15299,18 @@ public object FfiConverterTypeHttpRequest: FfiConverterRustBuffer<HttpRequest> {
  * the request's.
  */
 data class HttpResponse (
-    var `status`: kotlin.UShort
+    val `status`: kotlin.UShort
     , 
-    var `headers`: List<Header>
+    val `headers`: List<Header>
     , 
-    var `url`: kotlin.String
+    val `url`: kotlin.String
     , 
-    var `body`: kotlin.ByteArray
+    val `body`: kotlin.ByteArray
     , 
     /**
      * The body's size when it went to [`HttpRequest::download_to`].
      */
-    var `savedSize`: kotlin.ULong?
+    val `savedSize`: kotlin.ULong?
     
 ){
     
@@ -15328,16 +15361,16 @@ data class KeyPhone (
     /**
      * The phone's short id; None for phones no longer linked (nothing answers for their keys).
      */
-    var `id`: kotlin.String?
+    val `id`: kotlin.String?
     , 
-    var `label`: kotlin.String?
+    val `label`: kotlin.String?
     , 
     /**
      * Unix seconds; None for phones no longer linked.
      */
-    var `seenAt`: kotlin.Long?
+    val `seenAt`: kotlin.Long?
     , 
-    var `keys`: kotlin.UInt
+    val `keys`: kotlin.UInt
     
 ){
     
@@ -15382,9 +15415,9 @@ data class KeyUse (
     /**
      * Unix seconds.
      */
-    var `at`: kotlin.Long
+    val `at`: kotlin.Long
     , 
-    var `via`: KeyKind
+    val `via`: KeyKind
     
 ){
     
@@ -15420,21 +15453,21 @@ public object FfiConverterTypeKeyUse: FfiConverterRustBuffer<KeyUse> {
 
 
 data class Lecture (
-    var `serial`: kotlin.String
+    val `serial`: kotlin.String
     , 
     /**
      * Days since 1970-01-01.
      */
-    var `day`: kotlin.Int?
+    val `day`: kotlin.Int?
     , 
     /**
      * "TUE".
      */
-    var `weekday`: kotlin.String
+    val `weekday`: kotlin.String
     , 
-    var `topic`: kotlin.String
+    val `topic`: kotlin.String
     , 
-    var `materials`: List<Material>
+    val `materials`: List<Material>
     
 ){
     
@@ -15482,15 +15515,15 @@ data class LinkedPhone (
     /**
      * The short id the server removes it by.
      */
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `label`: kotlin.String?
+    val `label`: kotlin.String?
     , 
-    var `addedAt`: kotlin.Long
+    val `addedAt`: kotlin.Long
     , 
-    var `seenAt`: kotlin.Long
+    val `seenAt`: kotlin.Long
     , 
-    var `thisPhone`: kotlin.Boolean
+    val `thisPhone`: kotlin.Boolean
     
 ){
     
@@ -15541,15 +15574,15 @@ data class MailPhone (
     /**
      * Its device id, which removes it.
      */
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `label`: kotlin.String?
+    val `label`: kotlin.String?
     , 
-    var `addedAt`: kotlin.Long
+    val `addedAt`: kotlin.Long
     , 
-    var `seenAt`: kotlin.Long
+    val `seenAt`: kotlin.Long
     , 
-    var `thisPhone`: kotlin.Boolean
+    val `thisPhone`: kotlin.Boolean
     
 ){
     
@@ -15597,14 +15630,14 @@ public object FfiConverterTypeMailPhone: FfiConverterRustBuffer<MailPhone> {
  * The marks before "•" in their title ("ETH • CAT-1"), in first-seen order.
  */
 data class MarkSection (
-    var `title`: kotlin.String
+    val `title`: kotlin.String
     , 
     /**
      * Weighted scored / weightage ("44.3 / 55"); empty before any mark.
      */
-    var `total`: kotlin.String
+    val `total`: kotlin.String
     , 
-    var `marks`: List<GradeMark>
+    val `marks`: List<GradeMark>
     
 ){
     
@@ -15643,14 +15676,14 @@ public object FfiConverterTypeMarkSection: FfiConverterRustBuffer<MarkSection> {
 
 
 data class Marks (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
-    var `courses`: List<MarksCourse>
+    val `courses`: List<MarksCourse>
     
 ){
     
@@ -15696,51 +15729,51 @@ data class MarksCourse (
      * `<code>.theory` or `<code>.lab`, as `AttendanceCourse::key`, or `<code>.project` (kind
      * [`ClassKind::Lab`]).
      */
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `kind`: ClassKind
+    val `kind`: ClassKind
     , 
     /**
      * VTOP's "Embedded Theory", "Lab Only", ...
      */
-    var `courseType`: kotlin.String
+    val `courseType`: kotlin.String
     , 
-    var `faculty`: kotlin.String
+    val `faculty`: kotlin.String
     , 
-    var `slot`: kotlin.String
+    val `slot`: kotlin.String
     , 
     /**
      * In VTOP's order, numbers first ("Experiment-2" before "Experiment-10").
      */
-    var `assessments`: List<Assessment>
+    val `assessments`: List<Assessment>
     , 
     /**
      * Weighted marks scored so far, out of [`Self::max_weighted`]; a
      * re-evaluation counts once, the better of the two.
      */
-    var `weighted`: kotlin.Double
+    val `weighted`: kotlin.Double
     , 
     /**
      * The weightage of what was assessed so far (out of 100).
      */
-    var `maxWeighted`: kotlin.Double
+    val `maxWeighted`: kotlin.Double
     , 
     /**
      * `weighted / max_weighted`, 0–100; none before anything is assessed.
      */
-    var `percent`: kotlin.Double?
+    val `percent`: kotlin.Double?
     , 
-    var `band`: ScoreBand
+    val `band`: ScoreBand
     , 
     /**
      * The assessment posted last, as far as the app saw: an index into
      * [`Self::assessments`].
      */
-    var `latest`: kotlin.Int?
+    val `latest`: kotlin.Int?
     
 ){
     
@@ -15812,9 +15845,9 @@ data class Material (
     /**
      * "Material II" for VTOP's "Reference Material II".
      */
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
-    var `path`: kotlin.String
+    val `path`: kotlin.String
     
 ){
     
@@ -15853,27 +15886,27 @@ data class Mentor (
     /**
      * None when no mentor is assigned.
      */
-    var `name`: kotlin.String?
+    val `name`: kotlin.String?
     , 
-    var `initials`: kotlin.String
+    val `initials`: kotlin.String
     , 
     /**
      * Designation, department.
      */
-    var `lines`: List<kotlin.String>
+    val `lines`: List<kotlin.String>
     , 
-    var `cabin`: kotlin.String?
+    val `cabin`: kotlin.String?
     , 
-    var `contacts`: List<Contact>
+    val `contacts`: List<Contact>
     , 
-    var `more`: List<Field>
+    val `more`: List<Field>
     , 
     /**
      * VTOP drops them after a week.
      */
-    var `messages`: List<MentorMessage>
+    val `messages`: List<MentorMessage>
     , 
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     
 ){
     
@@ -15927,12 +15960,12 @@ public object FfiConverterTypeMentor: FfiConverterRustBuffer<Mentor> {
 
 
 data class MentorMessage (
-    var `body`: kotlin.String
+    val `body`: kotlin.String
     , 
     /**
      * The other columns: "Date: 01-Nov-2026".
      */
-    var `meta`: List<kotlin.String>
+    val `meta`: List<kotlin.String>
     
 ){
     
@@ -15971,11 +16004,11 @@ public object FfiConverterTypeMentorMessage: FfiConverterRustBuffer<MentorMessag
  * A key just made: [`NewKey::key`] is shown once.
  */
 data class NewKey (
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
-    var `mcpUrl`: kotlin.String
+    val `mcpUrl`: kotlin.String
     
 ){
     
@@ -16017,19 +16050,19 @@ public object FfiConverterTypeNewKey: FfiConverterRustBuffer<NewKey> {
  * When a course (code and kind) meets next.
  */
 data class NextClass (
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `kind`: ClassKind
+    val `kind`: ClassKind
     , 
     /**
      * 0 = today, 7 = the same weekday next week.
      */
-    var `daysAhead`: kotlin.Int
+    val `daysAhead`: kotlin.Int
     , 
     /**
      * Minutes since midnight.
      */
-    var `start`: kotlin.Int
+    val `start`: kotlin.Int
     
 ){
     
@@ -16074,9 +16107,9 @@ public object FfiConverterTypeNextClass: FfiConverterRustBuffer<NextClass> {
  * A `<select>` option: what VTOP expects back and what to show.
  */
 data class OutingChoice (
-    var `value`: kotlin.String
+    val `value`: kotlin.String
     , 
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     
 ){
     
@@ -16115,9 +16148,9 @@ public object FfiConverterTypeOutingChoice: FfiConverterRustBuffer<OutingChoice>
  * A small label over a short value, for the rules panel.
  */
 data class OutingFact (
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
-    var `value`: kotlin.String
+    val `value`: kotlin.String
     
 ){
     
@@ -16157,9 +16190,9 @@ public object FfiConverterTypeOutingFact: FfiConverterRustBuffer<OutingFact> {
  * midnight.
  */
 data class OutingMoment (
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
-    var `minute`: kotlin.Int
+    val `minute`: kotlin.Int
     
 ){
     
@@ -16198,43 +16231,43 @@ data class OutingRequest (
     /**
      * Unique in its list.
      */
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
-    var `kind`: OutingKind
+    val `kind`: OutingKind
     , 
-    var `place`: kotlin.String
+    val `place`: kotlin.String
     , 
-    var `purpose`: kotlin.String
+    val `purpose`: kotlin.String
     , 
     /**
      * VTOP's words, e.g. "Waiting for Mentor's Approval".
      */
-    var `status`: kotlin.String
+    val `status`: kotlin.String
     , 
-    var `standing`: OutingStanding
+    val `standing`: OutingStanding
     , 
     /**
      * "APPROVED", "PENDING", "REJECTED", else VTOP's status in capitals.
      */
-    var `statusLabel`: kotlin.String
+    val `statusLabel`: kotlin.String
     , 
-    var `when`: List<OutingWhen>
+    val `when`: List<OutingWhen>
     , 
     /**
      * "OUT NOW", "TODAY", "TOMORROW", "IN 3 DAYS" for a trip not over
      * (and not rejected).
      */
-    var `highlight`: kotlin.String?
+    val `highlight`: kotlin.String?
     , 
     /**
      * Set once VTOP accepted the request.
      */
-    var `passId`: kotlin.String?
+    val `passId`: kotlin.String?
     , 
     /**
      * Set while VTOP still lets the request be cancelled.
      */
-    var `cancelId`: kotlin.String?
+    val `cancelId`: kotlin.String?
     
 ){
     
@@ -16303,9 +16336,9 @@ data class OutingResult (
     /**
      * The request is in the list (applied) or gone from it (cancelled).
      */
-    var `done`: kotlin.Boolean
+    val `done`: kotlin.Boolean
     , 
-    var `message`: kotlin.String
+    val `message`: kotlin.String
     
 ){
     
@@ -16345,9 +16378,9 @@ public object FfiConverterTypeOutingResult: FfiConverterRustBuffer<OutingResult>
  * label ("Out", "Back", "Away").
  */
 data class OutingWhen (
-    var `label`: kotlin.String?
+    val `label`: kotlin.String?
     , 
-    var `text`: kotlin.String
+    val `text`: kotlin.String
     
 ){
     
@@ -16386,9 +16419,9 @@ public object FfiConverterTypeOutingWhen: FfiConverterRustBuffer<OutingWhen> {
  * A page of [`Core::fetch_pages`], and why it was not fetched.
  */
 data class PageFetched (
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `error`: CoreException?
+    val `error`: CoreException?
     
 ){
     
@@ -16428,12 +16461,12 @@ public object FfiConverterTypePageFetched: FfiConverterRustBuffer<PageFetched> {
  * student approves, so the sheet can name it.
  */
 data class PairApp (
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
     /**
      * Where the client goes back to (`claude.ai`), from its redirect URI.
      */
-    var `host`: kotlin.String
+    val `host`: kotlin.String
     
 ){
     
@@ -16472,20 +16505,20 @@ data class Parent (
     /**
      * "Father", "Mother", "Guardian".
      */
-    var `relation`: kotlin.String
+    val `relation`: kotlin.String
     , 
-    var `name`: kotlin.String?
+    val `name`: kotlin.String?
     , 
-    var `initials`: kotlin.String
+    val `initials`: kotlin.String
     , 
-    var `occupation`: kotlin.String?
+    val `occupation`: kotlin.String?
     , 
-    var `contacts`: List<Contact>
+    val `contacts`: List<Contact>
     , 
     /**
      * The other fields with a value.
      */
-    var `more`: List<Field>
+    val `more`: List<Field>
     
 ){
     
@@ -16536,11 +16569,11 @@ public object FfiConverterTypeParent: FfiConverterRustBuffer<Parent> {
  * A course of this semester for the planner: its parts' credits combined.
  */
 data class PlanCourse (
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `credits`: kotlin.Double
+    val `credits`: kotlin.Double
     
 ){
     
@@ -16585,9 +16618,9 @@ data class PlanDay (
     /**
      * Days since 1970-01-01.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
-    var `classes`: kotlin.Int
+    val `classes`: kotlin.Int
     
 ){
     
@@ -16623,12 +16656,12 @@ public object FfiConverterTypePlanDay: FfiConverterRustBuffer<PlanDay> {
 
 
 data class PlannedCourse (
-    var `credits`: kotlin.Double
+    val `credits`: kotlin.Double
     , 
     /**
      * S to F.
      */
-    var `grade`: kotlin.String
+    val `grade`: kotlin.String
     
 ){
     
@@ -16671,44 +16704,44 @@ data class Platform (
     /**
      * Carries VTOP's (and the Proxy route's) hops.
      */
-    var `http`: HttpTransport
+    val `http`: HttpTransport
     , 
     /**
      * Android's `CookieManager`, shared with the web view.
      */
-    var `cookies`: SharedCookies
+    val `cookies`: SharedCookies
     , 
     /**
      * The UDP route's sockets.
      */
-    var `udp`: UdpNetwork
+    val `udp`: UdpNetwork
     , 
     /**
      * The server's WebSocket.
      */
-    var `convex`: ConvexNetwork
+    val `convex`: ConvexNetwork
     , 
     /**
      * Account proofs' WebSockets.
      */
-    var `proof`: ProofNetwork
+    val `proof`: ProofNetwork
     , 
     /**
      * Asked before any VTOP session leaves the phone.
      */
-    var `cookieGate`: CookieGate
+    val `cookieGate`: CookieGate
     , 
     /**
      * Seals the saved password (the Android Keystore).
      */
-    var `cipher`: PasswordCipher
+    val `cipher`: PasswordCipher
     , 
-    var `dev`: DevConfig
+    val `dev`: DevConfig
     , 
     /**
      * The name the server shows for this phone ("OnePlus CPH2573").
      */
-    var `deviceLabel`: kotlin.String
+    val `deviceLabel`: kotlin.String
     
 ): Disposable{
     
@@ -16784,46 +16817,46 @@ data class Profile (
     /**
      * In title case.
      */
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
     /**
      * Up to two letters.
      */
-    var `initials`: kotlin.String
+    val `initials`: kotlin.String
     , 
-    var `registrationNumber`: kotlin.String
+    val `registrationNumber`: kotlin.String
     , 
-    var `program`: kotlin.String
+    val `program`: kotlin.String
     , 
-    var `school`: kotlin.String
+    val `school`: kotlin.String
     , 
     /**
      * VTOP's photo as base64 JPEG; empty without one.
      */
-    var `photo`: kotlin.String
+    val `photo`: kotlin.String
     , 
-    var `hostel`: Hostel?
+    val `hostel`: Hostel?
     , 
     /**
      * VIT email, mobile, parent WhatsApp, personal email.
      */
-    var `contacts`: List<Contact>
+    val `contacts`: List<Contact>
     , 
-    var `addresses`: List<Address>
+    val `addresses`: List<Address>
     , 
-    var `parents`: List<Parent>
+    val `parents`: List<Parent>
     , 
     /**
      * Every field the cards above do not show, by VTOP's section.
      */
-    var `details`: List<DetailSection>
+    val `details`: List<DetailSection>
     , 
-    var `mentor`: Mentor?
+    val `mentor`: Mentor?
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     
 ){
     
@@ -16896,11 +16929,11 @@ public object FfiConverterTypeProfile: FfiConverterRustBuffer<Profile> {
  * status and `{ code, error }` body).
  */
 data class ProofOpened (
-    var `socket`: ProofSocket?
+    val `socket`: ProofSocket?
     , 
-    var `status`: kotlin.UShort
+    val `status`: kotlin.UShort
     , 
-    var `body`: kotlin.ByteArray
+    val `body`: kotlin.ByteArray
     
 ): Disposable{
     
@@ -16952,24 +16985,24 @@ data class Punch (
     /**
      * Minutes since midnight; none when VTOP's time doesn't read as one.
      */
-    var `minute`: kotlin.Int?
+    val `minute`: kotlin.Int?
     , 
     /**
      * VTOP's time ("13:16:05"), for when `minute` is none.
      */
-    var `time`: kotlin.String
+    val `time`: kotlin.String
     , 
-    var `kind`: PunchKind
+    val `kind`: PunchKind
     , 
     /**
      * "MH2" of "MH2-FACE-IN-5".
      */
-    var `place`: kotlin.String
+    val `place`: kotlin.String
     , 
     /**
      * VTOP's venue, as given.
      */
-    var `venue`: kotlin.String
+    val `venue`: kotlin.String
     
 ){
     
@@ -17014,16 +17047,16 @@ public object FfiConverterTypePunch: FfiConverterRustBuffer<Punch> {
 
 
 data class RouteStatus (
-    var `chosen`: Route
+    val `chosen`: Route
     , 
     /**
      * The route VTOP's last answer came by, and when (unix seconds).
      */
-    var `lastUsed`: Route?
+    val `lastUsed`: Route?
     , 
-    var `lastUsedAt`: kotlin.Long?
+    val `lastUsedAt`: kotlin.Long?
     , 
-    var `skipped`: List<SkippedRoute>
+    val `skipped`: List<SkippedRoute>
     
 ){
     
@@ -17068,14 +17101,14 @@ public object FfiConverterTypeRouteStatus: FfiConverterRustBuffer<RouteStatus> {
  * [`Core::saved_account`]'s answer.
  */
 data class SavedAccount (
-    var `username`: kotlin.String
+    val `username`: kotlin.String
     , 
-    var `rejected`: kotlin.Boolean
+    val `rejected`: kotlin.Boolean
     , 
     /**
      * Known once signed in.
      */
-    var `registrationNumber`: kotlin.String?
+    val `registrationNumber`: kotlin.String?
     
 ){
     
@@ -17118,48 +17151,48 @@ data class ScheduledPaper (
      * `<code>.theory` or `<code>.lab` (as `AttendanceCourse::key`), unique
      * in its group.
      */
-    var `key`: kotlin.String
+    val `key`: kotlin.String
     , 
-    var `code`: kotlin.String
+    val `code`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `kind`: ClassKind
+    val `kind`: ClassKind
     , 
     /**
      * VTOP's "ETH", "TH", "ELA", ...
      */
-    var `courseType`: kotlin.String
+    val `courseType`: kotlin.String
     , 
-    var `slot`: kotlin.String
+    val `slot`: kotlin.String
     , 
     /**
      * Days since 1970-01-01; none until VTOP dates it.
      */
-    var `day`: kotlin.Int?
+    val `day`: kotlin.Int?
     , 
     /**
      * Minutes since midnight.
      */
-    var `start`: kotlin.Int?
+    val `start`: kotlin.Int?
     , 
-    var `end`: kotlin.Int?
+    val `end`: kotlin.Int?
     , 
-    var `reporting`: kotlin.Int?
+    val `reporting`: kotlin.Int?
     , 
     /**
      * "FN" / "AN"; empty when VTOP gives none.
      */
-    var `session`: kotlin.String
+    val `session`: kotlin.String
     , 
-    var `venue`: kotlin.String
+    val `venue`: kotlin.String
     , 
     /**
      * "R6 · C6" for VTOP's "R6C6", else as given.
      */
-    var `seat`: kotlin.String
+    val `seat`: kotlin.String
     , 
-    var `seatNo`: kotlin.String
+    val `seatNo`: kotlin.String
     
 ){
     
@@ -17236,15 +17269,15 @@ public object FfiConverterTypeScheduledPaper: FfiConverterRustBuffer<ScheduledPa
  * note "Freshers". A name that does not follow that shape is all `season`.
  */
 data class Semester (
-    var `id`: kotlin.String
+    val `id`: kotlin.String
     , 
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `season`: kotlin.String
+    val `season`: kotlin.String
     , 
-    var `year`: kotlin.String
+    val `year`: kotlin.String
     , 
-    var `note`: kotlin.String
+    val `note`: kotlin.String
     
 ){
     
@@ -17295,22 +17328,22 @@ data class SemesterSummary (
     /**
      * None without credits for any graded course.
      */
-    var `gpa`: kotlin.Double?
+    val `gpa`: kotlin.Double?
     , 
     /**
      * The credits the GPA counts.
      */
-    var `credits`: kotlin.Double
+    val `credits`: kotlin.Double
     , 
     /**
      * Each course's credits from the history, in [`Grades::courses`] order.
      */
-    var `courseCredits`: List<kotlin.Double?>
+    val `courseCredits`: List<kotlin.Double?>
     , 
     /**
      * S, A, ... F, N, P, then any other grade.
      */
-    var `counts`: List<GradeCount>
+    val `counts`: List<GradeCount>
     
 ){
     
@@ -17357,14 +17390,14 @@ public object FfiConverterTypeSemesterSummary: FfiConverterRustBuffer<SemesterSu
  * [`crate::CoreError::SemesterNeeded`] meanwhile).
  */
 data class Semesters (
-    var `items`: List<Semester>
+    val `items`: List<Semester>
     , 
-    var `selected`: kotlin.String?
+    val `selected`: kotlin.String?
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     
 ){
     
@@ -17409,16 +17442,16 @@ data class ServerDevice (
     /**
      * The first 8 characters of its id; None while it has no identity on the server.
      */
-    var `id`: kotlin.String?
+    val `id`: kotlin.String?
     , 
-    var `label`: kotlin.String
+    val `label`: kotlin.String
     , 
-    var `pushToken`: kotlin.Boolean
+    val `pushToken`: kotlin.Boolean
     , 
     /**
      * From the server; None when it doesn't say (before `devices:info`).
      */
-    var `registeredAt`: kotlin.Long?
+    val `registeredAt`: kotlin.Long?
     
 ){
     
@@ -17460,9 +17493,9 @@ public object FfiConverterTypeServerDevice: FfiConverterRustBuffer<ServerDevice>
 
 
 data class ServerMailbox (
-    var `address`: kotlin.String
+    val `address`: kotlin.String
     , 
-    var `phones`: List<MailPhone>
+    val `phones`: List<MailPhone>
     
 ){
     
@@ -17504,17 +17537,17 @@ data class ServerOptions (
     /**
      * Sign in with the saved password at once, without asking a phone first.
      */
-    var `alwaysUseVault`: kotlin.Boolean
+    val `alwaysUseVault`: kotlin.Boolean
     , 
     /**
      * Otherwise, how long a phone gets to answer first: 10, 20 or 45.
      */
-    var `phoneWaitSecs`: kotlin.UInt
+    val `phoneWaitSecs`: kotlin.UInt
     , 
     /**
      * How long the saved password is kept: 86400, 172800, or None (until VTOP rejects it).
      */
-    var `vaultTtlSecs`: kotlin.Long?
+    val `vaultTtlSecs`: kotlin.Long?
     
 ){
     
@@ -17556,16 +17589,16 @@ data class ServerSignIn (
     /**
      * Unix seconds.
      */
-    var `at`: kotlin.Long
+    val `at`: kotlin.Long
     , 
     /**
      * The server signed in with the saved password, else a phone did.
      */
-    var `byServer`: kotlin.Boolean
+    val `byServer`: kotlin.Boolean
     , 
-    var `ok`: kotlin.Boolean
+    val `ok`: kotlin.Boolean
     , 
-    var `reason`: kotlin.String?
+    val `reason`: kotlin.String?
     
 ){
     
@@ -17610,60 +17643,60 @@ data class ServerStatus (
     /**
      * This phone is one of the account's phones; the account's lists are empty when it is not.
      */
-    var `linked`: kotlin.Boolean
+    val `linked`: kotlin.Boolean
     , 
-    var `registrationNumber`: kotlin.String
+    val `registrationNumber`: kotlin.String
     , 
     /**
      * When the server made the account (None from servers that don't say, or no account yet).
      */
-    var `createdAt`: kotlin.Long?
+    val `createdAt`: kotlin.Long?
     , 
     /**
      * The semester connected apps read.
      */
-    var `semesterId`: kotlin.String?
+    val `semesterId`: kotlin.String?
     , 
-    var `options`: ServerOptions
+    val `options`: ServerOptions
     , 
     /**
      * The student has a forwarding address, on this phone or another.
      */
-    var `forwarding`: kotlin.Boolean
+    val `forwarding`: kotlin.Boolean
     , 
     /**
      * This phone's forwarding address and the phones on it.
      */
-    var `mailbox`: ServerMailbox?
+    val `mailbox`: ServerMailbox?
     , 
-    var `device`: ServerDevice
+    val `device`: ServerDevice
     , 
     /**
      * When the sealed VTOP session was saved, and by whom (`phone` or `server`).
      */
-    var `sessionSavedAt`: kotlin.Long?
+    val `sessionSavedAt`: kotlin.Long?
     , 
-    var `sessionSource`: kotlin.String?
+    val `sessionSource`: kotlin.String?
     , 
     /**
      * When the sealed password was saved and when it expires (None: kept until forgotten).
      */
-    var `vaultSavedAt`: kotlin.Long?
+    val `vaultSavedAt`: kotlin.Long?
     , 
-    var `vaultExpiresAt`: kotlin.Long?
+    val `vaultExpiresAt`: kotlin.Long?
     , 
-    var `vaultGmail`: kotlin.Boolean
+    val `vaultGmail`: kotlin.Boolean
     , 
-    var `credentialsRejectedAt`: kotlin.Long?
+    val `credentialsRejectedAt`: kotlin.Long?
     , 
     /**
      * Newest first, at most 10.
      */
-    var `signIns`: List<ServerSignIn>
+    val `signIns`: List<ServerSignIn>
     , 
-    var `phones`: List<LinkedPhone>
+    val `phones`: List<LinkedPhone>
     , 
-    var `keys`: List<AccessKey>
+    val `keys`: List<AccessKey>
     
 ){
     
@@ -17747,17 +17780,17 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
  * A connected app's request for this phone's VTOP session, waiting for an answer.
  */
 data class SessionRequest (
-    var `requestId`: kotlin.String
+    val `requestId`: kotlin.String
     , 
     /**
      * Unix ms.
      */
-    var `expiresAt`: kotlin.Long
+    val `expiresAt`: kotlin.Long
     , 
     /**
      * Whether the app also asks for the saved password.
      */
-    var `wantCredentials`: kotlin.Boolean
+    val `wantCredentials`: kotlin.Boolean
     
 ){
     
@@ -17799,14 +17832,14 @@ public object FfiConverterTypeSessionRequest: FfiConverterRustBuffer<SessionRequ
  * A route skipped after it failed.
  */
 data class SkippedRoute (
-    var `route`: Route
+    val `route`: Route
     , 
     /**
      * Unix seconds.
      */
-    var `until`: kotlin.Long
+    val `until`: kotlin.Long
     , 
-    var `reason`: kotlin.String
+    val `reason`: kotlin.String
     
 ){
     
@@ -17845,19 +17878,19 @@ public object FfiConverterTypeSkippedRoute: FfiConverterRustBuffer<SkippedRoute>
 
 
 data class Timetable (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
     /**
      * Unix seconds.
      */
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * By day, then start; back-to-back periods of a lab are one slot.
      */
-    var `slots`: List<ClassSlot>
+    val `slots`: List<ClassSlot>
     , 
-    var `courses`: List<Course>
+    val `courses`: List<Course>
     
 ){
     
@@ -17905,26 +17938,26 @@ data class TimetableDay (
     /**
      * Days since 1970-01-01, local.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
-    var `classes`: List<DayClass>
+    val `classes`: List<DayClass>
     , 
-    var `mark`: CalendarMark?
+    val `mark`: CalendarMark?
     , 
     /**
      * The calendar's name for the day ("Deepavali", "CAT - I").
      */
-    var `title`: kotlin.String?
+    val `title`: kotlin.String?
     , 
-    var `holdsTheory`: kotlin.Boolean
+    val `holdsTheory`: kotlin.Boolean
     , 
-    var `lastClassDay`: kotlin.Boolean
+    val `lastClassDay`: kotlin.Boolean
     , 
-    var `papers`: List<ExamPaper>
+    val `papers`: List<ExamPaper>
     , 
-    var `classDaysLeft`: kotlin.Int
+    val `classDaysLeft`: kotlin.Int
     , 
-    var `upcomingExam`: ExamStart?
+    val `upcomingExam`: ExamStart?
     
 ){
     
@@ -17987,12 +18020,12 @@ data class WebSession (
     /**
      * VTOP's origin, e.g. `https://vtop.vitap.ac.in`.
      */
-    var `baseUrl`: kotlin.String
+    val `baseUrl`: kotlin.String
     , 
     /**
      * The page to load first.
      */
-    var `startUrl`: kotlin.String
+    val `startUrl`: kotlin.String
     
 ){
     
@@ -18028,53 +18061,53 @@ public object FfiConverterTypeWebSession: FfiConverterRustBuffer<WebSession> {
 
 
 data class WeekendOuting (
-    var `updatedAt`: kotlin.Long
+    val `updatedAt`: kotlin.Long
     , 
     /**
      * VTOP takes applications and a day is left in the coming week.
      */
-    var `open`: kotlin.Boolean
+    val `open`: kotlin.Boolean
     , 
     /**
      * Why not, when not open; may be empty.
      */
-    var `notice`: kotlin.String
+    val `notice`: kotlin.String
     , 
-    var `hostel`: kotlin.String?
+    val `hostel`: kotlin.String?
     , 
     /**
      * The parent number VTOP has on file.
      */
-    var `parentContact`: kotlin.String?
+    val `parentContact`: kotlin.String?
     , 
-    var `rules`: WeekendOutingRules
+    val `rules`: WeekendOutingRules
     , 
     /**
      * Outing days, Next, Time slots, Places.
      */
-    var `facts`: List<OutingFact>
+    val `facts`: List<OutingFact>
     , 
     /**
      * "Sundays and Mondays".
      */
-    var `daysLabel`: kotlin.String
+    val `daysLabel`: kotlin.String
     , 
     /**
      * The days one can apply for (epoch days), from tomorrow.
      */
-    var `dates`: List<kotlin.Int>
+    val `dates`: List<kotlin.Int>
     , 
-    var `places`: List<OutingChoice>
+    val `places`: List<OutingChoice>
     , 
     /**
      * Labels as "9:30 AM – 3:30 PM".
      */
-    var `slots`: List<OutingChoice>
+    val `slots`: List<OutingChoice>
     , 
     /**
      * Newest first.
      */
-    var `requests`: List<OutingRequest>
+    val `requests`: List<OutingRequest>
     
 ){
     
@@ -18140,11 +18173,11 @@ public object FfiConverterTypeWeekendOuting: FfiConverterRustBuffer<WeekendOutin
 
 
 data class WeekendOutingCheck (
-    var `purpose`: kotlin.String?
+    val `purpose`: kotlin.String?
     , 
-    var `day`: kotlin.String?
+    val `day`: kotlin.String?
     , 
-    var `contact`: kotlin.String?
+    val `contact`: kotlin.String?
     
 ){
     
@@ -18186,15 +18219,15 @@ public object FfiConverterTypeWeekendOutingCheck: FfiConverterRustBuffer<Weekend
  * A weekend outing to apply for; `place` and `slot` are option values.
  */
 data class WeekendOutingForm (
-    var `place`: kotlin.String
+    val `place`: kotlin.String
     , 
-    var `purpose`: kotlin.String
+    val `purpose`: kotlin.String
     , 
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
-    var `slot`: kotlin.String
+    val `slot`: kotlin.String
     , 
-    var `contact`: kotlin.String
+    val `contact`: kotlin.String
     
 ){
     
@@ -18242,14 +18275,14 @@ public object FfiConverterTypeWeekendOutingForm: FfiConverterRustBuffer<WeekendO
  * What the weekend outing form allows, from VTOP's page.
  */
 data class WeekendOutingRules (
-    var `purposeMaxLength`: kotlin.UInt
+    val `purposeMaxLength`: kotlin.UInt
     , 
-    var `maxDaysAhead`: kotlin.UInt
+    val `maxDaysAhead`: kotlin.UInt
     , 
     /**
      * 0 = Sunday … 6 = Saturday.
      */
-    var `weekdays`: kotlin.ByteArray
+    val `weekdays`: kotlin.ByteArray
     
 ){
     
@@ -18291,12 +18324,12 @@ public object FfiConverterTypeWeekendOutingRules: FfiConverterRustBuffer<Weekend
  * Posted assessments, re-evaluations left out.
  */
 data class WrappedAssessments (
-    var `total`: kotlin.Int
+    val `total`: kotlin.Int
     , 
     /**
      * Most first, ties in [`KINDS`] order.
      */
-    var `byKind`: List<WrappedKindCount>
+    val `byKind`: List<WrappedKindCount>
     
 ){
     
@@ -18338,26 +18371,26 @@ data class WrappedAttendance (
     /**
      * Attended over counted, summed across courses, rounded up as VTOP does.
      */
-    var `percent`: kotlin.Int
+    val `percent`: kotlin.Int
     , 
-    var `attended`: kotlin.Int
+    val `attended`: kotlin.Int
     , 
-    var `counted`: kotlin.Int
+    val `counted`: kotlin.Int
     , 
-    var `onDuty`: kotlin.Int
+    val `onDuty`: kotlin.Int
     , 
-    var `best`: kotlin.String
+    val `best`: kotlin.String
     , 
-    var `bestPercent`: kotlin.Int
+    val `bestPercent`: kotlin.Int
     , 
-    var `least`: kotlin.String
+    val `least`: kotlin.String
     , 
-    var `leastPercent`: kotlin.Int
+    val `leastPercent`: kotlin.Int
     , 
     /**
      * The best-attended courses, up to 3, best first; never the least-attended one.
      */
-    var `top`: List<WrappedCourse>
+    val `top`: List<WrappedCourse>
     
 ){
     
@@ -18414,9 +18447,9 @@ public object FfiConverterTypeWrappedAttendance: FfiConverterRustBuffer<WrappedA
 
 
 data class WrappedBlock (
-    var `block`: kotlin.String
+    val `block`: kotlin.String
     , 
-    var `rooms`: kotlin.Int
+    val `rooms`: kotlin.Int
     
 ){
     
@@ -18455,18 +18488,18 @@ public object FfiConverterTypeWrappedBlock: FfiConverterRustBuffer<WrappedBlock>
  * From the class days with a cached biometric copy.
  */
 data class WrappedCampus (
-    var `daysCached`: kotlin.Int
+    val `daysCached`: kotlin.Int
     , 
-    var `daysTotal`: kotlin.Int
+    val `daysTotal`: kotlin.Int
     , 
     /**
      * "7:12 AM".
      */
-    var `earliestEntry`: kotlin.String?
+    val `earliestEntry`: kotlin.String?
     , 
-    var `latestReturn`: kotlin.String?
+    val `latestReturn`: kotlin.String?
     , 
-    var `daysOnCampus`: kotlin.Int
+    val `daysOnCampus`: kotlin.Int
     
 ){
     
@@ -18511,14 +18544,14 @@ public object FfiConverterTypeWrappedCampus: FfiConverterRustBuffer<WrappedCampu
 
 
 data class WrappedCat (
-    var `course`: kotlin.String
+    val `course`: kotlin.String
     , 
     /**
      * As named: "CAT" (a semester's only one), "CAT-I", "CAT-II".
      */
-    var `exam`: kotlin.String
+    val `exam`: kotlin.String
     , 
-    var `percent`: kotlin.Int
+    val `percent`: kotlin.Int
     
 ){
     
@@ -18557,13 +18590,13 @@ public object FfiConverterTypeWrappedCat: FfiConverterRustBuffer<WrappedCat> {
 
 
 data class WrappedCgpa (
-    var `before`: kotlin.Double?
+    val `before`: kotlin.Double?
     , 
-    var `after`: kotlin.Double
+    val `after`: kotlin.Double
     , 
-    var `creditsSemester`: kotlin.Double
+    val `creditsSemester`: kotlin.Double
     , 
-    var `creditsTotal`: kotlin.Double
+    val `creditsTotal`: kotlin.Double
     
 ){
     
@@ -18608,24 +18641,24 @@ public object FfiConverterTypeWrappedCgpa: FfiConverterRustBuffer<WrappedCgpa> {
  * The moment a course came closest to 75%, in VTOP's units (a lab session is two).
  */
 data class WrappedCloseCall (
-    var `course`: kotlin.String
+    val `course`: kotlin.String
     , 
     /**
      * The class that set the moment.
      */
-    var `day`: kotlin.Int
+    val `day`: kotlin.Int
     , 
     /**
      * Further absences that keep the course at 75% or more; none when under 75.
      */
-    var `spare`: kotlin.Int?
+    val `spare`: kotlin.Int?
     , 
-    var `percent`: kotlin.Int
+    val `percent`: kotlin.Int
     , 
     /**
      * After the course's last counted class.
      */
-    var `finalPercent`: kotlin.Int
+    val `finalPercent`: kotlin.Int
     
 ){
     
@@ -18670,11 +18703,11 @@ public object FfiConverterTypeWrappedCloseCall: FfiConverterRustBuffer<WrappedCl
 
 
 data class WrappedComeback (
-    var `lowPercent`: kotlin.Int
+    val `lowPercent`: kotlin.Int
     , 
-    var `lowDay`: kotlin.Int
+    val `lowDay`: kotlin.Int
     , 
-    var `finalPercent`: kotlin.Int
+    val `finalPercent`: kotlin.Int
     
 ){
     
@@ -18713,9 +18746,9 @@ public object FfiConverterTypeWrappedComeback: FfiConverterRustBuffer<WrappedCom
 
 
 data class WrappedCourse (
-    var `name`: kotlin.String
+    val `name`: kotlin.String
     , 
-    var `percent`: kotlin.Int
+    val `percent`: kotlin.Int
     
 ){
     
@@ -18754,31 +18787,31 @@ public object FfiConverterTypeWrappedCourse: FfiConverterRustBuffer<WrappedCours
  * The 7 days from a paper's day with the most papers sat.
  */
 data class WrappedCrunch (
-    var `papers`: kotlin.Int
+    val `papers`: kotlin.Int
     , 
-    var `firstDay`: kotlin.Int
+    val `firstDay`: kotlin.Int
     , 
     /**
      * `first_day` + 6.
      */
-    var `lastDay`: kotlin.Int
+    val `lastDay`: kotlin.Int
     , 
     /**
      * Papers on each day of the window, `first_day` first; 7 long.
      */
-    var `byDay`: List<kotlin.Int>
+    val `byDay`: List<kotlin.Int>
     , 
     /**
      * The most papers sat on one day, and the earliest such day.
      */
-    var `mostInADay`: kotlin.Int
+    val `mostInADay`: kotlin.Int
     , 
-    var `mostDay`: kotlin.Int
+    val `mostDay`: kotlin.Int
     , 
     /**
      * Days with a paper sat.
      */
-    var `examDays`: kotlin.Int
+    val `examDays`: kotlin.Int
     
 ){
     
@@ -18835,21 +18868,21 @@ data class WrappedDayHalf (
     /**
      * Before noon is the side with [`DAY_HALF_PERCENT`]; false: from 2 PM.
      */
-    var `morning`: kotlin.Boolean
+    val `morning`: kotlin.Boolean
     , 
     /**
      * That side's share, rounded down.
      */
-    var `percent`: kotlin.Int
+    val `percent`: kotlin.Int
     , 
-    var `classes`: kotlin.Int
+    val `classes`: kotlin.Int
     , 
-    var `total`: kotlin.Int
+    val `total`: kotlin.Int
     , 
     /**
      * Classes starting in each hour from 8 to 18; 11 long.
      */
-    var `byHour`: List<kotlin.Int>
+    val `byHour`: List<kotlin.Int>
     
 ){
     
@@ -18894,11 +18927,11 @@ public object FfiConverterTypeWrappedDayHalf: FfiConverterRustBuffer<WrappedDayH
 
 
 data class WrappedExams (
-    var `cats`: kotlin.Int
+    val `cats`: kotlin.Int
     , 
-    var `fats`: kotlin.Int
+    val `fats`: kotlin.Int
     , 
-    var `topVenue`: kotlin.String?
+    val `topVenue`: kotlin.String?
     
 ){
     
@@ -18940,24 +18973,24 @@ public object FfiConverterTypeWrappedExams: FfiConverterRustBuffer<WrappedExams>
  * Posted assessments scored at their max marks, re-evaluations left out.
  */
 data class WrappedFullMarks (
-    var `count`: kotlin.Int
+    val `count`: kotlin.Int
     , 
     /**
      * Posted assessments.
      */
-    var `of`: kotlin.Int
+    val `of`: kotlin.Int
     , 
     /**
      * Most first.
      */
-    var `byKind`: List<WrappedKindCount>
+    val `byKind`: List<WrappedKindCount>
     , 
     /**
      * The course with the most; none when that is one.
      */
-    var `topCourse`: kotlin.String?
+    val `topCourse`: kotlin.String?
     , 
-    var `topCount`: kotlin.Int
+    val `topCount`: kotlin.Int
     
 ){
     
@@ -19002,16 +19035,16 @@ public object FfiConverterTypeWrappedFullMarks: FfiConverterRustBuffer<WrappedFu
 
 
 data class WrappedGrades (
-    var `gpa`: kotlin.Double
+    val `gpa`: kotlin.Double
     , 
-    var `mix`: List<GradeCount>
+    val `mix`: List<GradeCount>
     , 
-    var `sCount`: kotlin.Int
+    val `sCount`: kotlin.Int
     , 
     /**
      * More S grades than any earlier semester in the grade history.
      */
-    var `sRecord`: kotlin.Boolean
+    val `sRecord`: kotlin.Boolean
     
 ){
     
@@ -19056,27 +19089,27 @@ data class WrappedHabits (
     /**
      * 0 = Monday; none without an absence.
      */
-    var `worstWeekday`: kotlin.Int?
+    val `worstWeekday`: kotlin.Int?
     , 
-    var `worstWeekdayMisses`: kotlin.Int
+    val `worstWeekdayMisses`: kotlin.Int
     , 
-    var `misses`: kotlin.Int
+    val `misses`: kotlin.Int
     , 
     /**
      * Over classes starting before 9:00.
      */
-    var `earlyPercent`: kotlin.Int?
+    val `earlyPercent`: kotlin.Int?
     , 
-    var `earlyClasses`: kotlin.Int
+    val `earlyClasses`: kotlin.Int
     , 
-    var `firstSlotDays`: kotlin.Int
+    val `firstSlotDays`: kotlin.Int
     , 
-    var `lastSlotDays`: kotlin.Int
+    val `lastSlotDays`: kotlin.Int
     , 
     /**
      * Absences by weekday, Monday first; 7 long.
      */
-    var `missesByWeekday`: List<kotlin.Int>
+    val `missesByWeekday`: List<kotlin.Int>
     
 ){
     
@@ -19137,27 +19170,27 @@ data class WrappedHostel (
     /**
      * Class days with an OUT and an IN after it.
      */
-    var `days`: kotlin.Int
+    val `days`: kotlin.Int
     , 
     /**
      * Hours out on an average one of those days, in tenths (94 is 9.4 hours).
      */
-    var `outTenths`: kotlin.Int
+    val `outTenths`: kotlin.Int
     , 
     /**
      * Half hours from 6:00 to 24:00, each out on at least half of `days`; 36 long.
      */
-    var `outByHalfHour`: List<kotlin.Boolean>
+    val `outByHalfHour`: List<kotlin.Boolean>
     , 
     /**
      * Trips back to the hostel between two class punches.
      */
-    var `naps`: kotlin.Int
+    val `naps`: kotlin.Int
     , 
     /**
      * 0 = Monday, with the most naps; none without a nap.
      */
-    var `napWeekday`: kotlin.Int?
+    val `napWeekday`: kotlin.Int?
     
 ){
     
@@ -19205,9 +19238,9 @@ public object FfiConverterTypeWrappedHostel: FfiConverterRustBuffer<WrappedHoste
  * Assessments of a kind of [`KINDS`] ("quizzes").
  */
 data class WrappedKindCount (
-    var `kind`: kotlin.String
+    val `kind`: kotlin.String
     , 
-    var `count`: kotlin.Int
+    val `count`: kotlin.Int
     
 ){
     
@@ -19243,18 +19276,18 @@ public object FfiConverterTypeWrappedKindCount: FfiConverterRustBuffer<WrappedKi
 
 
 data class WrappedMarks (
-    var `bestCat`: WrappedCat?
+    val `bestCat`: WrappedCat?
     , 
-    var `bestCourse`: kotlin.String?
+    val `bestCourse`: kotlin.String?
     , 
-    var `bestCoursePercent`: kotlin.Int
+    val `bestCoursePercent`: kotlin.Int
     , 
     /**
      * The average CAT-I to CAT-II change in points.
      */
-    var `catChange`: kotlin.Int?
+    val `catChange`: kotlin.Int?
     , 
-    var `mostImproved`: kotlin.String?
+    val `mostImproved`: kotlin.String?
     
 ){
     
@@ -19305,24 +19338,24 @@ data class WrappedMoves (
     /**
      * Each day's first floor and every rise after it.
      */
-    var `floors`: kotlin.Int
+    val `floors`: kotlin.Int
     , 
     /**
      * Distinct block and room.
      */
-    var `rooms`: kotlin.Int
+    val `rooms`: kotlin.Int
     , 
     /**
      * The most block changes in a day, and the earliest such day.
      */
-    var `mostHops`: kotlin.Int
+    val `mostHops`: kotlin.Int
     , 
-    var `mostHopsDay`: kotlin.Int
+    val `mostHopsDay`: kotlin.Int
     , 
     /**
      * Up to 3, most rooms first, then by name.
      */
-    var `blocks`: List<WrappedBlock>
+    val `blocks`: List<WrappedBlock>
     
 ){
     
@@ -19370,21 +19403,21 @@ public object FfiConverterTypeWrappedMoves: FfiConverterRustBuffer<WrappedMoves>
  * Classes in VTOP's units (a lab session is two).
  */
 data class WrappedOnDuty (
-    var `classes`: kotlin.Int
+    val `classes`: kotlin.Int
     , 
     /**
      * Days with a class on duty.
      */
-    var `days`: kotlin.Int
+    val `days`: kotlin.Int
     , 
-    var `present`: kotlin.Int
+    val `present`: kotlin.Int
     , 
-    var `absent`: kotlin.Int
+    val `absent`: kotlin.Int
     , 
     /**
      * The course with the most classes on duty, and one that ties it; `percent` is the count.
      */
-    var `top`: List<WrappedCourse>
+    val `top`: List<WrappedCourse>
     
 ){
     
@@ -19432,17 +19465,17 @@ public object FfiConverterTypeWrappedOnDuty: FfiConverterRustBuffer<WrappedOnDut
  * Approved requests starting inside the window.
  */
 data class WrappedOutings (
-    var `leaves`: kotlin.Int
+    val `leaves`: kotlin.Int
     , 
-    var `weekends`: kotlin.Int
+    val `weekends`: kotlin.Int
     , 
-    var `topPlace`: kotlin.String?
+    val `topPlace`: kotlin.String?
     , 
-    var `longestLeaveDays`: kotlin.Int?
+    val `longestLeaveDays`: kotlin.Int?
     , 
-    var `daysAway`: kotlin.Int
+    val `daysAway`: kotlin.Int
     , 
-    var `longestStayDays`: kotlin.Int
+    val `longestStayDays`: kotlin.Int
     
 ){
     
@@ -19493,13 +19526,13 @@ data class WrappedPlaces (
     /**
      * "AB1-205".
      */
-    var `room`: kotlin.String?
+    val `room`: kotlin.String?
     , 
-    var `roomMinutes`: kotlin.Int
+    val `roomMinutes`: kotlin.Int
     , 
-    var `faculty`: kotlin.String?
+    val `faculty`: kotlin.String?
     , 
-    var `facultyClasses`: kotlin.Int
+    val `facultyClasses`: kotlin.Int
     
 ){
     
@@ -19544,11 +19577,11 @@ public object FfiConverterTypeWrappedPlaces: FfiConverterRustBuffer<WrappedPlace
  * Against the next older semester; only the halves that improved.
  */
 data class WrappedPrevious (
-    var `semesterName`: kotlin.String
+    val `semesterName`: kotlin.String
     , 
-    var `attendanceChange`: kotlin.Int?
+    val `attendanceChange`: kotlin.Int?
     , 
-    var `gpaChange`: kotlin.Double?
+    val `gpaChange`: kotlin.Double?
     
 ){
     
@@ -19590,86 +19623,86 @@ public object FfiConverterTypeWrappedPrevious: FfiConverterRustBuffer<WrappedPre
  * Every fact of the selected semester's story; days are days since 1970-01-01 in India.
  */
 data class WrappedReport (
-    var `semesterId`: kotlin.String
+    val `semesterId`: kotlin.String
     , 
-    var `semesterName`: kotlin.String
+    val `semesterName`: kotlin.String
     , 
-    var `firstDay`: kotlin.Int
+    val `firstDay`: kotlin.Int
     , 
     /**
      * The last "Instructional Day" in the calendar.
      */
-    var `lastDay`: kotlin.Int
+    val `lastDay`: kotlin.Int
     , 
     /**
      * The calendar's last entry: the outing window's end.
      */
-    var `windowEnd`: kotlin.Int
+    val `windowEnd`: kotlin.Int
     , 
-    var `courses`: kotlin.Int
+    val `courses`: kotlin.Int
     , 
-    var `classDayCount`: kotlin.Int
+    val `classDayCount`: kotlin.Int
     , 
-    var `holidays`: kotlin.Int
+    val `holidays`: kotlin.Int
     , 
-    var `attendance`: WrappedAttendance?
+    val `attendance`: WrappedAttendance?
     , 
-    var `onDuty`: WrappedOnDuty?
+    val `onDuty`: WrappedOnDuty?
     , 
-    var `streak`: WrappedStreak?
+    val `streak`: WrappedStreak?
     , 
     /**
      * Course names; empty skips the slide.
      */
-    var `neverMissed`: List<kotlin.String>
+    val `neverMissed`: List<kotlin.String>
     , 
-    var `comeback`: WrappedComeback?
+    val `comeback`: WrappedComeback?
     , 
-    var `closeCall`: WrappedCloseCall?
+    val `closeCall`: WrappedCloseCall?
     , 
-    var `habits`: WrappedHabits?
+    val `habits`: WrappedHabits?
     , 
-    var `dayHalf`: WrappedDayHalf?
+    val `dayHalf`: WrappedDayHalf?
     , 
-    var `time`: WrappedTime?
+    val `time`: WrappedTime?
     , 
-    var `places`: WrappedPlaces?
+    val `places`: WrappedPlaces?
     , 
-    var `marks`: WrappedMarks?
+    val `marks`: WrappedMarks?
     , 
-    var `fullMarks`: WrappedFullMarks?
+    val `fullMarks`: WrappedFullMarks?
     , 
-    var `assessments`: WrappedAssessments?
+    val `assessments`: WrappedAssessments?
     , 
-    var `exams`: WrappedExams?
+    val `exams`: WrappedExams?
     , 
-    var `crunch`: WrappedCrunch?
+    val `crunch`: WrappedCrunch?
     , 
-    var `grades`: WrappedGrades?
+    val `grades`: WrappedGrades?
     , 
-    var `cgpa`: WrappedCgpa?
+    val `cgpa`: WrappedCgpa?
     , 
-    var `outings`: WrappedOutings?
+    val `outings`: WrappedOutings?
     , 
-    var `campus`: WrappedCampus?
+    val `campus`: WrappedCampus?
     , 
-    var `hostel`: WrappedHostel?
+    val `hostel`: WrappedHostel?
     , 
-    var `moves`: WrappedMoves?
+    val `moves`: WrappedMoves?
     , 
-    var `previous`: WrappedPrevious?
+    val `previous`: WrappedPrevious?
     , 
-    var `title`: WrappedTitle
+    val `title`: WrappedTitle
     , 
     /**
      * The title when Hide grades is on.
      */
-    var `titleWithoutGrades`: WrappedTitle
+    val `titleWithoutGrades`: WrappedTitle
     , 
     /**
      * Every instructional day, for the campus fetch.
      */
-    var `classDays`: List<kotlin.Int>
+    val `classDays`: List<kotlin.Int>
     
 ){
     
@@ -19798,23 +19831,23 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
 
 
 data class WrappedStreak (
-    var `length`: kotlin.Int
+    val `length`: kotlin.Int
     , 
-    var `firstDay`: kotlin.Int
+    val `firstDay`: kotlin.Int
     , 
-    var `lastDay`: kotlin.Int
+    val `lastDay`: kotlin.Int
     , 
-    var `perfectWeeks`: kotlin.Int
+    val `perfectWeeks`: kotlin.Int
     , 
     /**
      * Posted classes before the run, in time order: where it starts among [`Self::total`].
      */
-    var `offset`: kotlin.Int
+    val `offset`: kotlin.Int
     , 
     /**
      * Posted classes (present, on duty or absent), the classes the run is counted over.
      */
-    var `total`: kotlin.Int
+    val `total`: kotlin.Int
     
 ){
     
@@ -19865,21 +19898,21 @@ public object FfiConverterTypeWrappedStreak: FfiConverterRustBuffer<WrappedStrea
  * Attended classes; a lab session is one class of 100 minutes.
  */
 data class WrappedTime (
-    var `classes`: kotlin.Int
+    val `classes`: kotlin.Int
     , 
-    var `minutes`: kotlin.Int
+    val `minutes`: kotlin.Int
     , 
-    var `labMinutes`: kotlin.Int
+    val `labMinutes`: kotlin.Int
     , 
     /**
      * 0 = Monday.
      */
-    var `busiestWeekday`: kotlin.Int
+    val `busiestWeekday`: kotlin.Int
     , 
     /**
      * Attended classes by weekday in VTOP's units (a lab session is two), Monday first; 7 long.
      */
-    var `classesByWeekday`: List<kotlin.Int>
+    val `classesByWeekday`: List<kotlin.Int>
     
 ){
     
@@ -20659,11 +20692,12 @@ enum class ForwardingState {
      */
     OFF,
     /**
-     * An address, but no mail has reached it yet (Gmail not set up).
+     * An address, not finished setting up in Gmail yet.
      */
     WAITING,
     /**
-     * Mail reached the address: Gmail's confirmation or an OTP.
+     * Forwarding is set up: an OTP came through, or the student marked setup done after
+     * Gmail's confirmation arrived.
      */
     ON;
 

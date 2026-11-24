@@ -66,13 +66,8 @@ class PageHandle<T> internal constructor(
      * refresh while one runs waits for that one instead of fetching twice.
      */
     suspend fun refresh(trigger: String, user: Boolean = true) {
-        try {
-            flow("$id.refresh") { f -> fetchIn(f, trigger, user)?.let { throw it } }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Throwable) {
-            // In the state and the log already.
-        }
+        // A failure is in the state and the log already.
+        attempt { flow("$id.refresh") { f -> fetchIn(f, trigger, user)?.let { throw it } } }
     }
 
     /** One fetch at a time: joins the running one, else starts one; returns its failure. */
@@ -150,7 +145,7 @@ class PageHandle<T> internal constructor(
         val start = System.nanoTime()
         val otpRound = OtpPrompt.generation
         val otpAsks = OtpPrompt.asks
-        try {
+        return attempt {
             var udp = false
             val fresh = Activity.track("Refreshing ${id.replace('_', ' ')}", flow) {
                 withContext(Dispatchers.IO) {
@@ -164,10 +159,8 @@ class PageHandle<T> internal constructor(
             // A fetch caches the semester list when there was none.
             if (SemesterChoice.semesters == null) SemesterChoice.readCache(flow)
             OtpPrompt.signedIn(otpAsks, flow)
-            return fresh
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
+            fresh
+        }.getOrElse { e ->
             // A code was accepted while this fetch ran: VTOP is signed in now, so fetch again
             // instead of asking for another code.
             if (OtpPrompt.generation != otpRound) {
@@ -182,11 +175,9 @@ class PageHandle<T> internal constructor(
     /** Shows the cached copy; a corrupt or unreadable cache counts as none. */
     internal suspend fun readCache(flow: String) {
         if (state is PageState.Ready) return
-        val data = try {
+        val data = attempt {
             withContext(Dispatchers.IO) { cached(AppCore.await(), flow) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
+        }.getOrElse { e ->
             Log.warn("ui.$id", "cache unreadable, ignored: ${e.kindName()}", flow, mapOf("error" to e.toString().take(200)))
             null
         }
@@ -422,13 +413,8 @@ object OtpPrompt {
         message = null
         // Outlives the prompt, which closes as soon as it is cancelled.
         AppScope.launch {
-            try {
-                coreFlow("otp.cancel", Core::cancelOtp)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Throwable) {
-                // Signed out meanwhile, or nothing pending: in the log already.
-            }
+            // A failure (signed out meanwhile, or nothing pending) is in the log already.
+            attempt { coreFlow("otp.cancel", Core::cancelOtp) }
         }
     }
 }

@@ -57,7 +57,6 @@ import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Sheet
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Utensils
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import vitapmate.data.Doc
@@ -72,6 +71,7 @@ import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Radii
 import vitapmate.ui.Space
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /**
  * [doc]'s content URI in the download folder, shared as is; a plain file (Android 9 and older,
@@ -128,16 +128,13 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
     val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     fun act(name: String, block: suspend (String) -> Unit) {
         scope.launch {
-            try {
+            attempt {
                 flow("docs.$name") { f ->
                     block(f)
                     Log.info(SRC, name, f, mapOf("kind" to doc.kind.name, "count" to "${Docs.docs.size}"))
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: MessMenuFormatException) {
-                showToast("Not a mess menu", "${e.message} It stays a spreadsheet.")
-            } catch (e: Throwable) {
+            }.onFailure { e ->
+                if (e is MessMenuFormatException) return@onFailure showToast("Not a mess menu", "${e.message} It stays a spreadsheet.")
                 Log.warn(SRC, "$name failed: ${e::class.simpleName}")
                 showToast("Something went wrong", "Please try again.")
             }

@@ -36,7 +36,6 @@ import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.FileX
 import com.composables.icons.lucide.Lucide
 import java.io.File
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.core.OutingKind
@@ -50,6 +49,7 @@ import vitapmate.ui.ButtonVariant
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Space
+import vitapmate.data.attempt
 
 /**
  * The outing pass from Docs ([item] `<general|weekend>:<pass id>`) drawn page by page at the screen's
@@ -69,16 +69,14 @@ internal fun PassScreen(item: String) {
         val widthPx = with(LocalDensity.current) { (maxWidth - Space.lg * 2).roundToPx() }.coerceAtLeast(1)
         LaunchedEffect(passId, attempt, widthPx) {
             failure = null
-            try {
+            attempt {
                 pages = flow("outing.pass") { id ->
                     val doc = passDoc(context, kind, passId, id)
                     Docs.opened(doc.id)
                     withContext(Dispatchers.IO) { render(Docs.open(doc), widthPx) }
                         .also { Log.info("ui.outing", "pass shown", id, mapOf("kind" to kind.key, "pages" to "${it.size}")) }
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
+            }.onFailure { e ->
                 askedOtp(e)
                 failure = failureOf(e, "")
             }

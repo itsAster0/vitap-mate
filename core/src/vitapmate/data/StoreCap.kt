@@ -2,7 +2,6 @@ package vitapmate.data
 
 import android.content.Context
 import java.io.File
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.observability.ActivityHistory
@@ -19,7 +18,7 @@ object StoreCap {
     const val TARGET_BYTES = 10L * 1024 * 1024
 
     suspend fun enforce(context: Context, flow: String) = withContext(Dispatchers.IO) {
-        try {
+        attempt {
             val core = AppCore.await()
             val logs = File(context.cacheDir, "logs")
             val rolled = File(logs, "app.jsonl.1")
@@ -34,10 +33,6 @@ object StoreCap {
             // The current log is at most 1 MB (Rust rolls it); the older one is what can go.
             rolled.delete()
             Log.info("store", "trimmed", flow, mapOf("before" to "$total", "logs" to "$logBytes", "activity" to "$activity", "changes" to "$changes"))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            Log.warn("store", "trim failed: ${e::class.simpleName}", flow)
-        }
+        }.onFailure { e -> Log.warn("store", "trim failed: ${e::class.simpleName}", flow) }
     }
 }

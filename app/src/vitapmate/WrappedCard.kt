@@ -31,7 +31,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
-import kotlin.coroutines.cancellation.CancellationException
 import vitapmate.core.Core
 import vitapmate.core.WrappedReport
 import vitapmate.data.Activity
@@ -44,6 +43,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.formatDay
 import vitapmate.ui.heroCookie
 import vitapmate.ui.tappable
+import vitapmate.data.attempt
 
 /**
  * Semester Wrapped at the top of More, once the selected semester's classes are over (none
@@ -57,11 +57,9 @@ fun WrappedCard() {
     // Changes count; Settings.wrappedSeen is state, so opening Wrapped turns the card into the row.
     val last = Activity.recent.firstOrNull()?.flow
     val report by produceState<WrappedReport?>(null, SemesterChoice.selected, last) {
-        value = try {
+        value = attempt {
             coreFlow("more.wrapped", Core::cachedWrapped)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
+        }.getOrElse { e ->
             // A failed read (a Rust panic) means no card, never a crash; the flow logged its error.
             Log.warn("ui.more", "wrapped card read failed", fields = mapOf("error" to (e::class.simpleName ?: "Throwable")))
             null

@@ -181,17 +181,14 @@ object StaleSweep {
             snapshotFlow { Activity.running.isEmpty() }.first { it }
             delay(QUIET_MS.milliseconds)
             if (!Settings.autoRefresh || !Foreground.shown) throw Stop("app left or auto refresh off")
-            val ms = try {
+            val ms = attempt {
                 PageFetches.start("$id/stale/", f, user = false, hasCache = ats.none { it == 0L }, background = true) {
                     val start = System.nanoTime()
                     Activity.track(label, f) { withContext(Dispatchers.IO) { fetch(core) } }
                     (System.nanoTime() - start) / 1_000_000
                 }.result.await()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Dropped) {
-                throw Stop("$id waited too long")
-            } catch (e: Exception) {
+            }.getOrElse { e ->
+                if (e is Dropped) throw Stop("$id waited too long")
                 BackgroundProblems.report(e, f)
                 throw Stop("$id failed: ${e::class.simpleName}")
             }

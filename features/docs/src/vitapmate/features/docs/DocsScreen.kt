@@ -44,7 +44,6 @@ import com.composables.icons.lucide.FilePlus
 import com.composables.icons.lucide.Files
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 import vitapmate.data.Doc
 import vitapmate.data.DocKind
@@ -61,6 +60,7 @@ import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.LocalOpenDetail
 import vitapmate.ui.Space
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /** What the picker offers: the kinds Docs can show (Flutter's `docExtensions`). */
 private val pickable = arrayOf(
@@ -106,7 +106,7 @@ internal fun DocsScreen() {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         val menu = asMenu
         scope.launch {
-            try {
+            attempt {
                 flow("docs.import") { f ->
                     if (uri == null) return@flow Log.info(SRC, "import cancelled", f)
                     val doc = Docs.import(context, uri, f)
@@ -117,11 +117,8 @@ internal fun DocsScreen() {
                         Docs.setMessMenu(doc.id, true)
                     }
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: MessMenuFormatException) {
-                showToast("Not a mess menu", "${e.message} It stays a spreadsheet.")
-            } catch (e: Throwable) {
+            }.onFailure { e ->
+                if (e is MessMenuFormatException) return@onFailure showToast("Not a mess menu", "${e.message} It stays a spreadsheet.")
                 Log.warn(SRC, "import failed: ${e::class.simpleName}")
                 showToast("Couldn't add that file", "Please try another file.")
             }
@@ -227,14 +224,12 @@ internal fun DocsScreen() {
                 confirmDelete = false
                 selected = emptySet()
                 scope.launch {
-                    try {
+                    attempt {
                         flow("docs.delete") { f ->
                             gone.forEach { Docs.remove(it.id) }
                             Log.info(SRC, "delete", f, mapOf("deleted" to "${gone.size}", "count" to "${Docs.docs.size}"))
                         }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
+                    }.onFailure { e ->
                         Log.warn(SRC, "delete failed: ${e::class.simpleName}")
                         showToast("Something went wrong", "Please try again.")
                     }

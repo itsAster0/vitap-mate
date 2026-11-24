@@ -14,13 +14,13 @@ import com.composables.icons.lucide.FileText
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Printer
 import java.io.File
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.data.PdfExport
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.data.attempt
 
 /**
  * The menu a long press on the account button opens on a feature with [Feature.pdf]: the page as
@@ -35,11 +35,9 @@ fun PdfMenu(feature: String, open: Boolean, onDismiss: () -> Unit, build: suspen
         onDismiss()
         scope.launch {
             flow("$feature.pdf") { f ->
-                val file = try {
+                val file = attempt {
                     withContext(Dispatchers.IO) { build(context, f) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
+                }.getOrElse { e ->
                     Log.warn("ui.$feature", "pdf failed: ${e::class.simpleName}", f)
                     return@flow showToast("Couldn't make the PDF", "Please try again.")
                 }

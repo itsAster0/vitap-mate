@@ -34,15 +34,16 @@ object SemesterChoice {
     suspend fun refresh(trigger: String) = flow("semesters.refresh") { f ->
         loading = true
         try {
-            semesters = Activity.track("Loading semesters", f) { withContext(Dispatchers.IO) { AppCore.await().fetchSemesters(f) } }
-            problem = null
-            Log.info("ui.semesters", "fresh", f, mapOf("trigger" to trigger, "count" to "${semesters?.items?.size}"))
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            val failed = problemOf(e, f)
-            problem = failed
-            askedOtp(e)
-            Log.warn("ui.semesters", "refresh failed", f, mapOf("trigger" to trigger, "kind" to failed.kind.name))
+            attempt {
+                semesters = Activity.track("Loading semesters", f) { withContext(Dispatchers.IO) { AppCore.await().fetchSemesters(f) } }
+                problem = null
+                Log.info("ui.semesters", "fresh", f, mapOf("trigger" to trigger, "count" to "${semesters?.items?.size}"))
+            }.onFailure { e ->
+                val failed = problemOf(e, f)
+                problem = failed
+                askedOtp(e)
+                Log.warn("ui.semesters", "refresh failed", f, mapOf("trigger" to trigger, "kind" to failed.kind.name))
+            }
         } finally {
             loading = false
         }

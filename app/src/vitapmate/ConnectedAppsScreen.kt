@@ -51,7 +51,6 @@ import vitapmate.core.KeyPhone
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Sparkles
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,6 +80,7 @@ import vitapmate.ui.ProofProgress
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 import vitapmate.data.Problem
+import vitapmate.data.attempt
 
 /** Route id of Settings → Account → Connected apps. */
 const val CONNECTED_APPS = "connected_apps"
@@ -248,11 +248,9 @@ private fun KeyTags(key: AccessKey) {
 /** One call as flow `connected_apps.<name>`, off the main thread; a failure is logged, toasted and returned as a [ServerFailure]. */
 internal suspend fun <T> appsCall(name: String, call: suspend (Core, String) -> T): Result<T> {
     var flowId = ""
-    return try {
+    return attempt {
         Result.success(flow("connected_apps.$name") { f -> flowId = f; withContext(Dispatchers.IO) { call(AppCore.await(), f) } })
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
+    }.getOrElse { e ->
         Log.warn("ui.connected_apps", "$name failed: ${e::class.simpleName}", flowId)
         when (e) {
             is CoreException.OtpRequired -> OtpPrompt.ask(e.reason)

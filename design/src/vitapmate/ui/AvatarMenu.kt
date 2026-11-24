@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import vitapmate.data.Settings
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.data.attempt
 
 /**
  * The avatar's menu: Choose photo (the Photo Picker, no storage permission), Use VTOP photo when
@@ -34,17 +35,13 @@ fun AvatarMenu(expanded: Boolean, onDismiss: () -> Unit, vtopPhoto: String? = nu
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         scope.launch {
-            try {
+            attempt {
                 flow("profile.photo.pick") { id ->
                     if (uri == null) return@flow Log.info("ui.profile", "photo pick cancelled", id)
                     AvatarPhoto.pick(context, uri)
                     Log.info("ui.profile", "photo set", id)
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Throwable) {
-                showToast("Couldn't use that photo", "Try another image.", tone = ToastTone.Error)
-            }
+            }.onFailure { showToast("Couldn't use that photo", "Try another image.", tone = ToastTone.Error) }
         }
     }
     DropdownMenu(expanded, onDismiss, Modifier.testTag("avatar.menu")) {

@@ -6,7 +6,6 @@ import android.content.Intent
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import java.io.File
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
@@ -20,6 +19,7 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.DetailOpener
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /**
  * Flow `coursepage.file`: Android's DownloadManager fetches the VTOP file from the link Rust signs
@@ -37,7 +37,7 @@ internal suspend fun openCourseFile(
     keep: Boolean,
     fetch: suspend (Core, String) -> FileLink,
 ) {
-    try {
+    attempt {
         flow("coursepage.file") { f ->
             val (doc, kept) = Docs.download(context, "coursepage:$id", "coursepage", f, reuse = keep) { withContext(Dispatchers.IO) { fetch(AppCore.await(), f) } }
             Log.info("ui.coursepage", "file ready", f, mapOf("kind" to kind, "kept" to "$kept", "bytes" to "${doc.size}"))
@@ -55,9 +55,7 @@ internal suspend fun openCourseFile(
                 showToast("Saved to Docs", "No app on this phone opens this file.")
             }
         }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
+    }.onFailure { e ->
         if (askedOtp(e)) return
         showToast("Couldn't get the file", problemOf(e, "").message)
     }

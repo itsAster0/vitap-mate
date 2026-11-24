@@ -61,7 +61,6 @@ import com.composables.icons.lucide.SquareActivity
 import com.composables.icons.lucide.Trash
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Zap
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,6 +81,7 @@ import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
 import vitapmate.ui.ToastTone
 import vitapmate.ui.showToast
+import vitapmate.data.attempt
 
 /** Route id of Settings → Developer (not a tab choice). */
 const val DEVELOPER = "developer"
@@ -389,11 +389,9 @@ private suspend fun clearCache(scope: CacheScope, done: String) {
 }
 
 /** [work] on the core in flow [name], off the main thread; null when it failed (logged, never its data). */
-private suspend fun <T : Any> dev(name: String, work: suspend (Core, String) -> T): T? = try {
+private suspend fun <T : Any> dev(name: String, work: suspend (Core, String) -> T): T? = attempt {
     flow(name) { f -> withContext(Dispatchers.IO) { work(AppCore.await(), f) } }
-} catch (e: CancellationException) {
-    throw e
-} catch (e: Exception) {
+}.getOrElse { e ->
     Log.warn("ui.dev", "$name failed: ${e::class.simpleName}")
     null
 }

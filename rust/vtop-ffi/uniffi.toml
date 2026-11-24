@@ -2,3 +2,5 @@
 package_name = "vitapmate.core"
 cdylib_name = "vtop_ffi"
 android = true
+# Records are vals, so Compose treats them as stable and nothing mutates them in place.
+generate_immutable_records = true
