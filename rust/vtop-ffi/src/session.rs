@@ -5,14 +5,13 @@ use std::time::SystemTime;
 
 use tracing::{info, warn};
 use vtop_core::VtopError;
-use vtop_core::session::CookieStore;
 use vtop_core::sync::RwLock;
 use vtop_core::types::PersistedVtopSession;
 
 use crate::remote::route;
 use crate::{
-    ACCOUNT, Account, Core, CoreError, SESSION, STUDENT_FILES, SavedAccount, Session, SignIn, Slot,
-    demo, obs, traced, traced_sync, unix_now,
+    ACCOUNT, Account, Core, CoreError, OtpVia, SESSION, STUDENT_FILES, SavedAccount, Session,
+    SignIn, Slot, demo, obs, traced, traced_sync, unix_now,
 };
 
 #[uniffi::export]
@@ -75,7 +74,7 @@ impl Core {
             let outcome = match session.client.login().await {
                 Ok(()) => SignIn::Done,
                 Err(VtopError::OTPRequired(message, _)) => {
-                    session.otp = Some(message.clone());
+                    session.begin_otp(OtpVia::Phone, message.clone());
                     SignIn::NeedsOtp { message }
                 }
                 Err(error) => return Err(error.into()),
@@ -103,13 +102,15 @@ impl Core {
     pub async fn submit_otp(&self, flow: String, code: String) -> Result<(), CoreError> {
         traced("submit_otp", &flow, async {
             let slot = self.current()?;
-            if slot.read().await.server_otp {
-                return self.server_otp(&slot, Some(code.trim()), &flow).await;
+            if let Some(challenge_id) = slot.read().await.server_otp_challenge() {
+                return self
+                    .server_otp(&slot, challenge_id, Some(code.trim()), &flow)
+                    .await;
             }
             let mut session = slot.write().await;
             if session.client.otp_issued_at().is_none() {
                 // Another call (auto-fill, the prompt) already got in with a code.
-                if session.otp.is_none() && session.client.is_authenticated() {
+                if !session.is_awaiting_otp() && session.client.is_authenticated() {
                     info!("otp no longer needed: signed in");
                     return Ok(());
                 }
@@ -123,8 +124,7 @@ impl Core {
                     VtopError::AuthenticationFailed(reason) => CoreError::OtpRejected { reason },
                     error => error.into(),
                 })?;
-            session.otp = None;
-            session.logins += 1;
+            session.mark_signed_in();
             obs::set_regno(session.client.registration_number().ok());
             self.save(&slot, &session);
             Ok(())
@@ -135,8 +135,8 @@ impl Core {
     pub async fn resend_otp(&self, flow: String) -> Result<(), CoreError> {
         traced("resend_otp", &flow, async {
             let slot = self.current()?;
-            if slot.read().await.server_otp {
-                return self.server_otp(&slot, None, &flow).await;
+            if let Some(challenge_id) = slot.read().await.server_otp_challenge() {
+                return self.server_otp(&slot, challenge_id, None, &flow).await;
             }
             let mut session = slot.write().await;
             if session.client.otp_issued_at().is_none() {
@@ -158,7 +158,7 @@ impl Core {
         traced("cancel_otp", &flow, async {
             let slot = self.current()?;
             let mut session = slot.write().await;
-            if session.otp.is_some() {
+            if session.is_awaiting_otp() {
                 session.restart(&self.shared)?;
                 info!("pending otp dropped");
             }
@@ -228,13 +228,13 @@ impl Core {
         session.restart(&self.shared)?;
         match session.client.login().await {
             Ok(()) => {
-                session.logins += 1;
+                session.mark_signed_in();
                 obs::set_regno(session.client.registration_number().ok());
                 self.save(slot, session);
                 Ok(())
             }
             Err(VtopError::OTPRequired(message, _)) => {
-                session.otp = Some(message);
+                session.begin_otp(OtpVia::Phone, message);
                 Err(CoreError::OtpRejected {
                     reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
                         .into(),
@@ -264,26 +264,27 @@ impl Core {
             // Replaced or signed out meanwhile: its cookies are gone; never sign it in.
             return Err(CoreError::NotSignedIn);
         }
-        if let Some(message) = &session.otp {
+        if let Some(message) = session.otp_message() {
             // The challenge still open (no new mail): its issue time, so auto-fill knows how
             // long its code is good.
             return Err(CoreError::OtpRequired {
-                reason: message.clone(),
+                reason: message.to_owned(),
                 issued_at: session.client.otp_issued_at(),
             });
         }
-        if session.account.rejected {
+        if session.is_password_rejected() {
             info!("the saved password was rejected, not signing in again");
             return Err(CoreError::InvalidCredentials);
         }
         info!("signing in again");
         if let Err(error) = session.client.login().await {
             match &error {
-                VtopError::OTPRequired(message, _) => session.otp = Some(message.clone()),
+                VtopError::OTPRequired(message, _) => {
+                    session.begin_otp(OtpVia::Phone, message.clone());
+                }
                 VtopError::InvalidCredentials => {
                     warn!("VTOP rejected the saved password; no more sign-ins with it");
-                    CookieStore::clear(session.cookies.as_ref());
-                    session.account.rejected = true;
+                    session.mark_password_rejected();
                     if self.is_current(slot) {
                         self.write_account(&session.account);
                     }
@@ -292,7 +293,7 @@ impl Core {
             }
             return Err(error.into());
         }
-        session.logins += 1;
+        session.mark_signed_in();
         self.save(slot, session);
         Ok(())
     }

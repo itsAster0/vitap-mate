@@ -457,7 +457,7 @@ impl Core {
         // Asked once and before the first fetch, never across the lock: a code that goes in
         // meanwhile can't let the session (or, on expiry, the password) go out unasked.
         let mut fetch = ServerFetch::default();
-        let mut next = ServerFetch::start(slot.read().await.otp.is_some());
+        let mut next = ServerFetch::start(slot.read().await.is_awaiting_otp());
         let mut seen = 0;
         loop {
             next = match next {
@@ -469,7 +469,7 @@ impl Core {
                     )]
                     let session = {
                         let session = slot.read().await;
-                        if session.otp.is_some() {
+                        if session.is_awaiting_otp() {
                             return None; // Waiting for a code: the phone's path tells the student.
                         }
                         seen = session.logins;
@@ -540,7 +540,7 @@ impl Core {
         if session.logins != seen {
             return Ok(());
         }
-        if !self.is_current(slot) || session.otp.is_some() || session.account.rejected {
+        if !self.is_current(slot) || session.is_awaiting_otp() || session.is_password_rejected() {
             return Err(ServerError::Expired); // The phone's path says why.
         }
         info!("session expired, signing in on the server");
@@ -551,14 +551,19 @@ impl Core {
         let login = self.signed_call(flow, Kind::Action, "vtop:login", &body);
         let answer = match login.await {
             Err(EdgeError::Status { code, .. }) if code == "invalid_credentials" => {
-                // As on the phone: no more sign-ins with it (the phone's path then says so).
+                // As on the phone: clear cookies and stop signing in with it.
                 warn!("VTOP rejected the saved password on the server; no more sign-ins with it");
-                session.account.rejected = true;
-                self.write_account(&session.account);
+                session.mark_password_rejected();
+                if self.is_current(slot) {
+                    self.write_account(&session.account);
+                }
                 return Err(ServerError::Expired);
             }
             answer => answer?,
         };
+        if !self.is_current(slot) {
+            return Err(ServerError::Expired);
+        }
         let state: SessionState =
             serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
                 .map_err(|_| ServerError::Failed("unexpected sign-in answer".into()))?;
@@ -574,12 +579,11 @@ impl Core {
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("Enter the OTP VTOP emailed you.");
-            session.otp = Some(message.to_string());
-            session.server_otp = true;
+            session.begin_otp(crate::OtpVia::Server, message.to_string());
             info!("server sign-in waits for the otp");
             return Err(ServerError::Expired);
         }
-        session.logins += 1;
+        session.mark_signed_in();
         self.save(slot, &session);
         info!("signed in on the server");
         Ok(())
@@ -589,6 +593,7 @@ impl Core {
     pub(crate) async fn server_otp(
         &self,
         slot: &Arc<Slot>,
+        challenge_id: u64,
         code: Option<&str>,
         flow: &str,
     ) -> Result<(), CoreError> {
@@ -600,6 +605,19 @@ impl Core {
             return Err(CoreError::ConsentDenied);
         }
         let mut session = slot.write().await;
+        if !self.is_current(slot) {
+            return Err(CoreError::NotSignedIn);
+        }
+        if session.server_otp_challenge() != Some(challenge_id) {
+            if code.is_some() && !session.is_awaiting_otp() && session.client.is_authenticated() {
+                info!("server otp no longer needed: signed in");
+                return Ok(());
+            }
+            return Err(CoreError::OtpRejected {
+                reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
+                    .into(),
+            });
+        }
         #[expect(
             clippy::disallowed_methods,
             reason = "consent::allowed (consented) said yes above"
@@ -621,14 +639,16 @@ impl Core {
                 }
                 error => error.into(),
             })?;
+        if !self.is_current(slot) {
+            return Err(CoreError::NotSignedIn);
+        }
         let state: SessionState =
             serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
                 .map_err(|_| CoreError::from(VtopError::InvalidResponse))?;
         session.client.resume_session(&state)?;
         if code.is_some() && answer.get("status").is_some_and(|status| status == "ok") {
-            session.otp = None;
-            session.server_otp = false;
-            session.logins += 1;
+            session.mark_signed_in();
+            crate::obs::set_regno(session.client.registration_number().ok());
             self.save(slot, &session);
         }
         Ok(())
@@ -731,7 +751,9 @@ mod tests {
         let (core, edge) = core_on("otp-race", Route::Server).await;
         let gate = consent::tests::no(&core);
         let slot = core.current().unwrap();
-        slot.write().await.otp = Some("code".into());
+        slot.write()
+            .await
+            .begin_otp(crate::OtpVia::Phone, "code".into());
         let fetch = || {
             transport::with_flow(
                 "f".into(),
@@ -740,7 +762,7 @@ mod tests {
         };
         assert!(fetch().await.is_none());
         assert_eq!(gate.asks(), 0, "nothing to send while the code is pending");
-        slot.write().await.otp = None; // Another flow's code went in.
+        slot.write().await.mark_signed_in(); // Another flow's code went in.
         assert!(fetch().await.is_none());
         assert_eq!(gate.asks(), 1, "the send after it is asked about");
         assert!(edge.lock().unwrap().requests.is_empty());
@@ -751,10 +773,52 @@ mod tests {
         let (core, edge) = core_on("otp", Route::Server).await;
         let gate = consent::tests::no(&core);
         let slot = core.current().unwrap();
-        let sent = core.server_otp(&slot, Some("123456"), "f").await;
+        let challenge_id = slot
+            .write()
+            .await
+            .begin_otp(crate::OtpVia::Server, "code".into());
+        let sent = core
+            .server_otp(&slot, challenge_id, Some("123456"), "f")
+            .await;
         assert_eq!(sent, Err(CoreError::ConsentDenied));
         assert_eq!(gate.asks(), 1);
         assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn server_otp_rejects_stale_challenge_and_udp_adopt_clears_otp() {
+        let (core, edge) = core_on("otp-stale", Route::Server).await;
+        let _gate = consent::tests::yes(&core);
+        let slot = core.current().unwrap();
+        let first = slot
+            .write()
+            .await
+            .begin_otp(crate::OtpVia::Server, "first".into());
+        // A newer challenge replaces the first before the stale submit lands.
+        let _second = slot
+            .write()
+            .await
+            .begin_otp(crate::OtpVia::Server, "second".into());
+        let sent = core.server_otp(&slot, first, Some("123456"), "f").await;
+        assert!(
+            matches!(sent, Err(CoreError::OtpRejected { .. })),
+            "{sent:?}"
+        );
+        assert!(edge.lock().unwrap().requests.is_empty());
+
+        // Adopting a UDP-renewed session clears the pending OTP phase.
+        let renewed = serde_json::to_string(&SessionState {
+            cookies: "JSESSIONID=fresh".into(),
+            csrf_token: Some("csrf-fresh".into()),
+            registration_number: Some("22BCE0001".into()),
+            otp_issued_at: None,
+            logged_in_at: Some(unix_now() as u64),
+        })
+        .unwrap();
+        core.adopt_renewed(&renewed, Some(&slot)).await;
+        let session = slot.read().await;
+        assert!(!session.is_awaiting_otp());
+        assert_eq!(session.logins, 1);
     }
 
     /// Answers every hop with 200, or the proxy's JSON 502 when it is down, and keeps its URL.

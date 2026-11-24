@@ -469,12 +469,12 @@ mod tests {
         fs::write(dir.join(ACCOUNT), serde_json::to_vec(&account).unwrap()).unwrap();
         fs::write(dir.join(SESSION), "{}").unwrap();
         let mut session = Session::new(account, &core.shared).unwrap();
-        session.otp = Some("pending".into());
+        session.begin_otp(crate::OtpVia::Phone, "pending".into());
         core.install(Some(Arc::new(RwLock::new(session))));
 
         core.dev_clear_session("f".into()).await.unwrap();
         assert!(!dir.join(SESSION).exists());
-        assert!(core.current().unwrap().read().await.otp.is_none());
+        assert!(!core.current().unwrap().read().await.is_awaiting_otp());
         assert_eq!(
             core.signed_in_user("f".into()).as_deref(),
             Some("22BCE0001")

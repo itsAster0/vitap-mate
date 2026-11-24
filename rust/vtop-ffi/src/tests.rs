@@ -466,7 +466,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
             .client
             .resume_session(&waiting("JSESSIONID=pre", Some(7)))
             .unwrap();
-        session.otp = Some("Additional verification is required.".into());
+        session.begin_otp(OtpVia::Phone, "Additional verification is required.".into());
         session.logins = 3;
     }
     // Calls that need VTOP's session (Connected apps) answer with the open challenge too,
@@ -494,7 +494,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     );
     core.cancel_otp("f".into()).await.unwrap();
     let session = slot.read().await;
-    assert_eq!(session.otp, None);
+    assert_eq!(session.otp_message(), None);
     assert_eq!(session.logins, 3);
     let state = session.client.session_state();
     assert_eq!((state.otp_issued_at, state.cookies.as_str()), (None, ""));
@@ -726,19 +726,15 @@ fn core_signed_in_ago(base: String, name: &str, age: u64) -> (Core, Arc<Slot>, P
             logged_in_at: Some(unix_now() as u64 - age),
         })
         .unwrap();
-    let slot = Arc::new(RwLock::new(Session {
+    let slot = Arc::new(RwLock::new(Session::for_test(
         client,
-        cookies: cookies::SessionCookies::new(),
-        account: Account {
+        Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
             rejected: false,
             registration_number: None,
         },
-        logins: 0,
-        otp: None,
-        server_otp: false,
-    }));
+    )));
     let core = Core::for_test(&dir);
     core.install(Some(slot.clone()));
     (core, slot, dir)
@@ -778,7 +774,7 @@ async fn stale_session_needing_otp_returns_otp_required() {
         "{result:?}"
     );
     assert_eq!(logins.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert!(slot.read().await.otp.is_some());
+    assert!(slot.read().await.is_awaiting_otp());
     let _ = fs::remove_dir_all(&dir);
 }
 

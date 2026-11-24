@@ -269,7 +269,7 @@ impl Core {
 
     /// The session the gateway signed in again with, from now on this phone's too: otherwise
     /// the next fetch sends the expired one back and the gateway signs in on every fetch.
-    async fn adopt_renewed(&self, renewed: &str, started: Option<&Arc<crate::Slot>>) {
+    pub(crate) async fn adopt_renewed(&self, renewed: &str, started: Option<&Arc<crate::Slot>>) {
         let Ok(state) = serde_json::from_str::<vtop_core::SessionState>(renewed) else {
             warn!("udp: renewed session unreadable");
             return;
@@ -281,7 +281,8 @@ impl Core {
         let mut session = slot.write().await;
         match session.client.resume_session(&state) {
             Ok(()) => {
-                session.logins += 1;
+                session.mark_signed_in();
+                crate::obs::set_regno(session.client.registration_number().ok());
                 self.save(slot, &session);
                 info!("udp: took the session the gateway renewed");
             }

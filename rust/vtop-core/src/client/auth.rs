@@ -6,6 +6,36 @@ use super::{AuthStage, VtopClient, network_error, send_error};
 use crate::error::{VtopError, VtopResult};
 use crate::login::{self, Login, SignIn};
 
+/// Resets `AuthStage::LoggingIn` back to `Idle` if `login` exits via an error or cancellation.
+struct LoggingInGuard<'a> {
+    client: &'a VtopClient,
+    active: bool,
+}
+
+impl<'a> LoggingInGuard<'a> {
+    fn new(client: &'a VtopClient) -> Self {
+        Self {
+            client,
+            active: true,
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for LoggingInGuard<'_> {
+    fn drop(&mut self) {
+        if self.active {
+            let mut state = self.client.state();
+            if matches!(state.auth_stage, AuthStage::LoggingIn) {
+                state.auth_stage = AuthStage::Idle;
+            }
+        }
+    }
+}
+
 impl VtopClient {
     fn begin_auth_flow(&mut self, reason: &str) {
         self.auth_flow_id = self.auth_flow_id.saturating_add(1);
@@ -32,6 +62,7 @@ impl VtopClient {
             VtopError::ConfigurationError("this client has no credentials to log in with".into())
         })?;
         self.begin_auth_flow("login requested");
+        let mut guard = LoggingInGuard::new(self);
 
         if self.state().session.is_cookie_external() {
             self.auth_log(
@@ -42,6 +73,7 @@ impl VtopClient {
             match self.try_restore_existing_session().await {
                 Ok(true) => {
                     self.state().auth_stage = AuthStage::Idle;
+                    guard.disarm();
                     return Ok(());
                 }
                 Ok(false) => self.auth_log(
@@ -84,6 +116,7 @@ impl VtopClient {
                 state.session.set_registration_number(registration_number);
                 drop(state);
                 self.finish_login("login completed successfully");
+                guard.disarm();
                 Ok(())
             }
             SignIn::OtpRequired { csrf, issued_at } => {
@@ -95,6 +128,7 @@ impl VtopClient {
                     issued_at_unix_seconds: issued_at,
                 };
                 drop(state);
+                guard.disarm();
                 self.auth_log(Level::Info, "otp", "security OTP verification is required");
                 Err(VtopError::OTPRequired(
                     "Additional verification is required.".to_string(),
@@ -213,5 +247,41 @@ impl VtopClient {
         );
         self.reset_session_state();
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::transport::{Hop, HopFuture, Transport, TransportError};
+    use crate::inputs::{Password, Username};
+
+    #[derive(Debug)]
+    struct FailingTransport;
+
+    impl Transport for FailingTransport {
+        fn send(&self, _hop: Hop) -> HopFuture<'_> {
+            Box::pin(async { Err(TransportError::Connect("offline".into())) })
+        }
+
+        fn pause(
+            &self,
+            _duration: std::time::Duration,
+        ) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send + '_>> {
+            Box::pin(async {})
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_login_resets_auth_stage_to_idle() {
+        let mut client = VtopClient::builder()
+            .transport(std::sync::Arc::new(FailingTransport))
+            .with_credentials(
+                Username::parse("22BCE0001").unwrap(),
+                Password::parse("pw").unwrap(),
+            )
+            .unwrap();
+        assert!(client.login().await.is_err());
+        assert_eq!(client.state().auth_stage, AuthStage::Idle);
     }
 }

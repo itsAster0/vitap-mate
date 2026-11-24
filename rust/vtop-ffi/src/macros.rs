@@ -11,7 +11,7 @@ macro_rules! signed_in {
         let first = {
             let session = slot.read().await;
             let $client = &session.client;
-            if session.otp.is_some() {
+            if session.is_awaiting_otp() {
                 // Waiting for the OTP: a call now would check the session with VTOP, which
                 // bounces to the login page and wipes the challenge the code is for.
                 // `relogin` answers with the open challenge instead.

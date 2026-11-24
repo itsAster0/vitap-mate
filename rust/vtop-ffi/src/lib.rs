@@ -227,6 +227,28 @@ pub struct SavedAccount {
     pub registration_number: Option<String>,
 }
 
+/// Where an active security OTP challenge started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OtpVia {
+    Phone,
+    Server,
+}
+
+/// Lifecycle of an installed VTOP session slot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SessionPhase {
+    /// Normal session (signed in or restored cookies ready to validate/relogin).
+    Active,
+    /// VTOP accepted the password and is waiting for the emailed security OTP.
+    AwaitingOtp {
+        via: OtpVia,
+        message: String,
+        challenge_id: u64,
+    },
+    /// VTOP rejected the saved password; no automatic sign-in is tried again.
+    PasswordRejected,
+}
+
 struct Session {
     client: VtopClient,
     /// The client's cookies: the shared store's (the web view's) once this session is installed.
@@ -234,10 +256,9 @@ struct Session {
     account: Account,
     /// Bumped on every sign-in, so concurrent fetches re-login once.
     logins: u64,
-    /// The OTP prompt while VTOP waits for the emailed code.
-    otp: Option<String>,
-    /// That sign-in was the server's ([`Core::server_otp`] sends the code).
-    server_otp: bool,
+    phase: SessionPhase,
+    /// Monotonic id for OTP challenges on this slot so stale submissions are rejected.
+    next_challenge: u64,
 }
 
 impl Session {
@@ -252,14 +273,85 @@ impl Session {
             .config(dev::vtop_config(shared))
             .transport(transport::current(shared)?)
             .cookie_store(cookies.clone());
+        let phase = if account.rejected {
+            SessionPhase::PasswordRejected
+        } else {
+            SessionPhase::Active
+        };
         Ok(Self {
             client: client.with_credentials(username, password)?,
             cookies,
             account,
             logins: 0,
-            otp: None,
-            server_otp: false,
+            phase,
+            next_challenge: 0,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(client: VtopClient, account: Account) -> Self {
+        let phase = if account.rejected {
+            SessionPhase::PasswordRejected
+        } else {
+            SessionPhase::Active
+        };
+        Self {
+            client,
+            cookies: store::cookies::SessionCookies::new(),
+            account,
+            logins: 0,
+            phase,
+            next_challenge: 0,
+        }
+    }
+
+    pub(crate) fn is_awaiting_otp(&self) -> bool {
+        matches!(self.phase, SessionPhase::AwaitingOtp { .. })
+    }
+
+    pub(crate) fn otp_message(&self) -> Option<&str> {
+        match &self.phase {
+            SessionPhase::AwaitingOtp { message, .. } => Some(message.as_str()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn server_otp_challenge(&self) -> Option<u64> {
+        match self.phase {
+            SessionPhase::AwaitingOtp {
+                via: OtpVia::Server,
+                challenge_id,
+                ..
+            } => Some(challenge_id),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn is_password_rejected(&self) -> bool {
+        matches!(self.phase, SessionPhase::PasswordRejected)
+    }
+
+    pub(crate) fn begin_otp(&mut self, via: OtpVia, message: String) -> u64 {
+        self.next_challenge = self.next_challenge.saturating_add(1);
+        let challenge_id = self.next_challenge;
+        self.phase = SessionPhase::AwaitingOtp {
+            via,
+            message,
+            challenge_id,
+        };
+        challenge_id
+    }
+
+    pub(crate) fn mark_signed_in(&mut self) {
+        self.account.rejected = false;
+        self.phase = SessionPhase::Active;
+        self.logins = self.logins.saturating_add(1);
+    }
+
+    pub(crate) fn mark_password_rejected(&mut self) {
+        vtop_core::session::CookieStore::clear(self.cookies.as_ref());
+        self.account.rejected = true;
+        self.phase = SessionPhase::PasswordRejected;
     }
 
     /// Starts over on a fresh client with no cookies (the shared store's go too): no
@@ -267,8 +359,9 @@ impl Session {
     fn restart(&mut self, shared: &Arc<Shared>) -> Result<(), CoreError> {
         let fresh = Self::new(self.account.clone(), shared)?;
         fresh.cookies.activate(&shared.cookies, true);
-        (self.client, self.cookies, self.otp) = (fresh.client, fresh.cookies, None);
-        self.server_otp = false;
+        self.client = fresh.client;
+        self.cookies = fresh.cookies;
+        self.phase = fresh.phase;
         Ok(())
     }
 }

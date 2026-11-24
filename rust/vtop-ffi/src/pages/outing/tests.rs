@@ -525,19 +525,15 @@ async fn core_on(mock: &MockVtop, name: &str) -> (Core, PathBuf) {
             logged_in_at: None,
         })
         .unwrap();
-    let session = Session {
+    let session = Session::for_test(
         client,
-        cookies: crate::store::cookies::SessionCookies::new(),
-        account: Account {
+        Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
             rejected: false,
             registration_number: None,
         },
-        logins: 0,
-        otp: None,
-        server_otp: false,
-    };
+    );
     let core = Core::for_test(&dir);
     core.install(Some(Arc::new(RwLock::new(session))));
     (core, dir)
