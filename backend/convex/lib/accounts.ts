@@ -4,7 +4,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { AccountRecord, type KeyRecord, MAX_PHONES, MAX_SIGN_INS, type PhoneRecord, type SignInRecord, leastRecent, toFields } from "./accountState";
-import { claimMailbox } from "./mailboxes";
+import { claimMailbox, touch } from "./mailboxes";
 import { now } from "./util";
 
 export async function accountByRegno(ctx: QueryCtx, regno: string): Promise<Doc<"accounts"> | null> {
@@ -73,15 +73,22 @@ export async function unlinkPhone(ctx: MutationCtx, device: Doc<"devices">): Pro
 
 /** Takes the install off every forwarding address, and deletes its mail, except `keep`'s: a phone
  * that changes student must not get the last one's OTPs. By install, not by account, so rows
- * migrated under an account the phone was never linked to go too. */
+ * migrated under an account the phone was never linked to go too. Kept memberships are marked
+ * seen (hourly at most), so an active phone isn't dropped as stale when another joins. */
 async function dropMail(ctx: MutationCtx, deviceId: string, keep?: Id<"accounts">): Promise<void> {
-  for (const table of ["mailboxDevices", "otpInbox"] as const) {
-    const rows = await ctx.db
-      .query(table)
-      .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
-      .collect();
-    for (const row of rows) if (row.accountId !== keep) await ctx.db.delete(row._id);
+  const members = await ctx.db
+    .query("mailboxDevices")
+    .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+    .collect();
+  for (const row of members) {
+    if (row.accountId !== keep) await ctx.db.delete(row._id);
+    else await touch(ctx, row);
   }
+  const boxes = await ctx.db
+    .query("otpInbox")
+    .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+    .collect();
+  for (const row of boxes) if (row.accountId !== keep) await ctx.db.delete(row._id);
 }
 
 /** Links the install as one of the account's phones (linking again marks it seen). The phone seen

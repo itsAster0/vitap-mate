@@ -39,6 +39,24 @@ describe("addresses", () => {
     expect(rows.every((r) => r.accountId === ta.account)).toBe(true);
   });
 
+  it("keeps an active phone on the address when a second phone joins months later", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const b = await phone(2);
+    const ta = await prove(t, a);
+    const box = await ta.as.mutation(api.mail.register, { flow: "f" });
+    // Phone a stays active and refreshes past MEMBER_STALE_SECS (60 days).
+    advance(61 * 86_400);
+    await t.action(api.auth.token, await a.signed("auth:token", { refreshToken: ta.refreshToken }));
+    const tb = await prove(t, b);
+    expect(await tb.as.mutation(api.mail.register, { flow: "f" })).toEqual(box);
+    const { devices } = await ta.as.query(api.mail.devices, { flow: "f", id: box.id });
+    expect(devices.map((d) => d.deviceId).sort()).toEqual([a.deviceId, b.deviceId].sort());
+    expect((await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "555555" })).status).toBe(200);
+    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).sealed).toBeTruthy();
+    expect((await tb.as.query(api.mail.inbox, { flow: "f", id: box.id })).sealed).toBeTruthy();
+  });
+
   it("leave keeps the address; remove deletes it when last; others can be taken off", async () => {
     const t = await setup();
     const a = await phone(1);

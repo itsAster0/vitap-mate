@@ -108,13 +108,25 @@ describe("server sign-ins", () => {
     await as.action(api.app.login, { flow: "f" });
     // Ends with its request: nobody waits for it after that.
     advance(REQUEST_TIMEOUT_SECS - 1);
-    await t.mutation(internal.sweeps.minute, {});
+    await t.mutation(internal.sweeps.fiveMinutes, {});
     expect(await t.run((ctx) => ctx.db.query("logins").collect())).toHaveLength(1);
     advance(1);
-    await t.mutation(internal.sweeps.minute, {});
+    await t.mutation(internal.sweeps.fiveMinutes, {});
     expect(await t.run((ctx) => ctx.db.query("logins").collect())).toEqual([]);
     const { signIns } = await as.query(api.app.status, { flow: "f" });
     expect(signIns[0]).toMatchObject({ by: "server", ok: false, reason: "otp_not_found: the OTP mail did not arrive" });
+  });
+
+  it("ignore late OTP mail once expired, even before the 5-minute sweep runs", async () => {
+    const t = await setup();
+    const { as } = await student(t);
+    const calls = otpEngine("654321");
+    await as.action(api.app.login, { flow: "f" });
+    const initialCalls = calls.length;
+    advance(REQUEST_TIMEOUT_SECS);
+    await mail(t, "654321");
+    await drain(t);
+    expect(calls).toHaveLength(initialCalls);
   });
 
   it("start nothing for a request that is no longer waiting", async () => {

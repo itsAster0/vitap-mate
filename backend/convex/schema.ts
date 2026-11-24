@@ -73,8 +73,7 @@ export default defineSchema({
     .index("by_hash", ["hash"])
     .index("by_chain", ["chainId"])
     .index("by_device", ["deviceId"])
-    .index("by_account", ["accountId"])
-    .index("by_createdAt", ["createdAt"]),
+    .index("by_account", ["accountId"]),
 
   /** TLSNotary tickets: `open` from `auth:proveStart`, `taken` once the engine starts the proof,
    * then `proved` (with the registration number the proof showed, until `auth:token` uses the

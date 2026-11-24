@@ -1,7 +1,7 @@
 // Server sign-ins with saved credentials, one engine step per call (`/engine/login`). The first
 // step signs in whole (Gmail, or no OTP asked) or stops at VTOP's OTP; a stopped one waits here
 // until the student's forwarded OTP mail comes (`mail.deliver` schedules `resume`) or
-// `LOGIN_WAIT_SECS` pass (`sweeps.minute`). Each outcome goes to `sessions.loginDone`. Nothing
+// `LOGIN_WAIT_SECS` pass (`sweeps.fiveMinutes`). Each outcome goes to `sessions.loginDone`. Nothing
 // waits on mail or polls.
 
 import { v } from "convex/values";
@@ -96,7 +96,9 @@ export const waiting = internalQuery({
   handler: async (ctx, { loginId }) => {
     const row = await ctx.db.get(loginId);
     const account = row && (await ctx.db.get(row.accountId));
-    return row && account && row.sealedState !== null ? { sealedState: row.sealedState, regno: account.regno, requestId: row.requestId } : null;
+    return row && account && row.sealedState !== null && row.expiresAt > now()
+      ? { sealedState: row.sealedState, regno: account.regno, requestId: row.requestId }
+      : null;
   },
 });
 
@@ -124,6 +126,11 @@ export const stepped = internalMutation({
       return;
     }
     if (!row) return;
+    if (row.expiresAt <= now()) {
+      await ctx.db.delete(loginId);
+      await loginDone(ctx, regno, requestId, OTP_NOT_FOUND);
+      return;
+    }
     await ctx.db.patch(loginId, { sealedState: answer.sealedState, since: answer.since, busy: row.next !== null, next: null });
     if (row.next !== null) await ctx.scheduler.runAfter(0, internal.logins.resume, { loginId, otp: row.next });
   },
@@ -132,12 +139,13 @@ export const stepped = internalMutation({
 /** A code from the student's forwarded mail, sent at `sentAt`, for each of their sign-ins
  * waiting on one. */
 export async function offerCode(ctx: MutationCtx, accountId: Id<"accounts">, otp: string, sentAt: number): Promise<void> {
+  const at = now();
   const rows = await ctx.db
     .query("logins")
     .withIndex("by_account", (q) => q.eq("accountId", accountId))
     .collect();
   for (const row of rows) {
-    if (sentAt < row.since) continue;
+    if (row.expiresAt <= at || sentAt < row.since) continue;
     if (row.busy) {
       await ctx.db.patch(row._id, { next: otp });
       continue;

@@ -581,7 +581,8 @@ impl Engine {
             return None;
         }
         kept.at = Instant::now();
-        // A newer JWT, sent without the session: the kept one runs out in 15 minutes.
+        // A newer JWT, sent without the session: the phone sends each new one once, before
+        // the kept one runs out.
         if page.account.is_some() {
             kept.account.clone_from(&page.account);
         }

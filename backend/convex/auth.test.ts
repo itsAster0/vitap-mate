@@ -86,7 +86,7 @@ describe("tokens", () => {
     const tokens = await prove(t, p, "22bce0001");
     expect(tokens.regno).toBe(REGNO);
     expect(tokens.jwt.split(".")).toHaveLength(3);
-    expect(tokens.jwtExpiresAt).toBe((T0 + 900) * 1000);
+    expect(tokens.jwtExpiresAt).toBe((T0 + 24 * 3600) * 1000);
     expect(tokens.refreshToken).toMatch(/^vrt_[A-Za-z0-9_-]{43}$/);
     const payload = JSON.parse(atob(tokens.jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))) as Record<string, unknown>;
     expect(payload).toMatchObject({ sub: p.deviceId, regno: REGNO, acct: tokens.account, aud: "vmate", iss: "https://vmate.test" });
@@ -118,8 +118,9 @@ describe("tokens", () => {
     expect(second.refreshToken).not.toBe(first.refreshToken);
     const third = await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: second.refreshToken }));
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: first.refreshToken })))).toBe("refresh_reused");
-    // The newest token went with the chain.
+    // The newest token went with the chain, and the live 24-hour JWT stops working at once.
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: third.refreshToken })))).toBe("refresh_invalid");
+    expect(await codeOf(first.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
     expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(0);
   });
 
@@ -148,14 +149,42 @@ describe("tokens", () => {
     expect((await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: fresh.refreshToken }))).regno).toBe(fresh.regno);
   });
 
-  it("a refresh token works only from its own install and for 90 days", async () => {
+  it("a refresh token works only from its own install and has no time limit", async () => {
     const t = await setup();
     const p = await phone(1);
     const thief = await phone(2);
     const tokens = await prove(t, p);
     expect(await codeOf(t.action(api.auth.token, await thief.signed("auth:token", { refreshToken: tokens.refreshToken })))).toBe("refresh_invalid");
-    advance(90 * 86_400);
-    expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: tokens.refreshToken })))).toBe("refresh_invalid");
+    // Still works after more than 90 days, including a retry after a lost rotation reply.
+    advance(365 * 86_400);
+    const rotated = await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: tokens.refreshToken }));
+    expect(rotated.regno).toBe(REGNO);
+    advance(120 * 86_400);
+    const retried = await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: tokens.refreshToken }));
+    expect(retried.regno).toBe(REGNO);
+    expect(retried.refreshToken).not.toBe(rotated.refreshToken);
+  });
+
+  it("keeps both phones signed in with valid refresh and forwarding when a second phone proves the same account", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const b = await phone(2);
+    const ta = await prove(t, a);
+    const box = await ta.as.mutation(api.mail.register, { flow: "f" });
+    advance(10);
+    const tb = await prove(t, b);
+    expect(await tb.as.mutation(api.mail.register, { flow: "f" })).toEqual(box);
+    // Both phones keep working JWTs, independent refresh chains, and mailbox membership.
+    expect((await ta.as.query(api.account.view, { flow: "f" })).phoneCount).toBe(2);
+    expect((await tb.as.query(api.account.view, { flow: "f" })).phoneCount).toBe(2);
+    expect((await ta.as.query(api.screen.view, { mailbox: box.id })).mailbox).toMatchObject({ devices: expect.any(Array) });
+    expect((await tb.as.query(api.screen.view, { mailbox: box.id })).mailbox).toMatchObject({ devices: expect.any(Array) });
+    const ta2 = await t.action(api.auth.token, await a.signed("auth:token", { refreshToken: ta.refreshToken }));
+    const tb2 = await t.action(api.auth.token, await b.signed("auth:token", { refreshToken: tb.refreshToken }));
+    expect(ta2.regno).toBe(REGNO);
+    expect(tb2.regno).toBe(REGNO);
+    expect((await ta.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(2);
+    expect((await tb.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(2);
   });
 
   it("caps the proofs the engine runs, not the tickets fresh device keys ask for", async () => {
@@ -287,6 +316,10 @@ describe("tokens", () => {
     expect(await codeOf(as.action(api.vtop.fetch, { flow: "f", name: "semesters" }))).toBe("demo_unavailable");
     const refreshed = await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: tokens.refreshToken }));
     expect(refreshed.regno).toBe("DEMO2026");
+    // Signing out ends the demo's 24-hour JWT at once too.
+    await as.mutation(api.auth.signOut, { flow: "f" });
+    expect(await codeOf(as.query(api.devices.info, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: refreshed.refreshToken })))).toBe("refresh_invalid");
   });
 
   it("no JWT, no access", async () => {

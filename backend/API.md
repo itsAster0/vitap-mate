@@ -90,6 +90,7 @@ Every route, with its auth kind; the sections below give the details.
 | GET | `/v1/session/requests/{id}` | key | Polls a pending session request. |
 | POST | `/v1/session/expire` | key | Drops the cached session. |
 | POST | `/v1/pair` | none | The extension polls for the key made for its code. |
+| POST | `/v1/key/token` | key | A short JWT for the extension's socket (`extension:*` queries). |
 | POST | `/v1/pair/info` | none | Whether a pairing code is a browser's or an MCP client's. |
 | POST | `/v1/link` | signed | Links this phone to the student's account. |
 | POST | `/v1/keys` | signed | Makes an access key. |
@@ -438,6 +439,7 @@ an MCP use.
 | `POST /v1/session` | key | `200 { status: "ready", session: { cookies }, cookies: [Cookie-Editor], source }` from the cache, or `202 { status: "pending", stage, serverDueAt, requestId, pollAfterMs, expiresAt }`; `429 rate_limited` |
 | `GET /v1/session/requests/{id}` | key | `202` pending, `200` ready or `{ status: "error", code, error }`, `410 request_expired` |
 | `POST /v1/session/expire` | key | `204`; drops the cached session |
+| `POST /v1/key/token` | key | `{ jwt, expiresAt }` (no-store): a 24 h ES256 JWT `{ sub: keyHash, kind: "key" }` for the Convex socket, never a phone's; not a use of the key; `429` past 10 at once or 30 a minute |
 | `POST /v1/pair` | none | `{ code }` → `200 { status: "ready", key }` once the app made a key with this `pairCode`, else `202 { status: "pending", pollAfterMs }`; `400` for a malformed code |
 | `POST /v1/pair/info` | none | `{ code }` → `{ kind: "mcp", name, host }` when the code is an MCP client's authorize page (below) still waiting, else `{ kind: "browser" }`; `400` for a malformed code. The app asks before it approves. |
 
@@ -446,6 +448,13 @@ an MCP use.
 as `1`), shows it, and polls `POST /v1/pair`. The app sends it as
 `pairCode` on `/v1/keys`; the edge holds the new key under the code's
 SHA-256 for 5 minutes and hands it out once.
+
+**Live.** Builds from 3.0.0 open the Convex socket with a key JWT and watch
+`extension:key` (the account, null once revoked), `extension:request`
+(a request's stage, the server's sign-in step and `expiresAt`, never cookies),
+and `extension:pairing({ codeHash })` (`{ ready }` once the app approved; no sign-in).
+The newest build comes from GitHub, never the server. Cookies and keys still come once over
+`GET /v1/session/requests/{id}` and `POST /v1/pair`.
 
 When the code is an MCP client's (see OAuth below), `/v1/keys` names the
 key after the client (`label` is ignored), hands it to that sign-in

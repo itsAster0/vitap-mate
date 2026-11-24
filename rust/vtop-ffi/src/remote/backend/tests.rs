@@ -317,3 +317,46 @@ async fn a_switch_signs_out_of_the_last_students_account() {
     core.sign_out_last_student("f").await;
     assert_eq!(paths(&edge).len(), 2);
 }
+
+#[tokio::test]
+async fn an_expired_jwt_is_renewed_with_the_refresh_token_never_proved() {
+    let (core, edge, server) = setup("expired").await;
+    keep_token(&core, &server);
+    // The first JWT has run out by the next call (as one does minutes later).
+    let expired = json!({
+        "jwt": "jwt-old",
+        "jwtExpiresAt": (crate::test_edge::now() - 1) * 1000,
+        "refreshToken": "vrt_next",
+        "regno": "22BCE0001",
+        "account": "acct1",
+    });
+    can(&edge, "auth:token", 200, expired);
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    view(&core, "f1", true).await.unwrap().unwrap();
+    view(&core, "f2", true).await.unwrap().unwrap();
+    assert_eq!(
+        paths(&edge),
+        ["auth:token", "account:view", "auth:token", "account:view"]
+    );
+    assert_eq!(body(&edge, 2), json!({ "refreshToken": "vrt_next" }));
+    assert_eq!(core.device().refresh.unwrap().token, "vrt_1");
+}
+
+#[tokio::test]
+async fn a_refresh_failing_for_another_reason_keeps_the_token_and_never_proves() {
+    let (core, edge, server) = setup("refresh-other").await;
+    keep_token(&core, &server);
+    // Not a verdict on the refresh token (the socket's old JWT, a server fault): kept.
+    can(
+        &edge,
+        "auth:token",
+        401,
+        json!({ "code": "unauthenticated" }),
+    );
+    can(&edge, "auth:token", 500, json!({ "code": "server_error" }));
+    assert!(view(&core, "f1", true).await.is_err());
+    assert!(view(&core, "f2", true).await.is_err());
+    assert_eq!(paths(&edge), ["auth:token", "auth:token"]);
+    assert_eq!(core.device().refresh.unwrap().token, REFRESH);
+}

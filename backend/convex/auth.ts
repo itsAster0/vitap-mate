@@ -31,8 +31,6 @@ import { accountId, log, now, str } from "./lib/util";
 export const TICKET_TTL_SECS = 120;
 /** How long a proved ticket waits for its `auth:token`. */
 export const PROVED_TTL_SECS = 300;
-/** A refresh token unused this long is gone. */
-export const REFRESH_TTL_SECS = 90 * 86_400;
 export const REFRESH_PREFIX = "vrt_";
 
 // ---- the proof ticket -------------------------------------------------------------------
@@ -154,7 +152,7 @@ function grantOf(body: Record<string, unknown>): Asked {
   if (kinds.filter(Boolean).length !== 1) badRequest("Send exactly one of ticket, refreshToken, v2AccountToken or demo.");
   if (body.refreshToken !== undefined) {
     const token = str(body.refreshToken) ?? "";
-    if (!token.startsWith(REFRESH_PREFIX)) fail("refresh_invalid", "Unknown or expired refresh token; prove the account again.");
+    if (!token.startsWith(REFRESH_PREFIX)) fail("refresh_invalid", "Unknown or revoked refresh token; prove the account again.");
     return { kind: "refresh", token };
   }
   const device = deviceOf(body.device);
@@ -228,7 +226,7 @@ async function deleteChain(ctx: MutationCtx, chainId: string): Promise<void> {
 }
 
 const REFUSALS = {
-  refresh_invalid: "Unknown or expired refresh token; prove the account again.",
+  refresh_invalid: "Unknown or revoked refresh token; prove the account again.",
   refresh_reused: "This refresh token was used already; prove the account again.",
   device_removed: "This phone was removed from the account; sign in again.",
 } as const;
@@ -272,7 +270,7 @@ export const grant = internalMutation({
               .withIndex("by_chain", (q) => q.eq("chainId", row.chainId))
               .collect()
           ).filter((r) => r._creationTime > row._creationTime);
-          if (at < row.createdAt + REFRESH_TTL_SECS && later.length === 1 && later[0].usedAt === null) {
+          if (later.length === 1 && later[0].usedAt === null) {
             const account = row.accountId === undefined ? null : await ctx.db.get(row.accountId);
             const device = await deviceRow(ctx, deviceId);
             if (!device || (row.accountId !== undefined && (!account || device.accountId !== account._id))) {
@@ -285,12 +283,11 @@ export const grant = internalMutation({
             return account ? { regno: account.regno, account: account._id, demo: false } : { regno: DEMO_REGNO, account: "demo", demo: true };
           }
           await deleteChain(ctx, row.chainId);
+          // Unlink too so any live 24-hour JWT stops working at once and OTPs stop going here.
+          const leaked = await deviceRow(ctx, deviceId);
+          if (leaked) await unlinkPhone(ctx, leaked);
           console.warn("auth: a replaced refresh token came back; its chain is revoked");
           return { refused: "refresh_reused" };
-        }
-        if (at >= row.createdAt + REFRESH_TTL_SECS) {
-          await deleteChain(ctx, row.chainId);
-          return invalid();
         }
         const device = await deviceRow(ctx, deviceId);
         if (!device) {

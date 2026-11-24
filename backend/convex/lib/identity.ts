@@ -25,6 +25,8 @@ export type Claims = { deviceId: string; regno: string; acct: string; demo: bool
 
 export function claimsOf(identity: UserIdentity | null): Claims {
   if (identity === null) fail("unauthenticated", "Sign in first.");
+  // An access key's JWT (the extension's) never acts as a phone.
+  if (identity.kind !== undefined) fail("unauthenticated", "Sign in first.");
   const regno = identity.regno;
   const acct = identity.acct;
   if (typeof regno !== "string" || typeof acct !== "string") fail("unauthenticated", "Sign in first.");
@@ -43,7 +45,14 @@ export async function deviceRow(ctx: QueryCtx, deviceId: string): Promise<Doc<"d
 export async function callerOf(ctx: QueryCtx, claims: Claims): Promise<Caller> {
   const device = await deviceRow(ctx, claims.deviceId);
   if (!device) return removed();
-  if (claims.demo) return { deviceId: claims.deviceId, device, regno: DEMO_REGNO, demo: true, account: null };
+  if (claims.demo) {
+    const live = await ctx.db
+      .query("refreshTokens")
+      .withIndex("by_device", (q) => q.eq("deviceId", claims.deviceId))
+      .first();
+    if (!live || live.accountId !== undefined) return removed();
+    return { deviceId: claims.deviceId, device, regno: DEMO_REGNO, demo: true, account: null };
+  }
   const id = ctx.db.normalizeId("accounts", claims.acct);
   const account = id && (await ctx.db.get(id));
   if (!account || account.regno !== claims.regno || device.accountId !== account._id) return removed();

@@ -368,21 +368,21 @@ struct Issued {
 /// The last student's refresh token, set aside at a switch ([`Core::set_aside_identity`]).
 pub(crate) const LAST_STUDENT: &str = "server_last_student.json";
 
-/// Codes `auth:token` answers a refresh or v2 token it won't take with: the next source is
-/// tried.
 /// Whether a sign-out answered `code` because there is nothing left to sign out of.
 pub(crate) fn signed_out_already(code: &str) -> bool {
-    TOKEN_REFUSED.contains(&code)
+    TOKEN_REFUSED.contains(&code) || code == "unauthenticated"
 }
 
-const TOKEN_REFUSED: [&str; 7] = [
+/// Codes `auth:token` answers a refresh or v2 token it won't take with: the token is dropped
+/// and the next source is tried. Any other failure (offline, a server fault) keeps it, so a
+/// passing fault never costs a new proof.
+const TOKEN_REFUSED: [&str; 6] = [
     "device_removed",
     "refresh_reused",
     "refresh_invalid",
     "refresh_expired",
     "token_invalid",
     "token_expired",
-    "unauthenticated",
 ];
 
 impl Shared {
@@ -841,7 +841,7 @@ impl Core {
             .await
         {
             Ok(issued) => issued,
-            Err(error) if TOKEN_REFUSED.contains(&error.code()) => {
+            Err(error) if signed_out_already(error.code()) => {
                 info!(code = error.code(), "last student already signed out here");
                 self.forget(&[LAST_STUDENT]);
                 return;

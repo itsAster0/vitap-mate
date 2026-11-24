@@ -12,15 +12,18 @@ import { fail } from "./errors";
 import { hashesEqual } from "./crypto";
 
 export const AUDIENCE = "vmate";
-export const ACCESS_TTL_SECS = 15 * 60;
+export const ACCESS_TTL_SECS = 24 * 3600;
 
 const utf8 = new TextEncoder();
 const part = (value: object) => toBase64Url(utf8.encode(JSON.stringify(value)));
 
 export type AccessClaims = { sub: string; regno: string; acct: string; demo?: true };
+/** An access key's JWT for the extension's socket: `sub` is the key's SHA-256. It carries no
+ * `regno` or `acct`, so nothing that wants a phone can take it. */
+export type KeyClaims = { sub: string; kind: "key" };
 
-/** A compact JWT for `claims`, valid for 15 minutes from `nowSecs`. */
-export async function signAccessJwt(claims: AccessClaims, nowSecs: number): Promise<{ jwt: string; expiresAt: number }> {
+/** A compact JWT for `claims`, valid for 24 hours from `nowSecs`. */
+export async function signAccessJwt(claims: AccessClaims | KeyClaims, nowSecs: number): Promise<{ jwt: string; expiresAt: number }> {
   const raw = process.env.JWT_PRIVATE_JWK;
   if (!raw) throw new Error("JWT_PRIVATE_JWK is not configured");
   const jwk = JSON.parse(raw) as JsonWebKey & { kid?: string };

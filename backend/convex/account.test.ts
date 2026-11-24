@@ -277,7 +277,7 @@ describe("guides", () => {
 });
 
 describe("sweeps", () => {
-  it("drop expired tickets, stale sessions and unused refresh tokens", async () => {
+  it("drop expired tickets and stale sessions, and keep refresh tokens", async () => {
     const t = await setup();
     const { as, account } = await prove(t, await phone(1));
     await t.mutation(api.auth.proveStart, await (await phone(2)).signed("auth:proveStart", {}));
@@ -286,14 +286,15 @@ describe("sweeps", () => {
       await ctx.db.patch(ctx.db.normalizeId("accounts", account)!, { sealedSession: "s", sessionSavedAt: at, sessionSource: "phone" });
     });
     advance(121);
-    await t.mutation(internal.sweeps.minute, {});
+    await t.mutation(internal.sweeps.fiveMinutes, {});
     expect(await t.run((ctx) => ctx.db.query("proofTickets").collect())).toHaveLength(0);
     advance(7 * 86_400);
     await t.mutation(internal.sweeps.quarter, {});
     expect((await as.query(api.app.status, { flow: "f" })).sessionSavedAt).toBeNull();
-    advance(90 * 86_400);
-    await t.mutation(internal.sweeps.day, {});
-    expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(0);
+    advance(180 * 86_400);
+    await t.mutation(internal.sweeps.fiveMinutes, {});
+    await t.mutation(internal.sweeps.quarter, {});
+    expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(1);
   });
 });
 

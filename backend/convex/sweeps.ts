@@ -2,7 +2,6 @@
 // sweep deletes at most `BATCH` rows a run; the next run takes the rest.
 
 import { internalMutation } from "./_generated/server";
-import { REFRESH_TTL_SECS } from "./auth";
 import { saveRecord } from "./lib/accounts";
 import { REQUEST_KEEP_SECS, SESSION_CACHE_SECS } from "./lib/accountState";
 import { recordOf } from "./lib/identity";
@@ -12,9 +11,9 @@ import { now } from "./lib/util";
 
 const BATCH = 500;
 
-/** Every minute: expired tickets, pairings, OAuth requests and codes, server sign-ins whose OTP
+/** Every 5 minutes: expired tickets, pairings, OAuth requests and codes, server sign-ins whose OTP
  * mail never came, and finished session requests (kept 10 minutes for late polls and answers). */
-export const minute = internalMutation({
+export const fiveMinutes = internalMutation({
   args: {},
   handler: async (ctx) => {
     const at = now();
@@ -63,18 +62,5 @@ export const quarter = internalMutation({
       if (expired) doc.clearVault();
       await saveRecord(ctx, account._id, doc);
     }
-  },
-});
-
-/** Every day: refresh tokens unused for 90 days. */
-export const day = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const at = now();
-    const tokens = await ctx.db
-      .query("refreshTokens")
-      .withIndex("by_createdAt", (q) => q.lte("createdAt", at - REFRESH_TTL_SECS))
-      .take(BATCH);
-    for (const row of tokens) await ctx.db.delete(row._id);
   },
 });

@@ -4,8 +4,9 @@
 //! the library needs no tokio. Where the gateway listens and its keys come from the server's
 //! `udp:keys`, kept in [`GATEWAY`]; vtop-wire keeps its sessions in [`WIRE_DIR`].
 
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -29,15 +30,19 @@ const GATEWAY_KEEP_SECS: i64 = 6 * 3600;
 /// The whole UDP attempt, the engine's VTOP time in it; the route falls back to HTTPS after it.
 /// A gateway that never answers is given up on sooner (vtop-wire's `SILENT`, 5 s).
 const TIMEOUT: Duration = Duration::from_secs(30);
-/// How often the gateway gets a fresh JWT, which it signs in with when the session it holds
-/// expires: well inside the JWT's 15 minutes.
-const JWT_EVERY_MS: i64 = 10 * 60_000;
-/// When a JWT last went to the gateway (unix ms).
-static JWT_SENT_MS: AtomicI64 = AtomicI64::new(0);
+/// A hash of the JWT last sent to the gateway (0: none), which it signs in with when the session
+/// it holds expires. Each new JWT goes once, whatever its lifetime.
+static JWT_SENT: AtomicU64 = AtomicU64::new(0);
 
 /// The next fetch sends the JWT again: the identity changed (sign-out, another student).
 pub(crate) fn forget_jwt_sent() {
-    JWT_SENT_MS.store(0, Ordering::Relaxed);
+    JWT_SENT.store(0, Ordering::Relaxed);
+}
+
+fn jwt_hash(jwt: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    jwt.hash(&mut hasher);
+    hasher.finish().max(1)
 }
 
 /// One datagram received; `ip` without a scope.
@@ -204,10 +209,9 @@ impl Core {
             None => self.udp_gateway(&server, flow).await?,
         };
         page.session_hash = session_hash(&session);
-        let now_ms = unix_now().saturating_mul(1000);
-        if now_ms - JWT_SENT_MS.load(Ordering::Relaxed) >= JWT_EVERY_MS {
-            page.account = self.live_jwt();
-        }
+        page.account = self
+            .live_jwt()
+            .filter(|jwt| jwt_hash(jwt) != JWT_SENT.load(Ordering::Relaxed));
         loop {
             let key = gateway
                 .key(self.server_now())
@@ -242,8 +246,8 @@ impl Core {
             );
             let answer =
                 WirePageResponse::decode(&fetched.body).ok_or("unreadable answer from UDP")?;
-            if page.account.is_some() {
-                JWT_SENT_MS.store(now_ms, Ordering::Relaxed);
+            if let Some(jwt) = &page.account {
+                JWT_SENT.store(jwt_hash(jwt), Ordering::Relaxed);
             }
             if answer.status == NEED_SESSION && page.session.is_none() {
                 page.session = Some(session.clone());

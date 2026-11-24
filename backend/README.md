@@ -9,7 +9,7 @@ edge's Durable Objects. The contract is
 
 ```
 convex/schema.ts      every table; regno only on accounts, the rest link by accountId
-convex/auth.ts        TLSNotary tickets, auth:token (JWT + refresh chain), signOut
+convex/auth.ts        TLSNotary tickets, auth:token (24 h JWT + non-expiring rotating refresh chain), signOut
 convex/account.ts     account:view and the account's settings, phones, sign-ins, delete
 convex/app.ts         app:status, app:sessionClear, app:login and app:loginResult (live)
 convex/logins.ts      server sign-ins as scheduled engine steps: the OTP mail resumes them
@@ -19,6 +19,7 @@ convex/pair.ts        pair:info and pairing a browser or AI app
 convex/devices.ts     the install itself
 convex/sessions.ts    key holders' session requests, sessions:pending and sessions:answer
 convex/keys.ts        access keys for the extension and MCP
+convex/extension.ts   the extension's live queries (extension:key, request, pairing)
 convex/mail.ts        forwarding addresses (register, join), the sealed inbox, mail in
 convex/oauth.ts       MCP OAuth (register, authorize, token)
 convex/vtop.ts        vtop:fetch, fetchBatch and login* on the engine
