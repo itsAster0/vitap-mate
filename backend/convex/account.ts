@@ -6,12 +6,13 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { type MutationCtx, action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { deleteOwned, keysOf, phoneOf, phoneRows, phonesOf, saveRecord, unlinkPhone } from "./lib/accounts";
-import { AccountRecord, parseSettings, phoneId, semesterId } from "./lib/accountState";
+import { AccountRecord, SESSION_CACHE_SECS, parseSettings, phoneId, semesterId } from "./lib/accountState";
 import { deleteMailbox } from "./lib/mailboxes";
 import { badRequest, fail } from "./lib/errors";
 import { memberLabel } from "./lib/checks";
-import { credentialsOf, usableText } from "./lib/credentials";
+import { credentialsOf, credentialsValidator, usableText } from "./lib/credentials";
 import { type Caller, actionCaller, caller, mailboxOfAccount, realCaller, recordOf } from "./lib/identity";
+import { settings as settingsValidator } from "./schema";
 import { sealCredentials } from "./sessions";
 import { log, now } from "./lib/util";
 
@@ -48,7 +49,7 @@ async function change(ctx: MutationCtx, flow: string, what: string, edit: (doc: 
  * can read the OTP (Gmail access sent along, or a forwarding address); otherwise nothing is kept.
  * `label` renames this phone. Answers `{ savedCredentials, forwarding }`. */
 export const saveCredentials = action({
-  args: { flow: v.string(), label: v.optional(v.string()), credentials: v.any() },
+  args: { flow: v.string(), label: v.optional(v.string()), credentials: credentialsValidator },
   handler: async (ctx, args): Promise<{ savedCredentials: boolean; forwarding: boolean }> => {
     const me = await actionCaller(ctx);
     if (!me.account) return fail("demo_unavailable", "The demo account can't do this.");
@@ -100,7 +101,7 @@ export const forgetCredentials = mutation({
 });
 
 export const setSettings = mutation({
-  args: { flow: v.string(), settings: v.any() },
+  args: { flow: v.string(), settings: settingsValidator },
   handler: (ctx, { flow, settings }) =>
     change(ctx, flow, "settings changed", (doc) => {
       const parsed = parseSettings(settings);
@@ -116,10 +117,35 @@ export const setSemester = mutation({
     if (semester === null) return badRequest("semesterId is required.");
     // Sent with every new JWT: the same semester writes nothing, so live views don't run again.
     const me = await realCaller(ctx);
-    if ((await recordOf(ctx, me.account)).semesterId === semester) return null;
-    return change(ctx, args.flow, "semester set", (doc) => {
-      doc.semesterId = semester;
-    });
+    const doc = await recordOf(ctx, me.account);
+    if (doc.semesterId === semester) return null;
+    doc.semesterId = semester;
+    await saveRecord(ctx, me.account._id, doc);
+    log({ flow: args.flow, regno: me.regno }, "account: semester set");
+    return null;
+  },
+});
+
+/** Drops an expired cached session or saved vault at its scheduled `sweepAt` so subscribed live
+ * queries (`account:view`, `screen:view`, `extension:key`, `sessions:pending`) re-run. */
+export const expire = internalMutation({
+  args: { accountId: v.id("accounts") },
+  handler: async (ctx, { accountId }) => {
+    const account = await ctx.db.get(accountId);
+    if (!account) return;
+    const at = now();
+    const doc = await recordOf(ctx, account);
+    let changed = false;
+    if (doc.sealedSession !== null && at >= (doc.sessionSavedAt ?? 0) + SESSION_CACHE_SECS) {
+      doc.clearSession();
+      changed = true;
+    }
+    const ttl = doc.settings.vaultTtlSecs;
+    if (doc.sealedVault !== null && ttl !== null && doc.vaultSavedAt !== null && at >= doc.vaultSavedAt + ttl) {
+      doc.clearVault();
+      changed = true;
+    }
+    if (changed) await saveRecord(ctx, accountId, doc);
   },
 });
 

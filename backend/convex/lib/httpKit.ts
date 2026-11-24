@@ -23,34 +23,72 @@ export async function jsonBody(req: Request): Promise<Record<string, unknown> | 
   return parseObject(await req.text());
 }
 
-/** HTTP status for an error code thrown by a function, as the edge answered it. */
+/** HTTP status for an error code thrown by a function. */
 const STATUS: Record<string, number> = {
   bad_request: 400,
+  unauthenticated: 401,
+  device_removed: 401,
   key_unknown: 401,
   not_linked: 403,
+  demo_unavailable: 403,
   request_not_found: 404,
   mailbox_not_found: 404,
+  no_saved_credentials: 409,
   rate_limited: 429,
 };
+
+/** Reads `req`'s body up to `limit` bytes, returning null if `content-length` or the streamed
+ * bytes exceed it. */
+export async function readBodyCapped(req: Request, limit: number): Promise<ArrayBuffer | null> {
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) return null;
+  if (!req.body) return new ArrayBuffer(0);
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out.buffer;
+}
+
+async function handle(ctx: ActionCtx, req: Request, handler: (ctx: ActionCtx, req: Request) => Promise<Response>): Promise<Response> {
+  try {
+    return await handler(ctx, req);
+  } catch (e) {
+    const data = errorData(e);
+    if (data) return Response.json(data, { status: STATUS[data.code] ?? 400 });
+    // `/mcp/<key>` carries an access key in the path.
+    const path = new URL(req.url).pathname.replace(/^\/mcp\/.*/, "/mcp/…");
+    logError({}, `http: ${req.method} ${path} threw`, e);
+    return error(500, "internal_error", "Something went wrong on the server. Try again.");
+  }
+}
 
 /** Runs a handler; a thrown ConvexError becomes its `{ code, error }` reply, anything else
  * `500 internal_error`, never Convex's own page. */
 export function route(handler: (ctx: ActionCtx, req: Request) => Promise<Response>) {
-  return httpAction(async (ctx, req) => {
-    try {
-      return await handler(ctx, req);
-    } catch (e) {
-      const data = errorData(e);
-      if (data) return Response.json(data, { status: STATUS[data.code] ?? 400 });
-      // `/mcp/<key>` carries an access key in the path.
-      const path = new URL(req.url).pathname.replace(/^\/mcp\/.*/, "/mcp/…");
-      logError({}, `http: ${req.method} ${path} threw`, e);
-      return error(500, "internal_error", "Something went wrong on the server. Try again.");
-    }
-  });
+  return httpAction((ctx, req) => handle(ctx, req, handler));
 }
 
-/** CORS as the bridge sends it: every origin, or the listed ones in `ALLOWED_ORIGINS`. */
+/** CORS: every origin, or the listed ones in `ALLOWED_ORIGINS`. */
 export function withCors(response: Response, origin: string | null): Response {
   const out = new Response(response.body, response);
   const allowed = (process.env.ALLOWED_ORIGINS ?? "")
@@ -68,10 +106,10 @@ export function withCors(response: Response, origin: string | null): Response {
   return out;
 }
 
-/** An account route with CORS, and its `OPTIONS` (`204`). */
+/** An account route with CORS applied even to error replies, and its `OPTIONS` (`204`). */
 export function corsRoutes(method: "GET" | "POST", where: { path: string } | { pathPrefix: string }, handler: (ctx: ActionCtx, req: Request) => Promise<Response>): RouteSpec[] {
   return [
-    { ...where, method, handler: route(async (ctx, req) => withCors(await handler(ctx, req), req.headers.get("origin"))) },
+    { ...where, method, handler: httpAction(async (ctx, req) => withCors(await handle(ctx, req, handler), req.headers.get("origin"))) },
     { ...where, method: "OPTIONS", handler: httpAction(async (_ctx, req) => withCors(empty(), req.headers.get("origin"))) },
   ] as RouteSpec[];
 }

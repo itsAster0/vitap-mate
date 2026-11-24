@@ -1,6 +1,5 @@
-// The authorize page an MCP client opens (edge/src/oauth.ts, unchanged): the
-// client's name, a pairing code and its QR, and a script that polls
-// `/authorize/poll`.
+// HTML pages for the MCP OAuth `/authorize` flow: the client's name, a
+// pairing code with its QR, and a script that polls `/authorize/poll`.
 
 import { randomHex } from "./crypto";
 import { qrSvg } from "./qr";

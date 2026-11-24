@@ -1,5 +1,5 @@
-// The account, the install and VTOP on the engine, as a linked phone uses them;
-// plus the sweeps that replaced the Durable Objects' alarms.
+// Account management, device lifecycle, engine-proxied VTOP calls, guides,
+// scheduled expiry transitions, sweeps and FCM pushes.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REGNO, T0, advance, codeOf, engine, phone, prove, setup } from "../test/kit";
@@ -7,6 +7,8 @@ import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { guideFiles } from "../dev/guideFiles";
 import { recordSignIn } from "./lib/accounts";
+import { REQUEST_TIMEOUT_SECS, SESSION_CACHE_SECS } from "./lib/accountState";
+import { sha256Hex } from "./lib/crypto";
 import { GUIDE_FILES } from "./lib/guideFiles";
 import { PACKED_PAGE } from "./vtop";
 
@@ -21,7 +23,8 @@ describe("the account", () => {
     const t = await setup();
     const { as } = await prove(t, await phone(1));
     await as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 } });
-    expect(await codeOf(as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: true, phoneWaitSecs: 11 } }))).toBe("bad_request");
+    expect(await codeOf(as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: true, phoneWaitSecs: 11, vaultTtlSecs: null } }))).toBe("bad_request");
+    await expect(as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: "yes" } as never })).rejects.toThrow();
     await as.mutation(api.account.setSemester, { flow: "f", semesterId: " AP2026275 " });
     expect(await codeOf(as.mutation(api.account.setSemester, { flow: "f", semesterId: "bad id" }))).toBe("bad_request");
     const view = await as.query(api.account.view, { flow: "f" });
@@ -58,12 +61,12 @@ describe("the account", () => {
     // No forwarding address and no Gmail access: nothing is sealed.
     expect(await as.action(api.account.saveCredentials, { flow: "f", credentials: password })).toEqual({ savedCredentials: false, forwarding: false });
     expect(calls).toHaveLength(0);
-    const gmail = { refreshToken: "rt", clientId: "cid" };
+    const gmail = { refreshToken: "rt", clientId: "cid", clientSecret: null, deleteAfterReading: false };
     expect(await as.action(api.account.saveCredentials, { flow: "f", label: "Pixel", credentials: { ...password, gmail, otp: "gmail" } })).toEqual({
       savedCredentials: true,
       forwarding: false,
     });
-    expect(calls[0].body).toEqual({ account: REGNO, username: "22bce0001", password: "pw", gmail: { ...gmail, deleteAfterReading: false }, otp: "gmail" });
+    expect(calls[0].body).toEqual({ account: REGNO, username: "22bce0001", password: "pw", gmail: { refreshToken: "rt", clientId: "cid", deleteAfterReading: false }, otp: "gmail" });
     expect(calls[0].headers.get("x-vtop-flow")).toBe("f");
     const view = await as.query(api.account.view, { flow: "f" });
     expect(view).toMatchObject({ savedCredentials: true, vaultGmail: true, vaultSavedAt: T0 });
@@ -72,7 +75,7 @@ describe("the account", () => {
     await as.mutation(api.mail.register, { flow: "f" });
     engine(() => new Response(null, { status: 500 }));
     expect(await as.action(api.account.saveCredentials, { flow: "f", credentials: password })).toEqual({ savedCredentials: true, forwarding: true });
-    expect(await codeOf(as.action(api.account.saveCredentials, { flow: "f", credentials: null }))).toBe("bad_request");
+    await expect(as.action(api.account.saveCredentials, { flow: "f", credentials: null as never })).rejects.toThrow();
   });
 
   it("refuses the demo's credentials", async () => {
@@ -181,6 +184,26 @@ describe("the install", () => {
       createdAt: Math.floor(Date.now() / 1000),
     });
   });
+
+  it("drops mailbox memberships and otpInbox rows when removed", async () => {
+    const t = await setup();
+    const p = await phone(1);
+    const { as, account } = await prove(t, p);
+    const box = await as.mutation(api.mail.register, { flow: "f" });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("otpInbox", {
+        addressId: box.id,
+        deviceId: p.deviceId,
+        kind: "otp",
+        sealed: "box",
+        receivedAt: Math.floor(Date.now() / 1000),
+        accountId: ctx.db.normalizeId("accounts", account)!,
+      });
+    });
+    await as.mutation(api.devices.remove, { flow: "f" });
+    expect(await t.run((ctx) => ctx.db.query("mailboxDevices").collect())).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
+  });
 });
 
 describe("the Server screen", () => {
@@ -219,7 +242,9 @@ describe("VTOP on the engine", () => {
     const packed = await as.action(api.vtop.fetchBatch, { flow: "f", session, semester: "S", pages: [{ name: "x" }], dictionary: "d" });
     expect(new Uint8Array(packed as ArrayBuffer)).toEqual(new Uint8Array([1, 2, 3]));
     expect(await codeOf(as.action(api.vtop.fetchBatch, { flow: "f", session, semester: "S", pages: [] }))).toBe("session_expired");
-    expect(await codeOf(as.action(api.vtop.fetch, { flow: "f", junk: "x".repeat(70_000) }))).toBe("too_large");
+    expect(await codeOf(as.action(api.vtop.fetch, { flow: "f", session: { cookies: "x".repeat(70_000) }, name: "semesters" }))).toBe("too_large");
+    await expect(as.action(api.vtop.fetch, { flow: "f", junk: 1 } as never)).rejects.toThrow();
+    await expect(as.action(api.vtop.fetchBatch, { flow: "f", session, pages: "nope" } as never)).rejects.toThrow();
   });
 
   it("signs in on the server before any account, signed by the install", async () => {
@@ -302,15 +327,103 @@ describe("sweeps", () => {
     await t.mutation(internal.sweeps.quarter, {});
     expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(1);
   });
+
+  it("expires saved vault and cached session server-side at sweepAt so live queries re-run", async () => {
+    const t = await setup();
+    const { as, account } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f" });
+    const ext = t.withIdentity({ subject: await sha256Hex(made.key), kind: "key" });
+    engine((path) => (path === "/engine/seal" ? Response.json({ sealedVault: "sv" }) : undefined));
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
+    await as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: 86_400 } });
+    await as.action(api.account.saveCredentials, {
+      flow: "f",
+      credentials: { username: REGNO, password: "pw", gmail: { refreshToken: "rt", clientId: "cid" }, otp: "gmail" },
+    });
+    // Also store a cached session (expires in 7 days, after the 24h vault).
+    await t.mutation(internal.sessions.answered, {
+      requestId: await t.run(async (ctx) => {
+        const id = ctx.db.normalizeId("accounts", account)!;
+        await ctx.db.insert("sessionRequests", {
+          requestId: "r-exp",
+          accountId: id,
+          status: "pending",
+          cookies: null,
+          csrfToken: null,
+          error: null,
+          createdAt: Math.floor(Date.now() / 1000),
+          expiresAt: Math.floor(Date.now() / 1000) + 120,
+          vaultDueAt: null,
+          vaultStarted: false,
+          phoneAsked: true,
+          phoneError: null,
+          source: null,
+          phones: [],
+        });
+        return "r-exp";
+      }),
+      cookies: "JSESSIONID=a",
+      sealedSession: "ss",
+    });
+    expect((await as.query(api.account.view, {})).savedCredentials).toBe(true);
+    expect((await ext.query(api.extension.key, {}))?.cachedSession).toBe(true);
+    // At 24h: vault clears server-side without running sweeps.quarter; cached session stays.
+    vi.advanceTimersByTime(86_400 * 1000);
+    await t.finishInProgressScheduledFunctions();
+    expect((await as.query(api.account.view, {})).savedCredentials).toBe(false);
+    expect((await as.query(api.screen.view, {})).account.savedCredentials).toBe(false);
+    expect((await ext.query(api.extension.key, {}))?.savedCredentials).toBe(false);
+    expect((await ext.query(api.extension.key, {}))?.cachedSession).toBe(true);
+    // At 7d: cached session clears server-side too.
+    vi.advanceTimersByTime((SESSION_CACHE_SECS - 86_400) * 1000);
+    await t.finishInProgressScheduledFunctions();
+    expect((await ext.query(api.extension.key, {}))?.cachedSession).toBe(false);
+    expect((await as.query(api.screen.view, {})).status?.sessionSavedAt).toBeNull();
+  });
 });
 
 describe("FCM", () => {
-  it("sends data as strings, and nothing without a service account", async () => {
-    const { message, sendFcm } = await import("./push");
+  it("sends data as strings, passes timeouts, clears cached token on 401 and retries within request TTL", async () => {
+    const { RETRY_DELAYS_MS, message, sendFcm } = await import("./push");
     expect(message("tok", { seq: 3, kind: "mail_otp", nested: { a: 1 } })).toEqual({
       message: { token: "tok", data: { seq: "3", kind: "mail_otp", nested: '{"a":1}' }, android: { priority: "HIGH", ttl: "120s" } },
     });
+    expect(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0)).toBeLessThan(REQUEST_TIMEOUT_SECS * 1000);
     vi.stubEnv("FIREBASE_CREDENTIALS_JSON", "");
     expect(await sendFcm("tok", {})).toBe("off");
+
+    // Mint a real RS256 private key to test token caching, timeout signal and 401 cache clear.
+    const pair = (await crypto.subtle.generateKey(
+      { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+      true,
+      ["sign"],
+    )) as CryptoKeyPair;
+    const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
+    const pem = `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...pkcs8))}\n-----END PRIVATE KEY-----`;
+    vi.stubEnv(
+      "FIREBASE_CREDENTIALS_JSON",
+      JSON.stringify({ client_email: "fcm@test.iam", private_key: pem, project_id: "proj", token_uri: "https://oauth.test/token" }),
+    );
+    vi.stubEnv("FCM_URL", "https://fcm.test");
+    let tokenCalls = 0;
+    const fcmStatuses = [200, 401, 200];
+    const signals: Array<AbortSignal | undefined> = [];
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      signals.push(init?.signal ?? undefined);
+      const url = typeof input === "string" || input instanceof URL ? String(input) : input.url;
+      if (url === "https://oauth.test/token") {
+        tokenCalls += 1;
+        return Response.json({ access_token: `tok-${tokenCalls}`, expires_in: 3600 });
+      }
+      return new Response("{}", { status: fcmStatuses.shift() ?? 200 });
+    });
+    expect(await sendFcm("dev-tok", { kind: "mail_otp" })).toBe("sent");
+    expect(tokenCalls).toBe(1);
+    expect(await sendFcm("dev-tok", { kind: "mail_otp" })).toBe("failed");
+    expect(tokenCalls).toBe(1);
+    // After 401 cleared the cached token, the next call mints a fresh one.
+    expect(await sendFcm("dev-tok", { kind: "mail_otp" })).toBe("sent");
+    expect(tokenCalls).toBe(2);
+    expect(signals.every((s) => s instanceof AbortSignal)).toBe(true);
   });
 });

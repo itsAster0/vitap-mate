@@ -1,8 +1,8 @@
-// Firebase Cloud Messaging, as edge/src/fcm.ts sends it: a high-priority data
-// message whose values are strings. The OAuth token is minted from the
-// service account with Web Crypto (RS256) and kept while the isolate lives.
-// Without FIREBASE_CREDENTIALS_JSON nothing is sent: an open app still sees
-// its requests and mail through live queries.
+// Firebase Cloud Messaging wake-up pushes: high-priority data messages whose
+// values are strings. The OAuth token is minted from the service account with
+// Web Crypto (RS256) and cached while the isolate lives. Without
+// FIREBASE_CREDENTIALS_JSON nothing is sent: an open app still sees its
+// requests and mail through live queries.
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -14,9 +14,10 @@ import { logError, logWarn, now } from "./lib/util";
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 /** Mint a new token this long before the old one expires. */
 const REFRESH_MARGIN_SECS = 300;
-/** A send that failed for another reason than a dead token is tried this many times more. */
-const RETRIES = 2;
-const RETRY_AFTER_MS = 60_000;
+/** Timeout for Google OAuth token exchange and FCM message sends. */
+export const FCM_TIMEOUT_MS = 10_000;
+/** Retry delays for a transient failure: total 20 s, well inside the 120 s session request TTL. */
+export const RETRY_DELAYS_MS = [5_000, 15_000] as const;
 
 export type ServiceAccount = { client_email: string; private_key: string; project_id: string; token_uri: string };
 
@@ -50,6 +51,7 @@ async function accessToken(account: ServiceAccount): Promise<string> {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${unsigned}.${toBase64Url(sig)}`,
+    signal: AbortSignal.timeout(FCM_TIMEOUT_MS),
   });
   if (response.status !== 200) throw new Error(`token exchange failed: ${response.status}`);
   const token = (await response.json()) as { access_token: string; expires_in: number };
@@ -81,8 +83,15 @@ export async function sendFcm(token: string, data: Record<string, unknown>): Pro
     method: "POST",
     headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
     body: JSON.stringify(message(token, data)),
+    signal: AbortSignal.timeout(FCM_TIMEOUT_MS),
   });
   if (response.status === 200) return "sent";
+  if (response.status === 401) {
+    // Drop the cached OAuth token so the next try mints a fresh one instead of failing until expiry.
+    cached = null;
+    logWarn({}, "fcm: send answered 401; cleared cached access token");
+    return "failed";
+  }
   if (response.status === 404) return "token_invalid";
   if (response.status === 400 && (await response.text()).includes("UNREGISTERED")) return "token_invalid";
   logWarn({}, `fcm: send answered ${response.status}`);
@@ -104,8 +113,8 @@ export const send = internalAction({
     if (outcome === "token_invalid") {
       console.log("fcm: token is gone, cleared");
       await ctx.runMutation(internal.push.clearToken, { deviceId, token });
-    } else if (outcome === "failed" && attempt < RETRIES) {
-      await ctx.scheduler.runAfter(RETRY_AFTER_MS, internal.push.send, { deviceId, data, attempt: attempt + 1 });
+    } else if (outcome === "failed" && attempt < RETRY_DELAYS_MS.length) {
+      await ctx.scheduler.runAfter(RETRY_DELAYS_MS[attempt], internal.push.send, { deviceId, data, attempt: attempt + 1 });
     } else if (outcome === "failed") {
       logError({}, `fcm: send failed after ${attempt + 1} tries`);
     }

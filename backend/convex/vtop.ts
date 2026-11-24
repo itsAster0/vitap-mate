@@ -1,10 +1,9 @@
-// VTOP on the engine for a phone on the Server or Udp route (edge/src/
-// vtop-phone.ts): the engine signs in and fetches, and hands back the parsed
-// page only. Bodies go to the engine as they came. A JSON answer comes back
-// as its value (an error answer as a ConvexError with its `code`), a page the
-// engine packed with the phone's page dictionary as an ArrayBuffer.
+// VTOP page fetches and sign-ins relayed to the engine for phones on the
+// Server or UDP route. JSON answers return as their value (engine error
+// replies throw a ConvexError with their `code`); dictionary-packed pages
+// return as an ArrayBuffer.
 
-import { ConvexError, type Value } from "convex/values";
+import { ConvexError, type Value, v } from "convex/values";
 import { type ActionCtx, action } from "./_generated/server";
 import { fail } from "./lib/errors";
 import { actionCaller } from "./lib/identity";
@@ -67,12 +66,36 @@ async function phoneCall(ctx: ActionCtx, args: Record<string, Value>, enginePath
   return passToEngine(enginePath, JSON.stringify(body), trace);
 }
 
+/** Matches `vtop_core::SessionState` as `rust/vtop-ffi` serialises it. */
+const sessionState = v.object({
+  cookies: v.string(),
+  csrf_token: v.optional(v.union(v.string(), v.null())),
+  registration_number: v.optional(v.union(v.string(), v.null())),
+  otp_issued_at: v.optional(v.union(v.number(), v.null())),
+  logged_in_at: v.optional(v.union(v.number(), v.null())),
+});
+
 export const fetch = action({
-  handler: (ctx, args: Record<string, Value>) => phoneCall(ctx, args, "/engine/fetch"),
+  args: {
+    flow: v.optional(v.string()),
+    session: sessionState,
+    name: v.string(),
+    semester: v.optional(v.union(v.string(), v.null())),
+    args: v.optional(v.record(v.string(), v.string())),
+    dictionary: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: (ctx, args) => phoneCall(ctx, args as Record<string, Value>, "/engine/fetch"),
 });
 
 export const fetchBatch = action({
-  handler: (ctx, args: Record<string, Value>) => phoneCall(ctx, args, "/engine/fetch-batch"),
+  args: {
+    flow: v.optional(v.string()),
+    session: sessionState,
+    semester: v.optional(v.union(v.string(), v.null())),
+    pages: v.array(v.object({ name: v.string(), args: v.optional(v.record(v.string(), v.string())) })),
+    dictionary: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: (ctx, args) => phoneCall(ctx, args as Record<string, Value>, "/engine/fetch-batch"),
 });
 
 /** A server-route sign-in, before any account: signed, and it proves nothing (the phone proves

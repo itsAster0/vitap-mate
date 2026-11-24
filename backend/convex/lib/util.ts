@@ -53,10 +53,17 @@ export function logError(trace: Trace, message: string, err?: unknown): void {
   console.error(traced(trace, err === undefined ? message : `${message}: ${describeError(err)}`));
 }
 
-/** `name: message (at …; at …)` of a thrown value, short enough for one log line. */
+/** `name: message (at …; at …)` of a thrown value, short enough for one log line.
+ * Scrubs `/mcp/<key>` path segments so access keys never leak in error logs. */
 export function describeError(err: unknown): string {
   if (!(err instanceof Error)) return typeof err;
-  const text = err instanceof SyntaxError ? "" : err.message.replace(/\s+/g, " ").slice(0, 200);
+  const text =
+    err instanceof SyntaxError
+      ? ""
+      : err.message
+          .replace(/\/mcp\/[^\s/?#"')]+/g, "/mcp/…")
+          .replace(/\s+/g, " ")
+          .slice(0, 200);
   const frames = (err.stack ?? "")
     .split("\n")
     .map((l) => l.trim())

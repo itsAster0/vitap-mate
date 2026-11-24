@@ -1,11 +1,11 @@
-// VTOP sessions for key holders (the extension and agents), ported from
-// edge/src/account.ts. A request is answered from the cache (checked with
-// VTOP by the engine), or left pending while the phone that made the key is
-// asked (it sees the request in `sessions:pending`, woken by a push) and/or the engine signs in with saved
+// VTOP sessions for key holders (the extension and MCP clients). A request is
+// answered from the cache (checked with VTOP by the engine), or left pending
+// while the phone that made the key is asked (it sees the request in
+// `sessions:pending`, woken by a push) and/or the engine signs in with saved
 // credentials, in the order the student's settings choose. The phone answers
 // with `sessions:answer`; the engine's sign-in (logins.ts) ends in `loginDone`.
-// Timers the Durable Object's alarm ran are scheduled functions and crons.
-// Never log cookies, passwords, keys or tokens.
+// Expiry transitions and delayed server fallbacks run via scheduled mutations
+// and crons. Never log cookies, passwords, keys or tokens.
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -25,9 +25,9 @@ import {
   toHeader,
   validCookies,
 } from "./lib/accountState";
-import { type Credentials, credentialsOf, usableText } from "./lib/credentials";
+import { type Credentials, credentialsOf, credentialsValidator, usableText } from "./lib/credentials";
 import { engineJson } from "./lib/engine";
-import type { LoginOutcome, SealVault, SealedVault, SessionCheck, SessionChecked } from "./lib/engineApi";
+import { type LoginOutcome, SEAL, SESSION, type SealVault, type SealedVault, type SessionCheck, type SessionChecked } from "./lib/engineApi";
 import { fail } from "./lib/errors";
 import { actionCaller, caller, mailboxOfAccount, recordOf } from "./lib/identity";
 import { notify } from "./lib/notify";
@@ -109,7 +109,6 @@ export const start = internalMutation({
     const at = now();
     const use = keyUse(keyOf(key), at, via as KeyVia);
     if (use) await ctx.db.patch(key._id, use);
-    await saveRecord(ctx, account._id, doc);
     return { limited: false as const, accountId: account._id, regno: doc.id, cached: doc.cachedSession(at), source: doc.cachedSource() };
   },
 });
@@ -136,7 +135,7 @@ export async function cachedCookies(
 ): Promise<{ cookies: string; csrfToken: string | null } | null> {
   if (sealed === null) return null;
   try {
-    const checked = await engineJson<SessionChecked>("/engine/session", { sealedSession: sealed, account: regno } satisfies SessionCheck, { flow, regno });
+    const checked = await engineJson<SessionChecked>(SESSION, { sealedSession: sealed, account: regno } satisfies SessionCheck, { flow, regno });
     if (checked.status === "expired") {
       log({ flow, regno }, "account: cached session no longer works");
       await ctx.runMutation(internal.sessions.clearSession, { accountId: id });
@@ -158,7 +157,8 @@ export const open = internalMutation({
     const at = now();
     const joined = await pendingRequest(ctx, id, at);
     if (joined) return { joined: joined.request.startedView(), requestId: joined.request.id };
-    const account = (await ctx.db.get(id))!;
+    const account = await ctx.db.get(id);
+    if (!account) return fail("not_linked", "This account no longer exists.");
     const doc = await recordOf(ctx, account);
     const request = new RequestRecord(requestId, at);
     if (keyHash !== null) {
@@ -229,10 +229,14 @@ export async function begin(ctx: ActionCtx, requestId: string, opened: { plan: P
   const { regno, vault } = opened;
   switch (opened.plan.kind) {
     case "vault_first":
-      return startLogin(ctx, regno, vault!, requestId, null, false);
+      if (vault !== null) return startLogin(ctx, regno, vault, requestId, null, false);
+      await ctx.runMutation(internal.sessions.ask, { requestId, orFail: true });
+      return;
     case "phone_first":
       if (await ctx.runMutation(internal.sessions.ask, { requestId, orFail: false, serverAfter: opened.plan.waitSecs })) return;
-      return startLogin(ctx, regno, vault!, requestId, null, false);
+      if (vault !== null) return startLogin(ctx, regno, vault, requestId, null, false);
+      await ctx.runMutation(internal.sessions.failRequest, { requestId });
+      return;
     case "phone_only":
       await ctx.runMutation(internal.sessions.ask, { requestId, orFail: true });
   }
@@ -283,6 +287,17 @@ export const clearDue = internalMutation({
   },
 });
 
+/** Marks a pending request expired at `expiresAt` so subscribed live queries (`app:loginResult`,
+ * `sessions:pending`) re-run without altering HTTP `410 request_expired` poll semantics. */
+export const expireRequest = internalMutation({
+  args: { requestId: v.string() },
+  handler: async (ctx, { requestId }) => {
+    const row = await requestRow(ctx, requestId);
+    if (!row || row.status !== "pending" || row.expired || now() < row.expiresAt) return;
+    await ctx.db.patch(row._id, { expired: true });
+  },
+});
+
 // ---- the phone's answer ---------------------------------------------------------------------
 
 /** The session requests waiting on this phone, live: the app's handover prompt. Empty for the
@@ -291,12 +306,13 @@ export const pending = query({
   args: { flow: v.optional(v.string()) },
   handler: async (ctx) => {
     const me = await caller(ctx);
-    if (!me.account) return [];
+    const account = me.account;
+    if (!account) return [];
     const at = now();
-    const doc = await recordOf(ctx, me.account);
+    const doc = await recordOf(ctx, account);
     const rows = await ctx.db
       .query("sessionRequests")
-      .withIndex("by_account", (q) => q.eq("accountId", me.account!._id))
+      .withIndex("by_account", (q) => q.eq("accountId", account._id))
       .collect();
     return rows
       .map(requestOf)
@@ -334,8 +350,10 @@ export const answered = internalMutation({
   },
   handler: async (ctx, { requestId, cookies, sealedSession, vault }) => {
     const at = now();
-    const row = (await requestRow(ctx, requestId))!;
-    const account = (await ctx.db.get(row.accountId))!;
+    const row = await requestRow(ctx, requestId);
+    if (!row) return fail("request_not_found", "Unknown session request.");
+    const account = await ctx.db.get(row.accountId);
+    if (!account) return fail("request_not_found", "Unknown session request.");
     const request = requestOf(row);
     const late = !request.pending(at);
     if (!late) {
@@ -368,7 +386,7 @@ export async function sealCredentials(
     return undefined;
   }
   try {
-    const sealed = await engineJson<SealedVault>("/engine/seal", {
+    const sealed = await engineJson<SealedVault>(SEAL, {
       account: regno,
       username,
       password,
@@ -389,7 +407,7 @@ export const answer = action({
     flow: v.string(),
     requestId: v.string(),
     cookies: v.optional(v.array(v.object({ name: v.string(), value: v.string(), domain: v.string() }))),
-    credentials: v.optional(v.any()),
+    credentials: v.optional(v.union(credentialsValidator, v.null())),
     username: v.optional(v.string()),
     error: v.optional(v.string()),
   },
@@ -408,7 +426,7 @@ export const answer = action({
     const header = toHeader(cookies);
     let checked: SessionChecked;
     try {
-      checked = await engineJson<SessionChecked>("/engine/session", { cookies: header } satisfies SessionCheck, { flow: args.flow, regno: check.regno });
+      checked = await engineJson<SessionChecked>(SESSION, { cookies: header } satisfies SessionCheck, { flow: args.flow, regno: check.regno });
     } catch (e) {
       logError({ flow: args.flow, regno: check.regno }, "account: checking a phone answer failed", e);
       return fail("vtop_unreachable", "VTOP is unreachable; try again.");

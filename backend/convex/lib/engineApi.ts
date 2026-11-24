@@ -1,8 +1,6 @@
-// What the backend and the engine say to each other, as JSON (copied from
-// edge/src/shared/engine-api.ts; the engine did not change). Mirrors
-// vtop-shared's `engine` module (the engine's side); a field renamed there
-// must be renamed here. Every call carries `Authorization: Bearer
-// <INTERNAL_TOKEN>`.
+// JSON contract between the Convex backend and the Rust engine. Mirrors
+// vtop-shared's `engine` module; a field renamed there must be renamed here.
+// Every call carries `Authorization: Bearer <INTERNAL_TOKEN>`.
 
 /** Engine: whose session this is, or whether a cached one still works. */
 export const SESSION = "/engine/session";
@@ -10,13 +8,6 @@ export const SESSION = "/engine/session";
 export const SEAL = "/engine/seal";
 /** Engine: one step of a sign-in with saved credentials (see `logins.ts`). */
 export const LOGIN = "/engine/login";
-/** Engine: the mailbox owner hash of a live session (mail-otp routes). */
-export const MAIL_OWNER = "/internal/mail-otp/owner";
-/** Engine: verifies a phone's TLSNotary proof of its regno, a WebSocket the
- * edge opens as `GET ?device=<id>&challenge=<hex>` after it consumed that
- * device's challenge. Binary messages carry the proof both ways; the
- * engine's last message is one text frame, a `ProofVerdict`. */
-export const PROOF_VERIFY = "/engine/proof";
 
 /** Either fresh cookies from a client, or an account's cached session. */
 export type SessionCheck = {
@@ -42,11 +33,6 @@ export type SessionChecked = {
   /** The student's mailbox owner hash, when valid. */
   ownerHash?: string;
 }
-
-/** How a `PROOF_VERIFY` ended. */
-export type ProofVerdict =
-  | { status: "ok"; registrationNumber: string; ownerHash: string }
-  | { status: "failed"; reason: string };
 
 export type SealVault = {
   account: string;

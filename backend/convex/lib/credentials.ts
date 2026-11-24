@@ -1,7 +1,23 @@
-// Credentials a phone sends to be kept sealed (edge/src/account-db.ts).
+// Parsing and validation for VTOP credentials and Gmail grants sent by phones
+// to be sealed by the engine.
 
+import { v } from "convex/values";
 import type { GmailGrant, OtpMethod } from "./engineApi";
 import { str } from "./util";
+
+export const gmailGrantValidator = v.object({
+  refreshToken: v.string(),
+  clientId: v.string(),
+  clientSecret: v.optional(v.union(v.string(), v.null())),
+  deleteAfterReading: v.optional(v.boolean()),
+});
+
+export const credentialsValidator = v.object({
+  username: v.optional(v.union(v.string(), v.null())),
+  password: v.string(),
+  gmail: v.optional(v.union(gmailGrantValidator, v.null())),
+  otp: v.optional(v.union(v.literal("forwarding"), v.literal("gmail"), v.null())),
+});
 
 export function usableText(raw: unknown): string | null {
   return typeof raw === "string" ? raw.trim() || null : null;

@@ -14,8 +14,6 @@ export type MailBody = {
   receivedAt: number;
   otp: string | null;
   gmailConfirm: { code: string | null; link: string | null; requester: string | null } | null;
-  from: string;
-  subject: string;
 };
 
 export type MailEnv = {
@@ -35,13 +33,12 @@ export function mailBody(addressId: string, mail: Parsed): MailBody {
     receivedAt: mail.sentAt * 1000,
     otp: mail.kind === "otp" ? mail.code : null,
     gmailConfirm: mail.kind === "gmail_confirm" ? mail.confirm : null,
-    from: mail.from,
-    subject: mail.subject,
   };
 }
 
 /** An unexpected failure, at error level, with the error's name, message and the top of its
- * stack. Never pass mail bodies, codes or tokens. */
+ * stack. A SyntaxError's message is left out, as it quotes the text it could not parse. Never
+ * pass mail bodies, codes or tokens. */
 export function logError(message: string, err?: unknown): void {
   if (!(err instanceof Error)) {
     console.error(err === undefined ? message : `${message}: ${typeof err}`);
@@ -52,7 +49,7 @@ export function logError(message: string, err?: unknown): void {
     .map((l) => l.trim())
     .filter((l) => l.startsWith("at "))
     .slice(0, 3);
-  const text = err.message.replace(/\s+/g, " ").slice(0, 200);
+  const text = err instanceof SyntaxError ? "" : err.message.replace(/\s+/g, " ").slice(0, 200);
   console.error(`${message}: ${err.name}${text ? `: ${text}` : ""}${frames.length ? ` (${frames.join("; ")})` : ""}`);
 }
 

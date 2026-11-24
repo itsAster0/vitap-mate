@@ -53,9 +53,22 @@ export function isVtopPath(path: string): boolean {
   return path === "/vtop" || path.startsWith("/vtop/");
 }
 
-/** `value` with the proxy's origin swapped for `to`. */
+const ALLOWED_METHODS = new Set(["GET", "POST", "HEAD"]);
+
+/** `value` with origin `from` swapped for `to`, matching the parsed URL origin so prefix-similar
+ * hosts (e.g. `https://proxy.example.evil.com`) are never rewritten. */
 function reorigin(value: string, from: string, to: string): string {
-  return value.startsWith(from) ? to + value.slice(from.length) : value;
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return value;
+  }
+  if (parsed.origin !== from) return value;
+  const rest = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  // Bare `Origin` headers carry no trailing slash.
+  if (rest === "/" && !value.endsWith("/")) return to;
+  return `${to}${rest}`;
 }
 
 /** A VTOP cookie as the phone should store it: without `Domain`, so it
@@ -100,7 +113,8 @@ async function readBodyCapped(req: Request, limit: number): Promise<ArrayBuffer 
 }
 
 /** An unexpected failure, at error level, with the error's name, message and the top of its
- * stack. Never pass cookies, bodies or URLs (a query can hold a token). */
+ * stack. A SyntaxError's message is left out, as it quotes the text it could not parse. Never
+ * pass cookies, bodies or URLs (a query can hold a token). */
 function logError(message: string, err?: unknown): void {
   if (!(err instanceof Error)) {
     console.error(err === undefined ? message : `${message}: ${typeof err}`);
@@ -111,7 +125,7 @@ function logError(message: string, err?: unknown): void {
     .map((l) => l.trim())
     .filter((l) => l.startsWith("at "))
     .slice(0, 3);
-  const text = err.message.replace(/\s+/g, " ").slice(0, 200);
+  const text = err instanceof SyntaxError ? "" : err.message.replace(/\s+/g, " ").slice(0, 200);
   console.error(`${message}: ${err.name}${text ? `: ${text}` : ""}${frames.length ? ` (${frames.join("; ")})` : ""}`);
 }
 
@@ -122,6 +136,7 @@ export async function proxyVtop(
 ): Promise<Response> {
   const url = new URL(req.url);
   if (!isVtopPath(url.pathname)) return notFound();
+  if (!ALLOWED_METHODS.has(req.method)) return error(405, "method_not_allowed", "Method not allowed.");
   const proxy = url.origin;
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";

@@ -9,7 +9,7 @@ edge's Durable Objects. The contract is
 
 ```
 convex/schema.ts      every table; regno only on accounts, the rest link by accountId
-convex/auth.ts        TLSNotary tickets, auth:token (24 h JWT + non-expiring rotating refresh chain), signOut
+convex/auth.ts        TLSNotary tickets (taken and judged by vtop-verifier over /internal/proof-*), auth:token (24 h JWT + non-expiring rotating refresh chain), signOut
 convex/account.ts     account:view and the account's settings, phones, sign-ins, delete
 convex/app.ts         app:status, app:sessionClear, app:login and app:loginResult (live)
 convex/logins.ts      server sign-ins as scheduled engine steps: the OTP mail resumes them
@@ -25,7 +25,7 @@ convex/oauth.ts       MCP OAuth (register, authorize, token)
 convex/vtop.ts        vtop:fetch, fetchBatch and login* on the engine
 convex/http.ts        HTTP actions: key routes, pairing, OAuth, /mcp, /internal/*
 convex/push.ts        FCM (off without FIREBASE_CREDENTIALS_JSON)
-convex/sweeps.ts      what the DO alarms dropped, run by crons.ts
+convex/sweeps.ts      periodic cleanup backstops for expired rows, run by crons.ts
 convex/migrate.ts     the one-time backfill from the edge's Durable Objects (admin only)
 convex/lib/           pure rules (accountState.ts), crypto, mail_seal, vm1, helpers
 test/kit.ts           convex-test setup, fake phones, a stub engine
@@ -40,7 +40,7 @@ bun install
 bun run check        # tsc
 bun run test         # vitest + convex-test
 bunx convex deploy   # to CONVEX_SELF_HOSTED_URL in .env.local
-bun run smoke        # against https://vmate3.aster0.dev (SMOKE_URL to change)
+bun run smoke        # against https://vmate.aster0.dev (SMOKE_URL to change)
 ```
 
 `mise run check-backend` runs the check and the tests. The deployment's env is

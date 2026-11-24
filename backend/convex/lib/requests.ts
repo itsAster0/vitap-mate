@@ -1,13 +1,14 @@
 // `sessionRequests` rows as `RequestRecord`s, and the steps of a request that
 // write (asking the phones), shared by sessions.ts and app.ts.
 
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { type AccountRecord, PHONE_UNREACHABLE, RequestRecord } from "./accountState";
 import { notify } from "./notify";
 
 export function requestOf(row: Doc<"sessionRequests">): RequestRecord {
-  const { _id, _creationTime, requestId, accountId, ...fields } = row;
+  const { _id, _creationTime, requestId, accountId, expired: _expired, ...fields } = row;
   return Object.assign(new RequestRecord(requestId, row.createdAt), fields);
 }
 
@@ -42,6 +43,8 @@ export async function putRequest(ctx: MutationCtx, row: Doc<"sessionRequests">, 
 
 export async function insertRequest(ctx: MutationCtx, accountId: Id<"accounts">, r: RequestRecord): Promise<void> {
   await ctx.db.insert("sessionRequests", { requestId: r.id, accountId, ...requestFields(r) });
+  // Patch the row at expiry so subscribed live queries (`app:loginResult`, `sessions:pending`) re-run.
+  await ctx.scheduler.runAt(r.expiresAt * 1000, internal.sessions.expireRequest, { requestId: r.id });
 }
 
 /** The account's request still pending, if any: a new session call joins it. */

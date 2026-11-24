@@ -22,6 +22,14 @@ export const take = internalMutation({
   },
 });
 
+export const expire = internalMutation({
+  args: { pairingId: v.id("pairings") },
+  handler: async (ctx, { pairingId }) => {
+    const row = await ctx.db.get(pairingId);
+    if (row && row.expiresAt <= now()) await ctx.db.delete(pairingId);
+  },
+});
+
 /** Whose pairing code it is, before the app approves it: an MCP app waiting on its OAuth sign-in,
  * or else the browser extension. The phone asks over its socket, with its JWT. */
 export const info = query({
@@ -31,6 +39,6 @@ export const info = query({
     const pair = pairCode(code);
     if (pair === null) return badRequest("code must be a pairing code.");
     const app = await pendingApp(ctx, await sha256Hex(pair), now());
-    return app ? { kind: "mcp" as const, name: app.name, host: app.host } : { kind: "browser" as const };
+    return app.status === "pending" ? { kind: "mcp" as const, name: app.name, host: app.host } : { kind: "browser" as const };
   },
 });

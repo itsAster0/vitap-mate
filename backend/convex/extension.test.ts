@@ -2,9 +2,11 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REGNO, codeOf, engine, phone, prove, setup, type T } from "../test/kit";
-import { api, internal } from "./_generated/api";
-import { keyId } from "./lib/accountState";
+import { api } from "./_generated/api";
+import { REQUEST_TIMEOUT_SECS, keyId } from "./lib/accountState";
 import { sha256Hex } from "./lib/crypto";
+import { PAIR_TTL_SECS } from "./lib/pairing";
+import { REQUEST_TTL_SECS, s256 } from "./oauth";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -132,5 +134,51 @@ describe("live queries", () => {
     const res = (await (await post(t, "/v1/pair", { code: "ABCDE-FGHJK" })).json()) as { status: string };
     expect(res.status).toBe("ready");
     expect(await t.query(api.extension.pairing, { codeHash })).toEqual({ ready: false });
+  });
+
+  it("expires pairings, OAuth requests and session requests server-side so live queries re-run", async () => {
+    const t = await setup();
+    const { as, key } = await withKey(t);
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
+    // 1. Extension pairing row deleted at PAIR_TTL_SECS.
+    const codeHash = await sha256Hex("ABCDE12345");
+    await as.action(api.keys.create, { flow: "f", pairCode: "ABCDE-12345" });
+    expect(await t.query(api.extension.pairing, { codeHash })).toEqual({ ready: true });
+    // 2. OAuth authorize request marked expired at REQUEST_TTL_SECS while keys:create still sees pair_expired.
+    const reg = await post(t, "/register", { redirect_uris: ["https://claude.ai/cb"], client_name: "Claude" });
+    const { client_id } = (await reg.json()) as { client_id: string };
+    const html = await (
+      await t.fetch(
+        `/authorize?${new URLSearchParams({
+          response_type: "code",
+          client_id,
+          redirect_uri: "https://claude.ai/cb",
+          code_challenge: await s256("v".repeat(43)),
+          code_challenge_method: "S256",
+        })}`,
+      )
+    ).text();
+    const oauthCode = /aria-label="Pairing code">([0-9A-Z-]{11})</.exec(html)![1];
+    expect(await as.query(api.pair.info, { code: oauthCode })).toEqual({ kind: "mcp", name: "Claude", host: "claude.ai" });
+    // 3. Session request marked expired at REQUEST_TIMEOUT_SECS.
+    const started = (await (await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${key}` } })).json()) as { requestId: string };
+    expect(await as.query(api.sessions.pending, {})).toHaveLength(1);
+
+    vi.advanceTimersByTime(REQUEST_TIMEOUT_SECS * 1000);
+    await t.finishInProgressScheduledFunctions();
+    expect((await t.run((ctx) => ctx.db.query("sessionRequests").first()))?.expired).toBe(true);
+    expect(await as.query(api.sessions.pending, {})).toEqual([]);
+    expect((await t.fetch(`/v1/session/requests/${started.requestId}`, { headers: { authorization: `Bearer ${key}` } })).status).toBe(410);
+
+    vi.advanceTimersByTime((PAIR_TTL_SECS - REQUEST_TIMEOUT_SECS) * 1000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toEqual([]);
+    expect(await t.query(api.extension.pairing, { codeHash })).toEqual({ ready: false });
+
+    vi.advanceTimersByTime((REQUEST_TTL_SECS - PAIR_TTL_SECS) * 1000);
+    await t.finishInProgressScheduledFunctions();
+    expect((await t.run((ctx) => ctx.db.query("oauthRequests").first()))?.expired).toBe(true);
+    expect(await as.query(api.pair.info, { code: oauthCode })).toEqual({ kind: "browser" });
+    expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: oauthCode }))).toBe("pair_expired");
   });
 });

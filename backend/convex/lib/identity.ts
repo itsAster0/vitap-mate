@@ -90,5 +90,3 @@ export async function recordOf(ctx: QueryCtx, account: Doc<"accounts">): Promise
   const { _id, _creationTime, regno, ownerHash, ...fields } = account;
   return fromFields(regno, fields, (await mailboxOfAccount(ctx, _id))?.addressId ?? null);
 }
-
-export type AccountId = Id<"accounts">;

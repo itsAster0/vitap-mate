@@ -36,12 +36,12 @@ async function student(t: T) {
   return proved;
 }
 
-/** Runs what is scheduled (the steps `runAfter(0)` queues), keeping the clock where it is. */
+/** Runs immediate scheduled jobs (`runAfter(0)`), keeping the clock where it is. */
 async function drain(t: T) {
   const at = Date.now();
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   vi.setSystemTime(at);
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await t.finishAllScheduledFunctions(() => vi.advanceTimersByTime(0));
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(at);
 }
@@ -151,12 +151,51 @@ describe("server sign-ins", () => {
     await drain(t);
     const done = await as.fetch(`/v1/app/login/${requestId}`);
     expect([done.status, await done.json()]).toEqual([200, { status: "ok", session: SESSION }]);
-    expect((await as.fetch("/v1/app/login/nope")).status).toBe(503);
+    expect((await as.fetch("/v1/app/login/nope")).status).toBe(404);
     const anonymous = await t.fetch("/v1/app/login", { method: "POST", body: "{}" });
-    expect([anonymous.status, ((await anonymous.json()) as { code: string }).code]).toEqual([400, "unauthenticated"]);
+    expect([anonymous.status, ((await anonymous.json()) as { code: string }).code]).toEqual([401, "unauthenticated"]);
+    const badEnc = await as.fetch("/v1/app/login/%E0%A4%A");
+    expect(badEnc.status).toBe(400);
     await as.mutation(api.app.sessionClear, { flow: "f" });
+    // Timed-out sign-in returns 504 vtop_timeout.
+    const slow = await as.fetch("/v1/app/login", { method: "POST", body: JSON.stringify({ flow: "udp-2" }) });
+    const slowId = ((await slow.json()) as { requestId: string }).requestId;
+    advance(REQUEST_TIMEOUT_SECS);
+    const timedOut = await as.fetch(`/v1/app/login/${slowId}`);
+    expect([timedOut.status, ((await timedOut.json()) as { code: string }).code]).toEqual([504, "vtop_timeout"]);
+    // No saved credentials -> 409, demo -> 403, removed device -> 401.
+    await as.mutation(api.account.forgetCredentials, { flow: "f" });
+    const noCreds = await as.fetch("/v1/app/login", { method: "POST", body: "{}" });
+    expect([noCreds.status, ((await noCreds.json()) as { code: string }).code]).toEqual([409, "no_saved_credentials"]);
+    const p2 = await phone(2);
+    const demo = await t.action(api.auth.token, await p2.signed("auth:token", { demo: true, device: p2.device }));
+    const asDemo = t.withIdentity({ subject: p2.deviceId, regno: demo.regno, acct: demo.account, demo: true });
+    const demoRes = await asDemo.fetch("/v1/app/login", { method: "POST", body: "{}" });
+    expect([demoRes.status, ((await demoRes.json()) as { code: string }).code]).toEqual([403, "demo_unavailable"]);
+    // Restore vault and verify invalid_credentials -> 401.
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("accounts").first())!;
+      await ctx.db.patch(row._id, { sealedVault: "vault", vaultSavedAt: Math.floor(Date.now() / 1000) });
+    });
     engine((path) => (path === "/engine/login" ? Response.json({ status: "invalid_credentials" }) : undefined));
     const rejected = await as.fetch("/v1/app/login", { method: "POST", body: "{}" });
     expect([rejected.status, ((await rejected.json()) as { code: string }).code]).toEqual([401, "invalid_credentials"]);
+    await as.mutation(api.auth.signOut, { flow: "f" });
+    const removed = await as.fetch("/v1/app/login", { method: "POST", body: "{}" });
+    expect([removed.status, ((await removed.json()) as { code: string }).code]).toEqual([401, "device_removed"]);
+  });
+
+  it("marks a pending login request expired at its TTL so live app:loginResult re-runs", async () => {
+    const t = await setup();
+    const { as } = await student(t);
+    otpEngine("654321");
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
+    const started = (await as.action(api.app.login, { flow: "f" })) as { requestId: string };
+    expect(await as.query(api.app.loginResult, { requestId: started.requestId })).toEqual({ status: "pending", requestId: started.requestId });
+    vi.advanceTimersByTime(REQUEST_TIMEOUT_SECS * 1000);
+    await t.finishInProgressScheduledFunctions();
+    const row = await t.run((ctx) => ctx.db.query("sessionRequests").first());
+    expect(row?.expired).toBe(true);
+    expect(await as.query(api.app.loginResult, { requestId: started.requestId })).toMatchObject({ status: "error", code: "vtop_timeout" });
   });
 });

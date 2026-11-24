@@ -12,14 +12,14 @@ import { KEY_PREFIX, type KeyVia, ready } from "./lib/accountState";
 import { fromBase64 } from "./lib/base64";
 import { randomHex, sha256Hex } from "./lib/crypto";
 import { GUIDE_FILES } from "./lib/guideFiles";
-import { empty, error } from "./lib/errors";
-import { engineSend } from "./lib/engine";
-import { bearer, corsRoutes, holds, jsonBody, notInternal, route } from "./lib/httpKit";
+import { badRequest, empty, error } from "./lib/errors";
+import { engineJson, engineSend } from "./lib/engine";
+import { bearer, corsRoutes, holds, jsonBody, notInternal, readBodyCapped, route } from "./lib/httpKit";
 import { signAccessJwt } from "./lib/jwt";
 import { seal } from "./lib/mailSeal";
 import { page, pairingPage } from "./lib/oauthPage";
 import { ALPHABET, POLL_AFTER_MS, pairCode } from "./lib/pairing";
-import { env, logError, now, str } from "./lib/util";
+import { accountId, env, logError, logWarn, now, str } from "./lib/util";
 import { actionCaller } from "./lib/identity";
 import { hostOf, redirectMatches, redirectUriOk, s256 } from "./oauth";
 import { begin, cachedCookies } from "./sessions";
@@ -31,6 +31,33 @@ export const VERSION = "3.2.0";
 const http = httpRouter();
 const get = (path: string, handler: (ctx: ActionCtx, req: Request) => Promise<Response>) => http.route({ path, method: "GET", handler: route(handler) });
 const post = (path: string, handler: (ctx: ActionCtx, req: Request) => Promise<Response>) => http.route({ path, method: "POST", handler: route(handler) });
+
+const MAX_MCP_BODY_BYTES = 64 * 1024;
+const MCP_TIMEOUT_MS = 32_000;
+
+/** Best-effort client IP from Cloudflare or reverse-proxy headers. */
+function clientIp(req: Request): string {
+  return req.headers.get("cf-connecting-ip")?.trim() || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+function decodeSegment(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return badRequest("Malformed URL encoding.");
+  }
+}
+
+/** Checks per-IP limit first so one throttled caller cannot burn the global allowance. */
+async function rateLimited(
+  ctx: ActionCtx,
+  req: Request,
+  ipLimit: "oauthRegisterIp" | "oauthAuthorizeIp" | "oauthPollIp" | "oauthTokenIp" | "pairIp",
+  globalLimit: "oauthRegister" | "oauthAuthorize" | "oauthPoll" | "oauthToken" | "pairGlobal",
+): Promise<boolean> {
+  if (!(await rateLimits.limit(ctx, ipLimit, { key: clientIp(req) })).ok) return true;
+  return !(await rateLimits.limit(ctx, globalLimit)).ok;
+}
 
 get("/healthz", async () => Response.json({ service: "vmate-convex", version: VERSION }));
 
@@ -73,7 +100,7 @@ for (const spec of [
     const keyHash = await keyHashOf(req);
     const accountId = keyHash && (await ctx.runQuery(internal.sessions.keyHolder, { keyHash }));
     if (!accountId) return keyUnknown();
-    const requestId = decodeURIComponent(new URL(req.url).pathname.slice("/v1/session/requests/".length)).trim();
+    const requestId = decodeSegment(new URL(req.url).pathname.slice("/v1/session/requests/".length)).trim();
     const { status, body } = await ctx.runQuery(internal.sessions.poll, { accountId, requestId });
     return Response.json(body, { status });
   }),
@@ -96,6 +123,9 @@ for (const spec of [
   }),
   // The extension polls for the key the app made with its code.
   ...corsRoutes("POST", { path: "/v1/pair" }, async (ctx, req) => {
+    if (await rateLimited(ctx, req, "pairIp", "pairGlobal")) {
+      return error(429, "rate_limited", "Too many pairing requests; slow down.", { headers: { "retry-after": "10" } });
+    }
     const code = pairCode(str((await jsonBody(req))?.code));
     if (code === null) return error(400, "bad_request", "code must be a pairing code.");
     const key = await ctx.runMutation(internal.pair.take, { codeHash: await sha256Hex(code) });
@@ -180,7 +210,7 @@ post("/register", async (ctx, req) => {
   let name = [...(str(body.client_name)?.trim().replace(/\s+/g, " ") || "MCP app")].slice(0, 40).join("");
   // The app reads a key named "Browser" as the extension's.
   if (name.toLowerCase() === "browser") name = "MCP app";
-  if (!(await rateLimits.limit(ctx, "oauthRegister")).ok) {
+  if (await rateLimited(ctx, req, "oauthRegisterIp", "oauthRegister")) {
     return cors(error(429, "rate_limited", "Too many apps registered just now; try again later.", { headers: { "retry-after": "600" } }));
   }
   const at = now();
@@ -204,6 +234,11 @@ post("/register", async (ctx, req) => {
 });
 
 get("/authorize", async (ctx, req) => {
+  if (await rateLimited(ctx, req, "oauthAuthorizeIp", "oauthAuthorize")) {
+    const limited = page("Too many requests", "<p>Too many sign-in attempts right now. Try again in a few minutes.</p>", 429);
+    limited.headers.set("retry-after", "60");
+    return limited;
+  }
   const params = new URL(req.url).searchParams;
   const clientId = params.get("client_id") ?? "";
   const redirectUri = params.get("redirect_uri") ?? "";
@@ -247,6 +282,9 @@ get("/authorize", async (ctx, req) => {
 });
 
 post("/authorize/poll", async (ctx, req) => {
+  if (await rateLimited(ctx, req, "oauthPollIp", "oauthPoll")) {
+    return error(429, "rate_limited", "Too many poll requests; slow down.", { headers: { "retry-after": "10", "cache-control": "no-store" } });
+  }
   const id = str((await jsonBody(req))?.poll) ?? "";
   if (!/^[0-9a-f]{64}$/.test(id)) return error(400, "bad_request", "poll must be a poll id.", { fields: { status: "expired" } });
   const grant = randomHex(32);
@@ -263,6 +301,9 @@ post("/authorize/poll", async (ctx, req) => {
 });
 
 post("/token", async (ctx, req) => {
+  if (await rateLimited(ctx, req, "oauthTokenIp", "oauthToken")) {
+    return cors(error(429, "rate_limited", "Too many token requests; try again later.", { headers: { "retry-after": "60", "cache-control": "no-store" } }));
+  }
   const form = new URLSearchParams(await req.text());
   if (form.get("grant_type") !== "authorization_code") return cors(oauthError("unsupported_grant_type", "Only authorization_code is supported."));
   const code = form.get("code") ?? "";
@@ -307,15 +348,20 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   }
   const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   if (ip) headers.set("x-forwarded-for", ip);
-  const init: RequestInit = { method: req.method, headers };
+  const init: RequestInit = { method: req.method, headers, signal: AbortSignal.timeout(MCP_TIMEOUT_MS) };
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    const body = await req.arrayBuffer();
+    const body = await readBodyCapped(req, MAX_MCP_BODY_BYTES);
+    if (body === null) return error(413, "too_large", "The request is too large.");
     if (body.byteLength > 0) init.body = body;
   }
   let response: Response;
   try {
     response = await engineSend(`${url.pathname}${url.search}`, init);
   } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      logWarn({}, "mcp: engine timed out");
+      return error(504, "vtop_timeout", "The MCP tool took too long to answer.");
+    }
     logError({}, "mcp: engine unreachable", e);
     return error(503, "engine_unavailable", "The server can't reach the MCP tools right now.");
   }
@@ -334,10 +380,15 @@ for (const method of ["GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH"] as con
 
 // ---- the UDP gateway's sign-in for a phone (`app:login` over HTTP, with the phone's JWT) ----------
 
-/** A sign-in answer as the edge's `/v1/app/login` gave it: a rejected password is `401`, so the
- * gateway hands it to the phone as it is; a pending one `202`, followed at its `requestId`. */
+const LOGIN_ERROR_STATUS: Record<string, number> = {
+  invalid_credentials: 401,
+  request_not_found: 404,
+  vtop_timeout: 504,
+};
+
+/** A sign-in answer for the UDP gateway: pending is `202`, followed at its `requestId`. */
 function loginReply(answer: LoginAnswer): Response {
-  if (answer.status === "error") return error(answer.code === "invalid_credentials" ? 401 : 503, answer.code, answer.error);
+  if (answer.status === "error") return error(LOGIN_ERROR_STATUS[answer.code] ?? 503, answer.code, answer.error);
   return Response.json(answer, { status: answer.status === "ok" ? 200 : 202 });
 }
 
@@ -349,7 +400,7 @@ http.route({
   handler: route(async (ctx, req) => {
     const me = await actionCaller(ctx);
     if (!me.account) return error(403, "demo_unavailable", "The demo account can't do this.");
-    const requestId = decodeURIComponent(new URL(req.url).pathname.slice("/v1/app/login/".length)).trim();
+    const requestId = decodeSegment(new URL(req.url).pathname.slice("/v1/app/login/".length)).trim();
     return loginReply(await ctx.runQuery(internal.app.loginRequest, { accountId: me.account._id, requestId }));
   }),
 });
@@ -370,20 +421,37 @@ internalRoute("/internal/udp-keys", () => [process.env.GATEWAY_TOKEN, process.en
   return empty();
 });
 
-internalRoute("/internal/proof-ticket", () => [process.env.INTERNAL_TOKEN], async (ctx, req) => {
+// The verifier's own token opens these two routes and nothing else; the engine's still does,
+// for an engine that verified proofs itself.
+const verifierTokens = () => [process.env.VERIFIER_TOKEN, process.env.INTERNAL_TOKEN];
+
+internalRoute("/internal/proof-ticket", verifierTokens, async (ctx, req) => {
   const ticket = str((await jsonBody(req))?.ticket) ?? "";
   const taken = await ctx.runMutation(internal.auth.takeTicket, { ticket });
   if (taken && "busy" in taken) return error(429, "too_many_proofs", "The server is proving many accounts right now; try again in a minute.");
   return taken ? Response.json(taken) : error(404, "challenge_invalid", "Unknown, used or expired ticket.");
 });
 
-internalRoute("/internal/proof-done", () => [process.env.INTERNAL_TOKEN], async (ctx, req) => {
+/** A proved regno's mailbox owner hash, from the engine: it is keyed by `VAULT_KEY`, which
+ * seals the vaults and stays with the engine. Undefined when the engine can't say: the account
+ * keeps the hash it has, and a new one gets it at its next proof. */
+async function ownerHashOf(regno: string): Promise<string | undefined> {
+  try {
+    const { ownerHash } = await engineJson<{ ownerHash?: unknown }>("/engine/owner-hash", { registrationNumber: regno }, { regno });
+    return str(ownerHash);
+  } catch (e) {
+    logError({ regno }, "auth: no owner hash for a proof", e);
+    return undefined;
+  }
+}
+
+internalRoute("/internal/proof-done", verifierTokens, async (ctx, req) => {
   const body = await jsonBody(req);
   const ticket = str(body?.ticket);
   const regno = str(body?.regno);
-  const ownerHash = str(body?.ownerHash);
   const code = str(body?.code);
-  if (!ticket || (!code && !(regno && ownerHash))) return error(400, "bad_request", "Expected { ticket, regno, ownerHash } or { ticket, code }.");
+  if (!ticket || (!code && !regno)) return error(400, "bad_request", "Expected { ticket, regno } or { ticket, code }.");
+  const ownerHash = regno && !code ? await ownerHashOf(accountId(regno)) : undefined;
   const done = await ctx.runMutation(internal.auth.proofDone, { ticket, regno, ownerHash, code });
   return done ? empty() : error(404, "challenge_invalid", "Unknown, used or expired ticket.");
 });
@@ -394,7 +462,7 @@ internalRoute("/internal/mail", () => [process.env.MAIL_TOKEN], async (ctx, req)
   const body = await jsonBody(req);
   const addressId = str(body?.addressId) ?? "";
   const receivedAt = body?.receivedAt;
-  if (!body || typeof receivedAt !== "number") return error(400, "bad_request", "Invalid JSON body.");
+  if (!body || typeof receivedAt !== "number" || !Number.isFinite(receivedAt)) return error(400, "bad_request", "Invalid JSON body.");
   const at = now();
   const sentAt = Math.max(0, Math.min(Math.floor(receivedAt / 1000), at));
   const otp = str(body.otp);
@@ -441,7 +509,7 @@ http.route({
   pathPrefix: "/guides/",
   method: "GET",
   handler: route(async (_ctx, req) => {
-    const file = GUIDE_FILES[decodeURIComponent(new URL(req.url).pathname.slice("/guides/".length))];
+    const file = GUIDE_FILES[decodeSegment(new URL(req.url).pathname.slice("/guides/".length))];
     if (!file) return error(404, "not_found", "No such route.");
     const headers = { "cache-control": "public, max-age=3600", etag: file.etag };
     if (req.headers.get("if-none-match") === file.etag) return new Response(null, { status: 304, headers });

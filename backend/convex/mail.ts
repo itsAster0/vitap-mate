@@ -98,6 +98,14 @@ async function joinAddress(
       new TextEncoder().encode(mailbox.confirmation),
     );
     if (sealed !== null) {
+      for (const old of await ctx.db
+        .query("otpInbox")
+        .withIndex("by_address_device_kind", (q) =>
+          q.eq("addressId", mailbox.addressId).eq("deviceId", me.deviceId).eq("kind", "gmail_confirm"),
+        )
+        .collect()) {
+        await ctx.db.delete(old._id);
+      }
       await ctx.db.insert("otpInbox", {
         addressId: mailbox.addressId,
         deviceId: me.deviceId,
@@ -274,6 +282,10 @@ export const deliver = internalMutation({
         confirmationAt: at,
         updatedAt: at,
       });
+      await ctx.scheduler.runAt((at + CONFIRMATION_TTL_SECS) * 1000, internal.mail.dropConfirmation, {
+        mailboxId: mailbox._id,
+        confirmationAt: at,
+      });
     } else {
       await ctx.db.patch(mailbox._id, {
         lastOtpAt: sentAt,
@@ -310,7 +322,7 @@ export const deliver = internalMutation({
       // `inbox` stops handing out an OTP after SEALED_TTL_SECS, so it goes then; the 15-minute
       // sweep is only a backstop.
       if (kind === "otp")
-        await ctx.scheduler.runAfter(SEALED_TTL_SECS * 1000, internal.mail.dropBox, { box });
+        await ctx.scheduler.runAt((at + SEALED_TTL_SECS) * 1000, internal.mail.dropBox, { box });
       // The push is only a wake-up: an open app sees the box in `mail:inbox`.
       await notify(ctx, deviceId, "mail_otp", { mailbox: addressId, sealed });
     }
@@ -326,6 +338,25 @@ export const dropBox = internalMutation({
   args: { box: v.id("otpInbox") },
   handler: async (ctx, { box }) => {
     if (await ctx.db.get(box)) await ctx.db.delete(box);
+  },
+});
+
+/** Clears Gmail's forwarding confirmation at expiry so subscribed `mail:inbox` queries re-run. */
+export const dropConfirmation = internalMutation({
+  args: { mailboxId: v.id("mailboxes"), confirmationAt: v.number() },
+  handler: async (ctx, { mailboxId, confirmationAt }) => {
+    const mailbox = await ctx.db.get(mailboxId);
+    if (!mailbox || mailbox.confirmationAt !== confirmationAt || now() < confirmationAt + CONFIRMATION_TTL_SECS) return;
+    await ctx.db.patch(mailboxId, { confirmation: null, confirmationAt: null });
+    const rows = await ctx.db
+      .query("otpInbox")
+      .withIndex("by_account", (q) => q.eq("accountId", mailbox.accountId))
+      .collect();
+    for (const row of rows) {
+      if (row.addressId === mailbox.addressId && row.kind === "gmail_confirm" && row.receivedAt <= confirmationAt) {
+        await ctx.db.delete(row._id);
+      }
+    }
   },
 });
 

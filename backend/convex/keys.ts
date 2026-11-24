@@ -34,7 +34,6 @@ export const create = action({
     if (pair === null) return badRequest("pairCode must be a pairing code.");
     const key = KEY_PREFIX + randomHex(32);
     const created: Created = await ctx.runMutation(internal.keys.store, {
-      deviceId: me.deviceId,
       key,
       keyHash: await sha256Hex(key),
       codeHash: pair === undefined ? null : await sha256Hex(pair),
@@ -49,7 +48,6 @@ export const create = action({
 
 export const store = internalMutation({
   args: {
-    deviceId: v.string(),
     key: v.string(),
     keyHash: v.string(),
     codeHash: v.union(v.string(), v.null()),
@@ -65,10 +63,12 @@ export const store = internalMutation({
     if ((await keyRows(ctx, accountId)).length >= MAX_KEYS_PER_ACCOUNT) {
       fail("key_limit", "This account already has the most keys allowed; revoke one first.");
     }
-    if (app !== null) {
-      const request = app.row;
-      if (request.expiresAt <= at || request.accessKey !== null) fail("pair_expired", "That code has expired; start connecting again.");
-      await ctx.db.patch(request._id, { accessKey: args.key, accountId });
+    if (app?.status === "expired") {
+      fail("pair_expired", "That code has expired; start connecting again.");
+    }
+    const mcp = app?.status === "pending" ? app : null;
+    if (mcp !== null) {
+      await ctx.db.patch(mcp.row._id, { accessKey: args.key, accountId });
     } else if (args.codeHash !== null) {
       for (const old of await ctx.db
         .query("pairings")
@@ -76,19 +76,22 @@ export const store = internalMutation({
         .collect()) {
         await ctx.db.delete(old._id);
       }
-      await ctx.db.insert("pairings", { codeHash: args.codeHash, key: args.key, expiresAt: at + PAIR_TTL_SECS, accountId });
+      const expiresAt = at + PAIR_TTL_SECS;
+      const pairingId = await ctx.db.insert("pairings", { codeHash: args.codeHash, key: args.key, expiresAt, accountId });
+      await ctx.scheduler.runAt(expiresAt * 1000, internal.pair.expire, { pairingId });
     }
     await ctx.db.insert("accessKeys", {
       keyHash: args.keyHash,
       accountId,
-      label: keyLabel(app?.name ?? args.label ?? undefined),
+      label: keyLabel(mcp?.name ?? args.label ?? undefined),
       createdAt: at,
       lastUsedAt: null,
       deviceId: me.deviceId,
-      outings: args.outings,
+      // MCP OAuth keys always start with outings off (API.md).
+      outings: mcp !== null ? false : args.outings,
       uses: [],
     });
-    return { id: keyId(args.keyHash), key: args.key, mcpUrl: args.mcpUrl, app: app ? { name: app.name, host: app.host } : null };
+    return { id: keyId(args.keyHash), key: args.key, mcpUrl: args.mcpUrl, app: mcp ? { name: mcp.name, host: mcp.host } : null };
   },
 });
 

@@ -1,12 +1,11 @@
-// The HTTP routes kept from the edge: access keys and pairing, OAuth for MCP
-// clients (ported from edge/src/oauth.test.ts and pair.test.ts), `/mcp`, the
-// gateway's keys, and the internal tokens.
+// HTTP routes: access keys and pairing, OAuth 2.1 for MCP clients, `/mcp`,
+// gateway keys, and internal token checks.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REGNO, TOKENS, advance, codeOf, engine, phone, prove, setup, type T } from "../test/kit";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { pairCode } from "./lib/pairing";
-import { redirectMatches, redirectUriOk, s256 } from "./oauth";
+import { MAX_CLIENTS, redirectMatches, redirectUriOk, s256 } from "./oauth";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -17,13 +16,14 @@ afterEach(() => {
 const post = (t: T, path: string, body: unknown, headers: Record<string, string> = {}) =>
   t.fetch(path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
 const json = async (r: Response) => (await r.json()) as Record<string, unknown>;
+const VERIFIER_TOKEN = "verifier-test";
 
-/** Runs what is scheduled (the sign-in step `runAfter(0)` queues), keeping the clock where it is. */
+/** Runs immediate scheduled jobs (`runAfter(0)`), keeping the clock where it is. */
 async function drain(t: T) {
   const at = Date.now();
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   vi.setSystemTime(at);
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await t.finishAllScheduledFunctions(() => vi.advanceTimersByTime(0));
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(at);
 }
@@ -54,16 +54,50 @@ describe("basics", () => {
     expect((await post(t, "/internal/proof-ticket", { ticket: "0".repeat(32) }, { authorization: `Bearer ${TOKENS.INTERNAL_TOKEN}` })).status).toBe(404);
   });
 
-  it("let the engine take a ticket and report its verdict over HTTP", async () => {
+  it("let the verifier's token open the proof routes only", async () => {
     const t = await setup();
+    vi.stubEnv("VERIFIER_TOKEN", VERIFIER_TOKEN);
+    const verifier = { authorization: `Bearer ${VERIFIER_TOKEN}` };
+    const ticket = { ticket: "0".repeat(32) };
+    expect((await post(t, "/internal/proof-ticket", ticket, verifier)).status).toBe(404);
+    expect((await post(t, "/internal/proof-done", { ...ticket, code: "proof_failed" }, verifier)).status).toBe(404);
+    expect((await post(t, "/internal/proof-ticket", ticket, { authorization: `Bearer ${TOKENS.MAIL_TOKEN}` })).status).toBe(401);
+    const report = { host: "gw.test", ports: [443], keys: [{ id: "k1", publicKey: "A".repeat(43), from: 1, until: 2 }] };
+    expect((await post(t, "/internal/udp-keys", report, verifier)).status).toBe(401);
+    expect((await post(t, "/internal/mail", { addressId: "kkkkkkkkkk", receivedAt: 1 }, verifier)).status).toBe(401);
+    // Unset, no token works for it.
+    vi.stubEnv("VERIFIER_TOKEN", "");
+    expect((await post(t, "/internal/proof-ticket", ticket, { authorization: "Bearer " })).status).toBe(401);
+  });
+
+  it("let the verifier take a ticket and report its verdict, with the engine's owner hash", async () => {
+    const t = await setup();
+    vi.stubEnv("VERIFIER_TOKEN", VERIFIER_TOKEN);
+    const calls = engine((path, body) => (path === "/engine/owner-hash" ? Response.json({ ownerHash: `owner-of-${(body as { registrationNumber: string }).registrationNumber}` }) : undefined));
+    const p = await phone(1);
+    const { ticket } = await t.mutation(api.auth.proveStart, await p.signed("auth:proveStart", {}));
+    const auth = { authorization: `Bearer ${VERIFIER_TOKEN}` };
+    expect(await json(await post(t, "/internal/proof-ticket", { ticket }, auth))).toEqual({ device: p.deviceId });
+    expect((await post(t, "/internal/proof-done", { ticket }, auth)).status).toBe(400);
+    // A hash the verifier sends is not taken: only the engine holds the key.
+    expect((await post(t, "/internal/proof-done", { ticket, regno: REGNO.toLowerCase(), ownerHash: "forged" }, auth)).status).toBe(204);
+    expect(calls.map((c) => [c.path, c.body, c.headers.get("authorization")])).toEqual([["/engine/owner-hash", { registrationNumber: REGNO }, `Bearer ${TOKENS.INTERNAL_TOKEN}`]]);
+    const tokens = await t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }));
+    expect(tokens.regno).toBe(REGNO);
+    const account = await t.run((ctx) => ctx.db.query("accounts").first());
+    expect(account?.ownerHash).toBe(`owner-of-${REGNO}`);
+  });
+
+  it("prove an account without an owner hash when the engine can't give one", async () => {
+    const t = await setup();
+    engine(() => Response.json({ code: "unavailable" }, { status: 503 }));
     const p = await phone(1);
     const { ticket } = await t.mutation(api.auth.proveStart, await p.signed("auth:proveStart", {}));
     const auth = { authorization: `Bearer ${TOKENS.INTERNAL_TOKEN}` };
-    expect(await json(await post(t, "/internal/proof-ticket", { ticket }, auth))).toEqual({ device: p.deviceId });
-    expect((await post(t, "/internal/proof-done", { ticket }, auth)).status).toBe(400);
-    expect((await post(t, "/internal/proof-done", { ticket, regno: REGNO, ownerHash: "o" }, auth)).status).toBe(204);
-    const tokens = await t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }));
-    expect(tokens.regno).toBe(REGNO);
+    await post(t, "/internal/proof-ticket", { ticket }, auth);
+    expect((await post(t, "/internal/proof-done", { ticket, regno: REGNO }, auth)).status).toBe(204);
+    expect((await t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }))).regno).toBe(REGNO);
+    expect((await t.run((ctx) => ctx.db.query("accounts").first()))?.ownerHash).toBeNull();
   });
 });
 
@@ -255,6 +289,85 @@ describe("OAuth for MCP clients", () => {
     expect(views.keys[0].label).toBe("Claude");
   });
 
+  it("rejects expired or already-used OAuth codes with pair_expired and forces outings off", async () => {
+    const t = await setup();
+    const { as } = await prove(t, await phone(1));
+    const { client_id } = (await (await post(t, "/register", { redirect_uris: ["https://claude.ai/cb"], client_name: "Claude" })).json()) as { client_id: string };
+    const open = async () => {
+      const q = new URLSearchParams({
+        response_type: "code",
+        client_id,
+        redirect_uri: "https://claude.ai/cb",
+        code_challenge: await s256("v".repeat(43)),
+        code_challenge_method: "S256",
+      });
+      const html = await (await t.fetch(`/authorize?${q}`)).text();
+      return /aria-label="Pairing code">([0-9A-Z-]{11})</.exec(html)![1];
+    };
+    // Approving an MCP OAuth code forces outings off even when requested on, and a second use fails.
+    const usedCode = await open();
+    await as.action(api.keys.create, { flow: "f", pairCode: usedCode, outings: true });
+    const view = await as.query(api.account.view, { flow: "f" });
+    expect(view.keys[0].outings).toBe(false);
+    expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: usedCode }))).toBe("pair_expired");
+    // An expired OAuth code fails with pair_expired instead of minting an extension pairing.
+    const expiredCode = await open();
+    advance(601);
+    expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: expiredCode }))).toBe("pair_expired");
+    expect((await as.query(api.account.view, { flow: "f" })).keys).toHaveLength(1);
+    expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toEqual([]);
+  });
+
+  it("rate limits /register, /authorize, /authorize/poll, /token and /v1/pair per IP", async () => {
+    const t = await setup();
+    const ip1 = { "cf-connecting-ip": "203.0.113.1" };
+    const ip2 = { "cf-connecting-ip": "203.0.113.2" };
+    // /register: per-IP limit blocks ip1 while ip2 still registers.
+    let clientId = "";
+    for (let i = 0; i < 10; i++) {
+      const r = await post(t, "/register", { redirect_uris: ["https://a.test/cb"] }, ip1);
+      expect(r.status).toBe(201);
+      clientId = ((await r.json()) as { client_id: string }).client_id;
+    }
+    expect((await post(t, "/register", { redirect_uris: ["https://a.test/cb"] }, ip1)).status).toBe(429);
+    expect((await post(t, "/register", { redirect_uris: ["https://a.test/cb"] }, ip2)).status).toBe(201);
+    // /authorize: per-IP limit.
+    const authUrl = `/authorize?${new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: "https://a.test/cb",
+      code_challenge: await s256("v".repeat(43)),
+      code_challenge_method: "S256",
+    })}`;
+    for (let i = 0; i < 15; i++) expect((await t.fetch(authUrl, { headers: ip1 })).status).toBe(200);
+    expect((await t.fetch(authUrl, { headers: ip1 })).status).toBe(429);
+    expect((await t.fetch(authUrl, { headers: ip2 })).status).toBe(200);
+    // /authorize/poll: per-IP limit.
+    const pollBody = { poll: "a".repeat(64) };
+    for (let i = 0; i < 30; i++) expect((await post(t, "/authorize/poll", pollBody, ip1)).status).toBe(410);
+    expect((await post(t, "/authorize/poll", pollBody, ip1)).status).toBe(429);
+    expect((await post(t, "/authorize/poll", pollBody, ip2)).status).toBe(410);
+    // /token: per-IP limit.
+    const tokenInit = (headers: Record<string, string>) => ({
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: "bad",
+        client_id: clientId,
+        redirect_uri: "https://a.test/cb",
+        code_verifier: "v".repeat(43),
+      }).toString(),
+    });
+    for (let i = 0; i < 15; i++) expect((await t.fetch("/token", tokenInit(ip1))).status).toBe(400);
+    expect((await t.fetch("/token", tokenInit(ip1))).status).toBe(429);
+    expect((await t.fetch("/token", tokenInit(ip2))).status).toBe(400);
+    // /v1/pair: per-IP limit.
+    for (let i = 0; i < 30; i++) expect((await post(t, "/v1/pair", { code: "ABCDE-FGHJK" }, ip1)).status).toBe(202);
+    expect((await post(t, "/v1/pair", { code: "ABCDE-FGHJK" }, ip1)).status).toBe(429);
+    expect((await post(t, "/v1/pair", { code: "ABCDE-FGHJK" }, ip2)).status).toBe(202);
+  });
+
   it("checks the verifier and hands out the key as a bearer token", async () => {
     const t = await setup();
     const { as } = await prove(t, await phone(1));
@@ -307,5 +420,96 @@ describe("/mcp", () => {
     expect(ok.status).toBe(200);
     expect(calls.at(-1)?.path).toBe(`/mcp/${made.key}`);
     expect(calls.at(-1)?.headers.get("x-forwarded-for")).toBe("1.2.3.4");
+    // Oversized body rejected before reaching the engine.
+    const big = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "x".repeat(65 * 1024) });
+    expect(big.status).toBe(413);
+    expect((await json(big)).code).toBe("too_large");
+    // Engine timeout returns 504 vtop_timeout.
+    engine(() => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    const slow = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "{}" });
+    expect(slow.status).toBe(504);
+    expect((await json(slow)).code).toBe("vtop_timeout");
+  });
+
+  it("caps OAuth clients via oauthMeta counter and evicts the least-recently-used", async () => {
+    const t = await setup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("oauthClients", { clientId: "vmc_oldest", name: "Old", redirectUris: ["https://a.test/cb"], createdAt: 1, usedAt: 1 });
+      await ctx.db.insert("oauthClients", { clientId: "vmc_newer", name: "New", redirectUris: ["https://a.test/cb"], createdAt: 2, usedAt: 2 });
+      await ctx.db.insert("oauthMeta", { count: MAX_CLIENTS });
+    });
+    await t.mutation(internal.oauth.register, { clientId: "vmc_latest", name: "Latest", redirectUris: ["https://a.test/cb"], at: 3 });
+    const ids = await t.run(async (ctx) => (await ctx.db.query("oauthClients").collect()).map((c) => c.clientId));
+    expect(ids).not.toContain("vmc_oldest");
+    expect(ids).toContain("vmc_newer");
+    expect(ids).toContain("vmc_latest");
+    const meta = await t.run((ctx) => ctx.db.query("oauthMeta").first());
+    expect(meta?.count).toBe(MAX_CLIENTS);
+  });
+
+  it("scrubs /mcp/<key> from logged error messages", async () => {
+    const t = await setup();
+    const { as } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f" });
+    engine((path) => {
+      throw new TypeError(`fetch failed for https://engine.test${path}`);
+    });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "{}" });
+      expect(res.status).toBe(503);
+      const line = String(spy.mock.calls[0]?.[0]);
+      expect(line).toContain("/mcp/…");
+      expect(line).not.toContain(made.key);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("CORS and URL decoding", () => {
+  it("keeps CORS headers on thrown errors and answers 400 for malformed URL encoding", async () => {
+    const t = await setup();
+    const { as } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f" });
+    const badReq = await t.fetch("/v1/session/requests/%E0%A4%A", {
+      headers: { authorization: `Bearer ${made.key}`, origin: "chrome-extension://abc" },
+    });
+    expect(badReq.status).toBe(400);
+    expect((await json(badReq)).code).toBe("bad_request");
+    expect(badReq.headers.get("access-control-allow-origin")).toBe("*");
+    const badGuide = await t.fetch("/guides/%E0%A4%A");
+    expect(badGuide.status).toBe(400);
+    expect((await json(badGuide)).code).toBe("bad_request");
+  });
+
+  it("does not touch accounts.updatedAt on sessions:start", async () => {
+    const t = await setup();
+    const { as } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f" });
+    const before = await t.run(async (ctx) => (await ctx.db.query("accounts").first())!.updatedAt);
+    advance(120);
+    engine(() => undefined);
+    const res = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
+    expect(res.status).toBe(202);
+    const after = await t.run(async (ctx) => (await ctx.db.query("accounts").first())!.updatedAt);
+    expect(after).toBe(before);
+  });
+
+  it("validates sessions:answer credentials, guards missing requests in answered, and sets default timeout on enginePost", async () => {
+    const t = await setup();
+    const { as } = await prove(t, await phone(1));
+    await expect(as.action(api.sessions.answer, { flow: "f", requestId: "r", credentials: { password: 123 } as never })).rejects.toThrow();
+    expect(await codeOf(t.mutation(internal.sessions.answered, { requestId: "missing", cookies: "a=b" }))).toBe("request_not_found");
+    const { enginePost } = await import("./lib/engine");
+    let seenSignal: AbortSignal | null | undefined;
+    vi.stubGlobal("fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+      seenSignal = init?.signal;
+      return Response.json({ ok: true });
+    });
+    await enginePost("/engine/test", { a: 1 });
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
   });
 });

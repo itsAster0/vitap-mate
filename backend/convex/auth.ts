@@ -1,9 +1,9 @@
 // Who a phone is, and its tokens.
 //
 // 1. `auth:proveStart` (signed) hands the install a TLSNotary ticket: 2
-//    minutes, one at a time. The engine takes it (`/internal/proof-ticket`)
-//    when the phone opens `/proof`, and reports its verdict
-//    (`/internal/proof-done`).
+//    minutes, one at a time. The verifier (vtop-verifier) takes it
+//    (`/internal/proof-ticket`) when the phone opens `/proof`, and reports its
+//    verdict (`/internal/proof-done`); the engine gives the regno's owner hash.
 // 2. `auth:token` (signed) trades a proved ticket, a refresh token, a v2
 //    account token or the demo for an access JWT and a new refresh token. A
 //    refresh token is good once: using it replaces it, and showing a replaced
@@ -52,7 +52,7 @@ export const proveStart = mutation({
       .collect()) {
       await ctx.db.delete(old._id);
     }
-    // 128 bits, as the engine's binding wants (32 lower-case hex digits).
+    // 128 bits, as the verifier's binding wants (32 lower-case hex digits).
     const ticket = randomHex(16);
     const expiresAt = at + TICKET_TTL_SECS;
     await ctx.db.insert("proofTickets", { ticket, deviceId, status: "open", expiresAt });
@@ -69,7 +69,7 @@ async function ticketRow(ctx: MutationCtx, ticket: string): Promise<Doc<"proofTi
     .unique();
 }
 
-/** The engine starts a proof: an open ticket is used up and names its install; null when it is
+/** The verifier starts a proof: an open ticket is used up and names its install; null when it is
  * unknown, used or expired. */
 export const takeTicket = internalMutation({
   args: { ticket: v.string() },
@@ -78,7 +78,7 @@ export const takeTicket = internalMutation({
     const at = now();
     if (!row || row.status !== "open" || row.expiresAt <= at) return null;
     const { ok, retryAfter } = await rateLimits.limit(ctx, "proofGlobal", {});
-    // The ticket stays open: the phone tries again once the engine has room.
+    // The ticket stays open: the phone tries again once there is room.
     if (!ok) return { busy: retryAfter };
     // A proof can take a while on a slow VTOP: the sweep must not drop the ticket mid-proof.
     await ctx.db.patch(row._id, { status: "taken", expiresAt: at + TICKET_TTL_SECS });
@@ -86,15 +86,16 @@ export const takeTicket = internalMutation({
   },
 });
 
-/** The engine's verdict on a taken ticket; false when there is no such ticket. */
+/** The verifier's verdict on a taken ticket, with the owner hash the engine gave for its regno
+ * (none when the engine couldn't say); false when there is no such ticket. */
 export const proofDone = internalMutation({
   args: { ticket: v.string(), regno: v.optional(v.string()), ownerHash: v.optional(v.string()), code: v.optional(v.string()) },
   handler: async (ctx, { ticket, regno, ownerHash, code }) => {
     const row = await ticketRow(ctx, ticket);
     if (!row || row.status !== "taken") return false;
     const expiresAt = now() + PROVED_TTL_SECS;
-    if (regno && ownerHash && !code) {
-      await ctx.db.patch(row._id, { status: "proved", regno: accountId(regno), ownerHash, expiresAt });
+    if (regno && !code) {
+      await ctx.db.patch(row._id, { status: "proved", regno: accountId(regno), ...(ownerHash ? { ownerHash } : {}), expiresAt });
       console.log(`[regno=${accountId(regno)}] auth: a proof held`);
     } else {
       await ctx.db.patch(row._id, { status: "failed", code: code ?? "proof_failed", expiresAt });
@@ -186,7 +187,7 @@ export const token = action({
     const granted: Granted = await ctx.runMutation(internal.auth.grant, {
       deviceId: call.deviceId,
       signKey: call.signKey,
-      grant: JSON.stringify(grant),
+      grant,
       newHash: await sha256Hex(refreshToken),
       chainId: randomHex(16),
     });
@@ -233,14 +234,27 @@ const REFUSALS = {
 
 type Granted = { regno: string; account: string; demo: boolean } | { refused: keyof typeof REFUSALS };
 
+const deviceFieldsValidator = v.object({
+  sealKey: v.string(),
+  platform: v.string(),
+  label: v.union(v.string(), v.null()),
+  fcmToken: v.union(v.string(), v.null()),
+});
+
+const grantValidator = v.union(
+  v.object({ kind: v.literal("ticket"), ticket: v.string(), device: deviceFieldsValidator }),
+  v.object({ kind: v.literal("refresh"), hash: v.string() }),
+  v.object({ kind: v.literal("v2"), regno: v.string(), iat: v.number(), device: deviceFieldsValidator }),
+  v.object({ kind: v.literal("demo"), device: deviceFieldsValidator }),
+);
+
 /** Checks the grant and stores the new refresh token: in the old one's chain for a refresh, else
  * in a new chain. Who it is for, as the JWT names them. */
 export const grant = internalMutation({
-  args: { deviceId: v.string(), signKey: v.string(), grant: v.string(), newHash: v.string(), chainId: v.string() },
+  args: { deviceId: v.string(), signKey: v.string(), grant: grantValidator, newHash: v.string(), chainId: v.string() },
   handler: async (ctx, args): Promise<Granted> => {
     const at = now();
-    const grant = JSON.parse(args.grant) as Grant;
-    const { deviceId } = args;
+    const { deviceId, grant } = args;
     const store = (chainId: string, accountRow: Id<"accounts"> | null) =>
       ctx.db.insert("refreshTokens", { hash: args.newHash, deviceId, chainId, ...(accountRow ? { accountId: accountRow } : {}), usedAt: null, createdAt: at });
     // An install keeps one refresh token: a new chain (proof, trade-in, demo) ends its older ones,

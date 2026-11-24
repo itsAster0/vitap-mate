@@ -1,4 +1,5 @@
-// Checks on what clients send, as edge/src/state.ts made them.
+// Validation helpers for client-supplied device fields (FCM token, seal key,
+// platform and labels).
 
 import { isPublicKey } from "./mailSeal";
 

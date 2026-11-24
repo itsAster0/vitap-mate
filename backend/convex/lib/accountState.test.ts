@@ -1,4 +1,4 @@
-// Ported from edge/src/account-state.test.ts: the account rules did not change.
+// Unit tests for pure account state, key, cookie and session request rules.
 import { describe, expect, it } from "vitest";
 
 import {

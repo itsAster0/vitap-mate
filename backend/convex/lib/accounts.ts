@@ -1,6 +1,7 @@
 // Reading and writing `accounts` rows as `AccountRecord`s, and the rows that
 // hang off an account: its phones (linked `devices`), keys and sign-ins.
 
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { AccountRecord, type KeyRecord, MAX_PHONES, MAX_SIGN_INS, type PhoneRecord, type SignInRecord, leastRecent, toFields } from "./accountState";
@@ -14,10 +15,16 @@ export async function accountByRegno(ctx: QueryCtx, regno: string): Promise<Doc<
     .unique();
 }
 
-/** Writes the record back, as the edge's `save` did (with `updatedAt`). */
+/** Writes the record back with `updatedAt`, and schedules server-side expiry at `sweepAt` so live
+ * queries re-run when a cached session or saved vault expires. */
 export async function saveRecord(ctx: MutationCtx, id: Id<"accounts">, record: AccountRecord): Promise<void> {
   record.updatedAt = now();
-  await ctx.db.patch(id, toFields(record));
+  const fields = toFields(record);
+  const prev = await ctx.db.get(id);
+  await ctx.db.patch(id, fields);
+  if (fields.sweepAt !== undefined && fields.sweepAt !== prev?.sweepAt) {
+    await ctx.scheduler.runAt(fields.sweepAt * 1000, internal.account.expire, { accountId: id });
+  }
 }
 
 /** The student's account, made on first sight. */
@@ -75,7 +82,7 @@ export async function unlinkPhone(ctx: MutationCtx, device: Doc<"devices">): Pro
  * that changes student must not get the last one's OTPs. By install, not by account, so rows
  * migrated under an account the phone was never linked to go too. Kept memberships are marked
  * seen (hourly at most), so an active phone isn't dropped as stale when another joins. */
-async function dropMail(ctx: MutationCtx, deviceId: string, keep?: Id<"accounts">): Promise<void> {
+export async function dropMail(ctx: MutationCtx, deviceId: string, keep?: Id<"accounts">): Promise<void> {
   const members = await ctx.db
     .query("mailboxDevices")
     .withIndex("by_device", (q) => q.eq("deviceId", deviceId))

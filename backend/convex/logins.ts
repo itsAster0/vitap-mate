@@ -24,6 +24,37 @@ const OTP_NOT_FOUND: LoginOutcome = { status: "failed", reason: "otp_not_found: 
 /** How an engine step ended. */
 type Stepped = LoginOutcome | { status: "otp_needed"; sealedState: string; since: number };
 
+const steppedValidator = v.union(
+  v.object({ status: v.literal("ok"), cookies: v.string(), sealedSession: v.string(), csrfToken: v.optional(v.string()) }),
+  v.object({ status: v.literal("invalid_credentials") }),
+  v.object({ status: v.literal("vault_unusable") }),
+  v.object({ status: v.literal("forwarding_required") }),
+  v.object({ status: v.literal("gmail_revoked"), sealedVault: v.string() }),
+  v.object({ status: v.literal("failed"), reason: v.string() }),
+  v.object({ status: v.literal("otp_needed"), sealedState: v.string(), since: v.number() }),
+);
+
+/** Strips any extra engine fields so the value always satisfies `steppedValidator`. */
+function normalizeOutcome(outcome: LoginOutcome): LoginOutcome {
+  switch (outcome.status) {
+    case "ok":
+      return {
+        status: "ok",
+        cookies: outcome.cookies,
+        sealedSession: outcome.sealedSession,
+        ...(typeof outcome.csrfToken === "string" ? { csrfToken: outcome.csrfToken } : {}),
+      };
+    case "gmail_revoked":
+      return { status: "gmail_revoked", sealedVault: outcome.sealedVault };
+    case "failed":
+      return { status: "failed", reason: outcome.reason };
+    case "invalid_credentials":
+    case "vault_unusable":
+    case "forwarding_required":
+      return { status: outcome.status };
+  }
+}
+
 /** One engine step; an engine that can't be reached, or answers oddly, is a failed sign-in. */
 async function step(body: { account: string; sealedVault?: string; forwarding?: boolean; sealedState?: string; otp?: string }, flow: string | null): Promise<Stepped> {
   const trace = { flow, regno: body.account };
@@ -31,9 +62,9 @@ async function step(body: { account: string; sealedVault?: string; forwarding?: 
     const response = await enginePost(LOGIN, body, trace);
     const answer = response.status === 200 ? ((await response.json()) as Record<string, unknown>) : null;
     if (answer?.status === "otp_needed" && typeof answer.sealedState === "string" && typeof answer.since === "number") {
-      return answer as Stepped;
+      return { status: "otp_needed", sealedState: answer.sealedState, since: answer.since };
     }
-    if (isLoginOutcome(answer)) return answer;
+    if (isLoginOutcome(answer)) return normalizeOutcome(answer);
     logError(trace, `account: the engine's sign-in step answered ${response.status}`);
   } catch (e) {
     logError(trace, "account: engine unreachable for a sign-in", e);
@@ -83,7 +114,7 @@ type First = { loginId: Id<"logins">; regno: string; requestId: string; vault: s
 
 async function first(ctx: ActionCtx, { loginId, regno, requestId, vault, forwarding, flow }: First): Promise<void> {
   const stepped = await step({ account: regno, sealedVault: vault, forwarding }, flow);
-  await ctx.runMutation(internal.logins.stepped, { loginId, regno, requestId, stepped: JSON.stringify(stepped) });
+  await ctx.runMutation(internal.logins.stepped, { loginId, regno, requestId, stepped });
 }
 
 export const firstStep = internalAction({
@@ -109,16 +140,15 @@ export const resume = internalAction({
     const row = await ctx.runQuery(internal.logins.waiting, { loginId });
     if (!row) return;
     const stepped = await step({ account: row.regno, sealedState: row.sealedState, otp }, null);
-    await ctx.runMutation(internal.logins.stepped, { loginId, regno: row.regno, requestId: row.requestId, stepped: JSON.stringify(stepped) });
+    await ctx.runMutation(internal.logins.stepped, { loginId, regno: row.regno, requestId: row.requestId, stepped });
   },
 });
 
 /** Keeps a sign-in that waits for its OTP (sending it a code that came during the step), or
  * ends it. A late outcome, after the sweep ended the row, still caches its session. */
 export const stepped = internalMutation({
-  args: { loginId: v.id("logins"), regno: v.string(), requestId: v.string(), stepped: v.string() },
-  handler: async (ctx, { loginId, regno, requestId, stepped }) => {
-    const answer = JSON.parse(stepped) as Stepped;
+  args: { loginId: v.id("logins"), regno: v.string(), requestId: v.string(), stepped: steppedValidator },
+  handler: async (ctx, { loginId, regno, requestId, stepped: answer }) => {
     const row = await ctx.db.get(loginId);
     if (answer.status !== "otp_needed") {
       if (row) await ctx.db.delete(loginId);

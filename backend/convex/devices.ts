@@ -3,7 +3,7 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { revokeDevice } from "./lib/accounts";
+import { dropMail, revokeDevice } from "./lib/accounts";
 import { fcmToken, memberLabel, sealKey } from "./lib/checks";
 import { badRequest } from "./lib/errors";
 import { caller } from "./lib/identity";
@@ -60,16 +60,7 @@ export const remove = mutation({
       }
     }
     await revokeDevice(ctx, me.deviceId);
-    const accountId = me.device.accountId;
-    if (accountId !== undefined) {
-      for (const table of ["otpInbox", "mailboxDevices"] as const) {
-        const rows = await ctx.db
-          .query(table)
-          .withIndex("by_account", (q) => q.eq("accountId", accountId))
-          .collect();
-        for (const row of rows.filter((r) => r.deviceId === me.deviceId)) await ctx.db.delete(row._id);
-      }
-    }
+    await dropMail(ctx, me.deviceId);
     await ctx.db.delete(me.device._id);
     log({ flow, regno: me.regno }, "device: an install deleted itself");
     return null;

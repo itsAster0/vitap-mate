@@ -49,8 +49,6 @@ describe("parseMail", () => {
       kind: "otp",
       code: "112233",
       sentAt: 1792231200,
-      from: "noreply.sdc@vitap.ac.in",
-      subject: "VTOP Login OTP",
     });
   });
 
@@ -85,7 +83,6 @@ describe("parseMail", () => {
         requester: "student@gmail.com",
       },
       sentAt: 1792231200,
-      from: "forwarding-noreply@google.com",
     });
   });
 

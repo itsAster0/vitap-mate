@@ -1,6 +1,6 @@
-// Forwarding addresses `otp+<id>@<MAIL_DOMAIN>`, as edge/src/state.ts and
-// index.ts kept them. Each belongs to a student's account from the start, so
-// a new phone of theirs joins the same address.
+// Forwarding addresses `otp+<id>@<MAIL_DOMAIN>` and their member devices. Each
+// address belongs to a student's account from the start, so a new phone of
+// theirs joins the same address.
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -42,17 +42,6 @@ export function mailDomain(): string {
 
 export function address(id: string): string {
   return `${ADDRESS_PREFIX}${id}@${mailDomain()}`;
-}
-
-/** The mailbox id in a recipient address, if it is one of ours. */
-export function idFromAddress(recipient: string): string | null {
-  const local = recipient
-    .trim()
-    .split("@")[0]
-    .replace(/[A-Z]/g, (c) => c.toLowerCase());
-  if (!local.startsWith(ADDRESS_PREFIX)) return null;
-  const id = local.slice(ADDRESS_PREFIX.length);
-  return isId(id) ? id : null;
 }
 
 export const unknownMailbox = (): never =>

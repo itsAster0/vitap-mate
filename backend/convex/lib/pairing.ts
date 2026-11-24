@@ -1,4 +1,5 @@
-// Pairing codes the extension and the MCP authorize page show (edge/src/pair.ts).
+// Crockford base32 pairing codes shared by the browser extension and the MCP
+// authorize page.
 
 export const PAIR_TTL_SECS = 300;
 export const POLL_AFTER_MS = 2000;

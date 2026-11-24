@@ -564,12 +564,16 @@ requests and codes live in the `OAuth` Durable Object (one, named
 All need `Authorization: Bearer <INTERNAL_TOKEN>`, else `401 unauthorized`;
 `/internal/udp-keys` takes the gateway's own `GATEWAY_TOKEN` too, which opens
 nothing else, so a compromised gateway cannot wait for OTPs or reach accounts.
+The two proof routes take the verifier's (`rust/vtop-verifier`) own
+`VERIFIER_TOKEN` the same way.
 
 | Route | Caller | Request | Response |
 |---|---|---|---|
 | `POST /internal/accounts/login-done` | engine | `{ account, requestId, outcome }` (`LoginDone` in `src/shared/engine-api.ts`) | `204` |
 | `POST /internal/mail-otp/await` | engine | `{ ownerHash, publicKey, since, waitSecs }` | `{ sealed }` or `{ sealed: null }`; `404 mailbox_not_found` |
 | `POST /internal/udp-keys` | gateway | see UDP | `204` |
+| `POST /internal/proof-ticket` | verifier | `{ ticket }` | `{ device }`: the ticket is used up; `404 challenge_invalid` when unknown, used or expired; `429 too_many_proofs` at the proof cap (the ticket stays open) |
+| `POST /internal/proof-done` | verifier | `{ ticket, regno }` or `{ ticket, code }` | `204`, `404 challenge_invalid`. Convex asks the engine's `/engine/owner-hash` for the regno's owner hash; one the caller sends is ignored |
 | `POST /internal/export` | backfill | `{ kind, id }` or `{ kind, objectId }` | `{ kind, id \| objectId, found, tables, kv, omitted }` |
 
 `/internal/export` is for the one-time move to backend v3
@@ -591,11 +595,10 @@ exported.
 
 Every call carries `Authorization: Bearer <INTERNAL_TOKEN>`:
 `POST /engine/session`, `/engine/seal`, `/engine/login` (answers `202`, then
-reports to `/internal/accounts/login-done`), `GET /engine/proof` (the
-[account proof](#get-v1accountprove)'s WebSocket: `?device=&challenge=`, 32
-lower-case hex each, `400` otherwise, `503 proof_busy` past 4 at once; binary
-messages both ways, then the engine's text frame `{ status: "ok",
-registrationNumber, ownerHash }` or `{ status: "failed", reason }`),
+reports to `/internal/accounts/login-done`), `/engine/owner-hash`
+(`{ registrationNumber }` → `{ ownerHash }`, for a proof's verdict; the
+engine no longer verifies proofs, `rust/vtop-verifier` does, on the phone's
+`GET /proof?ticket=`),
 `/internal/mail-otp/owner`
 (`{ cookies }` → `{ ownerHash, registrationNumber }`, `401` if VTOP
 refuses; an engine without `registrationNumber` means no token), and the

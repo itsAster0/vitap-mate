@@ -1,9 +1,8 @@
-// What an account keeps, and the decisions it makes: when a cached session
-// or saved credentials may be used, who is asked for a session first, how a
-// request looks to its client. Ported from edge/src/account-state.ts with
-// its rules unchanged; the `accounts` row holds an `AccountRecord` field for
-// field (`toFields` / `fromFields`), and phones, keys and sign-ins are rows
-// of their own tables. No Convex APIs here, so it is tested on its own.
+// Pure account state and decision rules: cached session and saved credential
+// lifetimes, phone-vs-server sign-in plans, and session request views. The
+// `accounts` row holds an `AccountRecord` field for field (`toFields` /
+// `fromFields`), and phones, keys and sign-ins live in their own tables. No
+// Convex APIs here, so it is tested on its own.
 
 import { sha256HexSync } from "./sha256";
 

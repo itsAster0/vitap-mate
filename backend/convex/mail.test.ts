@@ -1,11 +1,10 @@
-// Forwarding addresses and mail in: ported from edge/src/mail.test.ts and the
-// mail-otp routes, with mail now arriving from the mail Worker.
+// Forwarding addresses and mail delivery from the mail Worker (`/internal/mail`).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REGNO, TOKENS, advance, codeOf, phone, prove, setup, type T } from "../test/kit";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { claimMailbox } from "./lib/mailboxes";
+import { CONFIRMATION_TTL_SECS, claimMailbox } from "./lib/mailboxes";
 import { open } from "./lib/mailSeal";
 
 afterEach(() => {
@@ -122,6 +121,12 @@ describe("mail in", () => {
     advance(60);
     const tb = await prove(t, b);
     await tb.as.mutation(api.mail.register, { flow: "f" });
+    // Joining again replaces the previous gmail_confirm row instead of duplicating it.
+    await tb.as.mutation(api.mail.join, { flow: "f" });
+    const bConfirmRows = await t.run(async (ctx) =>
+      (await ctx.db.query("otpInbox").collect()).filter((r) => r.deviceId === b.deviceId && r.kind === "gmail_confirm"),
+    );
+    expect(bConfirmRows).toHaveLength(1);
     const joined = await tb.as.query(api.mail.inbox, { flow: "f", id: box.id });
     expect(JSON.parse(await text(b.sealSecret, box.id, joined.confirmation)).code).toBe("123456789");
     await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "111111" });
@@ -292,5 +297,22 @@ describe("mail in", () => {
     const bad = await mail(t, { addressId: box.id, receivedAt: Date.now() });
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { code: string }).code).toBe("bad_request");
+  });
+
+  it("drops Gmail's confirmation at 24h via scheduled mutation so live mail:inbox re-runs", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const ta = await prove(t, a);
+    const box = await ta.as.mutation(api.mail.register, { flow: "f" });
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
+    const confirm = { code: "123456789", link: "https://mail-settings.google.com/mail/vf-abc", requester: "s@gmail.com" };
+    expect((await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: null, gmailConfirm: confirm })).status).toBe(200);
+    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).confirmation).not.toBeNull();
+    vi.advanceTimersByTime(CONFIRMATION_TTL_SECS * 1000);
+    await t.finishInProgressScheduledFunctions();
+    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).confirmation).toBeNull();
+    const row = await t.run((ctx) => ctx.db.query("mailboxes").first());
+    expect(row?.confirmation).toBeNull();
+    expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
   });
 });

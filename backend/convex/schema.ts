@@ -143,6 +143,8 @@ export default defineSchema({
     phoneError: nullable(v.string()),
     source: nullable(v.string()),
     phones: v.array(v.string()),
+    /** Set by the scheduled expiry mutation so subscribed live queries re-run at `expiresAt`. */
+    expired: v.optional(v.boolean()),
   })
     .index("by_requestId", ["requestId"])
     .index("by_account", ["accountId"])
@@ -164,6 +166,11 @@ export default defineSchema({
     .index("by_clientId", ["clientId"])
     .index("by_usedAt", ["usedAt"]),
 
+  /** Single-row count of `oauthClients`, so `/register` caps clients without scanning every row. */
+  oauthMeta: defineTable({
+    count: v.number(),
+  }),
+
   /** Authorize pages waiting for the app; `accessKey` and `accountId` once approved. */
   oauthRequests: defineTable({
     codeHash: v.string(),
@@ -175,6 +182,8 @@ export default defineSchema({
     expiresAt: v.number(),
     accessKey: nullable(v.string()),
     accountId: v.optional(v.id("accounts")),
+    /** Set at `expiresAt` so live `pair:info` queries re-run while `keys:store` still reports `pair_expired`. */
+    expired: v.optional(v.boolean()),
   })
     .index("by_codeHash", ["codeHash"])
     .index("by_pollHash", ["pollHash"])

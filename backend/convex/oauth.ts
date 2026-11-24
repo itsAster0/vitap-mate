@@ -1,15 +1,15 @@
-// OAuth for MCP clients (MCP authorization, 2025-06-18), ported from
-// edge/src/oauth.ts: dynamic registration, an authorize page that shows a
-// pairing code the app approves with `keys:create`, and `/token` swapping the
-// one-time code and its PKCE verifier for the access key. These are the
-// stored halves; http.ts has the routes. Codes, poll ids and verifiers are
-// kept as SHA-256 only. Random values come from the HTTP actions.
+// OAuth 2.1 state for MCP clients (MCP authorization, 2025-06-18): dynamic
+// client registration, authorize requests approved by the app via `keys:create`,
+// and one-time PKCE code redemption at `/token`. HTTP endpoints live in
+// `http.ts`. Codes, poll ids and verifiers are stored as SHA-256 hashes only.
 
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { type QueryCtx, internalMutation, internalQuery } from "./_generated/server";
 import { toBase64Url } from "./lib/base64";
 import { hashesEqual, sha256 } from "./lib/crypto";
+import { now } from "./lib/util";
 
 /** How long the authorize page waits for the app. */
 export const REQUEST_TTL_SECS = 600;
@@ -78,16 +78,23 @@ export async function s256(verifier: string): Promise<string> {
   return toBase64Url(await sha256(verifier));
 }
 
-/** The client behind a pairing code still waiting for the app; null when the code is not one of
- * these (it may be the extension's). */
-export async function pendingApp(ctx: QueryCtx, codeHash: string, at: number): Promise<{ name: string; host: string; row: Doc<"oauthRequests"> } | null> {
+export type OauthPairing =
+  | { status: "missing" }
+  | { status: "expired" }
+  | { status: "pending"; name: string; host: string; row: Doc<"oauthRequests"> };
+
+/** Looks up an MCP OAuth pairing code: `missing` when no OAuth request has this hash (so it may
+ * be an extension code), `expired` when the OAuth request expired, was already approved, or its
+ * client is gone, and `pending` when it is still waiting for approval. */
+export async function pendingApp(ctx: QueryCtx, codeHash: string, at: number): Promise<OauthPairing> {
   const row = await ctx.db
     .query("oauthRequests")
     .withIndex("by_codeHash", (q) => q.eq("codeHash", codeHash))
     .unique();
-  if (!row || row.expiresAt <= at || row.accessKey !== null) return null;
+  if (!row) return { status: "missing" };
+  if (row.expired || row.expiresAt <= at || row.accessKey !== null) return { status: "expired" };
   const client = await clientRow(ctx, row.clientId);
-  return client ? { name: client.name, host: hostOf(row.redirectUri), row } : null;
+  return client ? { status: "pending", name: client.name, host: hostOf(row.redirectUri), row } : { status: "expired" };
 }
 
 async function clientRow(ctx: QueryCtx, clientId: string) {
@@ -97,13 +104,23 @@ async function clientRow(ctx: QueryCtx, clientId: string) {
     .unique();
 }
 
-/** Stores a client, dropping the one unused longest when full. */
+/** Stores a client, dropping the one unused longest when full. Uses `oauthMeta` so each
+ * registration reads O(1) rows instead of scanning `MAX_CLIENTS + 1`. */
 export const register = internalMutation({
   args: { clientId: v.string(), name: v.string(), redirectUris: v.array(v.string()), at: v.number() },
   handler: async (ctx, { clientId, name, redirectUris, at }) => {
-    const oldest = await ctx.db.query("oauthClients").withIndex("by_usedAt").order("asc").take(MAX_CLIENTS + 1);
-    for (const extra of oldest.slice(0, Math.max(0, oldest.length - MAX_CLIENTS + 1))) await ctx.db.delete(extra._id);
+    let meta = await ctx.db.query("oauthMeta").first();
+    let count = meta ? meta.count : (await ctx.db.query("oauthClients").collect()).length;
+    if (count >= MAX_CLIENTS) {
+      const drop = count - MAX_CLIENTS + 1;
+      const oldest = await ctx.db.query("oauthClients").withIndex("by_usedAt").order("asc").take(drop);
+      for (const extra of oldest) await ctx.db.delete(extra._id);
+      count -= oldest.length;
+    }
     await ctx.db.insert("oauthClients", { clientId, name, redirectUris, createdAt: at, usedAt: at });
+    count += 1;
+    if (meta) await ctx.db.patch(meta._id, { count });
+    else await ctx.db.insert("oauthMeta", { count });
   },
 });
 
@@ -121,16 +138,29 @@ export const open = internalMutation({
   handler: async (ctx, args) => {
     const row = await clientRow(ctx, args.clientId);
     if (row) await ctx.db.patch(row._id, { usedAt: args.at });
-    await ctx.db.insert("oauthRequests", {
+    const expiresAt = args.at + REQUEST_TTL_SECS;
+    const requestId = await ctx.db.insert("oauthRequests", {
       codeHash: args.codeHash,
       pollHash: args.pollHash,
       clientId: args.clientId,
       redirectUri: args.redirectUri,
       challenge: args.challenge,
       state: args.state,
-      expiresAt: args.at + REQUEST_TTL_SECS,
+      expiresAt,
       accessKey: null,
     });
+    await ctx.scheduler.runAt(expiresAt * 1000, internal.oauth.expireRequest, { requestId });
+  },
+});
+
+/** Marks an unapproved OAuth request expired at `expiresAt` so live `pair:info` queries re-run
+ * while `keys:store` still sees the row and answers `pair_expired`. */
+export const expireRequest = internalMutation({
+  args: { requestId: v.id("oauthRequests") },
+  handler: async (ctx, { requestId }) => {
+    const row = await ctx.db.get(requestId);
+    if (!row || row.expired || row.accessKey !== null || row.expiresAt > now()) return;
+    await ctx.db.patch(requestId, { expired: true });
   },
 });
 

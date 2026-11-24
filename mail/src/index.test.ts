@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { MAIL_PATH, type MailBody } from "./convex";
+import { MAIL_PATH, type MailBody, logError } from "./convex";
 import { type Deps, type Env, type IncomingMail, type Queued, type QueuedMessage, RETRY_FOR_MS, backoff, handleEmail, handleQueue } from "./index";
 
 /** A minute after the test mail's `Date:`, in ms. */
@@ -23,8 +23,6 @@ const OTP_BODY: MailBody = {
   receivedAt: 1792231200_000,
   otp: "112233",
   gmailConfirm: null,
-  from: "noreply.sdc@vitap.ac.in",
-  subject: "VTOP Login OTP",
 };
 
 type Call = { url: string; init: RequestInit };
@@ -195,5 +193,20 @@ describe("handleQueue", () => {
     await handleQueue([junk], env(), { fetch, now: () => NOW });
     expect(junk.acked).toBe(true);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("logError", () => {
+  it("omits SyntaxError messages so unparsed payloads never leak to logs", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      logError("mail: bad json", new SyntaxError("Unexpected token 'SECRET_OTP_112233'"));
+      expect(spy).toHaveBeenCalledTimes(1);
+      const line = String(spy.mock.calls[0]?.[0]);
+      expect(line).toContain("SyntaxError");
+      expect(line).not.toContain("SECRET_OTP_112233");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

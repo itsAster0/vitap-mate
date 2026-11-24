@@ -1,7 +1,6 @@
-// What a forwarded mail means, ported from the v2 edge (edge/src/mail.ts and the address
-// checks in edge/src/state.ts). Only two kinds go on: VTOP's OTP mail, and Gmail's
-// forwarding confirmation (needed once during setup). Everything else is dropped. The mail
-// is parsed in memory and nothing about its content is logged.
+// Parses forwarded email for `otp+<id>@` addresses. Only two kinds go on: VTOP's OTP mail,
+// and Gmail's forwarding confirmation (needed once during setup). Everything else is dropped.
+// The mail is parsed in memory and nothing about its content is logged.
 
 import PostalMime, { type RawEmail } from "postal-mime";
 
@@ -22,8 +21,8 @@ export type GmailConfirm = { code: string | null; link: string | null; requester
 
 /** What a mail says, or null to drop it. `sentAt` is in seconds. */
 export type Parsed =
-  | { kind: "otp"; code: string; sentAt: number; from: string; subject: string }
-  | { kind: "gmail_confirm"; confirm: GmailConfirm; sentAt: number; from: string; subject: string };
+  | { kind: "otp"; code: string; sentAt: number }
+  | { kind: "gmail_confirm"; confirm: GmailConfirm; sentAt: number };
 
 /** Lower-cases A-Z only, so indexes into the result match the input. */
 function asciiLower(text: string): string {
@@ -111,13 +110,13 @@ export async function parseMail(raw: RawEmail, now: number): Promise<Parsed | nu
   switch (from) {
     case VTOP_SENDER: {
       const code = firstSixDigitCode(text);
-      return code === null ? null : { kind: "otp", code, sentAt, from, subject };
+      return code === null ? null : { kind: "otp", code, sentAt };
     }
     case GMAIL_FORWARDING_SENDER: {
       const code = digitsAfter(text, "confirmation code:") ?? digitsAfter(text, "(#");
       const link = confirmLink(text);
       if (code === null && link === null) return null;
-      return { kind: "gmail_confirm", confirm: { code, link, requester: requester(subject) }, sentAt, from, subject };
+      return { kind: "gmail_confirm", confirm: { code, link, requester: requester(subject) }, sentAt };
     }
     default:
       return null;

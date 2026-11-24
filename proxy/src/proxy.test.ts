@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MAX_BODY_BYTES, proxyVtop, VTOP_ORIGIN } from "./proxy";
 
@@ -131,5 +131,44 @@ describe("proxyVtop", () => {
     expect(byBody.status).toBe(413);
     expect(((await byBody.json()) as { code: string }).code).toBe("too_large");
     expect(seen).toHaveLength(0);
+  });
+
+  it("compares parsed URL origins when rewriting origin, referer and location", async () => {
+    const spoofedLoc = `${VTOP_ORIGIN}.evil.example/vtop/content`;
+    const { seen, fetcher } = capture(new Response(null, { status: 302, headers: { location: spoofedLoc } }));
+    const res = await proxyVtop(
+      new Request(`${PROXY}/vtop/login`, {
+        headers: {
+          origin: `${PROXY}.evil.example`,
+          referer: `${PROXY}.evil.example/vtop/open/page`,
+        },
+      }),
+      fetcher,
+    );
+    expect(seen[0].headers.get("origin")).toBe(`${PROXY}.evil.example`);
+    expect(seen[0].headers.get("referer")).toBe(`${PROXY}.evil.example/vtop/open/page`);
+    expect(res.headers.get("location")).toBe(spoofedLoc);
+  });
+
+  it("rejects non-VTOP HTTP methods with 405", async () => {
+    const { seen, fetcher } = capture(new Response("ok"));
+    const res = await proxyVtop(new Request(`${PROXY}/vtop/content`, { method: "DELETE" }), fetcher);
+    expect(res.status).toBe(405);
+    expect(((await res.json()) as { code: string }).code).toBe("method_not_allowed");
+    expect(seen).toHaveLength(0);
+  });
+
+  it("omits SyntaxError messages from error logs", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await proxyVtop(new Request(`${PROXY}/vtop/content`), async () => {
+        throw new SyntaxError("Unexpected token JSESSIONID=secret");
+      });
+      const line = String(spy.mock.calls[0]?.[0]);
+      expect(line).toContain("SyntaxError");
+      expect(line).not.toContain("JSESSIONID=secret");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

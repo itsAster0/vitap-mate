@@ -3,9 +3,8 @@
 // - The access JWT: ES256 with `JWT_PRIVATE_JWK` (a P-256 JWK as JSON). Convex
 //   checks it through auth.config.ts against `JWT_PUBLIC_JWK`. ECDSA needs
 //   randomness, so only actions sign.
-// - The v2 account token (edge/src/account-token.ts): HS256 with
-//   `ACCOUNT_TOKEN_SECRET`, traded once for a refresh token while phones move
-//   over.
+// - Legacy v2 account token: HS256 with `ACCOUNT_TOKEN_SECRET`, traded once
+//   for a refresh token while older installs move over.
 
 import { fromBase64Url, toBase64Url } from "./base64";
 import { fail } from "./errors";

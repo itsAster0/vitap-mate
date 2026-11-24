@@ -313,7 +313,7 @@ describe("tokens", () => {
     expect(await codeOf(as.mutation(api.mail.register, { flow: "f" }))).toBe("demo_unavailable");
     expect(await codeOf(as.mutation(api.account.setSemester, { flow: "f", semesterId: "AP1" }))).toBe("demo_unavailable");
     expect(await codeOf(as.action(api.keys.create, { flow: "f" }))).toBe("demo_unavailable");
-    expect(await codeOf(as.action(api.vtop.fetch, { flow: "f", name: "semesters" }))).toBe("demo_unavailable");
+    expect(await codeOf(as.action(api.vtop.fetch, { flow: "f", session: { cookies: "a=b" }, name: "semesters" }))).toBe("demo_unavailable");
     const refreshed = await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: tokens.refreshToken }));
     expect(refreshed.regno).toBe("DEMO2026");
     // Signing out ends the demo's 24-hour JWT at once too.

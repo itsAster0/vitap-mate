@@ -18,8 +18,22 @@ export const rateLimits = new RateLimiter(components.rateLimiter, {
    * new device keys can't get students locked out or VTOP blocking the engine. */
   loginUser: { kind: "token bucket", rate: 10, period: 10 * MINUTE, capacity: 5 },
   loginGlobal: { kind: "token bucket", rate: 120, period: MINUTE, capacity: 40 },
-  /** OAuth clients registered (anyone may): too many would push real ones out. */
-  oauthRegister: { kind: "token bucket", rate: 30, period: HOUR, capacity: 10 },
+  /** OAuth clients registered: per IP so one caller can't crowd out real apps, with a higher
+   * global ceiling. */
+  oauthRegisterIp: { kind: "token bucket", rate: 10, period: HOUR, capacity: 10 },
+  oauthRegister: { kind: "token bucket", rate: 200, period: HOUR, capacity: 60 },
+  /** OAuth `/authorize` page opens, per IP and globally. */
+  oauthAuthorizeIp: { kind: "token bucket", rate: 30, period: HOUR, capacity: 15 },
+  oauthAuthorize: { kind: "token bucket", rate: 300, period: HOUR, capacity: 100 },
+  /** OAuth `/authorize/poll` (page polls every 2 s), per IP and globally. */
+  oauthPollIp: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 30 },
+  oauthPoll: { kind: "token bucket", rate: 1200, period: MINUTE, capacity: 300 },
+  /** OAuth `/token` exchanges, per IP and globally. */
+  oauthTokenIp: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 15 },
+  oauthToken: { kind: "token bucket", rate: 300, period: MINUTE, capacity: 100 },
+  /** Extension `/v1/pair` polling (polls every 2 s), per IP and globally. */
+  pairIp: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 30 },
+  pairGlobal: { kind: "token bucket", rate: 1200, period: MINUTE, capacity: 300 },
   /** Session calls from an account's keys (extension, MCP), by account id. */
   sessionCall: { kind: "fixed window", rate: 60, period: MINUTE },
   /** Key JWTs for the extension's socket, by account: a client stuck reconnecting can't keep the

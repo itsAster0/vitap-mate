@@ -615,6 +615,8 @@ async function importOAuth(
       createdAt,
       usedAt: int(row, "used_at") ?? createdAt,
     });
+    const meta = await ctx.db.query("oauthMeta").first();
+    if (meta) await ctx.db.patch(meta._id, { count: meta.count + 1 });
     count(tally, "oauthClients.inserted");
   }
 }
