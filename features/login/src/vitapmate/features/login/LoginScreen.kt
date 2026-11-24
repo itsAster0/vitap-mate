@@ -77,12 +77,12 @@ import vitapmate.core.CoreException
 import vitapmate.core.CoreInterface
 import vitapmate.core.SignIn
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.Problem
 import vitapmate.data.SavedPasswords
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
-import vitapmate.observability.logAction
 import vitapmate.ui.PasswordField
 import vitapmate.ui.ProblemBanner
 import vitapmate.ui.Space
@@ -336,7 +336,15 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
             onResend = { scope.launch { challenge.resend(core()) } },
             onCancel = {
                 otp = null
-                scope.logAction("login.cancel_otp", "ui.login", "otp cancelled")
+                AppScope.launch {
+                    try {
+                        flow("login.cancel_otp") { id -> core().cancelOtp(id) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        // Signed out meanwhile or nothing pending: logged by flow().
+                    }
+                }
             },
             core = core,
         )

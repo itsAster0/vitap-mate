@@ -375,12 +375,17 @@ object OtpPrompt {
     var generation by mutableIntStateOf(0)
         private set
 
+    /** Monotonic id per distinct prompt open, so consecutive prompts with the same message don't collide. */
+    var challengeId by mutableIntStateOf(0)
+        private set
+
     /** Times the prompt was asked for, so a fetch can tell it opened before the fetch began. */
     var asks = 0
         private set
 
     fun ask(message: String) {
         asks++
+        if (this.message == null) challengeId++
         this.message = message
     }
 

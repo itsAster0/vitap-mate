@@ -42,4 +42,20 @@ class RefreshTriggerTest {
         assertNull(refreshTrigger(PageWake.Resume, stale = false))
         assertNull(refreshTrigger(PageWake.Resume, autoRefresh = false, stale = true))
     }
+
+    @Test
+    fun consecutiveOtpPromptsWithSameMessageGetDistinctChallengeIds() {
+        val before = OtpPrompt.challengeId
+        OtpPrompt.ask("Additional verification is required.")
+        val first = OtpPrompt.challengeId
+        assertEquals(before + 1, first)
+        // A second concurrent fetch hitting the same open prompt must not reset the challenge id.
+        OtpPrompt.ask("Additional verification is required.")
+        assertEquals(first, OtpPrompt.challengeId)
+        OtpPrompt.done()
+        // A fresh prompt later with the exact same default message gets a new challenge id.
+        OtpPrompt.ask("Additional verification is required.")
+        assertEquals(first + 1, OtpPrompt.challengeId)
+        OtpPrompt.done()
+    }
 }

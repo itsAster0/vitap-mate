@@ -26,7 +26,7 @@ fun FetchOtpOverlay() {
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val message = OtpPrompt.message ?: return
-    val challenge = remember(message) { OtpChallenge(message, "fetch_otp", "ui.otp") }
+    val challenge = remember(OtpPrompt.challengeId) { OtpChallenge(message, "fetch_otp", "ui.otp") }
     OtpSheet(
         challenge,
         onSubmit = {
