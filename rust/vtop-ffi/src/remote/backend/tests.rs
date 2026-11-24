@@ -432,3 +432,44 @@ async fn trailing_slash_on_saved_server_still_uses_kept_refresh_token() {
     view(&core, "f", false).await.unwrap().unwrap();
     assert_eq!(paths(&edge), ["auth:token", "account:view"]);
 }
+
+#[test]
+fn renewal_coordinator_coalesces_requests_and_stops_when_watches_drop() {
+    let mut renewal = Renewal::default();
+    let now = Instant::now();
+    let held_a = Arc::new(());
+    let held_b = Arc::new(());
+    assert!(renewal.watch(&held_a, "f1"), "first watch starts thread");
+    assert!(!renewal.watch(&held_b, "f2"), "second watch reuses thread");
+
+    // Multiple unauthenticated watch failures coalesce into one immediate run and dedupe listeners.
+    let listener_a: Arc<dyn LiveListener> = Arc::new(Heard::default());
+    let listener_b: Arc<dyn LiveListener> = Arc::new(Heard::default());
+    assert!(!renewal.request_now("f1", listener_a.clone()));
+    assert!(!renewal.request_now("f1", listener_a.clone()));
+    assert!(!renewal.request_now("f2", listener_b.clone()));
+    assert_eq!(renewal.pending.len(), 2);
+
+    assert_eq!(
+        renewal.decide(Some(1_000_000), 0, now),
+        RenewDecision::Run { flow: "f2".into() }
+    );
+    assert_eq!(renewal.phase, RenewPhase::Renewing);
+
+    // Server change pokes the coordinator without spawning a second thread.
+    renewal.poke();
+    assert!(renewal.running);
+
+    // No identity stops the coordinator and returns both pending listeners to notify.
+    let (stop, notify) = renewal.finish(&Err(CoreError::ConsentDenied), now);
+    assert!(stop);
+    assert_eq!(notify.len(), 2);
+    assert!(!renewal.running);
+
+    // Restarting then dropping all watches cleanly transitions to Stop.
+    assert!(renewal.watch(&held_a, "f3"));
+    drop(held_a);
+    drop(held_b);
+    assert_eq!(renewal.decide(Some(1_000_000), 0, now), RenewDecision::Stop);
+    assert!(!renewal.running);
+}

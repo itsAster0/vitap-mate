@@ -14,8 +14,8 @@
 mod auth;
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, PoisonError};
-use std::time::Duration;
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use futures::future::{BoxFuture, Either, select};
 use serde::{Deserialize, Serialize};
@@ -57,6 +57,8 @@ pub(crate) trait Backend: Send + Sync {
     /// Follows query `path(args)`: `on_update` hears its result now and after every change.
     fn watch(&self, path: &str, args: Value, on_update: OnUpdate) -> u64;
     fn unwatch(&self, id: u64);
+    /// Closes the underlying transport and stops background timers (default no-op for test doubles).
+    fn close(&self) {}
 }
 
 pub(crate) type OnUpdate = Box<dyn Fn(Result<Value, CallError>) + Send + Sync>;
@@ -88,6 +90,10 @@ impl Backend for ConvexClient {
     fn unwatch(&self, id: u64) {
         self.unsubscribe(SubscriptionId(id));
     }
+
+    fn close(&self) {
+        ConvexClient::close(self);
+    }
 }
 
 /// What a screen follows live ([`Core::live_watch`]).
@@ -118,8 +124,9 @@ pub trait LiveListener: Send + Sync {
 pub struct LiveWatch {
     backend: Arc<dyn Backend>,
     id: u64,
-    /// While any is held, the JWT is renewed before it runs out ([`keep_renewed`]).
-    _held: Arc<()>,
+    /// While any is held, the JWT is renewed before it runs out ([`Renewal`]).
+    held: Mutex<Option<Arc<()>>>,
+    wake: Arc<Condvar>,
 }
 
 #[uniffi::export]
@@ -127,6 +134,14 @@ impl LiveWatch {
     /// No more calls to its listener once the socket's queue drains.
     pub fn stop(&self) {
         self.backend.unwatch(self.id);
+        let dropped = self
+            .held
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if dropped.is_some() {
+            self.wake.notify_all();
+        }
     }
 }
 
@@ -189,6 +204,15 @@ impl Core {
             };
             let stamp = self.ensure_identity(&flow, path, false).await?;
             let backend = self.backend()?;
+            let held = Arc::new(());
+            let (wake, start) = {
+                let mut state = self.shared.backend_state();
+                let start = state.renewal.watch(&held, &flow);
+                (state.renewal.wake.clone(), start)
+            };
+            if start {
+                run_renewal_coordinator(Arc::downgrade(&self), self.shared.clone());
+            }
             let (core, renew_flow) = (Arc::downgrade(&self), flow.clone());
             // Tracks the JWT epoch this watch last succeeded under, so a rejected JWT invalidates
             // that epoch once and concurrent watches share one refresh.
@@ -210,7 +234,7 @@ impl Core {
                         ("unauthenticated", Some(core)) => {
                             let failed_epoch = seen_jwt_epoch.load(Ordering::Relaxed);
                             core.on_jwt_rejected(Some(failed_epoch));
-                            renew(core, renew_flow.clone(), listener.clone());
+                            core.request_watch_renewal(&renew_flow, listener.clone());
                         }
                         // Removed on another phone: only act if this watch belongs to the current
                         // identity generation, so a late error never wipes a newer refresh token.
@@ -232,114 +256,270 @@ impl Core {
             };
             let id = backend.watch(path, args, Box::new(on_update));
             info!(path, "live watch");
-            let held = Arc::new(());
-            let start = {
-                let mut state = self.shared.backend_state();
-                state.watched.push(Arc::downgrade(&held));
-                !std::mem::replace(&mut state.renewing, true)
-            };
-            if start {
-                keep_renewed(Arc::downgrade(&self), flow.clone());
-            }
             Ok(Arc::new(LiveWatch {
                 backend,
                 id,
-                _held: held,
+                held: Mutex::new(Some(held)),
+                wake,
             }))
         })
         .await
     }
 }
 
-/// How often [`keep_renewed`] looks again whether watches are held.
+/// How often the live-watch renewal coordinator checks again while waiting.
 const KEEP_CHECK: Duration = Duration::from_secs(30);
-
-/// Renews the JWT a minute before it runs out while any live watch is held, off the socket's
-/// thread. Self-hosted Convex drops a socket whose JWT expired, and every watch would then fail
-/// and renew on its own. Ends when the last watch goes, or with no identity it may take.
-fn keep_renewed(core: std::sync::Weak<Core>, flow: String) {
-    let unstarted = core.clone();
-    let spawned = std::thread::Builder::new()
-        .name("convex-keep-jwt".into())
-        .spawn(move || {
-            loop {
-                let Some(core) = core.upgrade() else { return };
-                let due = {
-                    let mut state = core.shared.backend_state();
-                    state.watched.retain(|held| held.strong_count() > 0);
-                    if state.watched.is_empty() {
-                        state.renewing = false;
-                        return;
-                    }
-                    state.auth.renew_due_ms()
-                };
-                let wait = if let Some(wait) = renew_in(due, core.server_now_ms()) {
-                    wait
-                } else {
-                    let renewed = futures::executor::block_on(core.identity(
-                        &flow,
-                        "keep live watches",
-                        false,
-                    ));
-                    match renewed {
-                        Ok(()) => Duration::from_secs(1),
-                        Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
-                            info!("live watches: no identity, not renewed");
-                            core.shared.backend_state().renewing = false;
-                            return;
-                        }
-                        Err(error) => {
-                            warn!(%error, "live watches: no new jwt");
-                            KEEP_CHECK
-                        }
-                    }
-                };
-                drop(core);
-                std::thread::sleep(wait);
-            }
-        });
-    if let Err(error) = spawned {
-        warn!(%error, "live watches: renewal not started");
-        if let Some(core) = unstarted.upgrade() {
-            core.shared.backend_state().renewing = false;
-        }
-    }
-}
-
-/// How long [`keep_renewed`] sleeps before it looks again, for a JWT due for renewal at `due`
-/// (none held: at once) at `now` (both unix ms); None: renew now.
-fn renew_in(due: Option<i64>, now: i64) -> Option<Duration> {
-    let left = due? - now;
-    (left > 0).then(|| Duration::from_millis(left.unsigned_abs()).min(KEEP_CHECK))
-}
 
 /// What a [`LiveListener`] hears when its watch can't follow any more.
 const NO_IDENTITY: &str = "no_identity";
 
-/// A new JWT for a watch the server stopped answering, off the socket's thread; the
-/// subscription runs again once it is set. Without an identity it can take, `listener` hears
-/// `no_identity`: the watch can't follow any more.
-fn renew(core: Arc<Core>, flow: String, listener: Arc<dyn LiveListener>) {
+/// Phase of the single live-watch JWT renewal coordinator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum RenewPhase {
+    #[default]
+    Idle,
+    Scheduled,
+    Renewing,
+}
+
+/// Next step decided by [`Renewal::decide`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RenewDecision {
+    Run { flow: String },
+    Wait { duration: Duration, signal: u64 },
+    Stop,
+}
+
+/// Single `Condvar`-driven coordinator for proactive JWT renewal and coalesced watch
+/// `unauthenticated` recovery, replacing per-watch threads and `thread::sleep`.
+struct Renewal {
+    wake: Arc<Condvar>,
+    phase: RenewPhase,
+    watched: Vec<std::sync::Weak<()>>,
+    /// Immediate renewal requested by one or more watches hearing `unauthenticated`.
+    renew_now: bool,
+    /// Flow id for the next renewal run.
+    flow: String,
+    /// Listeners waiting for the outcome of an immediate renewal (notified with `no_identity`
+    /// only if no identity can be taken).
+    pending: Vec<Arc<dyn LiveListener>>,
+    /// Backoff deadline after a transient renewal failure.
+    retry_after: Option<Instant>,
+    /// Bumped on every wakeup signal so `wait_timeout` never misses a wake between checks.
+    signal: u64,
+    /// True while the single coordinator OS thread is alive.
+    running: bool,
+}
+
+impl Default for Renewal {
+    fn default() -> Self {
+        Self {
+            wake: Arc::new(Condvar::new()),
+            phase: RenewPhase::Idle,
+            watched: Vec::new(),
+            renew_now: false,
+            flow: String::new(),
+            pending: Vec::new(),
+            retry_after: None,
+            signal: 0,
+            running: false,
+        }
+    }
+}
+
+impl Renewal {
+    /// Registers a held watch; returns true when the caller must start the coordinator thread.
+    fn watch(&mut self, held: &Arc<()>, flow: &str) -> bool {
+        self.watched.push(Arc::downgrade(held));
+        if self.flow.is_empty() {
+            self.flow = flow.to_owned();
+        }
+        self.signal += 1;
+        if self.phase == RenewPhase::Idle {
+            self.phase = RenewPhase::Scheduled;
+        }
+        let start = !self.running;
+        self.running = true;
+        self.wake.notify_all();
+        start
+    }
+
+    /// Requests an immediate coalesced renewal for a watch that heard `unauthenticated`; returns
+    /// true when the caller must start the coordinator thread.
+    fn request_now(&mut self, flow: &str, listener: Arc<dyn LiveListener>) -> bool {
+        self.renew_now = true;
+        self.retry_after = None;
+        self.flow = flow.to_owned();
+        if !self.pending.iter().any(|kept| Arc::ptr_eq(kept, &listener)) {
+            self.pending.push(listener);
+        }
+        self.signal += 1;
+        if self.phase == RenewPhase::Idle {
+            self.phase = RenewPhase::Scheduled;
+        }
+        let start = !self.running;
+        self.running = true;
+        self.wake.notify_all();
+        start
+    }
+
+    /// Clears transient retry backoff and wakes the coordinator without spawning another thread.
+    fn poke(&mut self) {
+        self.retry_after = None;
+        self.signal += 1;
+        self.wake.notify_all();
+    }
+
+    /// Pure decision for the coordinator loop's next step.
+    fn decide(&mut self, due_ms: Option<i64>, now_ms: i64, now: Instant) -> RenewDecision {
+        self.watched.retain(|held| held.strong_count() > 0);
+        if self.watched.is_empty() && !self.renew_now {
+            self.phase = RenewPhase::Idle;
+            self.retry_after = None;
+            self.pending.clear();
+            self.running = false;
+            return RenewDecision::Stop;
+        }
+        if self.renew_now {
+            self.renew_now = false;
+            self.retry_after = None;
+            self.phase = RenewPhase::Renewing;
+            return RenewDecision::Run {
+                flow: self.flow.clone(),
+            };
+        }
+        if let Some(until) = self.retry_after {
+            if until > now {
+                self.phase = RenewPhase::Scheduled;
+                return RenewDecision::Wait {
+                    duration: until.saturating_duration_since(now).min(KEEP_CHECK),
+                    signal: self.signal,
+                };
+            }
+            self.retry_after = None;
+        }
+        if let Some(wait) = renew_in(due_ms, now_ms) {
+            self.phase = RenewPhase::Scheduled;
+            RenewDecision::Wait {
+                duration: wait,
+                signal: self.signal,
+            }
+        } else {
+            self.phase = RenewPhase::Renewing;
+            RenewDecision::Run {
+                flow: self.flow.clone(),
+            }
+        }
+    }
+
+    /// Records the outcome of a renewal attempt; returns listeners to notify with `no_identity`
+    /// when the coordinator stops for lack of identity.
+    fn finish(
+        &mut self,
+        result: &Result<(), CoreError>,
+        now: Instant,
+    ) -> (bool, Vec<Arc<dyn LiveListener>>) {
+        let pending = std::mem::take(&mut self.pending);
+        match result {
+            Ok(()) => {
+                self.retry_after = Some(now + Duration::from_secs(1));
+                self.phase = RenewPhase::Scheduled;
+                (false, Vec::new())
+            }
+            Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
+                self.renew_now = false;
+                self.retry_after = None;
+                self.phase = RenewPhase::Idle;
+                self.running = false;
+                (true, pending)
+            }
+            Err(_) => {
+                self.retry_after = Some(now + KEEP_CHECK);
+                self.phase = RenewPhase::Scheduled;
+                (false, Vec::new())
+            }
+        }
+    }
+}
+
+/// Runs the single live-watch JWT renewal coordinator thread until no watches remain, no
+/// identity is available, or the [`Core`] is dropped.
+fn run_renewal_coordinator(core: std::sync::Weak<Core>, shared: Arc<Shared>) {
+    let fallback_shared = shared.clone();
     let spawned = std::thread::Builder::new()
-        .name("convex-renew".into())
+        .name("convex-keep-jwt".into())
         .spawn(move || {
-            let renewed = futures::executor::block_on(core.identity(&flow, "live watch", false));
-            match renewed {
-                Ok(()) => {}
-                // Signed out, or no identity it may take unasked: the watch just stops following.
-                Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
-                    info!("live watch: no identity, stops following");
-                    listener.on_error(
-                        NO_IDENTITY.into(),
-                        "Sign in again to follow changes.".into(),
-                    );
+            loop {
+                let Some(strong) = core.upgrade() else {
+                    let mut state = shared.backend_state();
+                    state.renewal.phase = RenewPhase::Idle;
+                    state.renewal.running = false;
+                    return;
+                };
+                let now_ms = strong.server_now_ms();
+                let now = Instant::now();
+                let decision = {
+                    let mut state = shared.backend_state();
+                    let due = state.auth.renew_due_ms();
+                    state.renewal.decide(due, now_ms, now)
+                };
+                match decision {
+                    RenewDecision::Stop => return,
+                    RenewDecision::Wait { duration, signal } => {
+                        // Drop the strong Core reference before sleeping so Core can be dropped.
+                        drop(strong);
+                        let state = shared.backend_state();
+                        if state.renewal.signal == signal {
+                            let wake = state.renewal.wake.clone();
+                            let (_guard, _timeout) = wake
+                                .wait_timeout(state, duration)
+                                .unwrap_or_else(PoisonError::into_inner);
+                        }
+                    }
+                    RenewDecision::Run { flow } => {
+                        let renewed = futures::executor::block_on(strong.identity(
+                            &flow,
+                            "live watch renewal",
+                            false,
+                        ));
+                        match &renewed {
+                            Ok(()) => {}
+                            Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
+                                info!("live watches: no identity, stops following");
+                            }
+                            Err(error) => warn!(%error, "live watches: no new jwt"),
+                        }
+                        let (stop, notify) = shared
+                            .backend_state()
+                            .renewal
+                            .finish(&renewed, Instant::now());
+                        drop(strong);
+                        for listener in notify {
+                            listener.on_error(
+                                NO_IDENTITY.into(),
+                                "Sign in again to follow changes.".into(),
+                            );
+                        }
+                        if stop {
+                            return;
+                        }
+                    }
                 }
-                Err(error) => warn!(%error, "live watch: no new jwt"),
             }
         });
     if let Err(error) = spawned {
-        warn!(%error, "live watch: renewal not started");
+        warn!(%error, "live watches: renewal not started");
+        let mut state = fallback_shared.backend_state();
+        state.renewal.phase = RenewPhase::Idle;
+        state.renewal.running = false;
     }
+}
+
+/// How long the coordinator waits before checking again, for a JWT due for renewal at `due`
+/// (none held: at once) at `now` (both unix ms); None: renew now.
+fn renew_in(due: Option<i64>, now: i64) -> Option<Duration> {
+    let left = due? - now;
+    (left > 0).then(|| Duration::from_millis(left.unsigned_abs()).min(KEEP_CHECK))
 }
 
 /// The core's server state ([`Shared::backend`]).
@@ -347,9 +527,7 @@ fn renew(core: Arc<Core>, flow: String, listener: Arc<dyn LiveListener>) {
 pub(crate) struct State {
     backend: Option<Arc<dyn Backend>>,
     auth: AuthMachine,
-    /// The live watches held ([`LiveWatch::_held`]), and whether [`keep_renewed`] runs.
-    watched: Vec<std::sync::Weak<()>>,
-    renewing: bool,
+    renewal: Renewal,
 }
 
 /// The refresh token `auth:token` handed this install. No `Debug`: it holds the token.
@@ -535,7 +713,7 @@ impl Core {
         } else {
             TIMEOUT
         };
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         let answer = within(timeout, backend.run(kind, path, args)).await;
         let outcome = match &answer {
             Ok(_) => "ok",
@@ -866,7 +1044,7 @@ impl Core {
                     json!({ "ticket": ticket, "device": self.device_info() })
                 }
             };
-            let asked = std::time::Instant::now();
+            let asked = Instant::now();
             let issued = self
                 .signed_call(flow, Kind::Action, "auth:token", &payload)
                 .await;
@@ -942,14 +1120,30 @@ impl Core {
         applied
     }
 
-    /// Developer changed the server URL: drops the old client and active JWT while leaving live
-    /// watch bookkeeping intact.
+    /// Coalesces an immediate watch renewal onto the single coordinator thread.
+    fn request_watch_renewal(self: &Arc<Self>, flow: &str, listener: Arc<dyn LiveListener>) {
+        let start = self
+            .shared
+            .backend_state()
+            .renewal
+            .request_now(flow, listener);
+        if start {
+            run_renewal_coordinator(Arc::downgrade(self), self.shared.clone());
+        }
+    }
+
+    /// Developer changed the server URL: drops the old client and active JWT while leaving the
+    /// single renewal coordinator intact.
     pub(crate) fn on_server_changed(&self) {
-        let effects = {
+        let (old, effects) = {
             let mut state = self.shared.backend_state();
-            state.backend = None;
-            state.auth.on_server_changed()
+            let old = state.backend.take();
+            state.renewal.poke();
+            (old, state.auth.on_server_changed())
         };
+        if let Some(old) = old {
+            old.close();
+        }
         self.run_effects(effects);
     }
 

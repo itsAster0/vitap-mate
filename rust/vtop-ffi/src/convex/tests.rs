@@ -841,3 +841,22 @@ fn a_failure_cached_before_a_new_jwt_waits_for_the_server() {
     assert_eq!(read.len(), 1);
     assert!(read[0].is_ok(), "{read:?}");
 }
+
+#[test]
+fn auth_error_reconnects_immediately_without_inflating_backoff() {
+    let harness = Harness::new();
+    harness.connect();
+    // Repeated AuthErrors reconnect immediately and must not double backoff_ms.
+    for i in 0..3 {
+        harness.push(auth_error());
+        harness.client.tick();
+        assert_eq!(harness.opens(), i + 2);
+        harness.connect();
+    }
+    // The next real disconnect still starts at INITIAL_BACKOFF_MS (500 ms), not 4000 ms.
+    harness.listener(3).on_closed("network".into());
+    harness.advance(499);
+    assert_eq!(harness.opens(), 4);
+    harness.advance(1);
+    assert_eq!(harness.opens(), 5);
+}

@@ -98,27 +98,107 @@ enum Io {
     AuthError,
 }
 
+/// Connection lifecycle of the single Convex WebSocket.
+enum Link {
+    /// No socket and nothing scheduled; the next call wakes it via `Backoff { at_ms: now }`.
+    Idle,
+    /// Waiting until `at_ms` before opening the next socket.
+    Backoff { at_ms: u64 },
+    /// Opening socket `epoch`; `socket` arrives when `ConvexNetwork::open` returns, and `opened`
+    /// records a synchronous `on_open` callback that arrived before `open` returned.
+    Opening {
+        epoch: u64,
+        socket: Option<Arc<dyn ConvexSocket>>,
+        opened: bool,
+    },
+    /// Socket `epoch` is open and carrying Convex sync frames.
+    Open {
+        epoch: u64,
+        socket: Arc<dyn ConvexSocket>,
+    },
+    /// Permanently closed; no further calls or reconnects.
+    Closed,
+}
+
+impl Link {
+    fn is_live(&self) -> bool {
+        matches!(self, Self::Opening { .. } | Self::Open { .. })
+    }
+
+    fn is_open(&self) -> bool {
+        matches!(self, Self::Open { .. })
+    }
+
+    fn is_closed(&self) -> bool {
+        matches!(self, Self::Closed)
+    }
+
+    fn is_idle(&self) -> bool {
+        matches!(self, Self::Idle)
+    }
+
+    fn reconnect_at(&self) -> Option<u64> {
+        match self {
+            Self::Backoff { at_ms } => Some(*at_ms),
+            _ => None,
+        }
+    }
+
+    fn epoch(&self) -> Option<u64> {
+        match self {
+            Self::Opening { epoch, .. } | Self::Open { epoch, .. } => Some(*epoch),
+            _ => None,
+        }
+    }
+
+    fn has_epoch(&self, epoch: u64) -> bool {
+        self.epoch() == Some(epoch)
+    }
+
+    fn socket_for(&self, epoch: u64) -> Option<Arc<dyn ConvexSocket>> {
+        match self {
+            Self::Opening {
+                epoch: current,
+                socket: Some(socket),
+                ..
+            }
+            | Self::Open {
+                epoch: current,
+                socket,
+            } if *current == epoch => Some(socket.clone()),
+            _ => None,
+        }
+    }
+
+    fn take_socket(&mut self) -> Option<Arc<dyn ConvexSocket>> {
+        match self {
+            Self::Opening { socket, .. } => socket.take(),
+            Self::Open { .. } => {
+                let prev = mem::replace(self, Self::Idle);
+                match prev {
+                    Self::Open { socket, .. } => Some(socket),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
 struct State {
     base: BaseConvexClient,
     session_id: SessionId,
-    /// The current socket, once `ConvexNetwork::open` has returned it.
-    socket: Option<Arc<dyn ConvexSocket>>,
-    /// Counts sockets; a listener's calls count only while its epoch is current.
-    epoch: u64,
-    /// Socket `epoch` is opening or open.
-    live: bool,
-    open: bool,
+    link: Link,
+    /// Monotonic socket epoch; a listener's calls count only while its epoch matches `link`.
+    next_epoch: u64,
     connection_count: u32,
     last_close_reason: String,
     backoff_ms: u64,
     last_server_ms: u64,
-    /// When to open the next socket, while there is none; None while idle.
-    reconnect_at: Option<u64>,
     /// When a call was last made or a socket last opened.
     last_used_ms: u64,
     /// Calls waiting for their answer.
     pending: usize,
-    closed: bool,
     next_subscription: u64,
     subscriptions: HashMap<SubscriptionId, Subscription>,
     /// Socket calls and updates waiting to run, in order.
@@ -171,18 +251,14 @@ impl ConvexClient {
             state: Mutex::new(State {
                 base: BaseConvexClient::new(),
                 session_id: random_session_id(),
-                socket: None,
-                epoch: 0,
-                live: false,
-                open: false,
+                link: Link::Backoff { at_ms: now },
+                next_epoch: 0,
                 connection_count: 0,
                 last_close_reason: "InitialConnect".into(),
                 backoff_ms: INITIAL_BACKOFF_MS,
                 last_server_ms: now,
-                reconnect_at: Some(now),
                 last_used_ms: now,
                 pending: 0,
-                closed: false,
                 next_subscription: 0,
                 subscriptions: HashMap::new(),
                 io: VecDeque::new(),
@@ -253,7 +329,7 @@ impl ConvexClient {
             };
             match io {
                 Io::Open { epoch } => {
-                    if state.epoch != epoch || !state.live {
+                    if !matches!(state.link, Link::Opening { epoch: e, .. } if e == epoch) {
                         continue;
                     }
                     drop(state);
@@ -263,22 +339,35 @@ impl ConvexClient {
                     });
                     let socket = self.network.open(self.url.clone(), listener);
                     let mut state = self.state();
-                    if state.epoch == epoch && state.live {
-                        state.socket = Some(socket);
-                    } else {
-                        drop(state);
-                        socket.disconnect();
+                    match &mut state.link {
+                        Link::Opening {
+                            epoch: current,
+                            socket: slot,
+                            opened,
+                        } if *current == epoch => {
+                            if *opened {
+                                // `on_open` fired synchronously inside `network.open`: complete
+                                // the transition now that the socket handle is stored.
+                                state.link = Link::Open { epoch, socket };
+                                self.enter_open(&mut state);
+                            } else {
+                                *slot = Some(socket);
+                            }
+                        }
+                        _ => {
+                            drop(state);
+                            socket.disconnect();
+                        }
                     }
                 }
                 Io::Send { epoch, text } => {
-                    let socket = state.socket.clone().filter(|_| state.epoch == epoch);
-                    let Some(socket) = socket else {
+                    let Some(socket) = state.link.socket_for(epoch) else {
                         continue;
                     };
                     drop(state);
                     if !socket.send(text) {
                         let mut state = self.state();
-                        if state.epoch == epoch && state.live {
+                        if state.link.has_epoch(epoch) {
                             let now = self.clock.now_ms();
                             self.drop_socket(&mut state, now, "SendFailed".into());
                             state.woken = true;
@@ -308,25 +397,27 @@ impl ConvexClient {
         let _entered = self.span.enter();
         let now = self.clock.now_ms();
         let mut state = self.state();
-        if state.closed {
+        if state.link.is_closed() {
             return None;
         }
-        if state.live && now >= state.last_server_ms + SILENCE_MS {
+        if state.link.is_live() && now >= state.last_server_ms + SILENCE_MS {
             self.drop_socket(&mut state, now, "InactiveServer".into());
         }
         let busy = state.pending > 0 || !state.subscriptions.is_empty();
-        if state.open && !busy && now >= state.last_used_ms + IDLE_MS {
+        if state.link.is_open() && !busy && now >= state.last_used_ms + IDLE_MS {
             info!("convex socket idle");
-            Self::close_socket(&mut state);
+            Self::close_socket(&mut state, Link::Idle);
             state.last_close_reason = "Idle".into();
-            state.reconnect_at = None;
         }
-        if !state.live && state.reconnect_at.is_some_and(|at| now >= at) {
+        if matches!(state.link, Link::Backoff { at_ms } if now >= at_ms) {
             self.open_socket(&mut state, now);
         }
-        let silence = state.live.then_some(state.last_server_ms + SILENCE_MS);
-        let reconnect = state.reconnect_at.filter(|_| !state.live);
-        let idle = (state.open && !busy).then_some(state.last_used_ms + IDLE_MS);
+        let silence = state
+            .link
+            .is_live()
+            .then_some(state.last_server_ms + SILENCE_MS);
+        let reconnect = state.link.reconnect_at();
+        let idle = (state.link.is_open() && !busy).then_some(state.last_used_ms + IDLE_MS);
         let next = silence.into_iter().chain(reconnect).chain(idle).min();
         self.finish_quietly(state, false);
         next
@@ -348,8 +439,8 @@ impl ConvexClient {
     fn use_now(&self, state: &mut State) {
         let now = self.clock.now_ms();
         state.last_used_ms = now;
-        if !state.live && state.reconnect_at.is_none() && !state.closed {
-            state.reconnect_at = Some(now);
+        if state.link.is_idle() {
+            state.link = Link::Backoff { at_ms: now };
         }
     }
 
@@ -361,37 +452,47 @@ impl ConvexClient {
 
     /// Queues the next socket's opening.
     fn open_socket(&self, state: &mut State, now: u64) {
-        state.epoch += 1;
+        state.next_epoch += 1;
+        let epoch = state.next_epoch;
         info!(connection = state.connection_count, "convex socket opening");
-        state.io.push_back(Io::Open { epoch: state.epoch });
-        state.live = true;
-        state.open = false;
+        state.io.push_back(Io::Open { epoch });
+        state.link = Link::Opening {
+            epoch,
+            socket: None,
+            opened: false,
+        };
         state.last_server_ms = now;
-        state.reconnect_at = None;
     }
 
     /// Closes the socket, if any, and plans the next one after the backoff.
     fn drop_socket(&self, state: &mut State, now: u64, reason: String) {
         info!(%reason, "convex socket closed");
-        Self::close_socket(state);
+        let delay = self.next_backoff(state);
+        Self::close_socket(state, Link::Backoff { at_ms: now + delay });
         state.last_close_reason = reason;
-        state.reconnect_at = Some(now + self.next_backoff(state));
     }
 
-    fn close_socket(state: &mut State) {
-        if let Some(socket) = state.socket.take() {
+    /// Closes the socket and schedules an immediate reconnect without inflating `backoff_ms`
+    /// (for `AuthError`, where the server dropped the socket over a stale JWT, not a link fault).
+    fn reconnect_now(&self, state: &mut State, now: u64, reason: String) {
+        info!(%reason, "convex socket closed");
+        Self::close_socket(state, Link::Backoff { at_ms: now });
+        state.last_close_reason = reason;
+    }
+
+    fn close_socket(state: &mut State, next: Link) {
+        if let Some(socket) = state.link.take_socket() {
             state.io.push_back(Io::Close(socket));
         }
-        state.epoch += 1;
-        state.live = false;
-        state.open = false;
+        state.next_epoch += 1;
+        state.link = next;
         // Whatever was queued is sent again after the next Connect.
         while state.base.pop_next_message().is_some() {}
     }
 
     /// Sends what the base client queued, while the socket is open.
     fn flush(&self, state: &mut State) {
-        if !state.open {
+        if !state.link.is_open() {
             return;
         }
         while let Some(message) = state.base.pop_next_message() {
@@ -401,6 +502,9 @@ impl ConvexClient {
 
     /// Queues `message` for the current socket.
     fn send(state: &mut State, message: ClientMessage) {
+        let Some(epoch) = state.link.epoch() else {
+            return;
+        };
         let kind: &str = message.as_ref();
         let kind = kind.to_owned();
         let text = match Value::try_from(message) {
@@ -410,18 +514,12 @@ impl ConvexClient {
                 return;
             }
         };
-        let epoch = state.epoch;
         state.io.push_back(Io::Send { epoch, text });
     }
 
-    fn on_open(&self, epoch: u64) {
-        let _entered = self.span.enter();
-        let mut state = self.state();
-        if state.epoch != epoch || !state.live || state.open {
-            return;
-        }
+    /// Runs the Convex `Connect` handshake and flushes ongoing work once `state.link` is `Open`.
+    fn enter_open(&self, state: &mut State) {
         info!("convex socket open");
-        state.open = true;
         state.last_used_ms = self.clock.now_ms();
         while state.base.pop_next_message().is_some() {}
         let connect = ClientMessage::Connect {
@@ -439,16 +537,36 @@ impl ConvexClient {
                 subscription.last = None;
             }
         }
-        Self::send(&mut state, connect);
+        Self::send(state, connect);
         state.base.resend_ongoing_queries_mutations();
-        self.flush(&mut state);
-        self.finish(state);
+        self.flush(state);
+    }
+
+    fn on_open(&self, epoch: u64) {
+        let _entered = self.span.enter();
+        let mut state = self.state();
+        match &mut state.link {
+            Link::Opening {
+                epoch: current,
+                socket,
+                opened,
+            } if *current == epoch => {
+                if let Some(socket) = socket.take() {
+                    state.link = Link::Open { epoch, socket };
+                    self.enter_open(&mut state);
+                    self.finish(state);
+                } else {
+                    *opened = true;
+                }
+            }
+            _ => {}
+        }
     }
 
     fn on_text(&self, epoch: u64, text: String) {
         let _entered = self.span.enter();
         let mut state = self.state();
-        if state.epoch != epoch || !state.live {
+        if !state.link.has_epoch(epoch) {
             return;
         }
         let now = self.clock.now_ms();
@@ -464,11 +582,10 @@ impl ConvexClient {
             }
             Ok(ServerMessage::AuthError { .. }) => {
                 // The server closes after it; the next socket goes without the token, and the
-                // owner hands in a new one.
+                // owner hands in a new one. Reconnect at once without inflating backoff_ms.
                 warn!("convex token rejected");
                 state.base.set_auth(AuthenticationToken::None);
-                self.drop_socket(&mut state, now, "AuthError".into());
-                state.reconnect_at = Some(now);
+                self.reconnect_now(&mut state, now, "AuthError".into());
                 state.io.push_back(Io::AuthError);
             }
             Ok(message) => {
@@ -497,7 +614,7 @@ impl ConvexClient {
     fn on_closed(&self, epoch: u64, reason: String) {
         let _entered = self.span.enter();
         let mut state = self.state();
-        if state.epoch != epoch || !state.live {
+        if !state.link.has_epoch(epoch) {
             return;
         }
         let now = self.clock.now_ms();
@@ -518,7 +635,7 @@ impl ConvexClient {
         let id = SubscriptionId(state.next_subscription);
         state.next_subscription += 1;
         let on_update: Callback = Arc::new(on_update);
-        let request = match state.closed {
+        let request = match state.link.is_closed() {
             true => Err(CallError::Closed),
             false => parse_path(path).and_then(|path| Ok((path, parse_args(args)?))),
         };
@@ -568,7 +685,7 @@ impl ConvexClient {
     /// Closed: it makes no more calls.
     #[cfg(test)]
     pub(crate) fn closed(&self) -> bool {
-        self.state().closed
+        self.state().link.is_closed()
     }
 
     /// A query's current result: followed until its first result, then dropped.
@@ -609,7 +726,7 @@ impl ConvexClient {
         let receiver = {
             let _entered = self.span.enter();
             let mut state = self.state();
-            if state.closed {
+            if state.link.is_closed() {
                 return Err(CallError::Closed);
             }
             let receiver = if action {
@@ -640,17 +757,14 @@ impl ConvexClient {
     }
 
     /// Closes the socket, fails pending calls and stops the timer thread.
-    #[cfg(test)]
     pub(crate) fn close(&self) {
         let _entered = self.span.enter();
         let mut state = self.state();
-        if state.closed {
+        if state.link.is_closed() {
             return;
         }
         info!("convex client closed");
-        state.closed = true;
-        Self::close_socket(&mut state);
-        state.reconnect_at = None;
+        Self::close_socket(&mut state, Link::Closed);
         state.base.cancel_requests();
         for subscription in mem::take(&mut state.subscriptions).into_values() {
             let update = Io::Update(subscription.on_update, Err(CallError::Closed));
@@ -663,7 +777,7 @@ impl ConvexClient {
 impl Drop for ConvexClient {
     fn drop(&mut self) {
         let state = self.state.get_mut().unwrap_or_else(PoisonError::into_inner);
-        if let Some(socket) = state.socket.take() {
+        if let Some(socket) = state.link.take_socket() {
             socket.disconnect();
         }
     }
@@ -685,7 +799,7 @@ fn run_timer(client: Weak<ConvexClient>) {
             Some(client.clock.now_ms() + client.next_backoff(&mut state))
         });
         let mut state = client.state();
-        if state.closed {
+        if state.link.is_closed() {
             return;
         }
         if mem::take(&mut state.woken) {
