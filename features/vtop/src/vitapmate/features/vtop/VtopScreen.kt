@@ -1,17 +1,15 @@
 package vitapmate.features.vtop
 
-import kotlinx.coroutines.flow.drop
-import androidx.compose.runtime.snapshotFlow
-import vitapmate.ui.rememberHaptics
 import android.content.Context
-import android.text.format.Formatter
 import android.net.Uri
+import android.os.SystemClock
+import android.text.format.Formatter
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -19,48 +17,48 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.ui.platform.LocalDensity
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.composables.icons.lucide.LogIn
 import com.composables.icons.lucide.Lucide
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import vitapmate.core.WebSession
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
-import vitapmate.data.Problem
 import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
@@ -68,6 +66,7 @@ import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
+import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 
 private const val SRC = VtopBrowser.SRC
@@ -75,6 +74,8 @@ private const val PREFS = "settings"
 // The Flutter app's keys and defaults.
 private const val COMPACT = "settings_vtop_compact_mode"
 private const val DESKTOP = "settings_vtop_desktop_mode"
+
+private class PrepareSlot(var job: Job? = null)
 
 /**
  * VTOP itself, signed in with the app's session (the Flutter app's `VtopWebview`): Rust confirms
@@ -89,16 +90,11 @@ internal fun VtopScreen() {
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     val background = MaterialTheme.colorScheme.background
-    var session by remember { mutableStateOf<WebSession?>(null) }
-    var problem by remember { mutableStateOf<Problem?>(null) }
-    var reconnecting by remember { mutableStateOf(false) }
-    var autoTried by remember { mutableStateOf(false) }
-    var askRelogin by remember { mutableStateOf(false) }
+    var webState by remember { mutableStateOf(VtopWebState()) }
+    val prepare = remember { PrepareSlot() }
     var dark by remember { mutableStateOf(background.luminance() < 0.5f) }
     var compact by remember { mutableStateOf(prefs.getBoolean(COMPACT, true)) }
     var desktop by remember { mutableStateOf(prefs.getBoolean(DESKTOP, false)) }
-    var viewGeneration by remember { mutableIntStateOf(0) }
-    var lastLoss by remember { mutableStateOf(0L) }
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
@@ -118,27 +114,41 @@ internal fun VtopScreen() {
 
     lateinit var browser: VtopBrowser
 
-    /** Asks Rust for a confirmed session and opens VTOP's start page. */
-    suspend fun prepare(name: String, force: Boolean) {
-        var id = ""
-        problem = null
-        session = null
-        try {
-            flow(name) { flowId ->
-                id = flowId
-                browser.flow = flowId
-                // The web view shares the app's cookie store: a confirmed session is all it needs.
-                val fresh = withContext(Dispatchers.IO) { AppCore.await().webSession(flowId, force) }
-                Log.info(SRC, "session ready", flowId, mapOf("force" to force.toString()))
-                session = fresh
-                browser.open(fresh)
+    fun dispatch(event: VtopWebEvent) {
+        val transition = webState.reduce(event, SystemClock.elapsedRealtime())
+        webState = transition.state
+        for (effect in transition.effects) {
+            when (effect) {
+                VtopWebEffect.DestroyView -> browser.destroy()
+                VtopWebEffect.CancelPrepare -> {
+                    prepare.job?.cancel()
+                    prepare.job = null
+                }
+                is VtopWebEffect.Prepare -> {
+                    prepare.job?.cancel()
+                    prepare.job = scope.launch {
+                        var id = ""
+                        try {
+                            flow(effect.flowName) { flowId ->
+                                id = flowId
+                                browser.flow = flowId
+                                // The web view shares the app's cookie store: a confirmed session is all it needs.
+                                val fresh = withContext(Dispatchers.IO) { AppCore.await().webSession(flowId, effect.force) }
+                                Log.info(SRC, "session ready", flowId, mapOf("force" to effect.force.toString()))
+                                dispatch(VtopWebEvent.PrepareSucceeded(effect.requestId, fresh))
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            askedOtp(e)
+                            val problem = problemOf(e, id)
+                            Log.warn(SRC, "not opened: ${e::class.simpleName}", id)
+                            dispatch(VtopWebEvent.PrepareFailed(effect.requestId, problem))
+                        }
+                    }
+                }
+                is VtopWebEffect.OpenSession -> browser.open(effect.session)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            askedOtp(e)
-            problem = problemOf(e, id)
-            Log.warn(SRC, "not opened: ${e::class.simpleName}", id)
         }
     }
 
@@ -146,45 +156,11 @@ internal fun VtopScreen() {
         scope.launch { flow("vtop.reload") { id -> Log.info(SRC, "reload", id, mapOf("trigger" to trigger)); browser.reload() } }
     }
 
-    fun relogin() {
-        if (reconnecting) return
-        reconnecting = true
-        scope.launch {
-            try {
-                prepare("vtop.relogin", force = true)
-            } finally {
-                reconnecting = false
-            }
-        }
-    }
-
     browser = remember {
         VtopBrowser(
-            onLoginPage = {
-                when {
-                    reconnecting || askRelogin -> {}
-                    !autoTried -> {
-                        autoTried = true
-                        relogin()
-                    }
-                    else -> askRelogin = true
-                }
-            },
-            // A signed-in page starts a new recovery cycle; a sign-in alone doesn't (VTOP may bounce straight back).
-            onAuthenticated = { autoTried = false },
-            onLost = {
-                // A page that keeps crashing stops here instead of looping.
-                val now = System.currentTimeMillis()
-                val repeated = now - lastLoss < 30_000
-                lastLoss = now
-                browser.destroy()
-                viewGeneration++
-                if (repeated) {
-                    problem = problemOf(IllegalStateException("VTOP stopped responding"), browser.flow.orEmpty())
-                } else {
-                    scope.launch { prepare("vtop.open", force = false) }
-                }
-            },
+            onLoginPage = { dispatch(VtopWebEvent.LoginPageHit) },
+            onAuthenticated = { dispatch(VtopWebEvent.Authenticated) },
+            onLost = { dispatch(VtopWebEvent.RenderProcessLost(browser.flow.orEmpty())) },
             onChooseFile = { callback, params ->
                 fileCallback?.onReceiveValue(null)
                 fileCallback = callback
@@ -205,7 +181,7 @@ internal fun VtopScreen() {
         if (browser.reloading) {
             wasReloading = true
         } else {
-            if (wasReloading && browser.error == null) haptics.confirm()
+            if (wasReloading && browser.error == null && webState.phase is VtopWebPhase.Active) haptics.confirm()
             wasReloading = false
             pull.animateToHidden()
         }
@@ -218,18 +194,25 @@ internal fun VtopScreen() {
         user = withContext(Dispatchers.IO) { runCatching { AppCore.await().signedInUser("") }.getOrNull() }
         recent = VtopRecent.read(context, user)
     }
-    LaunchedEffect(Unit) { prepare("vtop.open", force = false) }
-    DisposableEffect(Unit) { onDispose { browser.destroy() } }
+    LaunchedEffect(Unit) { dispatch(VtopWebEvent.Open) }
+    DisposableEffect(Unit) {
+        onDispose {
+            prepare.job?.cancel()
+            browser.destroy()
+        }
+    }
     // The OTP was accepted elsewhere (the app's prompt): try again.
     val otpAtStart = remember { OtpPrompt.generation }
     LaunchedEffect(OtpPrompt.generation) {
-        if (OtpPrompt.generation != otpAtStart && session == null) prepare("vtop.open", force = false)
+        if (OtpPrompt.generation != otpAtStart) dispatch(VtopWebEvent.OtpResolved)
     }
 
+    val phase = webState.phase
+    val ready = phase is VtopWebPhase.Active
     // Back steps through VTOP's pages (closing an overlay first) while there is one to go back to;
     // otherwise it is the app's back (predictive) and the screen closes. The arrow always closes.
     val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    val stepping = session != null && browser.canStepBack
+    val stepping = ready && browser.canStepBack
     val callback = remember {
         object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() = browser.back { handled -> if (!handled) close() }
@@ -246,61 +229,67 @@ internal fun VtopScreen() {
         onDispose { callback.remove() }
     }
 
-    val ready = session != null && problem == null
     Scaffold(
         topBar = {
             VtopToolbar(
-            title = browser.page?.title ?: "VTOP",
-            enabled = ready,
-            onClose = callback::close,
-            onHome = { browser.home() },
-            saved = saved,
-            onMenu = { scope.launch { saved = withContext(Dispatchers.IO) { Formatter.formatShortFileSize(context, assets.bytes()) } } },
-            onClearSaved = {
-                scope.launch {
-                    flow("vtop.clear_saved") { id ->
-                        withContext(Dispatchers.IO) { assets.clear() }
-                        Log.info(SRC, "saved files cleared", id)
+                title = browser.page?.title ?: "VTOP",
+                enabled = ready,
+                onClose = callback::close,
+                onHome = { browser.home() },
+                saved = saved,
+                onMenu = { scope.launch { saved = withContext(Dispatchers.IO) { Formatter.formatShortFileSize(context, assets.bytes()) } } },
+                onClearSaved = {
+                    scope.launch {
+                        flow("vtop.clear_saved") { id ->
+                            withContext(Dispatchers.IO) { assets.clear() }
+                            Log.info(SRC, "saved files cleared", id)
+                        }
+                        showToast("Saved files cleared", "VTOP's files download again as the page reloads.")
+                        reload("clear_saved")
                     }
-                    showToast("Saved files cleared", "VTOP's files download again as the page reloads.")
-                    reload("clear_saved")
-                }
-            },
-            onSearch = {
-                sidebar = null
-                searching = true
-                scope.launch {
-                    flow("vtop.search") { id ->
-                        val pages = suspendCancellableCoroutine { done -> browser.pages { done.resume(it) } }
-                        sidebar = pages
-                        Log.info(SRC, "search pages", id, mapOf("pages" to pages.size.toString(), "recent" to recent.size.toString()))
+                },
+                onSearch = {
+                    sidebar = null
+                    searching = true
+                    scope.launch {
+                        flow("vtop.search") { id ->
+                            val pages = suspendCancellableCoroutine { done -> browser.pages { done.resume(it) } }
+                            sidebar = pages
+                            Log.info(SRC, "search pages", id, mapOf("pages" to pages.size.toString(), "recent" to recent.size.toString()))
+                        }
                     }
-                }
-            },
-            toggles = listOf(
-                VtopToggle("dark", "Dark pages", dark) { dark = !dark; browser.dark = dark; browser.applyPreferences() },
-                VtopToggle("compact", "Compact view", compact) {
-                    compact = !compact
-                    prefs.edit().putBoolean(COMPACT, compact).apply()
-                    browser.compact = compact
-                    browser.applyPreferences()
                 },
-                VtopToggle("desktop", "Desktop mode", desktop) {
-                    desktop = !desktop
-                    prefs.edit().putBoolean(DESKTOP, desktop).apply()
-                    browser.desktop = desktop
-                    browser.applyPreferences()
-                },
-            ),
+                toggles = listOf(
+                    VtopToggle("dark", "Dark pages", dark) { dark = !dark; browser.dark = dark; browser.applyPreferences() },
+                    VtopToggle("compact", "Compact view", compact) {
+                        compact = !compact
+                        prefs.edit().putBoolean(COMPACT, compact).apply()
+                        browser.compact = compact
+                        browser.applyPreferences()
+                    },
+                    VtopToggle("desktop", "Desktop mode", desktop) {
+                        desktop = !desktop
+                        prefs.edit().putBoolean(DESKTOP, desktop).apply()
+                        browser.desktop = desktop
+                        browser.applyPreferences()
+                    },
+                ),
             )
         },
         containerColor = background,
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // The view starts while the session is prepared, so its start-up overlaps the network work.
-            key(viewGeneration) {
+            val generation = webState.viewGeneration
+            key(generation) {
                 AndroidView(
-                    factory = { browser.create(it, background.toArgb()) },
+                    factory = { ctx ->
+                        browser.create(ctx, background.toArgb()).also { webView ->
+                            webView.post {
+                                if (browser.view === webView) dispatch(VtopWebEvent.ViewAttached(generation))
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxSize().testTag("vtop.web"),
                 )
             }
@@ -327,11 +316,16 @@ internal fun VtopScreen() {
                     OutlinedButton({ browser.home(reload = true) }, Modifier.padding(top = Space.md).testTag("vtop.notice.home")) { Text("Open Home") }
                 }
             }
-            when {
-                problem != null -> Box(Modifier.fillMaxSize().background(background), Alignment.Center) {
-                    problem?.let { ProblemView(it, onRetry = { scope.launch { prepare("vtop.open", force = false) } }) }
+            when (phase) {
+                is VtopWebPhase.Failed -> Box(Modifier.fillMaxSize().background(background), Alignment.Center) {
+                    ProblemView(phase.problem, onRetry = { dispatch(VtopWebEvent.Retry) })
                 }
-                session == null -> VtopLoading(reconnecting)
+                is VtopWebPhase.Crashed -> Box(Modifier.fillMaxSize().background(background), Alignment.Center) {
+                    ProblemView(phase.problem, onRetry = { dispatch(VtopWebEvent.Retry) })
+                }
+                is VtopWebPhase.Preparing -> VtopLoading(phase.force)
+                is VtopWebPhase.WaitingForView -> VtopLoading(phase.recovery == VtopRecovery.AutoRelogin)
+                is VtopWebPhase.Active -> {}
             }
         }
     }
@@ -348,12 +342,12 @@ internal fun VtopScreen() {
         }, onDismiss = { searching = false })
     }
 
-    if (askRelogin) {
+    if (phase is VtopWebPhase.Active && phase.recovery == VtopRecovery.PromptRelogin) {
         AppDialog(
-            { askRelogin = false },
+            { dispatch(VtopWebEvent.DismissReloginPrompt) },
             "Login expired",
             "Try again",
-            { askRelogin = false; relogin() },
+            { dispatch(VtopWebEvent.ConfirmRelogin) },
             Modifier.testTag("vtop.relogin.dialog"),
             icon = Lucide.LogIn,
             confirmTag = "vtop.relogin.confirm",

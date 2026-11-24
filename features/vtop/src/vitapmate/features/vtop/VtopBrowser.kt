@@ -134,10 +134,11 @@ internal class VtopBrowser(
         }
         userAgent = settings.userAgentString
         assets = VtopAssets(context.cacheDir)
-        addJavascriptInterface(Bridge(), "vitapmate")
+        addJavascriptInterface(Bridge(this), "vitapmate")
         webViewClient = Client()
         webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
+                if (this@VtopBrowser.view !== view) return
                 this@VtopBrowser.progress = newProgress
             }
 
@@ -180,6 +181,15 @@ internal class VtopBrowser(
     fun destroy() {
         view?.destroy()
         view = null
+        hasContent = false
+        pageLoading = true
+        requests = 0
+        progress = 0
+        reloading = false
+        error = null
+        menuRequest = null
+        sidebar = null
+        canStepBack = false
     }
 
     /** Loads [session]'s start page from scratch (after fresh cookies were set). */
@@ -275,7 +285,7 @@ internal class VtopBrowser(
         val request = "${++menuSequence}"
         menuRequest = request
         view.evaluateJavascript(VtopScripts.waitForMenu(url, request), null)
-        view.postDelayed({ if (this.view != null && menuRequest == request) menuFailed() }, 11_000)
+        view.postDelayed({ if (this.view === view && menuRequest == request) menuFailed() }, 11_000)
     }
 
     private fun menuFailed() {
@@ -366,11 +376,11 @@ internal class VtopBrowser(
     }
 
     /** flutter_inappwebview's `callHandler` from the scripts ([VtopScripts.BRIDGE]), on the bridge thread. */
-    private inner class Bridge {
+    private inner class Bridge(private val owner: WebView) {
         @JavascriptInterface
         fun call(name: String, json: String) {
             val args = runCatching { JSONArray(json) }.getOrNull() ?: return
-            view?.post { handle(name, args) }
+            owner.post { if (this@VtopBrowser.view === owner) handle(name, args) }
         }
     }
 
@@ -385,7 +395,11 @@ internal class VtopBrowser(
                 val event = args.optJSONObject(0) ?: return
                 when (event.optString("type")) {
                     "activity" -> requests = event.optInt("active")
-                    "ready" -> view?.evaluateJavascript(VtopScripts.AUTHENTICATED) { if (it == "true") onAuthenticated() }
+                    "ready" -> view?.let { active ->
+                        active.evaluateJavascript(VtopScripts.AUTHENTICATED) {
+                            if (it == "true" && this@VtopBrowser.view === active) onAuthenticated()
+                        }
+                    }
                     // A request inside the page landed on the login page: the session ran out while browsing.
                     "login" -> {
                         Log.info(SRC, "login page in request", flow)
@@ -420,6 +434,7 @@ internal class VtopBrowser(
         }
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+            if (this@VtopBrowser.view !== view) return
             pageStart = SystemClock.elapsedRealtime()
             pageLoading = true
             requests = 0
@@ -429,14 +444,19 @@ internal class VtopBrowser(
             if (isVtop(Uri.parse(url))) inject(view)
         }
 
-        override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) = stepBack()
+        override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+            if (this@VtopBrowser.view !== view) return
+            stepBack()
+        }
 
         override fun onPageCommitVisible(view: WebView, url: String) {
+            if (this@VtopBrowser.view !== view) return
             hasContent = true
             if (isVtop(Uri.parse(url))) inject(view)
         }
 
         override fun onPageFinished(view: WebView, url: String) {
+            if (this@VtopBrowser.view !== view) return
             pageLoading = false
             reloading = false
             hasContent = true
@@ -451,7 +471,7 @@ internal class VtopBrowser(
             Log.info(SRC, "page loaded", flow, mapOf("path" to path, "ms" to (SystemClock.elapsedRealtime() - pageStart).toString()) + files)
             inject(view)
             view.evaluateJavascript(VtopScripts.AUTHENTICATED) { signedIn ->
-                if (signedIn != "true") return@evaluateJavascript
+                if (this@VtopBrowser.view !== view || signedIn != "true") return@evaluateJavascript
                 onAuthenticated()
                 reopen?.takeIf { it.url.isNotEmpty() }?.let {
                     Log.info(SRC, "reopen page", flow, mapOf("menu" to pathOf(it.url)))
@@ -465,6 +485,7 @@ internal class VtopBrowser(
             assets?.serve(request, userAgent)
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+            if (this@VtopBrowser.view !== view) return
             Log.warn(SRC, "load failed", flow, mapOf("path" to pathOf(request.url), "code" to error.errorCode.toString(), "main" to request.isForMainFrame.toString()))
             if (request.isForMainFrame) {
                 pageLoading = false
@@ -474,12 +495,14 @@ internal class VtopBrowser(
         }
 
         override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+            if (this@VtopBrowser.view !== view) return
             Log.warn(SRC, "http error", flow, mapOf("path" to pathOf(request.url), "status" to response.statusCode.toString(), "main" to request.isForMainFrame.toString()))
             if (request.isForMainFrame) error = "VTOP returned an error. Try Home again."
         }
 
         // Handling this keeps Android from killing the whole app with the page's process.
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+            if (this@VtopBrowser.view !== view) return true
             Log.warn(SRC, "render process gone", flow, mapOf("crash" to detail.didCrash().toString()))
             onLost()
             return true
