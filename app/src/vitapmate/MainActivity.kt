@@ -95,10 +95,13 @@ class MainActivity : ComponentActivity() {
         // A connected app's session request from the notification: asked once the app shows.
         if (open == OPEN_SESSION_REQUEST) {
             val requestId = intent.getStringExtra(ITEM) ?: return
+            val expiresAtMs = intent.getLongExtra(EXPIRES_AT, -1L).takeIf { it > 0L }
             intent.removeExtra(OPEN)
+            intent.removeExtra(ITEM)
+            intent.removeExtra(EXPIRES_AT)
             lifecycleScope.launch {
                 lifecycle.withStarted {}
-                Push.answer(applicationContext, requestId, tapped = true)
+                Push.handleRequest(applicationContext, requestId, expiresAtMs, tapped = true)
             }
             return
         }
@@ -110,12 +113,14 @@ class MainActivity : ComponentActivity() {
         const val OPEN_INBOX = "inbox"
         const val OPEN_SESSION_REQUEST = "session_request"
         const val ITEM = "item"
+        const val EXPIRES_AT = "expires_at"
     }
 
     override fun onStart() {
         // Before super: the screens it starts read whether the app is on screen.
         Foreground.started()
         super.onStart()
+        Push.onForeground(applicationContext)
         // The calendar from the cache, if it is on.
         AppScope.launch { CalendarSync.sync(applicationContext) }
     }
