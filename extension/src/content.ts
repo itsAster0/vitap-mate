@@ -1,6 +1,8 @@
 // Runs on VTOP's pages: the sign-in card that shows the current step, auto sign-in, signing in again
 // after VTOP signs the browser out, and the buttons that start a sign-in. This file is a classic
-// script, so it imports nothing the popup shares (that would be a module chunk).
+// script, so it imports only types from shared modules (runtime imports would emit a module chunk).
+
+import type { BackgroundMessage, LoginReply, PageMessage } from "./messages";
 
 const VTOP_ROOT_PATHS = ["/vtop", "/vtop/"];
 const VTOP_CONTENT_PATH = "/vtop/content";
@@ -9,6 +11,34 @@ const LAUNCHER_ID = "vtop-mate-panel-launcher";
 const INLINE_ID = "vtop-mate-signin";
 
 type Tone = "active" | "ok" | "error";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** Local runtime guard matching `messages.ts` so this file stays a standalone classic script. */
+function isPageMessage(value: unknown): value is PageMessage {
+  if (!isRecord(value) || typeof value.type !== "string") return false;
+  switch (value.type) {
+    case "VTOP_MATE_LOADING":
+      return (
+        typeof value.text === "string" &&
+        (value.serverDueAt === undefined || typeof value.serverDueAt === "number") &&
+        (value.tone === undefined || value.tone === "active" || value.tone === "ok")
+      );
+    case "VTOP_MATE_ERROR":
+      return typeof value.text === "string";
+    case "VTOP_MATE_HIDE_LOADING":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isLoginReply(value: unknown): value is LoginReply {
+  if (!isRecord(value) || typeof value.ok !== "boolean") return false;
+  return value.ok ? true : typeof value.error === "string";
+}
 
 // ---- the page badge ---------------------------------------------------------------------------
 
@@ -163,10 +193,10 @@ function staleTab() {
 }
 
 /** Messages the background, or asks for a reload if this tab is stale. */
-function sendToBackground(message: unknown, onReply?: (reply: any) => void) {
+function sendToBackground(message: BackgroundMessage, onReply?: (reply: unknown) => void) {
   if (!extensionAlive()) return staleTab();
   try {
-    chrome.runtime.sendMessage(message, (reply) => {
+    chrome.runtime.sendMessage(message, (reply: unknown) => {
       // Reading lastError stops Chrome logging it when nobody answers.
       void chrome.runtime.lastError;
       onReply?.(reply);
@@ -187,11 +217,13 @@ async function stored(keys: string[]): Promise<Record<string, unknown> | null> {
 function startSignIn(source: "content" | "resign", onDone?: (ok: boolean) => void) {
   resigning = source === "resign";
   sendToBackground({ type: "LOGIN_WITH_TOKEN", source }, (response) => {
-    if (!response) {
+    if (!isLoginReply(response)) {
       showBadge("Sign-in was interrupted", "error", "Try again.");
       hideBadge(3500);
+      onDone?.(false);
+      return;
     }
-    onDone?.(Boolean(response?.ok));
+    onDone?.(response.ok);
   });
 }
 
@@ -202,7 +234,9 @@ const isRootPage = () => onVtop() && VTOP_ROOT_PATHS.includes(window.location.pa
 const isOutsideContent = () => onVtop() && window.location.pathname !== VTOP_CONTENT_PATH;
 /** VTOP sends a browser it signed out to its login (or open) page, as bridge.ts's isLoginRedirect. */
 const isLoginPage = () =>
-  onVtop() && (window.location.pathname.startsWith("/vtop/login") || window.location.pathname.startsWith("/vtop/initialProcess"));
+  onVtop() &&
+  (window.location.pathname.startsWith("/vtop/login") ||
+    window.location.pathname.startsWith("/vtop/initialProcess"));
 
 /** Takes the shared 15 s cooldown, so a page that keeps bouncing doesn't loop. */
 async function takeCooldown(lastAutoLoginAt: unknown) {
@@ -218,7 +252,14 @@ async function takeCooldown(lastAutoLoginAt: unknown) {
 
 async function maybeSignIn() {
   if (!extensionAlive() || (!isRootPage() && !isLoginPage())) return;
-  const s = await stored(["token", "autoLogin", "reSignIn", "lastAutoLoginAt", "lastLogin", "signedOutAt"]);
+  const s = await stored([
+    "token",
+    "autoLogin",
+    "reSignIn",
+    "lastAutoLoginAt",
+    "lastLogin",
+    "signedOutAt",
+  ]);
   if (!s || !String(s.token ?? "").trim()) return;
 
   if (isRootPage()) {
@@ -263,12 +304,13 @@ function watchLogout() {
 
 /**
  * Puts a "VITAP Mate" button next to the sign-in button on VTOP's Student card. VTOP loads that
- * card after the page, so this runs again whenever the page changes.
+ * card after the page, so this runs again until the button is mounted.
  */
-function addStudentCardButton() {
-  if (!extensionAlive() || document.getElementById(INLINE_ID)) return;
+function addStudentCardButton(): boolean {
+  if (!extensionAlive()) return false;
+  if (document.getElementById(INLINE_ID)) return true;
   const studentButton = document.querySelector<HTMLButtonElement>("#stdForm button[type=submit]");
-  if (!studentButton) return;
+  if (!studentButton) return false;
 
   const button = document.createElement("button");
   button.id = INLINE_ID;
@@ -317,10 +359,17 @@ function addStudentCardButton() {
 
   studentButton.insertAdjacentElement("afterend", button);
   document.getElementById(LAUNCHER_ID)?.remove();
+  return true;
 }
 
 function createPanelLauncher() {
-  if (!isOutsideContent() || document.getElementById(LAUNCHER_ID) || document.getElementById(INLINE_ID)) return;
+  if (
+    !isOutsideContent() ||
+    document.getElementById(LAUNCHER_ID) ||
+    document.getElementById(INLINE_ID)
+  ) {
+    return;
+  }
 
   const button = document.createElement("button");
   button.id = LAUNCHER_ID;
@@ -345,44 +394,50 @@ function createPanelLauncher() {
   document.documentElement.appendChild(button);
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message: unknown) => {
+  if (!isPageMessage(message)) return;
+
   if (message.type === "VTOP_MATE_LOADING") {
-    serverDueAt = typeof message.serverDueAt === "number" ? message.serverDueAt : undefined;
+    serverDueAt = message.serverDueAt;
     if (message.tone === "ok") {
       serverDueAt = undefined;
       if (resigning) showBadge("Signed in again", "ok", "VTOP had signed you out");
-      else showBadge(message.text ?? "Signed in", "ok");
+      else showBadge(message.text || "Signed in", "ok");
       resigning = false;
       hideBadge(3000);
     } else {
-      showBadge(message.text ?? "Signing in", "active");
+      showBadge(message.text || "Signing in", "active");
     }
+    return;
   }
 
   if (message.type === "VTOP_MATE_ERROR") {
     serverDueAt = undefined;
     resigning = false;
-    const text = String(message.text ?? "Sign-in failed");
+    const text = message.text || "Sign-in failed";
     const cut = text.indexOf(". ");
-    showBadge(cut > 0 ? text.slice(0, cut) : text.replace(/\.$/, ""), "error", cut > 0 ? text.slice(cut + 2) : "");
+    showBadge(
+      cut > 0 ? text.slice(0, cut) : text.replace(/\.$/, ""),
+      "error",
+      cut > 0 ? text.slice(cut + 2) : "",
+    );
     hideBadge(6000);
+    return;
   }
 
-  if (message.type === "VTOP_MATE_HIDE_LOADING") hideBadge();
+  hideBadge();
 });
 
-addStudentCardButton();
+const mounted = addStudentCardButton();
 createPanelLauncher();
 watchLogout();
 void maybeSignIn();
 
-if (isOutsideContent()) {
+if (!mounted && isOutsideContent()) {
   const observer = new MutationObserver(() => {
-    if (!extensionAlive()) {
+    if (!extensionAlive() || addStudentCardButton()) {
       observer.disconnect();
-      return;
     }
-    addStudentCardButton();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 }

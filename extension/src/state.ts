@@ -1,5 +1,8 @@
 import type { SessionSource } from "./bridge";
 
+/** The last finished sign-in, kept for the popup. */
+export type LastLogin = { at: number; via: string; ms: number; source?: SessionSource };
+
 /** What the popup and the page script keep in `chrome.storage.local`. */
 export type Settings = {
   token?: string;
