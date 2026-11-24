@@ -103,8 +103,9 @@ pub enum LiveTopic {
 pub trait LiveListener: Send + Sync {
     /// The server's data changed (and once at first): read it again.
     fn on_change(&self);
-    /// The query failed with `code` (`unauthenticated` renews the JWT; the next change follows).
-    fn on_error(&self, code: String);
+    /// The query failed with `code` and the server's `message` for the student
+    /// (`unauthenticated` renews the JWT; the next change follows).
+    fn on_error(&self, code: String, message: String);
 }
 
 /// One [`Core::live_watch`]; stopping or dropping it unsubscribes.
@@ -190,7 +191,9 @@ impl Core {
             let on_update = move |update: Result<Value, CallError>| match update {
                 Ok(_) => listener.on_change(),
                 Err(error) => {
-                    let code = edge_error(path, error).code().to_string();
+                    let error = edge_error(path, error);
+                    let code = error.code().to_string();
+                    let message = error.message().to_string();
                     match (code.as_str(), core.upgrade()) {
                         ("unauthenticated", Some(core)) => {
                             renew(core, renew_flow.clone(), listener.clone());
@@ -201,12 +204,12 @@ impl Core {
                             if let Some(core) = core {
                                 core.removed_here();
                             }
-                            listener.on_error(NO_IDENTITY.into());
+                            listener.on_error(NO_IDENTITY.into(), message);
                             return;
                         }
                         _ => {}
                     }
-                    listener.on_error(code);
+                    listener.on_error(code, message);
                 }
             };
             let id = backend.watch(path, args, Box::new(on_update));
@@ -311,7 +314,10 @@ fn renew(core: Arc<Core>, flow: String, listener: Arc<dyn LiveListener>) {
                 // Signed out, or no identity it may take unasked: the watch just stops following.
                 Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
                     info!("live watch: no identity, stops following");
-                    listener.on_error(NO_IDENTITY.into());
+                    listener.on_error(
+                        NO_IDENTITY.into(),
+                        "Sign in again to follow changes.".into(),
+                    );
                 }
                 Err(error) => warn!(%error, "live watch: no new jwt"),
             }
@@ -417,11 +423,28 @@ pub(crate) fn edge_error(path: &str, error: CallError) -> EdgeError {
         CallError::Convex { message, data } => {
             let text = |key| data.get(key).and_then(Value::as_str).map(str::to_string);
             let code = text("code").unwrap_or_else(|| "server_error".into());
-            info!(path, code = code.as_str(), "server refused");
-            EdgeError::Status {
-                code,
-                message: text("error").unwrap_or(message),
+            let message = text("error").unwrap_or(message);
+            // These answer the phone's own state (an expired JWT, a removed phone, the demo):
+            // the caller handles them. Any other code is worth a look.
+            if matches!(
+                code.as_str(),
+                "unauthenticated" | "device_removed" | "demo_unavailable"
+            ) {
+                info!(
+                    path,
+                    code = code.as_str(),
+                    message = message.as_str(),
+                    "server refused"
+                );
+            } else {
+                warn!(
+                    path,
+                    code = code.as_str(),
+                    message = message.as_str(),
+                    "server refused"
+                );
             }
+            EdgeError::Status { code, message }
         }
     }
 }

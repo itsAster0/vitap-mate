@@ -46,6 +46,14 @@ impl EdgeError {
             Self::Status { code, .. } => code,
         }
     }
+
+    /// What the server said, for the student.
+    pub(crate) fn message(&self) -> &str {
+        match self {
+            Self::Offline => "The server can't be reached.",
+            Self::Status { message, .. } => message,
+        }
+    }
 }
 
 impl From<EdgeError> for CoreError {

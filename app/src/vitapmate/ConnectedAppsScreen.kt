@@ -148,6 +148,7 @@ fun ConnectedAppsScreen() {
 
     Page("Connected apps", CONNECTED_APPS) { padding ->
         LazyColumn(contentPadding = padding) {
+            if (apps != null) item { LiveProblemBanner(LiveTopic.ACCOUNT, ::load) }
             item {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {

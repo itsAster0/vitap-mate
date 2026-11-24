@@ -232,7 +232,7 @@ impl LiveListener for Heard {
     fn on_change(&self) {
         self.0.lock().unwrap().push("change".into());
     }
-    fn on_error(&self, code: String) {
+    fn on_error(&self, code: String, _message: String) {
         self.0.lock().unwrap().push(code);
     }
 }

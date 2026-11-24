@@ -155,6 +155,7 @@ fun ServerScreen() {
 
     Page("Server", SERVER) { padding ->
         LazyColumn(contentPadding = padding) {
+            if (status != null && removed == null) item { LiveProblemBanner(LiveTopic.SERVER, ::load) }
             val s = status
             when {
                 removed != null -> item {

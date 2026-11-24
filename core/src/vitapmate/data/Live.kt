@@ -13,6 +13,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.drop
@@ -29,6 +32,12 @@ import vitapmate.observability.flow
 
 /** The server's live queries (Rust's `Core::live_watch`), as flows. */
 object Live {
+    /** Each followed topic's failing watch, until its next change or until it stops. */
+    private val failing = MutableStateFlow<Map<LiveTopic, Problem>>(emptyMap())
+
+    /** Why [topic]'s watch stopped answering, while it does; null while it follows. */
+    fun problem(topic: LiveTopic): Flow<Problem?> = failing.map { it[topic] }
+
     /**
      * One [Unit] when [topic] is first read and one each time the server's copy changes, while
      * collected (cancelling unsubscribes). Ends at once, empty, when it can't follow (no identity
@@ -40,14 +49,21 @@ object Live {
             flow(name) { id ->
                 AppCore.await().liveWatch(id, topic, object : LiveListener {
                     override fun onChange() {
+                        failing.update { it - topic }
                         trySend(Unit)
                     }
 
-                    override fun onError(code: String) {
+                    override fun onError(code: String, message: String) {
                         // A refused JWT is renewed in Rust and the next change follows; with no
                         // identity left (signed out, this phone removed) the flow ends.
-                        Log.warn("data.live", "$name failed: $code", id)
-                        if (code == "no_identity") close()
+                        Log.warn("data.live", "$name failed: $code", id, mapOf("message" to message))
+                        when (code) {
+                            "unauthenticated" -> {}
+                            "no_identity" -> close()
+                            else -> failing.update {
+                                it + (topic to Problem(ProblemKind.Unexpected, "Live Updates Stopped", message, id, retryable = true, userInitiated = false))
+                            }
+                        }
                     }
                 })
             }
@@ -57,7 +73,10 @@ object Live {
             // flow() logged it; an empty flow means "read once".
             null
         }
-        if (watch == null) close() else awaitClose { watch.stop() }
+        if (watch == null) close() else awaitClose {
+            watch.stop()
+            failing.update { it - topic }
+        }
     }.conflate().flowOn(Dispatchers.IO)
 }
 
