@@ -289,7 +289,7 @@ describe("sweeps", () => {
     await t.mutation(internal.sweeps.minute, {});
     expect(await t.run((ctx) => ctx.db.query("proofTickets").collect())).toHaveLength(0);
     advance(7 * 86_400);
-    await t.mutation(internal.sweeps.hour, {});
+    await t.mutation(internal.sweeps.quarter, {});
     expect((await as.query(api.app.status, { flow: "f" })).sessionSavedAt).toBeNull();
     advance(90 * 86_400);
     await t.mutation(internal.sweeps.day, {});

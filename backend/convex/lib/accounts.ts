@@ -65,10 +65,9 @@ export async function revokeDevice(ctx: MutationCtx, deviceId: string): Promise<
 /** Takes the install off its account: ends its refresh tokens and takes it off the account's
  * forwarding address, so a removed or lost phone stops getting the student's OTPs. */
 export async function unlinkPhone(ctx: MutationCtx, device: Doc<"devices">): Promise<void> {
-  const accountId = device.accountId;
   await ctx.db.patch(device._id, { accountId: undefined, linkedAt: undefined, seenAt: undefined });
   await revokeDevice(ctx, device.deviceId);
-  if (accountId === undefined) return;
+  // Even unlinked: a backfilled membership can sit on an install that was never linked here.
   await dropMail(ctx, device.deviceId);
 }
 
@@ -93,7 +92,8 @@ export async function linkPhone(ctx: MutationCtx, account: Doc<"accounts">, devi
   // Another student's phone until now: it leaves their account and forwarding address first.
   if (!again && device.accountId !== undefined) await unlinkPhone(ctx, device);
   await ctx.db.patch(device._id, { accountId: account._id, linkedAt: again ? (device.linkedAt ?? at) : at, seenAt: at, linkedOnce: true });
-  if (!again) await dropMail(ctx, device.deviceId, account._id);
+  // Linking again too: the backfill can leave an older student's membership on this install.
+  await dropMail(ctx, device.deviceId, account._id);
   const others = (await phoneRows(ctx, account._id)).filter((row) => row.deviceId !== device.deviceId);
   while (others.length >= MAX_PHONES) {
     const oldest = leastRecent(others.map(phoneOf));

@@ -3,6 +3,7 @@
 // where the screen read four.
 
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 import { keysOf, phoneOf, phonesOf, signInsOf } from "./lib/accounts";
 import { AccountRecord } from "./lib/accountState";
@@ -51,13 +52,14 @@ export const view = query({
     const account = doc.view(phones, keys, me.deviceId, doc.mailboxId !== null, at);
     const forwarding = doc.mailboxId === null ? null : address(doc.mailboxId);
     const status = account.thisPhone ? doc.statusView(forwarding, phones.length, keys, await signInsOf(ctx, id)) : null;
-    return { account, device, status, mailbox: mailbox === undefined ? null : await phonesOn(ctx, mailbox, me.deviceId) };
+    return { account, device, status, mailbox: mailbox === undefined ? null : await phonesOn(ctx, mailbox, me.deviceId, id) };
   },
 });
 
-/** The phones on `addressId`, or `{ gone: true }` when `deviceId` isn't one of them. */
-async function phonesOn(ctx: Parameters<typeof membersOf>[0], addressId: string, deviceId: string) {
-  const members = (await mailboxRow(ctx, addressId)) ? await membersOf(ctx, addressId) : [];
+/** The phones on `addressId`, or `{ gone: true }` when it isn't `accountId`'s or `deviceId` isn't
+ * one of them. */
+async function phonesOn(ctx: Parameters<typeof membersOf>[0], addressId: string, deviceId: string, accountId: Id<"accounts">) {
+  const members = (await mailboxRow(ctx, addressId))?.accountId === accountId ? await membersOf(ctx, addressId) : [];
   if (!members.some((m) => m.deviceId === deviceId)) return { gone: true as const };
   const devices = [];
   for (const m of members) {

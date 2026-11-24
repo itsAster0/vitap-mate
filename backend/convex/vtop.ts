@@ -11,7 +11,7 @@ import { actionCaller } from "./lib/identity";
 import { rateLimits } from "./lib/rateLimits";
 import { enginePost } from "./lib/engine";
 import { signedArgs, verifySigned } from "./lib/signed";
-import { type Trace, log, now } from "./lib/util";
+import { type Trace, log, logError, logWarn, now } from "./lib/util";
 
 /** Bodies are a session and a page name, or a username and password. */
 const MAX_BODY_BYTES = 64 * 1024;
@@ -33,9 +33,12 @@ export async function passToEngine(enginePath: string, body: string, trace: Trac
     answer = await enginePost(enginePath, body, trace, abort.signal);
     // Read here, under the timer.
     raw = await answer.arrayBuffer();
-  } catch {
-    if (abort.signal.aborted) fail("vtop_timeout", "VTOP took too long to answer.");
-    log(trace, "vtop: engine unreachable");
+  } catch (e) {
+    if (abort.signal.aborted) {
+      logWarn(trace, `vtop: ${enginePath} timed out`);
+      fail("vtop_timeout", "VTOP took too long to answer.");
+    }
+    logError(trace, `vtop: engine unreachable for ${enginePath}`, e);
     return fail("engine_unavailable", "The server can't reach VTOP right now.");
   } finally {
     clearTimeout(timer);
@@ -50,6 +53,7 @@ export async function passToEngine(enginePath: string, body: string, trace: Trac
   if (answer.ok) return json as Value;
   const data = json as { code?: unknown; error?: unknown } | null;
   if (data && typeof data.code === "string") throw new ConvexError(data as Record<string, Value>);
+  logError(trace, `vtop: the engine answered ${enginePath} with ${answer.status} and no error code`);
   return fail(answer.status === 404 ? "not_found" : "engine_unavailable", `The engine answered ${answer.status}.`);
 }
 

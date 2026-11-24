@@ -127,6 +127,9 @@ struct State {
     draining: bool,
     /// Something changed that the timer thread should look at.
     woken: bool,
+    /// A new identity was sent and no transition has come since: a cached failure may be the
+    /// old identity's (an expired JWT's `unauthenticated`), so it isn't handed out.
+    auth_changed: bool,
 }
 
 pub(crate) struct ConvexClient {
@@ -185,6 +188,7 @@ impl ConvexClient {
                 io: VecDeque::new(),
                 draining: false,
                 woken: false,
+                auth_changed: false,
             }),
             wake: Condvar::new(),
             // One client serves every flow: its own lines belong to none of them (each call's
@@ -335,6 +339,7 @@ impl ConvexClient {
         let mut state = self.state();
         let token = jwt.map_or(AuthenticationToken::None, AuthenticationToken::User);
         state.base.set_auth(token);
+        state.auth_changed = true;
         self.flush(&mut state);
         self.finish(state);
     }
@@ -473,6 +478,7 @@ impl ConvexClient {
                         // A server that only fails or pings keeps the backoff growing.
                         if transition {
                             state.backoff_ms = INITIAL_BACKOFF_MS;
+                            state.auth_changed = false;
                         }
                         if updated.is_some() {
                             queue_updates(&mut state);
@@ -526,7 +532,12 @@ impl ConvexClient {
         };
         self.use_now(&mut state);
         let subscriber = state.base.subscribe(path, args);
-        let last = state.base.latest_results().get(&subscriber).cloned();
+        let last = state
+            .base
+            .latest_results()
+            .get(&subscriber)
+            .filter(|result| !state.auth_changed || matches!(result, FunctionResult::Value(_)))
+            .cloned();
         if let Some(result) = &last {
             let update = Io::Update(on_update.clone(), outcome_of(result.clone()));
             state.io.push_back(update);

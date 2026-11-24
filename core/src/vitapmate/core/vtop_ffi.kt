@@ -20420,6 +20420,7 @@ public object FfiConverterTypePunchKind: FfiConverterRustBuffer<PunchKind> {
 enum class Route {
     
     DIRECT,
+    PROXY,
     SERVER,
     UDP;
 

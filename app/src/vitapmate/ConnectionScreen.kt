@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Minimize2
 import com.composables.icons.lucide.Radio
 import com.composables.icons.lucide.School
 import com.composables.icons.lucide.Server
@@ -73,6 +74,7 @@ private class RouteChoice(val route: VtopRoute, val title: String, val icon: Ima
 
 private val CHOICES = listOf(
     RouteChoice(VtopRoute.DIRECT, "Direct", Lucide.Smartphone, "The phone signs in and fetches from VTOP itself"),
+    RouteChoice(VtopRoute.PROXY, "Compressing proxy", Lucide.Minimize2, "The same requests through the vitapmate server, about 6× smaller"),
     RouteChoice(VtopRoute.SERVER, "Server fetch", Lucide.Server, "The server fetches pages; the phone gets only the data"),
     RouteChoice(VtopRoute.UDP, "Server fetch over UDP", Lucide.Radio, "Server fetch over vitapmate's UDP link, for slow or lossy networks"),
 )
@@ -171,6 +173,7 @@ private fun RouteHero(status: RouteStatus) {
     val route = status.chosen
     val (first, second) = when (route) {
         VtopRoute.DIRECT -> null to null
+        VtopRoute.PROXY -> "6× smaller" to null
         VtopRoute.SERVER -> "data only" to "fetches"
         VtopRoute.UDP -> "UDP" to "fetches"
     }

@@ -1,0 +1,12 @@
+# The VTOP proxy Worker for the app's Proxy route (README.md). Deploy only when asked:
+#   bunx wrangler deploy
+# Convex's PROXY_URL names it for phones (`proxy:info`).
+name = "vmate-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+routes = [{ pattern = "vmate-proxy.aster0.dev", custom_domain = true }]
+
+[observability.logs]
+enabled = true
+invocation_logs = false

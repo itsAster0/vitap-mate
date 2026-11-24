@@ -33,6 +33,7 @@ import {
   touch,
   unknownMailbox,
 } from "./lib/mailboxes";
+import { internal } from "./_generated/api";
 import { seal } from "./lib/mailSeal";
 import { log, now } from "./lib/util";
 
@@ -119,7 +120,7 @@ export const remove = mutation({
   },
   handler: async (ctx, { flow, id, everywhere }) => {
     const me = await realCaller(ctx);
-    const done = await leaveMailbox(ctx, me.deviceId, id, {
+    const done = await leaveMailbox(ctx, me.deviceId, id, me.account._id, {
       deleteWhenLast: true,
       everywhere,
     });
@@ -139,7 +140,7 @@ export const leave = mutation({
   args: { flow: v.string(), id: v.string() },
   handler: async (ctx, { flow, id }) => {
     const me = await realCaller(ctx);
-    await leaveMailbox(ctx, me.deviceId, id, { deleteWhenLast: false });
+    await leaveMailbox(ctx, me.deviceId, id, me.account._id, { deleteWhenLast: false });
     log({ flow, regno: me.regno }, "mail-otp: a device left a mailbox");
     return null;
   },
@@ -151,7 +152,7 @@ export const devices = query({
   handler: async (ctx, { id }) => {
     const me = await caller(ctx);
     if (me.demo) return unknownMailbox();
-    const { members } = await owned(ctx, me.deviceId, id);
+    const { members } = await owned(ctx, me.deviceId, id, me.account?._id ?? null);
     const out = [];
     for (const m of members) {
       const device = await ctx.db
@@ -175,13 +176,13 @@ export const removeDevice = mutation({
   args: { flow: v.string(), id: v.string(), removeDevice: v.string() },
   handler: async (ctx, { flow, id, removeDevice: target }) => {
     const me = await realCaller(ctx);
-    const { members, me: mine } = await owned(ctx, me.deviceId, id);
+    const { members, me: mine } = await owned(ctx, me.deviceId, id, me.account._id);
     await touch(ctx, mine);
     if (!members.some((m) => m.deviceId === target))
       fail("unknown_device", "That device does not use this address.");
     if (target === me.deviceId)
       badRequest("Use remove to take this device off the address.");
-    await leaveMailbox(ctx, target, id, { deleteWhenLast: false });
+    await leaveMailbox(ctx, target, id, me.account._id, { deleteWhenLast: false });
     log(
       { flow, regno: me.regno },
       "mail-otp: a device was removed from a mailbox",
@@ -198,7 +199,7 @@ export const inbox = query({
   handler: async (ctx, { id }) => {
     const me = await caller(ctx);
     if (me.demo) return unknownMailbox();
-    const { mailbox } = await owned(ctx, me.deviceId, id);
+    const { mailbox } = await owned(ctx, me.deviceId, id, me.account?._id ?? null);
     const at = now();
     const latest = (kind: "otp" | "gmail_confirm") =>
       ctx.db
@@ -298,7 +299,7 @@ export const deliver = internalMutation({
         )
         .collect();
       for (const row of old) await ctx.db.delete(row._id);
-      await ctx.db.insert("otpInbox", {
+      const box = await ctx.db.insert("otpInbox", {
         addressId,
         deviceId,
         kind,
@@ -306,12 +307,25 @@ export const deliver = internalMutation({
         receivedAt: at,
         accountId: mailbox.accountId,
       });
+      // `inbox` stops handing out an OTP after SEALED_TTL_SECS, so it goes then; the 15-minute
+      // sweep is only a backstop.
+      if (kind === "otp")
+        await ctx.scheduler.runAfter(SEALED_TTL_SECS * 1000, internal.mail.dropBox, { box });
       // The push is only a wake-up: an open app sees the box in `mail:inbox`.
       await notify(ctx, deviceId, "mail_otp", { mailbox: addressId, sealed });
     }
     if (otp !== undefined)
       await offerCode(ctx, mailbox.accountId, otp, sentAt);
     return true;
+  },
+});
+
+/** Deletes an OTP box once it can no longer be collected; gone already (replaced or left) is
+ * fine. */
+export const dropBox = internalMutation({
+  args: { box: v.id("otpInbox") },
+  handler: async (ctx, { box }) => {
+    if (await ctx.db.get(box)) await ctx.db.delete(box);
   },
 });
 

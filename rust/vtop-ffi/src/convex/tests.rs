@@ -812,3 +812,32 @@ fn a_failed_watch_hears_its_error_again_on_the_next_socket() {
         "heard again, so its owner renews"
     );
 }
+
+#[test]
+fn a_failure_cached_before_a_new_jwt_waits_for_the_server() {
+    let harness = Harness::new();
+    harness.connect();
+    let (watched, on_watch) = recorder();
+    harness
+        .client
+        .subscribe("account:view", json!({}), on_watch);
+    harness.push(transition(
+        version(0, 0, 0),
+        version(1, 0, 10),
+        vec![failed(0, "unauthenticated")],
+    ));
+    assert_eq!(watched.lock().unwrap().len(), 1);
+    harness.client.set_auth(Some("new-jwt".into()));
+    // The same query read again: the expired JWT's failure isn't its answer.
+    let (read, on_read) = recorder();
+    harness.client.subscribe("account:view", json!({}), on_read);
+    assert!(read.lock().unwrap().is_empty());
+    harness.push(transition(
+        version(1, 0, 10),
+        version(2, 1, 20),
+        vec![updated(0, json!({ "regno": "23ABC0001" }))],
+    ));
+    let read = read.lock().unwrap();
+    assert_eq!(read.len(), 1);
+    assert!(read[0].is_ok(), "{read:?}");
+}

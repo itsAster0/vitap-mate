@@ -47,6 +47,7 @@ import type * as mail from "../mail.js";
 import type * as migrate from "../migrate.js";
 import type * as oauth from "../oauth.js";
 import type * as pair from "../pair.js";
+import type * as proxy from "../proxy.js";
 import type * as push from "../push.js";
 import type * as screen from "../screen.js";
 import type * as sessions from "../sessions.js";
@@ -100,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   migrate: typeof migrate;
   oauth: typeof oauth;
   pair: typeof pair;
+  proxy: typeof proxy;
   push: typeof push;
   screen: typeof screen;
   sessions: typeof sessions;

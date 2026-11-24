@@ -40,6 +40,22 @@ export function mailBody(addressId: string, mail: Parsed): MailBody {
   };
 }
 
+/** An unexpected failure, at error level, with the error's name, message and the top of its
+ * stack. Never pass mail bodies, codes or tokens. */
+export function logError(message: string, err?: unknown): void {
+  if (!(err instanceof Error)) {
+    console.error(err === undefined ? message : `${message}: ${typeof err}`);
+    return;
+  }
+  const frames = (err.stack ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("at "))
+    .slice(0, 3);
+  const text = err.message.replace(/\s+/g, " ").slice(0, 200);
+  console.error(`${message}: ${err.name}${text ? `: ${text}` : ""}${frames.length ? ` (${frames.join("; ")})` : ""}`);
+}
+
 export async function postMail(env: MailEnv, body: MailBody, fetch: Fetch): Promise<Outcome> {
   let response: Response;
   try {
@@ -50,12 +66,12 @@ export async function postMail(env: MailEnv, body: MailBody, fetch: Fetch): Prom
       signal: AbortSignal.timeout(POST_TIMEOUT_MS),
     });
   } catch (e) {
-    console.log(`mail: Convex unreachable: ${e instanceof Error ? e.name : "error"}`);
+    logError("mail: Convex unreachable", e);
     return "retry";
   }
   if (response.status === 200) return "stored";
   if (response.status === 404 && (await errorCode(response)) === "mailbox_not_found") return "no_mailbox";
-  console.log(`mail: Convex answered ${response.status}`);
+  logError(`mail: Convex answered ${response.status}`);
   return "retry";
 }
 

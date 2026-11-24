@@ -335,7 +335,7 @@ impl Core {
             if saved.joined || saved.server != self.forwarding_server() {
                 return Ok(());
             }
-            self.rejoin(&flow, &saved, true).await.map(drop)
+            self.rejoin(&flow, &saved, true, true).await.map(drop)
         })
         .await
     }
@@ -364,9 +364,15 @@ enum Rejoined {
 
 impl Core {
     /// Joins `saved`'s address from this install, with the identity it has (a v2 account token
-    /// is traded in) but no proof: it runs unasked, on every open until it works, and the next
-    /// proof the student starts brings it about. True once joined.
-    async fn rejoin(&self, flow: &str, saved: &Saved, make: bool) -> Result<Rejoined, CoreError> {
+    /// is traded in). With `prove`, an install with none proves who the student is first (the
+    /// proof sends no cookie, so nothing is asked); without, it waits for an identity.
+    async fn rejoin(
+        &self,
+        flow: &str,
+        saved: &Saved,
+        make: bool,
+        prove: bool,
+    ) -> Result<Rejoined, CoreError> {
         let path = if make { "mail:register" } else { "mail:join" };
         let body = match self
             .account_call(
@@ -374,13 +380,13 @@ impl Core {
                 Kind::Mutation,
                 path,
                 "Keep mail forwarding",
-                false,
+                prove,
                 json!({}),
             )
             .await
         {
             Ok(answer) => answer?,
-            Err(CoreError::ConsentDenied) => {
+            Err(CoreError::ConsentDenied | CoreError::NotSignedIn) => {
                 info!("no identity yet: rejoined later");
                 return Ok(Rejoined::Later);
             }
@@ -574,7 +580,7 @@ impl Core {
             // moved the student's phones to their old address. Joined where the student's
             // address is; forgotten only when they have none (deleted) or it can't be asked.
             Err(error) if error.code() == GONE => {
-                let rejoined = Box::pin(self.rejoin(flow, &saved, !saved.joined)).await;
+                let rejoined = Box::pin(self.rejoin(flow, &saved, !saved.joined, false)).await;
                 return Err(match rejoined {
                     Ok(Rejoined::Joined) => CoreError::Other {
                         reason: "Mail forwarding reconnected. Try again.".into(),
@@ -590,6 +596,13 @@ impl Core {
                         }
                     }
                     Err(error) => error,
+                });
+            }
+            // No identity on this install yet (updated from v2 without a live account token):
+            // the app proves and rejoins once signed in (`keep_forwarding`).
+            Err(error) if error.code() == "unauthenticated" => {
+                return Err(CoreError::ForwardingOff {
+                    reason: "Mail forwarding reconnects once you're signed in.".into(),
                 });
             }
             Err(error) if error.code() == REMOVED => {

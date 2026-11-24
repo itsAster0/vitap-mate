@@ -11,7 +11,7 @@ workers_dev = false
 
 [vars]
 # Convex's HTTP actions; the Worker POSTs /internal/mail there.
-CONVEX_URL = "https://vmate3.aster0.dev"
+CONVEX_URL = "https://vmate.aster0.dev"
 # Where mail to other or unknown addresses goes; empty rejects it.
 FALLBACK_FORWARD = ""
 

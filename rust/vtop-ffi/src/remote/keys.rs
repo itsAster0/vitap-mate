@@ -500,7 +500,22 @@ impl Core {
             }
         };
         let path = "sessions:answer";
-        let answer = self.device_call(flow, Kind::Action, path, body).await;
+        // With a session to send, an install with no identity yet (updated from v2 without a
+        // live account token) proves first: the student already said yes, and the proof needs
+        // the live session the answer carries anyway.
+        let answer = if failed.is_none() {
+            self.account_call(
+                flow,
+                Kind::Action,
+                path,
+                "Answer a connected app",
+                true,
+                body,
+            )
+            .await?
+        } else {
+            self.device_call(flow, Kind::Action, path, body).await
+        };
         info!(
             sent = failed.is_none(),
             late = answer.as_ref().ok().and_then(|a| a["late"].as_bool()),

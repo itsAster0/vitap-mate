@@ -54,7 +54,7 @@ export const remove = mutation({
     const me = await caller(ctx);
     if (mailbox) {
       try {
-        await leaveMailbox(ctx, me.deviceId, mailbox, { deleteWhenLast: true });
+        await leaveMailbox(ctx, me.deviceId, mailbox, me.account?._id ?? null, { deleteWhenLast: true });
       } catch {
         // Not on that address (any more): leaving it is what was wanted. It throws before writing.
       }

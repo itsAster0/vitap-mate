@@ -32,7 +32,7 @@ import { fail } from "./lib/errors";
 import { actionCaller, caller, mailboxOfAccount, recordOf } from "./lib/identity";
 import { notify } from "./lib/notify";
 import { askPhone, insertRequest, pendingRequest, putRequest, requestOf, requestRow } from "./lib/requests";
-import { accountId, log, now } from "./lib/util";
+import { accountId, log, logError, logWarn, now } from "./lib/util";
 import { startLogin } from "./logins";
 
 const PHONE_SESSION_INVALID =
@@ -130,7 +130,7 @@ export async function cachedCookies(
     }
     return checked.cookies ? { cookies: checked.cookies, csrfToken: checked.csrfToken ?? null } : null;
   } catch (e) {
-    log({ flow, regno }, `account: cannot check the cache: ${e instanceof Error ? e.message : "unknown"}`);
+    logError({ flow, regno }, "account: cannot check the cache", e);
     return null;
   }
 }
@@ -362,8 +362,8 @@ export async function sealCredentials(
       ...(otp !== null ? { otp } : {}),
     } satisfies SealVault, { flow, regno });
     return { sealed: sealed.sealedVault, gmail: gmail !== null };
-  } catch {
-    log({ flow, regno }, "account: sealing credentials failed");
+  } catch (e) {
+    logError({ flow, regno }, "account: sealing credentials failed", e);
     return undefined;
   }
 }
@@ -395,8 +395,8 @@ export const answer = action({
     let checked: SessionChecked;
     try {
       checked = await engineJson<SessionChecked>("/engine/session", { cookies: header } satisfies SessionCheck, { flow: args.flow, regno: check.regno });
-    } catch {
-      log({ flow: args.flow, regno: check.regno }, "account: checking a phone answer failed");
+    } catch (e) {
+      logError({ flow: args.flow, regno: check.regno }, "account: checking a phone answer failed", e);
       return fail("vtop_unreachable", "VTOP is unreachable; try again.");
     }
     switch (checked.status) {
@@ -408,6 +408,7 @@ export const answer = action({
         await ctx.runMutation(internal.sessions.failRequest, { requestId, error: PHONE_SESSION_INVALID });
         return fail("session_invalid", "VTOP does not accept these cookies.");
       default:
+        logWarn({ flow: args.flow, regno: check.regno }, `account: the engine could not check a phone answer (${String(checked.status)})`);
         return fail("vtop_unreachable", "VTOP is unreachable; try again.");
     }
     const credentials = credentialsOf(args.credentials);
@@ -490,9 +491,10 @@ export async function loginDone(ctx: MutationCtx, regno: string, requestId: stri
       fallback = { reason: null };
       break;
     case "failed":
-      log({ regno: doc.id }, "account: server sign-in failed for now");
+      logWarn({ regno: doc.id }, "account: server sign-in failed for now");
       signIn = { at, by: "server", ok: false, reason: outcome.reason };
-      fallback = { reason: null };
+      // With no phone to ask (`app:login`), the engine's reason is the answer.
+      fallback = { reason: request?.phones.length === 0 ? outcome.reason : null };
       break;
   }
   if (fallback && request?.pending(at)) {

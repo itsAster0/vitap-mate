@@ -14,6 +14,7 @@ convex/account.ts     account:view and the account's settings, phones, sign-ins,
 convex/app.ts         app:status, app:sessionClear, app:login and app:loginResult (live)
 convex/logins.ts      server sign-ins as scheduled engine steps: the OTP mail resumes them
 convex/screen.ts      screen:view, the Server screen's one live read
+convex/proxy.ts       proxy:info, the Proxy route's Worker (PROXY_URL)
 convex/pair.ts        pair:info and pairing a browser or AI app
 convex/devices.ts     the install itself
 convex/sessions.ts    key holders' session requests, sessions:pending and sessions:answer

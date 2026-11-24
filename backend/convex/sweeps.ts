@@ -34,16 +34,16 @@ export const minute = internalMutation({
   },
 });
 
-/** Every hour: sealed mail past its use (an OTP box after 15 minutes, a confirmation after a
- * day), cached sessions past their week and saved credentials past the
- * student's chosen lifetime. */
-export const hour = internalMutation({
+/** Every 15 minutes: sealed mail past its use (an OTP box after 5 minutes, a confirmation after
+ * a day), cached sessions past their week and saved credentials past the student's chosen
+ * lifetime. */
+export const quarter = internalMutation({
   args: {},
   handler: async (ctx) => {
     const at = now();
     const inbox = await ctx.db
       .query("otpInbox")
-      .withIndex("by_receivedAt", (q) => q.lte("receivedAt", at - Math.max(15 * 60, SEALED_TTL_SECS)))
+      .withIndex("by_receivedAt", (q) => q.lte("receivedAt", at - SEALED_TTL_SECS))
       .take(BATCH);
     for (const row of inbox) {
       if (row.kind === "otp" || at - row.receivedAt >= CONFIRMATION_TTL_SECS) await ctx.db.delete(row._id);

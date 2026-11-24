@@ -18,14 +18,14 @@ import { bearer, corsRoutes, holds, jsonBody, notInternal, route } from "./lib/h
 import { seal } from "./lib/mailSeal";
 import { page, pairingPage } from "./lib/oauthPage";
 import { ALPHABET, POLL_AFTER_MS, pairCode } from "./lib/pairing";
-import { env, now, str } from "./lib/util";
+import { env, logError, now, str } from "./lib/util";
 import { actionCaller } from "./lib/identity";
 import { hostOf, redirectMatches, redirectUriOk, s256 } from "./oauth";
 import { begin, cachedCookies } from "./sessions";
 import { type LoginAnswer, loginFor } from "./app";
 import { parseGateway } from "./udp";
 
-export const VERSION = "3.0.0-test";
+export const VERSION = "3.2.0";
 
 const http = httpRouter();
 const get = (path: string, handler: (ctx: ActionCtx, req: Request) => Promise<Response>) => http.route({ path, method: "GET", handler: route(handler) });
@@ -304,7 +304,8 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   let response: Response;
   try {
     response = await engineSend(`${url.pathname}${url.search}`, init);
-  } catch {
+  } catch (e) {
+    logError({}, "mcp: engine unreachable", e);
     return error(503, "engine_unavailable", "The server can't reach the MCP tools right now.");
   }
   if (response.status !== 401 || response.headers.has("www-authenticate")) return response;

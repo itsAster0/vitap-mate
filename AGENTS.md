@@ -53,6 +53,7 @@ rust/                 Cargo workspace
   vtop-mcp/           MCP tools the engine serves behind the backend's /mcp
 backend/              self-hosted Convex (TypeScript, bun): all server state; the phone's one socket
 mail/                 Cloudflare Email Worker: hands forwarded mail to the backend, keeps nothing
+proxy/                Cloudflare Worker vmate-proxy: VTOP behind a compressing proxy (the Proxy route)
 edge/                 the v2 Worker and Durable Objects (until cleanup); guides/ is still the source
 extension/            Chrome and Firefox extension (Svelte, bun)
 fastlane/             Play Store lanes and release notes
@@ -69,7 +70,7 @@ keystore/             release keystore (gitignored; never read or print it)
 | Shared widget | `design/src/vitapmate/ui/`, one widget per file. |
 | Shell, nav, Settings, Developer, Inspector UI | `app/src/vitapmate/`. |
 | Data, settings store, downloads, files | `core/src/vitapmate/data/`. |
-| How the app reaches VTOP | `rust/vtop-ffi/src/remote/route.rs` (Direct, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/remote/route/plan.rs`. |
+| How the app reaches VTOP | `rust/vtop-ffi/src/remote/route.rs` (Direct, Proxy, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/remote/route/plan.rs`. |
 | Logging | Kotlin: `core/src/vitapmate/observability/` (`Log`, `flow()`). Rust: `tracing`, with the pipeline in `rust/vtop-ffi/src/obs.rs`. |
 | Server-side state | Convex in `backend/convex/`, never the engine or the gateway. A read the app shows is a query it can watch live (`LiveTopic`); queries take no `flow` argument, so the same read shares the watch's subscription. List new functions in `backend/README.md`. |
 
@@ -77,7 +78,7 @@ keystore/             release keystore (gitignored; never read or print it)
 
 A page or route change reaches more than one place. Check each:
 
-- The three routes: Direct, Server and Udp (`rust/vtop-ffi/src/remote/route.rs`).
+- The four routes: Direct, Proxy, Server and Udp (`rust/vtop-ffi/src/remote/route.rs`).
 - Cached and fresh data: `cached_x` with no cache yet, and `fetch_x` over it.
 - The vtop-mcp tools (`rust/vtop-mcp/src/tools.rs`) for a read page.
 - The extension, when a session or server route changes (`extension/AGENTS.md`).
@@ -87,12 +88,14 @@ A page or route change reaches more than one place. Check each:
 ### Glossary
 
 - flow: one user action or background run (`flow()`); its id goes first in every `Core` call.
-- route: how the phone reaches VTOP: Direct, Server (the engine fetches) or Udp
-  (Server over vm1).
+- route: how the phone reaches VTOP: Direct, Proxy (the same requests through the
+  `proxy/` Worker, whose URL Convex gives out as `proxy:info`), Server (the engine
+  fetches) or Udp (Server over vm1).
 - spec: a `PageSpec` in `rust/vtop-proto/src/spec.rs`: name, args, cache file, machine.
 - page: one VTOP page, fetched by its spec and cached on the phone per semester.
 - backend: the self-hosted Convex the phone talks to over one WebSocket (`backend/`);
-  the test one is vmate3.aster0.dev, prod moves to vmate.aster0.dev at cutover.
+  the app and the mail Worker default to vmate.aster0.dev; the test one is
+  vmate3.aster0.dev (Settings → Developer → Server on a debug build).
 - edge: the v2 Cloudflare Worker and Durable Objects (`edge/`), retired at cutover.
 - engine: `rust/vtop-bridge`, Railway `engine-v2`: signs in and fetches for the server routes.
 - gateway: `rust/vtop-gateway`, the UDP end of vm1 on the Linode.

@@ -62,7 +62,12 @@ check("guides:demo", Object.keys(demoGuide.pages).length > 10);
 const guide = await fetch(`${base}/guides/forwarding/1-add.webp`);
 check("GET /guides/* image", guide.status === 200 && guide.headers.get("content-type") === "image/webp");
 check("GET /guides/* 304", (await fetch(`${base}/guides/forwarding/1-add.webp`, { headers: { "if-none-match": guide.headers.get("etag") ?? "" } })).status === 304);
-check("udp:keys before a report", (await code(open.query(api.udp.keys, {}))) === "udp_unavailable");
+// The gateway's keys, or udp_unavailable before it has reported any.
+const udp = await open.query(api.udp.keys, {}).then(
+  (g) => (g as { ports: number[]; keys: unknown[] }).ports.length > 0 && (g as { keys: unknown[] }).keys.length > 0,
+  (e) => code(Promise.reject(e)).then((c) => c === "udp_unavailable"),
+);
+check("udp:keys", udp);
 
 // ---- demo ----------------------------------------------------------------------------------
 const demoPhone = await phone();

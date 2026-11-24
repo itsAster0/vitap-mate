@@ -8,7 +8,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { toBase64Url } from "./lib/base64";
-import { now } from "./lib/util";
+import { logError, logWarn, now } from "./lib/util";
 
 /** An OAuth scope name, not an address. */
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
@@ -66,14 +66,14 @@ export async function sendFcm(token: string, data: Record<string, unknown>): Pro
   try {
     account = JSON.parse(json) as ServiceAccount;
   } catch {
-    console.log("fcm: FIREBASE_CREDENTIALS_JSON is not JSON");
+    logError({}, "fcm: FIREBASE_CREDENTIALS_JSON is not JSON");
     return "off";
   }
   let access: string;
   try {
     access = await accessToken(account);
   } catch (e) {
-    console.log(`fcm: no access token: ${e instanceof Error ? e.message : "unknown"}`);
+    logError({}, "fcm: no access token", e);
     return "failed";
   }
   const base = (process.env.FCM_URL ?? "https://fcm.googleapis.com").replace(/\/+$/, "");
@@ -85,6 +85,7 @@ export async function sendFcm(token: string, data: Record<string, unknown>): Pro
   if (response.status === 200) return "sent";
   if (response.status === 404) return "token_invalid";
   if (response.status === 400 && (await response.text()).includes("UNREGISTERED")) return "token_invalid";
+  logWarn({}, `fcm: send answered ${response.status}`);
   return "failed";
 }
 
@@ -97,7 +98,7 @@ export const send = internalAction({
     try {
       outcome = await sendFcm(token, data as Record<string, unknown>);
     } catch (e) {
-      console.log(`fcm: send error: ${e instanceof Error ? e.name : "unknown"}`);
+      logWarn({}, `fcm: send error: ${e instanceof Error ? e.name : "unknown"}`);
       outcome = "failed";
     }
     if (outcome === "token_invalid") {
@@ -106,7 +107,7 @@ export const send = internalAction({
     } else if (outcome === "failed" && attempt < RETRIES) {
       await ctx.scheduler.runAfter(RETRY_AFTER_MS, internal.push.send, { deviceId, data, attempt: attempt + 1 });
     } else if (outcome === "failed") {
-      console.log("fcm: send failed");
+      logError({}, `fcm: send failed after ${attempt + 1} tries`);
     }
   },
 });

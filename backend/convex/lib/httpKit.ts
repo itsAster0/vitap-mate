@@ -5,7 +5,7 @@ import type { RouteSpec } from "convex/server";
 import { type ActionCtx, httpAction } from "../_generated/server";
 import { hashesEqual, sha256Hex } from "./crypto";
 import { empty, error, errorData } from "./errors";
-import { parseObject } from "./util";
+import { logError, parseObject } from "./util";
 
 export function bearer(req: Request): string {
   const value = req.headers.get("authorization") ?? "";
@@ -42,7 +42,9 @@ export function route(handler: (ctx: ActionCtx, req: Request) => Promise<Respons
     } catch (e) {
       const data = errorData(e);
       if (data) return Response.json(data, { status: STATUS[data.code] ?? 400 });
-      console.log(`http: ${req.method} ${new URL(req.url).pathname} threw: ${e instanceof Error ? e.name : "unknown"}`);
+      // `/mcp/<key>` carries an access key in the path.
+      const path = new URL(req.url).pathname.replace(/^\/mcp\/.*/, "/mcp/…");
+      logError({}, `http: ${req.method} ${path} threw`, e);
       return error(500, "internal_error", "Something went wrong on the server. Try again.");
     }
   });

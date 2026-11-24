@@ -556,8 +556,9 @@ async function importMailbox(
       count(tally, "mailboxDevices.no_device");
       continue;
     }
-    // Signed out, removed, or another student's phone on v3 since: it must not get this one's OTPs.
-    if (device.linkedOnce && device.accountId !== account._id) {
+    // Another student's phone, or signed out or removed on v3 since: it must not get this one's
+    // OTPs.
+    if (device.accountId !== undefined ? device.accountId !== account._id : device.linkedOnce) {
       count(tally, "mailboxDevices.left_on_v3");
       continue;
     }
@@ -616,6 +617,29 @@ async function importOAuth(
     count(tally, "oauthClients.inserted");
   }
 }
+
+/** Drops forwarding memberships (and their sealed mail) whose install is another student's phone,
+ * or was signed out or removed on v3: the rule `importMailbox` keeps, for rows imported before it
+ * did. Returns how many went. */
+export const dropStrayMembers = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let dropped = 0;
+    for (const row of await ctx.db.query("mailboxDevices").collect()) {
+      const device = await deviceByDeviceId(ctx, row.deviceId);
+      const stray = !device || (device.accountId !== undefined ? device.accountId !== row.accountId : device.linkedOnce === true);
+      if (!stray) continue;
+      const boxes = await ctx.db
+        .query("otpInbox")
+        .withIndex("by_device", (q) => q.eq("deviceId", row.deviceId))
+        .collect();
+      for (const box of boxes) if (box.addressId === row.addressId) await ctx.db.delete(box._id);
+      await ctx.db.delete(row._id);
+      dropped += 1;
+    }
+    return dropped;
+  },
+});
 
 /** Imports one batch, in the order given. Devices go before accounts (which link them) and
  * accounts before mailboxes (which belong to them), so the script sends them so. */

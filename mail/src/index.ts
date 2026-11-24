@@ -4,7 +4,7 @@
 // is tried again with backoff for up to RETRY_FOR_MS. Mail to other addresses, or to an
 // address Convex doesn't know, goes to FALLBACK_FORWARD (rejected without one).
 
-import { type Fetch, type MailBody, type MailEnv, mailBody, postMail } from "./convex";
+import { type Fetch, type MailBody, type MailEnv, logError, mailBody, postMail } from "./convex";
 import { idFromAddress, parseMail } from "./parse";
 
 /** An OTP is useless after a few minutes; nothing is kept longer than this. */
@@ -72,12 +72,12 @@ export async function handleQueue(messages: readonly QueuedMessage[], env: Env, 
     messages.map(async (message) => {
       const { body } = message;
       if (!isQueued(body)) {
-        console.log("mail: dropped an unreadable queued mail");
+        logError("mail: dropped an unreadable queued mail");
         message.ack();
         return;
       }
       if (deps.now() - body.queuedAt >= RETRY_FOR_MS) {
-        console.log("mail: gave up on a queued mail");
+        logError("mail: gave up on a queued mail");
         message.ack();
         return;
       }
@@ -95,7 +95,7 @@ export async function handleQueue(messages: readonly QueuedMessage[], env: Env, 
           const left = body.queuedAt + RETRY_FOR_MS - deps.now();
           const delaySeconds = Math.min(backoff(message.attempts), Math.ceil(left / 1000));
           if (delaySeconds <= 0) {
-            console.log("mail: gave up on a queued mail");
+            logError("mail: gave up on a queued mail");
             message.ack();
             return;
           }

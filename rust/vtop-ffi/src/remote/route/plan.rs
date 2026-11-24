@@ -191,6 +191,9 @@ mod tests {
         let cases: &[ActiveCase<'_>] = &[
             (Direct, &[], Direct, NOW, true),
             (Direct, &[], Server, NOW, false),
+            (Proxy, &[], Proxy, NOW, true),
+            (Proxy, &[], Server, NOW, false),
+            (Proxy, &[(Proxy, failed("x"), NOW)], Proxy, NOW, false),
             (Server, &[], Server, NOW, true),
             (Server, &[], Udp, NOW, false),
             (Udp, &[], Udp, NOW, true),
@@ -239,6 +242,7 @@ mod tests {
         // (chosen, failed routes at NOW, at, next)
         let cases: &[(Route, &[Route], i64, Option<Route>)] = &[
             (Route::Direct, &[], NOW, None),
+            (Route::Proxy, &[], NOW, None),
             (Route::Server, &[], NOW, Some(Route::Server)),
             (Route::Udp, &[], NOW, Some(Route::Udp)),
             (Route::Udp, &[Route::Udp], NOW, Some(Route::Server)),

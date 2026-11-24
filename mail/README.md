@@ -31,7 +31,7 @@ to any other address goes to `FALLBACK_FORWARD`.
 
 | Name | Kind | What |
 |---|---|---|
-| `CONVEX_URL` | var (`wrangler.toml`) | Convex's HTTP actions, `https://vmate3.aster0.dev` for the test |
+| `CONVEX_URL` | var (`wrangler.toml`) | Convex's HTTP actions, `https://vmate.aster0.dev` |
 | `FALLBACK_FORWARD` | var | where other mail goes; empty rejects it |
 | `MAIL_TOKEN` | secret | the same value as `MAIL_TOKEN` in the Convex env |
 | `MAIL_QUEUE` | Queue binding | `vmate-mail-retry` |

@@ -35,6 +35,11 @@ const JWT_EVERY_MS: i64 = 10 * 60_000;
 /// When a JWT last went to the gateway (unix ms).
 static JWT_SENT_MS: AtomicI64 = AtomicI64::new(0);
 
+/// The next fetch sends the JWT again: the identity changed (sign-out, another student).
+pub(crate) fn forget_jwt_sent() {
+    JWT_SENT_MS.store(0, Ordering::Relaxed);
+}
+
 /// One datagram received; `ip` without a scope.
 #[derive(Clone, PartialEq, Eq, uniffi::Record)]
 pub struct Datagram {
@@ -177,6 +182,9 @@ impl Core {
         session: String,
     ) -> Result<Value, String> {
         let deadline = Instant::now() + TIMEOUT;
+        // A renewed session belongs to the student signed in now, not to whoever is by the time
+        // the answer comes.
+        let started = self.current().ok();
         let network = NETWORK
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -250,7 +258,7 @@ impl Core {
                 continue;
             }
             if let Some(renewed) = answer.session.as_deref().filter(|_| answer.status == 200) {
-                self.adopt_renewed(renewed).await;
+                self.adopt_renewed(renewed, started.as_ref()).await;
             }
             let unreadable = || format!("unreadable page from UDP (HTTP {})", answer.status);
             if answer.packed && answer.status == 200 {
@@ -270,17 +278,20 @@ impl Core {
 
     /// The session the gateway signed in again with, from now on this phone's too: otherwise
     /// the next fetch sends the expired one back and the gateway signs in on every fetch.
-    async fn adopt_renewed(&self, renewed: &str) {
+    async fn adopt_renewed(&self, renewed: &str, started: Option<&Arc<crate::Slot>>) {
         let Ok(state) = serde_json::from_str::<vtop_core::SessionState>(renewed) else {
             warn!("udp: renewed session unreadable");
             return;
         };
-        let Ok(slot) = self.current() else { return };
+        let Some(slot) = started.filter(|slot| self.is_current(slot)) else {
+            info!("udp: renewed session dropped: signed out meanwhile");
+            return;
+        };
         let mut session = slot.write().await;
         match session.client.resume_session(&state) {
             Ok(()) => {
                 session.logins += 1;
-                self.save(&slot, &session);
+                self.save(slot, &session);
                 info!("udp: took the session the gateway renewed");
             }
             Err(error) => warn!(%error, "udp: renewed session not taken"),

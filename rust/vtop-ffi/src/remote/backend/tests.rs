@@ -284,6 +284,24 @@ fn held_watches_renew_the_jwt_a_minute_early() {
 }
 
 #[tokio::test]
+async fn a_sign_out_the_server_missed_is_sent_later() {
+    let (core, edge, server) = setup("signout-later").await;
+    keep_token(&core, &server);
+    can(&edge, "auth:signOut", 503, json!({ "code": "unavailable" }));
+    core.sign_out_of_server("f".into(), false).await.unwrap();
+    // Not signed out on the server: the token waits, not lost.
+    assert!(core.device().refresh.is_none());
+    assert!(core.read::<Refresh>(LAST_STUDENT).is_some());
+    can(&edge, "auth:signOut", 200, json!(null));
+    core.sign_out_last_student("f").await;
+    assert!(core.read::<Refresh>(LAST_STUDENT).is_none());
+    assert_eq!(
+        paths(&edge).last().map(String::as_str),
+        Some("auth:signOut")
+    );
+}
+
+#[tokio::test]
 async fn a_switch_signs_out_of_the_last_students_account() {
     let (core, edge, server) = setup("switch").await;
     keep_token(&core, &server);

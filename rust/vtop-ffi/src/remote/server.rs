@@ -361,10 +361,25 @@ impl Core {
                 .device_call(&flow, Kind::Mutation, "auth:signOut", body)
                 .await
             {
-                Ok(_) => info!(everywhere, "signed out of the server"),
-                Err(error) => info!(code = error.code(), "server sign-out not sent"),
+                Ok(_) => {
+                    info!(everywhere, "signed out of the server");
+                    self.forget_identity();
+                }
+                Err(error) if crate::remote::backend::signed_out_already(error.code()) => {
+                    info!(code = error.code(), "already signed out of the server");
+                    self.forget_identity();
+                }
+                // Offline: the refresh token is kept aside, and the next leave_old_forwarding
+                // signs this install out with it, so it stops getting this student's OTPs and
+                // session requests.
+                Err(error) => {
+                    info!(
+                        code = error.code(),
+                        "server sign-out not sent: kept for later"
+                    );
+                    self.set_aside_identity();
+                }
             }
-            self.forget_identity();
             Ok(())
         })
         .await

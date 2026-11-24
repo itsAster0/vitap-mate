@@ -370,6 +370,11 @@ pub(crate) const LAST_STUDENT: &str = "server_last_student.json";
 
 /// Codes `auth:token` answers a refresh or v2 token it won't take with: the next source is
 /// tried.
+/// Whether a sign-out answered `code` because there is nothing left to sign out of.
+pub(crate) fn signed_out_already(code: &str) -> bool {
+    TOKEN_REFUSED.contains(&code)
+}
+
 const TOKEN_REFUSED: [&str; 7] = [
     "device_removed",
     "refresh_reused",
@@ -891,6 +896,7 @@ impl Core {
     /// Drops the JWT and the refresh token (signed out of the server; another student; this
     /// install removed there). The v2 token goes with the student's files.
     pub(crate) fn forget_identity(&self) {
+        crate::remote::udp::forget_jwt_sent();
         let backend = {
             let mut state = self.shared.backend_state();
             state.jwt = None;

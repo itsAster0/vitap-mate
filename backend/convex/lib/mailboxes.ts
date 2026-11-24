@@ -23,8 +23,6 @@ export const MAX_MEMBERS = 5;
 export const MEMBER_STALE_SECS = 60 * 24 * 3600;
 /** `seenAt` is written at most this often. */
 const SEEN_EVERY_SECS = 3600;
-/** How long an engine sign-in may wait for forwarded OTPs. */
-export const WAITER_TTL_SECS = 300;
 
 export function newId(): string {
   // 32 letters: a byte modulo 32 is uniform.
@@ -196,14 +194,16 @@ export async function sealedTo(
   return out;
 }
 
-/** The mailbox named `addressId` with its members, if the install is one of them. */
+/** The mailbox named `addressId` with its members, if it is `accountId`'s and the install is one
+ * of them. A membership left from another student (a phone that changed hands) gives nothing. */
 export async function owned(
   ctx: QueryCtx,
   deviceId: string,
   addressId: string,
+  accountId: Id<"accounts"> | null,
 ) {
   const mailbox = await mailboxRow(ctx, addressId);
-  if (!mailbox) return unknownMailbox();
+  if (!mailbox || mailbox.accountId !== accountId) return unknownMailbox();
   const members = await membersOf(ctx, addressId);
   const me = members.find((m) => m.deviceId === deviceId);
   if (!me) return unknownMailbox();
@@ -297,9 +297,10 @@ export async function leaveMailbox(
   ctx: MutationCtx,
   deviceId: string,
   addressId: string,
+  accountId: Id<"accounts"> | null,
   opts: { deleteWhenLast: boolean; everywhere?: boolean },
 ): Promise<"left" | "deleted"> {
-  const { mailbox, members, me } = await owned(ctx, deviceId, addressId);
+  const { mailbox, members, me } = await owned(ctx, deviceId, addressId, accountId);
   if (
     opts.deleteWhenLast &&
     (opts.everywhere === true || members.length <= 1)

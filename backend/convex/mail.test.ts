@@ -71,6 +71,7 @@ describe("mail in", () => {
     const tb = await prove(t, b);
     const box = await ta.as.mutation(api.mail.register, { flow: "f" });
     await tb.as.mutation(api.mail.register, { flow: "f" });
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
     const sentMs = Date.now() - 5000;
     const res = await mail(t, { addressId: box.id, receivedAt: sentMs, otp: "401295", gmailConfirm: null, from: "noreply.sdc@vitap.ac.in", subject: "OTP" });
     expect(res.status).toBe(200);
@@ -84,6 +85,9 @@ describe("mail in", () => {
     }
     advance(301);
     expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).sealed).toBeNull();
+    // Then the boxes themselves go, without waiting for the 15-minute sweep.
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
   });
 
   it("keeps Gmail's confirmation a day for phones that join later, until an OTP comes", async () => {
@@ -136,6 +140,33 @@ describe("mail in", () => {
     await prove(t, a, "23ABC0002");
     await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "444444" });
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
+  });
+
+  it("a membership left on another student's address gives that student's phone nothing", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const b = await phone(2);
+    const ta = await prove(t, a);
+    const box = await ta.as.mutation(api.mail.register, { flow: "f" });
+    advance(10);
+    const tb = await prove(t, b, "23ABC0002");
+    // As a backfill could leave it: b on a's address, under a's account.
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("mailboxDevices").collect())[0];
+      await ctx.db.insert("mailboxDevices", { ...row, _id: undefined, _creationTime: undefined, deviceId: b.deviceId } as never);
+    });
+    for (const call of [
+      () => tb.as.query(api.mail.devices, { flow: "f", id: box.id }),
+      () => tb.as.query(api.mail.inbox, { flow: "f", id: box.id }),
+      () => tb.as.mutation(api.mail.remove, { flow: "f", id: box.id, everywhere: true }),
+      () => tb.as.mutation(api.mail.removeDevice, { flow: "f", id: box.id, removeDevice: a.deviceId }),
+    ]) {
+      expect(await codeOf(call())).toBe("mailbox_not_found");
+    }
+    expect((await tb.as.query(api.screen.view, { mailbox: box.id })).mailbox).toEqual({ gone: true });
+    expect((await ta.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(2);
+    expect(await t.mutation(internal.migrate.dropStrayMembers, {})).toBe(1);
+    expect((await ta.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(1);
   });
 
   it("drops a box sealed to a phone that changed student before delivery", async () => {

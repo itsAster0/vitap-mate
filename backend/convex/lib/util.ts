@@ -38,6 +38,34 @@ export type Trace = { flow?: string | null; regno?: string | null };
 /** One line in the log, led by `flow=` and `regno=` so a student's lines and one action's lines
  * can be pulled together. Never pass cookies, passwords, OTPs, keys or tokens. */
 export function log(trace: Trace, message: string): void {
+  console.log(traced(trace, message));
+}
+
+/** A failure the caller has to put up with, such as VTOP being slow. Same rules as `log`. */
+export function logWarn(trace: Trace, message: string): void {
+  console.warn(traced(trace, message));
+}
+
+/** An unexpected failure, at error level: `message` with the error's name, message and the top
+ * of its stack. A SyntaxError's message is left out, as it quotes the text it could not parse
+ * (an engine reply can hold cookies or a session). Same rules as `log`. */
+export function logError(trace: Trace, message: string, err?: unknown): void {
+  console.error(traced(trace, err === undefined ? message : `${message}: ${describeError(err)}`));
+}
+
+/** `name: message (at …; at …)` of a thrown value, short enough for one log line. */
+export function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return typeof err;
+  const text = err instanceof SyntaxError ? "" : err.message.replace(/\s+/g, " ").slice(0, 200);
+  const frames = (err.stack ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("at "))
+    .slice(0, 3);
+  return `${err.name}${text ? `: ${text}` : ""}${frames.length ? ` (${frames.join("; ")})` : ""}`;
+}
+
+function traced(trace: Trace, message: string): string {
   const tags = [trace.flow ? `flow=${trace.flow.slice(0, 64)}` : "", trace.regno ? `regno=${trace.regno}` : ""].filter(Boolean).join(" ");
-  console.log(tags ? `[${tags}] ${message}` : message);
+  return tags ? `[${tags}] ${message}` : message;
 }

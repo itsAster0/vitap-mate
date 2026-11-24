@@ -12,7 +12,7 @@ import { enginePost } from "./lib/engine";
 import { LOGIN, type LoginOutcome } from "./lib/engineApi";
 import { mailboxOfAccount } from "./lib/identity";
 import { putRequest, requestOf, requestRow } from "./lib/requests";
-import { log, now } from "./lib/util";
+import { logError, now } from "./lib/util";
 import { isLoginOutcome, loginDone } from "./sessions";
 
 /** How long a sign-in waits for its OTP mail. */
@@ -34,9 +34,9 @@ async function step(body: { account: string; sealedVault?: string; forwarding?: 
       return answer as Stepped;
     }
     if (isLoginOutcome(answer)) return answer;
-    log(trace, `account: the engine's sign-in step answered ${response.status}`);
-  } catch {
-    log(trace, "account: engine unreachable for a sign-in");
+    logError(trace, `account: the engine's sign-in step answered ${response.status}`);
+  } catch (e) {
+    logError(trace, "account: engine unreachable for a sign-in", e);
   }
   return { status: "failed", reason: "server_login_failed: The server could not reach the engine." };
 }

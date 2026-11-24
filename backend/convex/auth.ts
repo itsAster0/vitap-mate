@@ -285,7 +285,7 @@ export const grant = internalMutation({
             return account ? { regno: account.regno, account: account._id, demo: false } : { regno: DEMO_REGNO, account: "demo", demo: true };
           }
           await deleteChain(ctx, row.chainId);
-          console.log("auth: a replaced refresh token came back; its chain is revoked");
+          console.warn("auth: a replaced refresh token came back; its chain is revoked");
           return { refused: "refresh_reused" };
         }
         if (at >= row.createdAt + REFRESH_TTL_SECS) {
@@ -354,7 +354,7 @@ export const grant = internalMutation({
       case "demo":
         // The demo is no account: an install that was a student's phone leaves it.
         const device = await upsertDevice(ctx, deviceId, args.signKey, grant.device);
-        if (device.accountId !== undefined) await unlinkPhone(ctx, device);
+        await unlinkPhone(ctx, device);
         await startChain(null);
         return { regno: DEMO_REGNO, account: "demo", demo: true };
     }
