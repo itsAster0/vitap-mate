@@ -13,7 +13,7 @@
 //! VTOP's next OTP.
 
 use std::fs;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -24,7 +24,7 @@ use vtop_core::spec;
 use vtop_core::types::StudentProfile;
 
 use crate::remote::backend::Kind;
-use crate::{Core, CoreError, PAGES, traced, traced_sync};
+use crate::{Core, CoreError, PAGES, Slot, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
 /// Addresses this phone still has to leave on the edge, kept past sign-out (not a student
@@ -43,17 +43,6 @@ const CLOCK_SKEW_SECS: i64 = 60;
 pub(crate) static FILE_LOCK: Mutex<()> = Mutex::new(());
 /// Serialises read-modify-write of [`LEAVE_FILE`].
 static LEAVE_LOCK: Mutex<()> = Mutex::new(());
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum ForwardingState {
-    /// No address on this phone.
-    Off,
-    /// An address, not finished setting up in Gmail yet.
-    Waiting,
-    /// Forwarding is set up: an OTP came through, or the student marked setup done after
-    /// Gmail's confirmation arrived.
-    On,
-}
 
 /// Gmail's "confirm forwarding" mail: the code to type in Gmail, or the link to open.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -97,39 +86,247 @@ fn gmail_link(link: &str) -> Option<String> {
     (host_ok && token_ok).then(|| link.to_string())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct Forwarding {
-    pub state: ForwardingState,
-    pub address: Option<String>,
-    /// What the Gmail filter matches in From.
-    pub sender: String,
-    /// The latest Gmail confirmation that arrived, while setting up.
-    pub confirmation: Option<GmailConfirmation>,
-    /// Unix seconds of the latest forwarded mail of either kind.
-    pub last_mail_at: Option<i64>,
-    /// Unix seconds of the latest forwarded OTP.
-    pub last_otp_at: Option<i64>,
+/// This phone's forwarding address and how far its setup got, for the app.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum Forwarding {
+    /// No address on this phone.
+    Off {
+        /// What the Gmail filter matches in From.
+        sender: String,
+    },
+    /// An address, not finished setting up in Gmail yet (or kept from v2 and not rejoined).
+    Waiting {
+        address: String,
+        sender: String,
+        /// The latest Gmail confirmation that arrived.
+        confirmation: Option<GmailConfirmation>,
+        /// Unix seconds of the latest forwarded mail of either kind.
+        last_mail_at: Option<i64>,
+    },
+    /// Forwarding is set up: an OTP came through, or the student marked setup done after
+    /// Gmail's confirmation arrived.
+    On {
+        address: String,
+        sender: String,
+        /// Unix seconds of the latest forwarded OTP; None when marked done before one came.
+        last_otp_at: Option<i64>,
+        last_mail_at: Option<i64>,
+    },
 }
 
-/// This phone's address. A file from before signed requests (it held a mailbox secret and its
-/// own key) does not parse, so it reads as no address.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Where this phone's address lives.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Mailbox {
+    /// The server the address lives on.
+    pub(crate) server: String,
+    pub(crate) id: String,
+    pub(crate) address: String,
+}
+
+/// How far an address's Gmail setup got.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Setup {
+    /// Not known to work yet; Gmail's confirmation shows once it arrives.
+    Waiting {
+        confirmation: Option<GmailConfirmation>,
+        last_mail_at: Option<i64>,
+    },
+    /// Forwarding works: an OTP came through (now or, as the server says, before), or the
+    /// student marked setup done after Gmail's confirmation arrived. Gmail's confirmation is
+    /// only for setting up, so none is kept here.
+    Active {
+        last_mail_at: Option<i64>,
+        last_otp_at: Option<i64>,
+    },
+}
+
+impl Setup {
+    const NEW: Self = Self::Waiting {
+        confirmation: None,
+        last_mail_at: None,
+    };
+
+    /// An OTP sent at `at` reached the address.
+    fn otp_at(self, at: i64) -> Self {
+        let (last_mail_at, last_otp_at) = match self {
+            Self::Waiting { last_mail_at, .. } => (last_mail_at, None),
+            Self::Active {
+                last_mail_at,
+                last_otp_at,
+            } => (last_mail_at, last_otp_at),
+        };
+        Self::Active {
+            last_mail_at: last_mail_at.max(Some(at)),
+            last_otp_at: last_otp_at.max(Some(at)),
+        }
+    }
+
+    /// `payload` reached the address.
+    fn mail(self, payload: &Payload) -> Self {
+        let Payload::GmailConfirm {
+            code,
+            link,
+            requester,
+            sent_at,
+        } = payload
+        else {
+            return self.otp_at(payload.sent_at());
+        };
+        match self {
+            // Gmail's confirmation mail only shows the address was added; forwarding works once
+            // Gmail forwards VTOP's mail or the student marks setup done.
+            Self::Waiting { last_mail_at, .. } => Self::Waiting {
+                confirmation: Some(GmailConfirmation {
+                    code: code.clone(),
+                    link: link.as_deref().and_then(gmail_link),
+                    requester: requester.clone(),
+                    sent_at: *sent_at,
+                    requester_known: None,
+                }),
+                last_mail_at: last_mail_at.max(Some(*sent_at)),
+            },
+            // Working already: the server keeps the confirmation 24 h until an OTP arrives, and
+            // it isn't shown again.
+            Self::Active {
+                last_mail_at,
+                last_otp_at,
+            } => Self::Active {
+                last_mail_at: last_mail_at.max(Some(*sent_at)),
+                last_otp_at,
+            },
+        }
+    }
+
+    /// The student says the Gmail filter is made: only once Gmail's mail has reached the address.
+    fn mark_done(self) -> Self {
+        match self {
+            Self::Waiting {
+                confirmation,
+                last_mail_at,
+            } if confirmation.is_some() || last_mail_at.is_some() => Self::Active {
+                last_mail_at,
+                last_otp_at: None,
+            },
+            other => other,
+        }
+    }
+}
+
+/// This phone's address (`forwarding.json`, as [`Stored`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MailboxState {
+    Off,
+    /// Kept from the v2 edge: this install isn't on the address as backend v3 knows it, so
+    /// nothing is forwarded to it until [`Core::keep_forwarding`] proves the student and rejoins.
+    /// `kept` is the setup it goes back to.
+    NeedsRejoin {
+        mailbox: Mailbox,
+        kept: Setup,
+    },
+    Joined {
+        mailbox: Mailbox,
+        setup: Setup,
+    },
+}
+
+impl MailboxState {
+    fn mailbox(&self) -> Option<&Mailbox> {
+        match self {
+            Self::Off => None,
+            Self::NeedsRejoin { mailbox, .. } | Self::Joined { mailbox, .. } => Some(mailbox),
+        }
+    }
+
+    fn id(&self) -> Option<&str> {
+        self.mailbox().map(|mailbox| mailbox.id.as_str())
+    }
+
+    /// `next` applied to the setup of the address `id`, if it is still this phone's.
+    fn with_setup(self, id: &str, next: impl FnOnce(Setup) -> Setup) -> Self {
+        match self {
+            Self::NeedsRejoin { mailbox, kept } if mailbox.id == id => Self::NeedsRejoin {
+                mailbox,
+                kept: next(kept),
+            },
+            Self::Joined { mailbox, setup } if mailbox.id == id => Self::Joined {
+                mailbox,
+                setup: next(setup),
+            },
+            other => other,
+        }
+    }
+
+    /// On `to` after the server rejoined this phone, which was on `from`; None when it isn't on
+    /// `from` any more (turned off or signed out meanwhile).
+    fn rejoined(&self, from: &str, to: Mailbox) -> Option<Self> {
+        let (Self::NeedsRejoin {
+            mailbox,
+            kept: setup,
+        }
+        | Self::Joined { mailbox, setup }) = self
+        else {
+            return None;
+        };
+        if mailbox.id != from {
+            return None;
+        }
+        // The student's account holds another address: mail goes there now, so its Gmail setup
+        // has to be checked again (and the old one's times don't apply).
+        let setup = if to.id == mailbox.id {
+            setup.clone()
+        } else {
+            warn!("rejoined a different address");
+            Setup::NEW
+        };
+        Some(Self::Joined { mailbox: to, setup })
+    }
+
+    /// The file for this state; None for [`MailboxState::Off`], which has none.
+    fn stored(&self) -> Option<Stored> {
+        let (mailbox, setup, joined) = match self {
+            Self::Off => return None,
+            Self::NeedsRejoin { mailbox, kept } => (mailbox, kept, false),
+            Self::Joined { mailbox, setup } => (mailbox, setup, true),
+        };
+        let (ready, last_mail_at, last_otp_at, confirmation) = match setup {
+            Setup::Waiting {
+                confirmation,
+                last_mail_at,
+            } => (false, *last_mail_at, None, confirmation.clone()),
+            Setup::Active {
+                last_mail_at,
+                last_otp_at,
+            } => (true, *last_mail_at, *last_otp_at, None),
+        };
+        Some(Stored {
+            server: mailbox.server.clone(),
+            id: mailbox.id.clone(),
+            address: mailbox.address.clone(),
+            owner_claimed: false,
+            joined,
+            ready,
+            last_mail_at,
+            last_otp_at,
+            confirmation,
+        })
+    }
+}
+
+/// `forwarding.json` as earlier versions wrote it, and still written so (an older app keeps
+/// reading it). A file from before signed requests (it held a mailbox secret and its own key)
+/// does not parse, so it reads as no address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Saved {
-    /// The edge the address lives on.
+struct Stored {
     server: String,
     id: String,
     address: String,
-    /// From v2, where the student's first address claimed its owner hash. Unused now, and kept
-    /// only so a file a v2 install wrote still reads (unknown fields are refused).
-    #[serde(default)]
+    /// From v2, where the student's first address claimed its owner hash. Unused, and read only
+    /// so a file a v2 install wrote still parses (unknown fields are refused).
+    #[serde(default, skip_serializing)]
     owner_claimed: bool,
-    /// This install is on the address on `server` as the backend v3 knows it. An address kept
-    /// from the v2 edge isn't, until [`Core::keep_forwarding`] proves the student and rejoins it.
     #[serde(default)]
     joined: bool,
-    /// Forwarding works: an OTP came through (now or, as the server says, before), or the
-    /// student marked setup done after Gmail's confirmation arrived.
     #[serde(default)]
     ready: bool,
     #[serde(default)]
@@ -140,17 +337,38 @@ struct Saved {
     confirmation: Option<GmailConfirmation>,
 }
 
-impl Saved {
-    /// Gmail's confirmation is only for setting up: once an OTP sent after it came, forwarding
-    /// works and it goes, as on the edge.
-    fn drop_stale_confirmation(&mut self) {
-        if self
-            .confirmation
-            .as_ref()
-            .is_some_and(|c| self.last_otp_at >= Some(c.sent_at))
-        {
-            self.confirmation = None;
+impl TryFrom<Stored> for MailboxState {
+    type Error = &'static str;
+
+    fn try_from(stored: Stored) -> Result<Self, Self::Error> {
+        if stored.id.is_empty() || stored.address.is_empty() {
+            return Err("forwarding.json has no address");
         }
+        let mailbox = Mailbox {
+            server: stored.server,
+            id: stored.id,
+            address: stored.address,
+        };
+        // An OTP that came through shows forwarding works, whatever `ready` says.
+        let setup = if stored.ready || stored.last_otp_at.is_some() {
+            Setup::Active {
+                last_mail_at: stored.last_mail_at,
+                last_otp_at: stored.last_otp_at,
+            }
+        } else {
+            Setup::Waiting {
+                confirmation: stored.confirmation,
+                last_mail_at: stored.last_mail_at,
+            }
+        };
+        Ok(if stored.joined {
+            Self::Joined { mailbox, setup }
+        } else {
+            Self::NeedsRejoin {
+                mailbox,
+                kept: setup,
+            }
+        })
     }
 }
 
@@ -232,7 +450,7 @@ impl Core {
     /// This phone's forwarding address and how far its setup got. No network.
     pub fn forwarding_status(&self, flow: String) -> Forwarding {
         traced_sync("forwarding_status", &flow, || Ok(self.forwarding_view()))
-            .unwrap_or_else(|_| view(None))
+            .unwrap_or_else(|_| view(&MailboxState::Off))
     }
 
     /// Gives this phone a forwarding address. A student who already has one (made on another
@@ -240,9 +458,10 @@ impl Core {
     /// them. Does nothing when this phone already has one.
     pub async fn set_up_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("set_up_forwarding", &flow, async {
+            let slot = self.current()?;
             // A signed-out student's address first, as it may be the one this sign-in joins.
             self.leave_queued(&flow).await;
-            if self.read::<Saved>(FILE).is_some() {
+            if self.mailbox_state() != MailboxState::Off {
                 info!("already set up");
                 return Ok(self.forwarding_view());
             }
@@ -258,21 +477,12 @@ impl Core {
                     json!({}),
                 )
                 .await??;
-            let saved = Saved {
+            let mailbox = Mailbox {
                 server,
                 id: string(&body, "id")?,
                 address: string(&body, "address")?,
-                owner_claimed: true,
-                joined: true,
-                // Even a joined address may never have been confirmed in Gmail: the next pull
-                // brings Gmail's confirmation or the latest OTP, which tells.
-                ready: false,
-                last_mail_at: None,
-                last_otp_at: None,
-                confirmation: None,
             };
-            self.write(FILE, &saved);
-            info!("forwarding address set up");
+            self.save_new_mailbox(&slot, mailbox)?;
             Ok(self.forwarding_view())
         })
         .await
@@ -293,21 +503,20 @@ impl Core {
     /// nothing before confirmation (or without an address). No network.
     pub fn mark_forwarding_done(&self, flow: String) -> Forwarding {
         traced_sync("mark_forwarding_done", &flow, || {
-            {
-                let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-                if let Some(mut saved) = self.read::<Saved>(FILE)
-                    && !saved.ready
-                    && (saved.confirmation.is_some() || saved.last_mail_at.is_some())
-                {
-                    saved.ready = true;
-                    saved.confirmation = None;
-                    self.write(FILE, &saved);
-                    info!("forwarding marked done");
+            self.update_mailbox(|state| match state {
+                MailboxState::Joined { mailbox, setup } => {
+                    let setup = setup.mark_done();
+                    if matches!(setup, Setup::Active { .. }) {
+                        info!("forwarding marked done");
+                    }
+                    MailboxState::Joined { mailbox, setup }
                 }
-            }
+                // Not rejoined yet: nothing reaches this install to mark done over.
+                other => other,
+            });
             Ok(self.forwarding_view())
         })
-        .unwrap_or_else(|_| view(None))
+        .unwrap_or_else(|_| view(&MailboxState::Off))
     }
 
     /// The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
@@ -353,13 +562,13 @@ impl Core {
     /// when the app opens signed in.
     pub async fn keep_forwarding(&self, flow: String) -> Result<(), CoreError> {
         traced("keep_forwarding", &flow, async {
-            let Some(saved) = self.read::<Saved>(FILE) else {
+            let MailboxState::NeedsRejoin { mailbox, .. } = self.mailbox_state() else {
                 return Ok(());
             };
-            if saved.joined || saved.server != self.forwarding_server() {
+            if mailbox.server != self.forwarding_server() {
                 return Ok(());
             }
-            self.rejoin(&flow, &saved, true, true).await.map(drop)
+            self.rejoin(&flow, &mailbox.id, true, true).await.map(drop)
         })
         .await
     }
@@ -387,13 +596,69 @@ enum Rejoined {
 }
 
 impl Core {
-    /// Joins `saved`'s address from this install, with the identity it has (a v2 account token
-    /// is traded in). With `prove`, an install with none proves who the student is first (the
-    /// proof sends no cookie, so nothing is asked); without, it waits for an identity.
+    /// The saved address; Off without one (or with a file that doesn't read).
+    fn mailbox_state(&self) -> MailboxState {
+        let Some(stored) = self.read::<Stored>(FILE) else {
+            return MailboxState::Off;
+        };
+        MailboxState::try_from(stored).unwrap_or_else(|error| {
+            warn!(error, "forwarding.json not used");
+            MailboxState::Off
+        })
+    }
+
+    /// Saves `state`; Off removes the file. The caller holds [`FILE_LOCK`].
+    fn store_mailbox(&self, state: &MailboxState) {
+        match state.stored() {
+            Some(stored) => self.write(FILE, &stored),
+            None => self.remove_file(FILE),
+        }
+    }
+
+    /// The saved state through `next`, under [`FILE_LOCK`]; written only when it changed.
+    fn update_mailbox(&self, next: impl FnOnce(MailboxState) -> MailboxState) -> MailboxState {
+        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let before = self.mailbox_state();
+        let after = next(before.clone());
+        if after != before {
+            self.store_mailbox(&after);
+        }
+        after
+    }
+
+    /// Saves the address `mail:register` gave while `slot` was signed in, unless this phone got
+    /// one meanwhile.
+    fn save_new_mailbox(&self, slot: &Arc<Slot>, mailbox: Mailbox) -> Result<(), CoreError> {
+        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        if !self.is_current(slot) {
+            // Signed out (or another student signed in) during the call: this install is on the
+            // address now, and the next student mustn't get its OTPs.
+            info!("signed out while setting up: address queued to leave");
+            self.queue_leave_of(&mailbox);
+            return Err(CoreError::NotSignedIn);
+        }
+        if self.mailbox_state() != MailboxState::Off {
+            info!("set up meanwhile");
+            return Ok(());
+        }
+        // Even a joined address may never have been confirmed in Gmail: the next pull brings
+        // Gmail's confirmation or the latest OTP, which tells.
+        self.store_mailbox(&MailboxState::Joined {
+            mailbox,
+            setup: Setup::NEW,
+        });
+        info!("forwarding address set up");
+        Ok(())
+    }
+
+    /// Joins the student's address from this install, which was on `from`, with the identity it
+    /// has (a v2 account token is traded in). With `prove`, an install with none proves who the
+    /// student is first (the proof sends no cookie, so nothing is asked); without, it waits for
+    /// an identity.
     async fn rejoin(
         &self,
         flow: &str,
-        saved: &Saved,
+        from: &str,
         make: bool,
         prove: bool,
     ) -> Result<Rejoined, CoreError> {
@@ -420,43 +685,45 @@ impl Core {
             info!("the student has no address any more");
             return Ok(Rejoined::NoAddress);
         }
-        let id = string(&body, "id")?;
-        let address = string(&body, "address")?;
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        // Turned off or signed out meanwhile: not brought back.
-        let Some(mut kept) = self.read::<Saved>(FILE).filter(|now| now.id == saved.id) else {
-            info!("forwarding changed meanwhile, not rejoined");
-            return Ok(Rejoined::Later);
+        let to = Mailbox {
+            server: self.forwarding_server(),
+            id: string(&body, "id")?,
+            address: string(&body, "address")?,
         };
-        if id != kept.id {
-            // The student's account holds another address: mail goes there now, so its
-            // Gmail setup has to be checked again.
-            warn!("rejoined a different address");
-            kept.address = address;
-            kept.id = id;
-            kept.ready = false;
-            kept.last_mail_at = None;
-            kept.last_otp_at = None;
-            kept.confirmation = None;
+        let mut joined = false;
+        self.update_mailbox(|state| match state.rejoined(from, to) {
+            Some(next) => {
+                joined = true;
+                next
+            }
+            None => state,
+        });
+        if joined {
+            info!("forwarding address rejoined");
+            Ok(Rejoined::Joined)
+        } else {
+            info!("forwarding changed meanwhile, not rejoined");
+            Ok(Rejoined::Later)
         }
-        kept.joined = true;
-        kept.server = self.forwarding_server();
-        self.write(FILE, &kept);
-        info!("forwarding address rejoined");
-        Ok(Rejoined::Joined)
     }
 
     /// Queues this phone's address to be left; called before the student's files are forgotten.
     pub(crate) fn queue_leave(&self) {
-        let Some(saved) = self.read::<Saved>(FILE) else {
-            return;
-        };
+        // Not while a setup saves the address: it would be saved after this and then forgotten.
+        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(mailbox) = self.mailbox_state().mailbox() {
+            self.queue_leave_of(mailbox);
+        }
+    }
+
+    /// Queues `mailbox` to be left.
+    fn queue_leave_of(&self, mailbox: &Mailbox) {
         let _lock = LEAVE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         let mut queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
-        if !queue.iter().any(|leave| leave.id == saved.id) {
+        if !queue.iter().any(|leave| leave.id == mailbox.id) {
             queue.push(Leave {
-                server: saved.server,
-                id: saved.id,
+                server: mailbox.server.clone(),
+                id: mailbox.id.clone(),
             });
             self.write(LEAVE_FILE, &queue);
             info!("address queued to leave");
@@ -478,11 +745,11 @@ impl Core {
     /// Leaves the queued addresses with the JWT already set; one that fails stays queued.
     pub(crate) async fn leave_queued(&self, flow: &str) {
         let queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
-        let current = self.read::<Saved>(FILE).map(|saved| saved.id);
         let mut done = Vec::new();
         for leave in queue {
-            // Joined again since: this phone uses it.
-            if current.as_ref() == Some(&leave.id) {
+            // Joined again since: this phone uses it. Read for each, as a sign-in may rejoin one
+            // while earlier ones are left.
+            if self.mailbox_state().id() == Some(leave.id.as_str()) {
                 done.push(leave);
                 continue;
             }
@@ -546,8 +813,13 @@ impl Core {
 
     /// This phone's address as `(server, mailbox id, address)`, if it has one.
     pub(crate) fn saved_mailbox(&self) -> Option<(String, String, String)> {
-        self.read::<Saved>(FILE)
-            .map(|saved| (saved.server, saved.id, saved.address))
+        self.mailbox_state().mailbox().map(|mailbox| {
+            (
+                mailbox.server.clone(),
+                mailbox.id.clone(),
+                mailbox.address.clone(),
+            )
+        })
     }
 
     /// Takes this phone off its address (deleting it for every phone with `everywhere`) and
@@ -557,10 +829,10 @@ impl Core {
         flow: &str,
         everywhere: bool,
     ) -> Result<(), CoreError> {
-        let Some(saved) = self.read::<Saved>(FILE) else {
+        let Some(id) = self.mailbox_state().id().map(str::to_string) else {
             return Ok(());
         };
-        let body = json!({ "id": saved.id, "everywhere": everywhere });
+        let body = json!({ "id": id, "everywhere": everywhere });
         match self
             .device_call(flow, Kind::Mutation, "mail:remove", body)
             .await
@@ -572,13 +844,17 @@ impl Core {
             }
             Err(error) => return Err(error.into()),
         }
-        self.forget_forwarding(&saved.id);
+        self.forget_forwarding(&id);
         Ok(())
     }
 
     fn forwarding_view(&self) -> Forwarding {
-        let mut forwarding = view(self.read::<Saved>(FILE).as_ref());
-        if let Some(confirmation) = &mut forwarding.confirmation {
+        let mut forwarding = view(&self.mailbox_state());
+        if let Forwarding::Waiting {
+            confirmation: Some(confirmation),
+            ..
+        } = &mut forwarding
+        {
             confirmation.requester_known = self.requester_known(confirmation.requester.as_deref());
         }
         forwarding
@@ -587,69 +863,83 @@ impl Core {
     /// The latest box in this phone's inbox, opened and recorded; None without an address, a
     /// box, or one that opens. An address the edge no longer knows is forgotten here.
     async fn pull(&self, flow: &str) -> Result<Option<Payload>, CoreError> {
-        let Some(saved) = self.read::<Saved>(FILE) else {
-            return Err(CoreError::ForwardingOff {
-                reason: "Mail forwarding is off.".into(),
-            });
-        };
-        let body = json!({ "id": saved.id });
-        // While the inbox is watched (an OTP wait) the client answers this from that
-        // subscription, with no trip to the server.
-        let inbox = match self
-            .device_call(flow, Kind::Query, "mail:inbox", body)
-            .await
-        {
-            Ok(inbox) => inbox,
-            // Not on this address (any more): kept from v2 and not rejoined yet, or the server
-            // moved the student's phones to their old address. Joined where the student's
-            // address is; forgotten only when they have none (deleted) or it can't be asked.
-            Err(error) if error.code() == GONE => {
-                let rejoined = Box::pin(self.rejoin(flow, &saved, !saved.joined, false)).await;
-                return Err(match rejoined {
-                    Ok(Rejoined::Joined) => CoreError::Other {
-                        reason: "Mail forwarding reconnected. Try again.".into(),
-                    },
-                    Ok(Rejoined::Later) if !saved.joined => CoreError::ForwardingOff {
+        let mut rejoined = false;
+        loop {
+            let state = self.mailbox_state();
+            let joined = matches!(state, MailboxState::Joined { .. });
+            let Some(id) = state.id().map(str::to_string) else {
+                return Err(CoreError::ForwardingOff {
+                    reason: "Mail forwarding is off.".into(),
+                });
+            };
+            let body = json!({ "id": id });
+            // While the inbox is watched (an OTP wait) the client answers this from that
+            // subscription, with no trip to the server.
+            let error = match self
+                .device_call(flow, Kind::Query, "mail:inbox", body)
+                .await
+            {
+                Ok(inbox) => return Ok(self.open_inbox(&id, &inbox)),
+                Err(error) => error,
+            };
+            return Err(match error.code() {
+                // Not on this address (any more): kept from v2 and not rejoined yet, or the
+                // server moved the student's phones to their old address. Joined where the
+                // student's address is, then read there; forgotten only when they have none
+                // (deleted) or it can't be asked.
+                GONE if !rejoined => match Box::pin(self.rejoin(flow, &id, !joined, false)).await {
+                    Ok(Rejoined::Joined) => {
+                        rejoined = true;
+                        continue;
+                    }
+                    Ok(Rejoined::Later) if !joined => CoreError::ForwardingOff {
                         reason: "Mail forwarding reconnects once you're signed in.".into(),
                     },
                     Ok(Rejoined::Later | Rejoined::NoAddress) => {
-                        self.forget_forwarding(&saved.id);
+                        self.forget_forwarding(&id);
                         CoreError::ForwardingOff {
                             reason: "Your forwarding address no longer exists. Set it up again."
                                 .into(),
                         }
                     }
                     Err(error) => error,
-                });
-            }
-            // No identity on this install yet (updated from v2 without a live account token):
-            // the app proves and rejoins once signed in (`keep_forwarding`).
-            Err(error) if error.code() == "unauthenticated" => {
-                return Err(CoreError::ForwardingOff {
+                },
+                // Rejoined, and the server still doesn't know this install on the address.
+                GONE => CoreError::Other {
+                    reason: "Mail forwarding reconnected. Try again.".into(),
+                },
+                // No identity on this install yet (updated from v2 without a live account
+                // token): the app proves and rejoins once signed in (`keep_forwarding`).
+                "unauthenticated" => CoreError::ForwardingOff {
                     reason: "Mail forwarding reconnects once you're signed in.".into(),
-                });
-            }
-            Err(error) if error.code() == REMOVED => {
-                self.forget_forwarding(&saved.id);
-                return Err(CoreError::ForwardingOff {
-                    reason: "This phone was removed from your account. Sign in again.".into(),
-                });
-            }
-            Err(error) => return Err(error.into()),
-        };
+                },
+                REMOVED => {
+                    self.forget_forwarding(&id);
+                    CoreError::ForwardingOff {
+                        reason: "This phone was removed from your account. Sign in again.".into(),
+                    }
+                }
+                _ => error.into(),
+            });
+        }
+    }
+
+    /// Opens and records `mail:inbox`'s answer for the address `id`: the latest box, if one
+    /// opens.
+    fn open_inbox(&self, id: &str, inbox: &Value) -> Option<Payload> {
         let seal_secret = &self.device().seal_secret;
         // Kept by the server since setup, for a phone that joined after Gmail sent it.
         if let Some(sealed) = inbox
             .get("confirmation")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty())
-            && let Some(confirmation) = open(seal_secret, &saved.id, sealed)
+            && let Some(confirmation) = open(seal_secret, id, sealed)
         {
             debug!("gmail confirmation kept on the edge");
-            self.record(&saved.id, &confirmation);
+            self.record(id, &confirmation);
         }
         if let Some(at) = inbox.get("lastOtpAt").and_then(Value::as_i64) {
-            self.record_otp_at(&saved.id, at);
+            self.update_mailbox(|state| state.with_setup(id, |setup| setup.otp_at(at)));
         }
         let Some(sealed) = inbox
             .get("sealed")
@@ -657,109 +947,79 @@ impl Core {
             .filter(|s| !s.is_empty())
         else {
             debug!("inbox empty");
-            return Ok(None);
+            return None;
         };
-        let Some(payload) = open(seal_secret, &saved.id, sealed) else {
-            return Ok(None);
-        };
+        let payload = open(seal_secret, id, sealed)?;
         info!(
             kind = payload.kind(),
             sent_at = payload.sent_at(),
             "forwarded mail"
         );
-        self.record(&saved.id, &payload);
-        Ok(Some(payload))
-    }
-
-    /// Notes that an OTP sent at `at` reached the address `id` (if it is still this phone's).
-    fn record_otp_at(&self, id: &str, at: i64) {
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        let Some(mut saved) = self.read::<Saved>(FILE).filter(|saved| saved.id == id) else {
-            return;
-        };
-        let before = saved.clone();
-        saved.ready = true;
-        saved.last_otp_at = saved.last_otp_at.max(Some(at));
-        saved.last_mail_at = saved.last_mail_at.max(Some(at));
-        saved.drop_stale_confirmation();
-        if saved != before {
-            self.write(FILE, &saved);
-        }
+        self.record(id, &payload);
+        Some(payload)
     }
 
     /// Notes that `payload` reached the address `id` (if it is still this phone's).
     fn record(&self, id: &str, payload: &Payload) {
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        let Some(mut saved) = self.read::<Saved>(FILE).filter(|saved| saved.id == id) else {
-            return;
-        };
-        let before = saved.clone();
-        let prev_mail_at = saved.last_mail_at;
-        let sent_at = payload.sent_at();
-        // Gmail's confirmation mail only shows the address was added; forwarding works once
-        // Gmail forwards VTOP's mail or the student marks setup done.
-        saved.ready |= matches!(payload, Payload::Otp { .. });
-        saved.last_mail_at = saved.last_mail_at.max(Some(sent_at));
-        match payload {
-            Payload::Otp { .. } => saved.last_otp_at = saved.last_otp_at.max(Some(sent_at)),
-            // Older than an OTP that already came, or a confirmation the student already marked
-            // done (the server keeps it 24 h until an OTP arrives): don't show it again.
-            Payload::GmailConfirm { sent_at, .. }
-                if saved.last_otp_at >= Some(*sent_at)
-                    || (saved.ready && prev_mail_at >= Some(*sent_at)) => {}
-            Payload::GmailConfirm {
-                code,
-                link,
-                requester,
-                sent_at,
-            } => {
-                saved.confirmation = Some(GmailConfirmation {
-                    code: code.clone(),
-                    link: link.as_deref().and_then(gmail_link),
-                    requester: requester.clone(),
-                    sent_at: *sent_at,
-                    requester_known: None,
-                });
-            }
-        }
-        saved.drop_stale_confirmation();
-        if saved != before {
-            self.write(FILE, &saved);
-        }
+        self.update_mailbox(|state| state.with_setup(id, |setup| setup.mail(payload)));
     }
 
     /// Forgets this phone's address, whichever it is: the server deleted it with the account.
     pub(crate) fn forget_any_forwarding(&self) {
-        if let Some(saved) = self.read::<Saved>(FILE) {
-            self.forget_forwarding(&saved.id);
+        if let Some(id) = self.mailbox_state().id() {
+            self.forget_forwarding(id);
         }
     }
 
     pub(crate) fn forget_forwarding(&self, id: &str) {
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        if self.read::<Saved>(FILE).is_some_and(|saved| saved.id == id) {
-            #[expect(
-                clippy::let_underscore_must_use,
-                reason = "a file already gone is the goal"
-            )]
-            let _ = fs::remove_file(self.at(FILE));
-            info!("forwarding forgotten");
-        }
+        self.update_mailbox(|state| {
+            if state.id() == Some(id) {
+                info!("forwarding forgotten");
+                MailboxState::Off
+            } else {
+                state
+            }
+        });
     }
 }
 
-fn view(saved: Option<&Saved>) -> Forwarding {
-    Forwarding {
-        state: match saved {
-            None => ForwardingState::Off,
-            Some(saved) if saved.ready => ForwardingState::On,
-            Some(_) => ForwardingState::Waiting,
+fn view(state: &MailboxState) -> Forwarding {
+    let sender = VTOP_SENDER.to_string();
+    match state {
+        MailboxState::Off => Forwarding::Off { sender },
+        // Nothing is forwarded to this install until it rejoins, so it isn't on yet.
+        MailboxState::NeedsRejoin { mailbox, .. } => Forwarding::Waiting {
+            address: mailbox.address.clone(),
+            sender,
+            confirmation: None,
+            last_mail_at: None,
         },
-        address: saved.map(|saved| saved.address.clone()),
-        sender: VTOP_SENDER.to_string(),
-        confirmation: saved.and_then(|saved| saved.confirmation.clone()),
-        last_mail_at: saved.and_then(|saved| saved.last_mail_at),
-        last_otp_at: saved.and_then(|saved| saved.last_otp_at),
+        MailboxState::Joined {
+            mailbox,
+            setup:
+                Setup::Waiting {
+                    confirmation,
+                    last_mail_at,
+                },
+        } => Forwarding::Waiting {
+            address: mailbox.address.clone(),
+            sender,
+            confirmation: confirmation.clone(),
+            last_mail_at: *last_mail_at,
+        },
+        MailboxState::Joined {
+            mailbox,
+            setup:
+                Setup::Active {
+                    last_mail_at,
+                    last_otp_at,
+                },
+        } => Forwarding::On {
+            address: mailbox.address.clone(),
+            sender,
+            last_otp_at: *last_otp_at,
+            last_mail_at: *last_mail_at,
+        },
     }
 }
 

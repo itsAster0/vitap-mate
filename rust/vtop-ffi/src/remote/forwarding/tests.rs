@@ -14,6 +14,38 @@ fn seal(core: &Core, edge: &Arc<Mutex<Edge>>, payload: Value) {
         Some(mail_seal::seal(&key, ID, payload.to_string().as_bytes()).unwrap());
 }
 
+/// The view's variant, for comparing.
+fn state(forwarding: &Forwarding) -> &'static str {
+    match forwarding {
+        Forwarding::Off { .. } => "off",
+        Forwarding::Waiting { .. } => "waiting",
+        Forwarding::On { .. } => "on",
+    }
+}
+
+fn confirmation(forwarding: &Forwarding) -> Option<GmailConfirmation> {
+    match forwarding {
+        Forwarding::Waiting { confirmation, .. } => confirmation.clone(),
+        _ => None,
+    }
+}
+
+fn last_mail_at(forwarding: &Forwarding) -> Option<i64> {
+    match forwarding {
+        Forwarding::Off { .. } => None,
+        Forwarding::Waiting { last_mail_at, .. } | Forwarding::On { last_mail_at, .. } => {
+            *last_mail_at
+        }
+    }
+}
+
+fn last_otp_at(forwarding: &Forwarding) -> Option<i64> {
+    match forwarding {
+        Forwarding::On { last_otp_at, .. } => *last_otp_at,
+        _ => None,
+    }
+}
+
 #[tokio::test]
 async fn sets_up_checks_fetches_and_turns_off() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-{}", std::process::id()));
@@ -25,20 +57,19 @@ async fn sets_up_checks_fetches_and_turns_off() {
     // The server makes the student's address, or joins theirs.
     let core = signed_in(&dir, url.clone());
     keep_token(&core, &url);
-    assert_eq!(
-        core.forwarding_status("f".into()).state,
-        ForwardingState::Off
-    );
+    assert_eq!(state(&core.forwarding_status("f".into())), "off");
     let fetched = core.fetch_forwarded_otp("f".into(), 0).await;
     assert!(matches!(fetched, Err(CoreError::ForwardingOff { .. })));
 
     let set_up = core.set_up_forwarding("f-setup".into()).await.unwrap();
-    assert_eq!(set_up.state, ForwardingState::Waiting);
-    assert_eq!(
-        set_up.address.as_deref(),
-        Some("otp+k3f9x2ab7q@vmate.aster0.dev")
-    );
-    assert_eq!(set_up.sender, VTOP_SENDER);
+    let Forwarding::Waiting {
+        address, sender, ..
+    } = &set_up
+    else {
+        panic!("{set_up:?}");
+    };
+    assert_eq!(address, "otp+k3f9x2ab7q@vmate.aster0.dev");
+    assert_eq!(sender, VTOP_SENDER);
     {
         let edge = edge.lock().unwrap();
         let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
@@ -52,11 +83,8 @@ async fn sets_up_checks_fetches_and_turns_off() {
 
     // Nothing forwarded yet: cannot mark done before confirmation arrives.
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.state, ForwardingState::Waiting);
-    assert_eq!(
-        core.mark_forwarding_done("f".into()).state,
-        ForwardingState::Waiting
-    );
+    assert_eq!(state(&checked), "waiting");
+    assert_eq!(state(&core.mark_forwarding_done("f".into())), "waiting");
     assert_eq!(
         edge.lock().unwrap().requests.last().unwrap().body,
         json!({ "id": ID })
@@ -69,11 +97,11 @@ async fn sets_up_checks_fetches_and_turns_off() {
         json!({ "kind": "gmail_confirm", "code": "981234567", "link": null, "requester": "me@vitapstudent.ac.in", "sentAt": 1_700_000_000 }),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.state, ForwardingState::Waiting);
-    let confirmation = checked.confirmation.unwrap();
-    assert_eq!(confirmation.code.as_deref(), Some("981234567"));
-    assert_eq!(checked.last_mail_at, Some(1_700_000_000));
-    assert_eq!(checked.last_otp_at, None);
+    assert_eq!(state(&checked), "waiting");
+    let confirm = confirmation(&checked).unwrap();
+    assert_eq!(confirm.code.as_deref(), Some("981234567"));
+    assert_eq!(last_mail_at(&checked), Some(1_700_000_000));
+    assert_eq!(last_otp_at(&checked), None);
     // Not an OTP.
     assert_eq!(core.fetch_forwarded_otp("f".into(), 0).await, Ok(None));
 
@@ -89,10 +117,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
     let code = core.fetch_forwarded_otp("f".into(), sent + 120).await;
     assert_eq!(code, Ok(None));
     let status = core.forwarding_status("f".into());
-    assert_eq!(
-        (status.state, status.last_otp_at),
-        (ForwardingState::On, Some(sent))
-    );
+    assert_eq!((state(&status), last_otp_at(&status)), ("on", Some(sent)));
     // No key or secret in forwarding.json.
     let saved = fs::read_to_string(dir.join(FILE)).unwrap();
     assert!(!saved.contains("secret") && !saved.contains("seed"));
@@ -107,10 +132,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
         );
         assert_eq!(last.body, json!({ "id": ID, "everywhere": false }));
     }
-    assert_eq!(
-        core.forwarding_status("f".into()).state,
-        ForwardingState::Off
-    );
+    assert_eq!(state(&core.forwarding_status("f".into())), "off");
     assert!(!dir.join(FILE).exists());
 
     // An address the server lost is forgotten here.
@@ -118,10 +140,7 @@ async fn sets_up_checks_fetches_and_turns_off() {
     edge.lock().unwrap().gone = true;
     let checked = core.check_forwarding("f".into()).await;
     assert!(matches!(checked, Err(CoreError::ForwardingOff { .. })));
-    assert_eq!(
-        core.forwarding_status("f".into()).state,
-        ForwardingState::Off
-    );
+    assert_eq!(state(&core.forwarding_status("f".into())), "off");
 
     // One identity; every call went signed or with its JWT.
     let edge = edge.lock().unwrap();
@@ -179,19 +198,18 @@ async fn check_shows_the_confirmation_the_edge_kept() {
         .into(),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.state, ForwardingState::Waiting);
+    assert_eq!(state(&checked), "waiting");
     assert_eq!(
-        checked.confirmation.unwrap().code.as_deref(),
+        confirmation(&checked).unwrap().code.as_deref(),
         Some("981234567")
     );
-    assert_eq!(checked.last_otp_at, None);
+    assert_eq!(last_otp_at(&checked), None);
 
     // Once Gmail's confirmation arrived, the student can mark setup done without waiting for an
     // OTP; the server's 24h kept confirmation doesn't re-appear on the next check.
     let done = core.mark_forwarding_done("f".into());
-    assert_eq!(done.state, ForwardingState::On);
-    assert!(done.confirmation.is_none());
-    assert_eq!(done.last_otp_at, None);
+    assert_eq!(state(&done), "on");
+    assert_eq!(last_otp_at(&done), None);
     edge.lock().unwrap().canned.insert(
         inbox.clone(),
         [(
@@ -201,8 +219,7 @@ async fn check_shows_the_confirmation_the_edge_kept() {
         .into(),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.state, ForwardingState::On);
-    assert!(checked.confirmation.is_none());
+    assert_eq!(state(&checked), "on");
 
     // An OTP forwarded to the address before shows it works.
     edge.lock().unwrap().canned.insert(
@@ -214,9 +231,7 @@ async fn check_shows_the_confirmation_the_edge_kept() {
         .into(),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
-    assert_eq!(checked.last_otp_at, Some(1_700_000_100));
-    // and Gmail's confirmation goes, here as on the server.
-    assert!(checked.confirmation.is_none());
+    assert_eq!(last_otp_at(&checked), Some(1_700_000_100));
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -260,10 +275,7 @@ async fn old_file_reads_as_no_address() {
     });
     fs::write(dir.join(FILE), old.to_string()).unwrap();
     let core = Core::for_test(&dir);
-    assert_eq!(
-        core.forwarding_status("f".into()).state,
-        ForwardingState::Off
-    );
+    assert_eq!(state(&core.forwarding_status("f".into())), "off");
 }
 
 #[tokio::test]
@@ -285,18 +297,8 @@ async fn offline_keeps_the_address() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let core = Core::for_test(&dir);
-    let saved = Saved {
-        // Nothing listens on port 9.
-        server: "http://127.0.0.1:9".into(),
-        id: ID.into(),
-        address: "a@b".into(),
-        owner_claimed: false,
-        joined: false,
-        ready: false,
-        last_mail_at: None,
-        last_otp_at: None,
-        confirmation: None,
-    };
+    // Nothing listens on port 9.
+    let saved = json!({ "server": "http://127.0.0.1:9", "id": ID, "address": "a@b" });
     core.write(FILE, &saved);
     // With an identity on the default server, which this test can't reach.
     keep_token(&core, crate::remote::edge::DEFAULT_SERVER);
@@ -308,10 +310,7 @@ async fn offline_keeps_the_address() {
         core.turn_off_forwarding("f".into()).await,
         Err(CoreError::Offline)
     );
-    assert_eq!(
-        core.forwarding_status("f".into()).state,
-        ForwardingState::Waiting
-    );
+    assert_eq!(state(&core.forwarding_status("f".into())), "waiting");
 }
 
 #[test]
@@ -506,49 +505,47 @@ async fn an_address_kept_from_v2_is_rejoined_once() {
     fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
     let core = signed_in(&dir, url.clone());
     keep_token(&core, &url);
-    let v2 = Saved {
-        server: url.clone(),
-        id: ID.into(),
-        address: format!("otp+{ID}@vmate.aster0.dev"),
-        owner_claimed: true,
-        joined: false,
-        ready: true,
-        last_mail_at: Some(5),
-        last_otp_at: Some(5),
-        confirmation: None,
+    let v2 = |id: &str| {
+        json!({
+            "server": url, "id": id, "address": format!("otp+{ID}@vmate.aster0.dev"),
+            "owner_claimed": true, "ready": true, "last_mail_at": 5, "last_otp_at": 5,
+        })
     };
-    core.write(FILE, &v2);
+    core.write(FILE, &v2(ID));
+    // Not on the address yet: not shown as on, so background sync waits for the rejoin.
+    assert_eq!(state(&core.forwarding_status("f".into())), "waiting");
     // An OTP wait before the rejoin: the server doesn't know this install on the address yet,
-    // so it is rejoined there and then, not forgotten.
-    edge.lock().unwrap().gone = true;
+    // so it is rejoined there and then, not forgotten, and the inbox read once joined.
+    edge.lock().unwrap().canned.insert(
+        "mail:inbox".into(),
+        [(
+            404,
+            json!({ "code": GONE, "error": "No such forwarding address." }),
+        )]
+        .into(),
+    );
     let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
-    assert!(matches!(pulled, Err(CoreError::Other { .. })), "{pulled:?}");
-    assert_eq!(paths(&edge), ["auth:token", "mail:inbox", "mail:register"]);
-    edge.lock().unwrap().gone = false;
-    let kept = core.read::<Saved>(FILE).unwrap();
-    assert!(kept.joined);
+    assert_eq!(pulled, Ok(None));
+    assert_eq!(
+        paths(&edge),
+        ["auth:token", "mail:inbox", "mail:register", "mail:inbox"]
+    );
     // The same address: its Gmail setup still holds.
-    assert_eq!((kept.id.as_str(), kept.ready), (ID, true));
+    let kept = core.forwarding_status("f".into());
+    assert_eq!((state(&kept), last_otp_at(&kept)), ("on", Some(5)));
+    assert!(matches!(core.mailbox_state(), MailboxState::Joined { .. }));
     core.keep_forwarding("f".into()).await.unwrap();
     // Joined: opening the app again asks nothing.
-    assert_eq!(paths(&edge).len(), 3);
+    assert_eq!(paths(&edge).len(), 4);
 
     // The account holds another address: this phone moves to it and checks Gmail again.
-    core.write(
-        FILE,
-        &Saved {
-            id: "zzzzzzzzzz".into(),
-            ..v2
-        },
-    );
+    core.write(FILE, &v2("zzzzzzzzzz"));
     core.keep_forwarding("f".into()).await.unwrap();
-    let moved = core.read::<Saved>(FILE).unwrap();
-    assert_eq!(
-        (moved.id.as_str(), moved.ready, moved.joined),
-        (ID, false, true)
-    );
+    assert_eq!(core.saved_mailbox().unwrap().1, ID);
+    let moved = core.forwarding_status("f".into());
+    assert_eq!(state(&moved), "waiting");
     // The old address's "last OTP" isn't shown for the new one.
-    assert_eq!((moved.last_otp_at, moved.last_mail_at), (None, None));
+    assert_eq!(last_mail_at(&moved), None);
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -571,15 +568,244 @@ async fn a_phone_moved_to_the_students_old_address_follows_it() {
     }
     let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
     assert!(matches!(pulled, Err(CoreError::Other { .. })), "{pulled:?}");
-    let kept = core.read::<Saved>(FILE).unwrap();
+    assert_eq!(core.saved_mailbox().unwrap().1, "zzzzzzzzzz");
     assert_eq!(
-        (kept.id.as_str(), kept.ready, kept.joined),
-        ("zzzzzzzzzz", false, true)
+        core.mailbox_state(),
+        MailboxState::Joined {
+            mailbox: Mailbox {
+                server: url.clone(),
+                id: "zzzzzzzzzz".into(),
+                address: "otp+zzzzzzzzzz@vmate.aster0.dev".into(),
+            },
+            setup: Setup::NEW,
+        }
     );
     // Deleted on another phone: no address to follow, so it is forgotten.
     edge.lock().unwrap().moved_to = None;
     let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
     assert!(matches!(pulled, Err(CoreError::ForwardingOff { .. })));
-    assert!(core.read::<Saved>(FILE).is_none());
+    assert_eq!(core.mailbox_state(), MailboxState::Off);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+fn mailbox(id: &str) -> Mailbox {
+    Mailbox {
+        server: "https://vmate.aster0.dev".into(),
+        id: id.into(),
+        address: format!("otp+{id}@vmate.aster0.dev"),
+    }
+}
+
+fn confirm(sent_at: i64) -> Payload {
+    Payload::GmailConfirm {
+        code: Some("981234567".into()),
+        link: Some("https://evil.example/mail/vf-x".into()),
+        requester: None,
+        sent_at,
+    }
+}
+
+fn parse(stored: Value) -> Result<MailboxState, &'static str> {
+    MailboxState::try_from(serde_json::from_value::<Stored>(stored).unwrap())
+}
+
+#[test]
+fn stored_files_of_every_version_read() {
+    let base = json!({ "server": "https://vmate.aster0.dev", "id": ID, "address": "a@b" });
+    let with = |extra: Value| {
+        let mut file = base.clone();
+        file.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        file
+    };
+    let mailbox = Mailbox {
+        server: "https://vmate.aster0.dev".into(),
+        id: ID.into(),
+        address: "a@b".into(),
+    };
+    // Imported from v2 before this install rejoined: nothing but where it lives.
+    assert_eq!(
+        parse(base.clone()),
+        Ok(MailboxState::NeedsRejoin {
+            mailbox: mailbox.clone(),
+            kept: Setup::NEW
+        })
+    );
+    // v2 with OTPs through: rejoining resumes it as working.
+    assert_eq!(
+        parse(with(
+            json!({ "owner_claimed": true, "ready": true, "last_mail_at": 5, "last_otp_at": 5 })
+        )),
+        Ok(MailboxState::NeedsRejoin {
+            mailbox: mailbox.clone(),
+            kept: Setup::Active {
+                last_mail_at: Some(5),
+                last_otp_at: Some(5)
+            }
+        })
+    );
+    let confirmation = json!({ "code": "1", "link": null, "requester": null, "sent_at": 7 });
+    let waiting = parse(with(
+        json!({ "joined": true, "last_mail_at": 7, "confirmation": confirmation }),
+    ))
+    .unwrap();
+    assert!(matches!(
+        &waiting,
+        MailboxState::Joined {
+            setup: Setup::Waiting {
+                confirmation: Some(_),
+                last_mail_at: Some(7)
+            },
+            ..
+        }
+    ));
+    // Ready with a confirmation left over (marked done, or an OTP after it): the confirmation
+    // goes, as working forwarding has none to show.
+    assert_eq!(
+        parse(with(
+            json!({ "joined": true, "ready": true, "confirmation": confirmation })
+        )),
+        Ok(MailboxState::Joined {
+            mailbox: mailbox.clone(),
+            setup: Setup::Active {
+                last_mail_at: None,
+                last_otp_at: None
+            }
+        })
+    );
+    // An OTP came through though `ready` wasn't set: working.
+    assert!(matches!(
+        parse(with(json!({ "joined": true, "last_otp_at": 9 }))),
+        Ok(MailboxState::Joined {
+            setup: Setup::Active { .. },
+            ..
+        })
+    ));
+    assert!(parse(json!({ "server": "s", "id": "", "address": "a@b" })).is_err());
+
+    // Each state writes the file it reads back as, in the shape older apps read.
+    for state in [
+        waiting,
+        MailboxState::NeedsRejoin {
+            mailbox: mailbox.clone(),
+            kept: Setup::Active {
+                last_mail_at: Some(5),
+                last_otp_at: Some(5),
+            },
+        },
+        MailboxState::Joined {
+            mailbox,
+            setup: Setup::NEW,
+        },
+    ] {
+        let stored = serde_json::to_value(state.stored().unwrap()).unwrap();
+        assert!(stored.get("owner_claimed").is_none());
+        assert!(stored["joined"].is_boolean() && stored["ready"].is_boolean());
+        assert_eq!(parse(stored), Ok(state));
+    }
+    assert_eq!(MailboxState::Off.stored(), None);
+}
+
+#[test]
+fn setup_moves_only_forward() {
+    // Gmail's confirmation shows, with only a Gmail link kept.
+    let waiting = Setup::NEW.mail(&confirm(10));
+    let Setup::Waiting {
+        confirmation: Some(shown),
+        last_mail_at: Some(10),
+    } = &waiting
+    else {
+        panic!("{waiting:?}");
+    };
+    assert_eq!(shown.link, None);
+    // Nothing reached the address: not done yet.
+    assert_eq!(Setup::NEW.mark_done(), Setup::NEW);
+    let done = waiting.clone().mark_done();
+    assert_eq!(
+        done,
+        Setup::Active {
+            last_mail_at: Some(10),
+            last_otp_at: None
+        }
+    );
+    // The server's kept confirmation, read again once working, isn't shown again.
+    assert_eq!(done.clone().mail(&confirm(10)), done);
+    let otp = Payload::Otp {
+        code: "401295".into(),
+        sent_at: 20,
+    };
+    let working = waiting.mail(&otp);
+    assert_eq!(
+        working,
+        Setup::Active {
+            last_mail_at: Some(20),
+            last_otp_at: Some(20)
+        }
+    );
+    // An older OTP time from the server doesn't move it back.
+    assert_eq!(working.clone().otp_at(15), working);
+}
+
+#[test]
+fn an_address_kept_from_v2_is_not_on_until_rejoined() {
+    let active = Setup::Active {
+        last_mail_at: Some(5),
+        last_otp_at: Some(5),
+    };
+    let kept = MailboxState::NeedsRejoin {
+        mailbox: mailbox(ID),
+        kept: active.clone(),
+    };
+    assert!(matches!(
+        view(&kept),
+        Forwarding::Waiting {
+            last_mail_at: None,
+            confirmation: None,
+            ..
+        }
+    ));
+    // Rejoined on the same address: the setup it had.
+    let rejoined = kept.rejoined(ID, mailbox(ID)).unwrap();
+    assert!(matches!(view(&rejoined), Forwarding::On { .. }));
+    // On another: set up again.
+    assert_eq!(
+        kept.rejoined(ID, mailbox("zzzzzzzzzz")),
+        Some(MailboxState::Joined {
+            mailbox: mailbox("zzzzzzzzzz"),
+            setup: Setup::NEW
+        })
+    );
+    // Turned off, or another address, meanwhile: left as it is.
+    assert_eq!(MailboxState::Off.rejoined(ID, mailbox(ID)), None);
+    assert_eq!(kept.rejoined("other", mailbox(ID)), None);
+    // Mail for another address doesn't touch this one.
+    assert_eq!(
+        kept.clone().with_setup("other", |setup| setup.otp_at(99)),
+        kept
+    );
+}
+
+#[tokio::test]
+async fn a_setup_finished_after_a_sign_out_is_queued_to_leave() {
+    let (core, _edge, dir, _url) = forwarding_core("signed-out").await;
+    core.forget_forwarding(ID);
+    // The sign-out came while `mail:register` was answering: the address isn't saved for the
+    // next student, and this install leaves it.
+    let slot = core.current().unwrap();
+    core.install(None);
+    assert_eq!(
+        core.save_new_mailbox(&slot, mailbox(ID)),
+        Err(CoreError::NotSignedIn)
+    );
+    assert_eq!(core.mailbox_state(), MailboxState::Off);
+    let queue = core.read::<Vec<Leave>>(LEAVE_FILE).unwrap();
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue[0].id, ID);
+    // Still signed in, with an address saved meanwhile: that one stays.
+    core.install(Some(slot.clone()));
+    core.save_new_mailbox(&slot, mailbox("zzzzzzzzzz")).unwrap();
+    core.save_new_mailbox(&slot, mailbox(ID)).unwrap();
+    assert_eq!(core.saved_mailbox().unwrap().1, "zzzzzzzzzz");
     let _ = fs::remove_dir_all(&dir);
 }

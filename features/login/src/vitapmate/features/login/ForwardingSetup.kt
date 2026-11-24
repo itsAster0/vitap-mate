@@ -51,7 +51,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import com.composables.icons.lucide.RefreshCw
 import vitapmate.core.Forwarding
-import vitapmate.core.ForwardingState
+import vitapmate.core.GmailConfirmation
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.Dot
@@ -71,9 +71,27 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val context = LocalContext.current
-    val address = status.address.orEmpty()
     val accent = tones.accentTone
-    val on = status.state == ForwardingState.ON
+    val address: String
+    val sender: String
+    val confirmation: GmailConfirmation?
+    val lastOtpAt: Long?
+    when (status) {
+        is Forwarding.Off -> return
+        is Forwarding.Waiting -> {
+            address = status.address
+            sender = status.sender
+            confirmation = status.confirmation
+            lastOtpAt = null
+        }
+        is Forwarding.On -> {
+            address = status.address
+            sender = status.sender
+            confirmation = null
+            lastOtpAt = status.lastOtpAt
+        }
+    }
+    val on = status is Forwarding.On
     Column(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(accent.subtle).heroCookie()
             .padding(start = Space.lg, top = Space.md, bottom = Space.lg, end = Space.xs),
@@ -89,11 +107,10 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
         }
         // Waiting in the warning tone, the confirmation in the neutral one, working in success.
-        val lastOtpAt = status.lastOtpAt
         val (label, tone) = when {
             lastOtpAt != null -> "Working · last OTP ${ago(lastOtpAt)}" to tones.success
             on -> "Working · no OTP forwarded yet" to tones.success
-            status.confirmation != null -> "Confirm in Gmail, then create the filter" to neutralTone
+            confirmation != null -> "Confirm in Gmail, then create the filter" to neutralTone
             else -> "Waiting for Gmail's confirmation mail…" to tones.warning
         }
         Row(
@@ -105,7 +122,7 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             Text(label, Modifier.testTag("forwarding.status"), style = MaterialTheme.typography.labelMedium, color = tone.onSubtle)
         }
     }
-    status.confirmation?.let { confirm ->
+    confirmation?.let { confirm ->
         // Anyone who knows the address can make Gmail send one: say so when it names a Gmail
         // address the student's VTOP profile doesn't have.
         val unknown = confirm.requesterKnown == false
@@ -131,8 +148,8 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
     }
     // Steps 1 and 2 are done once Gmail's confirmation arrives (or forwarding is on); step 3 is
     // done once an OTP comes through or the student marks setup done.
-    val added = on || status.confirmation != null
-    val filtered = on || status.lastOtpAt != null
+    val added = on || confirmation != null
+    val filtered = on || lastOtpAt != null
     fun state(done: Boolean, current: Boolean) = if (done) StepState.Done else if (current) StepState.Current else StepState.Plain
     Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings", state = state(added, true)) {
         "In the Gmail where VTOP's mail arrives (usually @vitapstudent.ac.in): Add a forwarding address, paste yours, then Next → Proceed → OK. " +
@@ -142,9 +159,9 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
         "Gmail's confirmation mail comes here, not to your inbox, and shows up above on its own. Confirm in Gmail, or type the code into Gmail's Verify box."
     }
     Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
-        "Reload Gmail first. Then create a new filter with From ${status.sender}, tick Forward it to and pick your address, then Create filter."
+        "Reload Gmail first. Then create a new filter with From ${sender}, tick Forward it to and pick your address, then Create filter."
     }
-    if (!on && status.confirmation != null) {
+    if (!on && confirmation != null) {
         Button(
             if (MailForwarding.busy != null) null else onDone,
             Modifier.fillMaxWidth().testTag("forwarding.done"),
@@ -157,18 +174,18 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
         Spacer(Modifier.size(Space.sm))
         Text("Step-by-step guide with screenshots")
     }
-    if (guide) ForwardingGuide(status.sender) { guide = false }
+    if (guide) ForwardingGuide(sender) { guide = false }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("From", Modifier.padding(start = 40.dp, end = Space.sm), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-        Text(status.sender, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace))
-        IconButton({ copy(context, "VTOP sender", status.sender) }, Modifier.testTag("forwarding.copy_sender")) { Icon(Lucide.Copy, "Copy the sender") }
+        Text(sender, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace))
+        IconButton({ copy(context, "VTOP sender", sender) }, Modifier.testTag("forwarding.copy_sender")) { Icon(Lucide.Copy, "Copy the sender") }
     }
     Text(
-        "Still asked to type the OTP? The filter's From must be exactly ${status.sender} and its action Forward to your address. Mail sent before the filter isn't forwarded.",
+        "Still asked to type the OTP? The filter's From must be exactly ${sender} and its action Forward to your address. Mail sent before the filter isn't forwarded.",
         style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
-    val checking = MailForwarding.busy == "check"
+    val checking = MailForwarding.busy == ForwardingOp.Check
     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
         Button(if (MailForwarding.busy != null) null else onCheck, Modifier.weight(1f).testTag("forwarding.check"), prefix = if (checking) null else Lucide.RefreshCw) {
             if (checking) LoadingIndicator(Modifier.size(20.dp))
@@ -182,7 +199,7 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             shapes = ButtonDefaults.shapes(),
             colors = ButtonDefaults.buttonColors(containerColor = tones.danger.subtle, contentColor = tones.danger.onSubtle),
         ) {
-            Text(if (MailForwarding.busy == "off") "Turning off…" else "Turn off")
+            Text(if (MailForwarding.busy == ForwardingOp.TurnOff) "Turning off…" else "Turn off")
         }
     }
 }

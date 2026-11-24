@@ -32,7 +32,6 @@ import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.Forwarding
-import vitapmate.core.ForwardingState
 import vitapmate.data.OtpSource
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -60,16 +59,16 @@ internal fun ForwardingContent() {
     var confirmOff by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         MailForwarding.error = null
-        flow("forwarding.open") { Log.info("ui.forwarding", "open", it, mapOf("state" to "${status?.state}")) }
+        flow("forwarding.open") { Log.info("ui.forwarding", "open", it, mapOf("state" to "${status?.let { it::class.simpleName?.uppercase() }}")) }
         MailForwarding.load("open")
     }
-    LaunchedEffect(status?.state) {
-        if (MailForwarding.status?.state != ForwardingState.WAITING) return@LaunchedEffect
+    LaunchedEffect(status is Forwarding.Waiting) {
+        if (MailForwarding.status !is Forwarding.Waiting) return@LaunchedEffect
         // Checks again when the server says the inbox changed; every few seconds only while the
         // live socket is down.
         val wake = LiveWake(this, LiveTopic.MAIL_INBOX)
         try {
-            while (MailForwarding.status?.state == ForwardingState.WAITING) {
+            while (MailForwarding.status is Forwarding.Waiting) {
                 MailForwarding.check(quiet = true)
                 wake.next(WAITING_POLL_MS)
             }
@@ -77,10 +76,10 @@ internal fun ForwardingContent() {
             wake.stop()
         }
     }
-    when {
-        status == null -> Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator() }
-        status.state == ForwardingState.OFF -> ForwardingIntro(MailForwarding::setUp)
-        else -> ForwardingSetup(
+    when (status) {
+        null -> Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator() }
+        is Forwarding.Off -> ForwardingIntro(MailForwarding::setUp)
+        is Forwarding.Waiting, is Forwarding.On -> ForwardingSetup(
             status,
             onCheck = { scope.launch { MailForwarding.check() } },
             onDone = MailForwarding::markDone,

@@ -29,12 +29,14 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
 import vitapmate.core.Core
-import vitapmate.core.ForwardingState
+import vitapmate.core.Forwarding
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.OtpSource
+import vitapmate.data.PauseReason
 import vitapmate.data.Settings
 import vitapmate.data.StoreCap
+import vitapmate.data.SyncHealth
 import vitapmate.data.VtopSync
 import vitapmate.data.coreFlow
 import vitapmate.features.login.MailForwarding
@@ -47,7 +49,7 @@ import vitapmate.observability.flow
  * Settings → Background sync: a WorkManager job every [Settings.syncHours] (on a network) that
  * fetches VTOP's pages ([VtopSync]), so Rust records what changed, then notifies about the
  * changes of the kinds switched on. Offered only while OTP auto-fill works; a run whose OTP can't
- * be filled stops quietly and marks sync paused ([Settings.syncPaused]) until a run goes through.
+ * be filled stops quietly and marks sync paused ([Settings.syncHealth]) until a run goes through.
  * Flow `sync.background`, log src `sync`.
  */
 object BackgroundSync {
@@ -62,7 +64,11 @@ object BackgroundSync {
      */
     fun available(): Boolean = when (OtpAutofill.inUse()) {
         null -> false
-        OtpSource.Forwarding -> MailForwarding.status?.let { it.state == ForwardingState.ON || it.lastMailAt != null } == true
+        OtpSource.Forwarding -> when (val status = MailForwarding.status) {
+            null, is Forwarding.Off -> false
+            is Forwarding.Waiting -> status.lastMailAt != null
+            is Forwarding.On -> true
+        }
         OtpSource.Gmail -> true
     }
 
@@ -189,9 +195,6 @@ class SeenReceiver : android.content.BroadcastReceiver() {
     }
 }
 
-/** Why sync is paused when VTOP turned the saved password down; saving a new one clears it. */
-internal const val SYNC_PASSWORD_REJECTED = "VTOP turned down your password"
-
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext
@@ -205,26 +208,19 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         flow("sync.background", unattended = true) { f ->
             MailForwarding.load("sync")
             if (!BackgroundSync.available()) {
-                Settings.syncPaused = if (OtpAutofill.selected().name == "Gmail") "Gmail needs reconnecting" else "OTP auto-fill isn't set up"
-                Log.info("sync", "skipped: ${Settings.syncPaused}", f)
+                val reason = if (OtpAutofill.selected() == OtpSource.Gmail) PauseReason.GmailReconnect else PauseReason.NotSetUp
+                Settings.syncHealth = SyncHealth.Paused(reason)
+                Log.info("sync", "skipped: ${reason.text}", f)
                 return@flow
             }
             val result = VtopSync.run("sync.background.pages", "Background sync", everything = false, pageTimeoutMs = PAGE_TIMEOUT_MS, unattended = true) { e, id ->
                 val why = OtpAutofill.solve(id, e.issuedAt?.toLong())
-                if (why == OtpAutofill.NO_CODE) {
-                    // VTOP mails late at times: one miss is only this run's outcome; two runs in a row pause sync.
-                    val misses = prefs.getInt(MISSES, 0) + 1
-                    prefs.edit().putInt(MISSES, misses).apply()
-                    if (misses >= 2) Settings.syncPaused = why
-                } else if (why != null) Settings.syncPaused = why
+                Settings.syncHealth = Settings.syncHealth.afterOtp(why)
                 why == null
             }
-            if (result.outcome == VtopSync.Outcome.Rejected) Settings.syncPaused = SYNC_PASSWORD_REJECTED
+            if (result.outcome == VtopSync.Outcome.Rejected) Settings.syncHealth = SyncHealth.Paused(PauseReason.PasswordRejected)
             // A run that fetched nothing (offline, VTOP down) says nothing about auto-fill working.
-            if (result.outcome == VtopSync.Outcome.Done && result.fetched > 0) {
-                Settings.syncPaused = null
-                prefs.edit().remove(MISSES).apply()
-            }
+            if (result.outcome == VtopSync.Outcome.Done && result.fetched > 0) Settings.syncHealth = SyncHealth.OK
             Widgets.refresh(app)
             CalendarSync.sync(app, unattended = true)
             // New changes since the last notification, of the kinds switched on.
@@ -244,8 +240,5 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     private companion object {
         /** Each page's limit: short, so a slow VTOP ends the run instead of draining battery. */
         const val PAGE_TIMEOUT_MS = 20_000L
-
-        /** Runs in a row whose OTP code never came ([OtpAutofill.NO_CODE]). */
-        const val MISSES = "otp_misses"
     }
 }

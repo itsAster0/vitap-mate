@@ -189,7 +189,7 @@ object Gmail {
             save(saved)
             Settings.otpSource = OtpSource.Gmail
             // Paused over Gmail: the next run can try again.
-            if (Settings.syncPaused?.startsWith("Gmail") == true) Settings.syncPaused = null
+            Settings.syncHealth = Settings.syncHealth.resumedIf(PauseReason::gmail)
             Log.info(SRC, "connected", flow, mapOf("grant_days" to "${saved.daysLeft ?: "-"}"))
             return saved
         } catch (e: Throwable) {

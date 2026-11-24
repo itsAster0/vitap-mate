@@ -149,11 +149,23 @@ object Settings {
     var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
 
     /**
-     * Why background sync is paused ("Gmail needs reconnecting"), set when a background run
-     * couldn't finish the OTP (no code coming only after two runs in a row) and cleared by the
-     * next good run; null when it isn't.
+     * How background sync stands: paused when a background run couldn't finish the OTP (no code
+     * coming only after two runs in a row), until the next good run. The reason's id is saved
+     * where older apps kept its text; the miss count beside it.
      */
-    var syncPaused by text("settings_sync_paused")
+    var syncHealth by pref(
+        "settings_sync_paused",
+        SyncHealth.OK,
+        { k, _ -> SyncHealth.parse(getString(k, null), getInt(SYNC_MISSES, 0)) },
+        { k, v ->
+            when (v) {
+                is SyncHealth.Active -> remove(k).putInt(SYNC_MISSES, v.otpMisses)
+                is SyncHealth.Paused -> putString(k, v.reason.id).remove(SYNC_MISSES)
+            }
+        },
+    )
+
+    private const val SYNC_MISSES = "settings_sync_otp_misses"
 
     /** The course part background sync last checked for new files ([VtopSync]). */
     var syncCourse by text("settings_sync_course")
@@ -167,7 +179,7 @@ object Settings {
     fun forgetStudent() {
         otpSource = null
         backgroundSync = false
-        syncPaused = null
+        syncHealth = SyncHealth.OK
         syncCourse = null
         wrappedSeen = emptySet()
         wrappedHideGrades = emptySet()
@@ -194,6 +206,12 @@ object Settings {
     fun load(context: Context) {
         val p = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
         prefs = p
+        // Older apps counted missed codes in their own file.
+        val old = context.getSharedPreferences("sync", Context.MODE_PRIVATE)
+        if (old.contains("otp_misses")) {
+            p.edit { putInt(SYNC_MISSES, old.getInt("otp_misses", 0)) }
+            old.edit { remove("otp_misses") }
+        }
         all.forEach { it.load(p) }
         Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
         NOTIFY_KINDS.forEach { k -> if (!p.getBoolean("settings_notify_$k", true)) notifyOff[k] = true }
@@ -202,7 +220,7 @@ object Settings {
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
+            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncHealth is SyncHealth.Paused), "notifyOff" to notifyOff.keys.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 

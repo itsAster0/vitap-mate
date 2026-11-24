@@ -2171,13 +2171,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent() and 0xFFFF) != 23504) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 10239) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 50526) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 44213) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 61987) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 46814) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_keep_forwarding() and 0xFFFF) != 50119) {
@@ -2186,10 +2186,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding() and 0xFFFF) != 64678) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_forwarding_done() and 0xFFFF) != 49022) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_forwarding_done() and 0xFFFF) != 56019) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 7277) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 22862) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding() and 0xFFFF) != 9462) {
@@ -13860,76 +13860,6 @@ public object FfiConverterTypeFileLink: FfiConverterRustBuffer<FileLink> {
 
 
 
-data class Forwarding (
-    val `state`: ForwardingState
-    , 
-    val `address`: kotlin.String?
-    , 
-    /**
-     * What the Gmail filter matches in From.
-     */
-    val `sender`: kotlin.String
-    , 
-    /**
-     * The latest Gmail confirmation that arrived, while setting up.
-     */
-    val `confirmation`: GmailConfirmation?
-    , 
-    /**
-     * Unix seconds of the latest forwarded mail of either kind.
-     */
-    val `lastMailAt`: kotlin.Long?
-    , 
-    /**
-     * Unix seconds of the latest forwarded OTP.
-     */
-    val `lastOtpAt`: kotlin.Long?
-    
-){
-    
-
-    
-
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeForwarding: FfiConverterRustBuffer<Forwarding> {
-    override fun read(buf: ByteBuffer): Forwarding {
-        return Forwarding(
-            FfiConverterTypeForwardingState.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterOptionalTypeGmailConfirmation.read(buf),
-            FfiConverterOptionalLong.read(buf),
-            FfiConverterOptionalLong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: Forwarding) = (
-            FfiConverterTypeForwardingState.allocationSize(value.`state`) +
-            FfiConverterOptionalString.allocationSize(value.`address`) +
-            FfiConverterString.allocationSize(value.`sender`) +
-            FfiConverterOptionalTypeGmailConfirmation.allocationSize(value.`confirmation`) +
-            FfiConverterOptionalLong.allocationSize(value.`lastMailAt`) +
-            FfiConverterOptionalLong.allocationSize(value.`lastOtpAt`)
-    )
-
-    override fun write(value: Forwarding, buf: ByteBuffer) {
-            FfiConverterTypeForwardingState.write(value.`state`, buf)
-            FfiConverterOptionalString.write(value.`address`, buf)
-            FfiConverterString.write(value.`sender`, buf)
-            FfiConverterOptionalTypeGmailConfirmation.write(value.`confirmation`, buf)
-            FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
-            FfiConverterOptionalLong.write(value.`lastOtpAt`, buf)
-    }
-}
-
-
-
 data class GeneralOuting (
     /**
      * Unix seconds.
@@ -20681,44 +20611,155 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
 
 
 
-
-enum class ForwardingState {
+/**
+ * This phone's forwarding address and how far its setup got, for the app.
+ */
+sealed class Forwarding {
     
     /**
      * No address on this phone.
      */
-    OFF,
+    data class Off(
+        /**
+         * What the Gmail filter matches in From.
+         */
+        val `sender`: kotlin.String) : Forwarding()
+        
+    {
+        
+
+        companion object
+    }
+    
     /**
-     * An address, not finished setting up in Gmail yet.
+     * An address, not finished setting up in Gmail yet (or kept from v2 and not rejoined).
      */
-    WAITING,
+    data class Waiting(
+        val `address`: kotlin.String, 
+        val `sender`: kotlin.String, 
+        /**
+         * The latest Gmail confirmation that arrived.
+         */
+        val `confirmation`: vitapmate.core.GmailConfirmation?, 
+        /**
+         * Unix seconds of the latest forwarded mail of either kind.
+         */
+        val `lastMailAt`: kotlin.Long?) : Forwarding()
+        
+    {
+        
+
+        companion object
+    }
+    
     /**
      * Forwarding is set up: an OTP came through, or the student marked setup done after
      * Gmail's confirmation arrived.
      */
-    ON;
+    data class On(
+        val `address`: kotlin.String, 
+        val `sender`: kotlin.String, 
+        /**
+         * Unix seconds of the latest forwarded OTP; None when marked done before one came.
+         */
+        val `lastOtpAt`: kotlin.Long?, 
+        val `lastMailAt`: kotlin.Long?) : Forwarding()
+        
+    {
+        
 
+        companion object
+    }
+    
+
+    
+
+    
     
 
 
     companion object
 }
 
-
 /**
  * @suppress
  */
-public object FfiConverterTypeForwardingState: FfiConverterRustBuffer<ForwardingState> {
-    override fun read(buf: ByteBuffer) = try {
-        ForwardingState.values()[buf.getInt() - 1]
-    } catch (e: IndexOutOfBoundsException) {
-        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
+    override fun read(buf: ByteBuffer): Forwarding {
+        return when(buf.getInt()) {
+            1 -> Forwarding.Off(
+                FfiConverterString.read(buf),
+                )
+            2 -> Forwarding.Waiting(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterOptionalTypeGmailConfirmation.read(buf),
+                FfiConverterOptionalLong.read(buf),
+                )
+            3 -> Forwarding.On(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterOptionalLong.read(buf),
+                FfiConverterOptionalLong.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
     }
 
-    override fun allocationSize(value: ForwardingState) = 4UL
+    override fun allocationSize(value: Forwarding): ULong = when(value) {
+        is Forwarding.Off -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`sender`)
+            )
+        }
+        is Forwarding.Waiting -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`address`)
+                + FfiConverterString.allocationSize(value.`sender`)
+                + FfiConverterOptionalTypeGmailConfirmation.allocationSize(value.`confirmation`)
+                + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
+            )
+        }
+        is Forwarding.On -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`address`)
+                + FfiConverterString.allocationSize(value.`sender`)
+                + FfiConverterOptionalLong.allocationSize(value.`lastOtpAt`)
+                + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
+            )
+        }
+    }
 
-    override fun write(value: ForwardingState, buf: ByteBuffer) {
-        buf.putInt(value.ordinal + 1)
+    override fun write(value: Forwarding, buf: ByteBuffer) {
+        when(value) {
+            is Forwarding.Off -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`sender`, buf)
+                Unit
+            }
+            is Forwarding.Waiting -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`address`, buf)
+                FfiConverterString.write(value.`sender`, buf)
+                FfiConverterOptionalTypeGmailConfirmation.write(value.`confirmation`, buf)
+                FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
+                Unit
+            }
+            is Forwarding.On -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`address`, buf)
+                FfiConverterString.write(value.`sender`, buf)
+                FfiConverterOptionalLong.write(value.`lastOtpAt`, buf)
+                FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 }
 

@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
 import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mail
-import vitapmate.core.ForwardingState
+import vitapmate.core.Forwarding
 import vitapmate.data.Gmail
 import vitapmate.data.OtpSource
 import vitapmate.features.login.MailForwarding
@@ -31,11 +31,11 @@ fun OtpAutofillSetting() {
     val account = Gmail.account
     var warn = false
     val hint = when (picked) {
-        OtpSource.Forwarding -> when (forwarding?.state) {
+        OtpSource.Forwarding -> when (forwarding) {
             null -> "…"
-            ForwardingState.OFF -> "Mail forwarding · not set up yet, so OTPs are typed by hand"
-            ForwardingState.WAITING -> "Mail forwarding · finish setting up in Gmail"
-            ForwardingState.ON -> "Mail forwarding" + (forwarding.lastOtpAt?.let { " · last OTP ${ago(it)}" } ?: "")
+            is Forwarding.Off -> "Mail forwarding · not set up yet, so OTPs are typed by hand"
+            is Forwarding.Waiting -> "Mail forwarding · finish setting up in Gmail"
+            is Forwarding.On -> "Mail forwarding" + (forwarding.lastOtpAt?.let { " · last OTP ${ago(it)}" } ?: "")
         }
         OtpSource.Gmail -> otpWarning()?.also { warn = true } ?: if (account == null) "Gmail · not connected yet" else "Gmail · ${account.email}"
     }

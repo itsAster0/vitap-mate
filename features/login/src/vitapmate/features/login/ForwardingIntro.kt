@@ -55,7 +55,7 @@ internal fun ForwardingIntro(onSetUp: () -> Unit) {
     MailForwarding.error?.let { (title, message) ->
         Box(Modifier.testTag("forwarding.error")) { Callout(Lucide.CircleAlert, AppTheme.tones.danger, "$title. $message") }
     }
-    val busy = MailForwarding.busy == "setup"
+    val busy = MailForwarding.busy == ForwardingOp.Setup
     Button(if (busy) null else onSetUp, Modifier.fillMaxWidth().testTag("forwarding.setup"), prefix = if (busy) null else Lucide.Forward) {
         if (busy) LoadingIndicator(Modifier.size(20.dp))
         Text(if (busy) proofStage() else "Set up my address")

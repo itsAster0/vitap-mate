@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import vitapmate.data.NOTIFY_KINDS
 import vitapmate.data.SYNC_HOURS
 import vitapmate.data.Settings
+import vitapmate.data.SyncHealth
 import vitapmate.features.login.MailForwarding
 import vitapmate.observability.Log
 import vitapmate.observability.logAction
@@ -62,7 +63,7 @@ fun BackgroundSyncRow(onClick: () -> Unit) {
 }
 
 /** Why background sync is paused, while it is on (also in Settings' "Needs you"); null otherwise. */
-fun syncPaused(): String? = Settings.syncPaused?.takeIf { Settings.backgroundSync && BackgroundSync.available() }
+fun syncPaused(): String? = Settings.syncHealth.pausedFor?.text?.takeIf { Settings.backgroundSync && BackgroundSync.available() }
 
 private fun syncSummary(available: Boolean, on: Boolean, paused: String?): String = when {
     !available -> "Needs OTP auto-fill: set it up in Settings → Account"
@@ -87,12 +88,12 @@ fun BackgroundSyncSetting(details: @Composable ColumnScope.(on: Boolean) -> Unit
     }
     val set = { value: Boolean ->
         Settings.backgroundSync = value
-        if (value) Settings.syncPaused = null
+        if (value) Settings.syncHealth = SyncHealth.OK
         BackgroundSync.apply(context)
         if (value && Build.VERSION.SDK_INT >= 33) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
         scope.logAction("settings.background_sync", "ui.settings", "background sync ${if (value) "on" else "off"}", mapOf("hours" to "${Settings.syncHours}"))
     }
-    val paused = Settings.syncPaused?.takeIf { on }
+    val paused = Settings.syncHealth.pausedFor?.text?.takeIf { on }
     val tones = AppTheme.tones
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)

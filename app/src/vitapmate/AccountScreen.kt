@@ -67,6 +67,7 @@ import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
+import vitapmate.data.PauseReason
 import vitapmate.data.SavedPasswords
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
@@ -148,7 +149,7 @@ fun AccountScreen() {
                 if (done) {
                     AccountState.rejected = false
                     // Paused over the old password: the next run can try again.
-                    if (Settings.syncPaused == SYNC_PASSWORD_REJECTED) Settings.syncPaused = null
+                    Settings.syncHealth = Settings.syncHealth.resumedIf { it == PauseReason.PasswordRejected }
                     savedPassword = password
                     if (other) {
                         PageFetches.cancelAll()
