@@ -210,7 +210,7 @@ read page comes from it.
   page's `data` as `/v1/vtop/fetch` answers it. A page with other arguments
   stands in for one not recorded (another day's biometrics).
 - Recorded from a real account (a debuggable app with `demo_record.json` in
-  its data folder), then `bun run demo <recording>` in `edge/` swaps
+  its data folder), then `bun dev/demo.ts <recording>` in `backend/` swaps
   in a made-up student and fails if a personal value is left.
 
 ## Devices

@@ -14,11 +14,13 @@ else
   files=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u)
 fi
 
-crates=() whole=false deny=false kotlin=false edge=false ext=false
+crates=() whole=false deny=false kotlin=false backend=false workers=false deploy=false ext=false
 while IFS= read -r f; do
   case "$f" in
-    edge/*) edge=true ;;
-    rust/vtop-shared/vectors/*) edge=true crates+=("vtop-shared") ;;
+    backend/*) backend=true ;;
+    mail/* | proxy/*) workers=true ;;
+    deploy/*) deploy=true ;;
+    rust/vtop-shared/vectors/*) backend=true crates+=("vtop-shared") ;;
     rust/vtop-convex/* | rust/vps/* | rust/*.md) ;;
     rust/Cargo.toml | rust/Cargo.lock | rust/deny.toml) whole=true deny=true ;;
     rust/.cargo/*) whole=true ;;
@@ -64,10 +66,12 @@ if $kotlin; then
   run . ./kotlin test
   run . mise run detekt
 fi
-$edge && run . mise run check-edge
+$backend && run . mise run check-backend
+$workers && run . mise run check-workers
+$deploy && run . mise run check-deploy
 $ext && run . mise run check-ext
 
-if [ ${#pkgs[@]} -eq 0 ] && ! $deny && ! $kotlin && ! $edge && ! $ext; then
+if [ ${#pkgs[@]} -eq 0 ] && ! $deny && ! $kotlin && ! $backend && ! $workers && ! $deploy && ! $ext; then
   echo "no checks for the changed files"
 fi
 if [ ${#failed[@]} -gt 0 ]; then

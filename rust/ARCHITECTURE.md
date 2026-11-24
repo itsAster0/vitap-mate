@@ -11,7 +11,9 @@ rust/                    Cargo workspace
 ├── vtop-tlsn/           TLSNotary proofs of VTOP's /vtop/content (the account proof): prover for the app, verifier for the Engine
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
 └── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out; makes its own weekly keys (on a Linode in Chennai)
-edge/                    the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript, at the repo root)
+backend/                 self-hosted Convex in front of the Engine (TypeScript, at the repo root; backend/README.md)
+mail/ proxy/             the Cloudflare Email Worker and the Proxy route's Worker
+deploy/                  alchemy.run.ts: deploys the Engine, the gateway and the Workers
 ```
 
 ## vtop-core
@@ -154,8 +156,7 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   `Account` yes. A connected app's session and the routes still send the
   session. Dropped on sign-out,
   another student, and deleting the server account or this install. Old
-  installs still send the session to get one (`withSession` in
-  `edge/src/account.ts`), deprecated.
+  installs still send the session to get one (`withSession`), deprecated.
 - **Account proof** (`vtop-ffi/src/remote/account_proof.rs`, `vtop-tlsn`,
   API.md "Account proof"). The phone proves its regno with TLSNotary in
   proxy mode: `POST /v1/account/prove/start` gives a single-use challenge
@@ -189,7 +190,7 @@ the last 10 sign-ins and each key's last 10 uses (extension or MCP, from the
 records, with a delete for each (`vtop-ffi/src/remote/server.rs`). `/healthz` reports
 `version` and `colo`.
 
-MCP clients (Claude and others) connect to `/mcp` with OAuth (`edge/src/
+MCP clients (Claude and others) connect to `/mcp` with OAuth (`backend/convex/
 oauth.ts`): `/mcp` answers 401 with the metadata URL, the client registers and
 opens `/authorize`, which shows a pairing code and QR. The student scans it in
 Connected apps → Pair a browser; the app makes an access key with that
@@ -248,9 +249,10 @@ $INTERNAL_TOKEN`. The gateway, on a public VPS, has its own `GATEWAY_TOKEN`:
 the engine takes it only on the fetch and sign-in routes, the edge only on
 `/internal/udp-keys`, so it can't ask whose a session is or wait for OTPs.
 
-Deploy: the edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway
-`engine-v2`) and the gateway with `bun run deploy` in `edge/`
-(`alchemy.run.ts`), from a laptop; CI deploys nothing.
+Deploy: the engine (nest, with Railway `engine-v2` as a standby), the gateway
+and the mail and proxy Workers with `bun run deploy` in `deploy/`
+(`alchemy.run.ts`), which then deploys the Convex functions, from a laptop; CI
+deploys nothing. Convex itself runs on hawk at vmate.aster0.dev.
 The gateway image is built for x86, pushed to GHCR and run on the Linode
 `fedora-in-maa` (172.232.115.40, UDP 3478-3481) over SSH, with host networking, `rust/vps/resolv.conf` as its resolvers
 and `~/vitapmate-gateway/data` for the keys.
@@ -269,7 +271,7 @@ and `~/vitapmate-gateway/data` for the keys.
 - `vtop-wire`: framing, Reed-Solomon, the loss estimate, and client ↔
   gateway over localhost UDP (30% loss, restarts, replays, two processes).
 - `vtop-gateway`: the client through the gateway to a mock engine.
-- `edge/` (`bun run test`): accounts, devices, mail OTP, the `/vtop/` proxy, account proofs' challenges and relay.
+- `backend/` (`bunx vitest run`): accounts, devices, mail OTP, account proofs' challenges and relay; `mail/` and `proxy/` (`bun run test`).
 - `vtop-ffi/src/tests.rs`, `<module>/tests.rs` (`pages/outing/`, `remote/forwarding/`, ...) and next to
   each module: the app's crate; `test_edge.rs` is the mock edge they share.
 - `vtop-core/examples/parse_bench.rs`: parser timings on fixtures or raw pages.

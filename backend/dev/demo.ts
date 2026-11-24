@@ -1,7 +1,7 @@
 // Turns a demo recording (`demo_record.json`, see rust/vtop-ffi/src/demo.rs) into
 // guides/demo.json with a made-up student: the profile, mentor, outing and grade history
 // identity is replaced, and every personal value the profile held is swept from all pages.
-// Fails when one is still there. Review the output before `bun run deploy`.
+// Fails when one is still there. Review the output, then `bun dev/gen-guides.ts` and `bunx convex deploy`.
 //
 //   bun dev/demo.ts <demo_record.json>
 

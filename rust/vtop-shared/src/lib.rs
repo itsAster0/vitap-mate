@@ -1,6 +1,6 @@
-//! Formats the app and the engine share with each other and with the edge
-//! Worker. The edge is TypeScript and keeps its own copy of what it needs
-//! (`edge/src/shared/`); a change here must be made there too. No
+//! Formats the app and the engine share with each other and with the backend.
+//! The backend is TypeScript and keeps its own copy of what it needs
+//! (`backend/convex/lib/`); a change here must be made there too. No
 //! I/O, so it builds for every target.
 #![cfg_attr(
     not(test),

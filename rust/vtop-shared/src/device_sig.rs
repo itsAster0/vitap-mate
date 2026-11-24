@@ -2,7 +2,7 @@
 //! seed (32 bytes, base64url without padding) and sends, with every request:
 //! `x-vm-device` (its id), `x-vm-time` (unix seconds) and `x-vm-sig`, the
 //! signature over [`message`]. The edge checks it with WebCrypto in its
-//! TypeScript copy (`edge/`), against `vectors/device_sig.json`.
+//! TypeScript copy (`backend/convex/lib/signed.ts`, `crypto.ts`), against `vectors/device_sig.json`.
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};

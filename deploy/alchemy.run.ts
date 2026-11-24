@@ -1,6 +1,6 @@
 // The servers around backend v3, deployed with Alchemy from a laptop: `bun run deploy` here
 // (stage `prod`), which then deploys the Convex functions (`bunx convex deploy` in ../backend).
-// Needs the variables in .env.example; CI deploys nothing. State lives in the account's Alchemy
+// Needs the variables in .env.example (in .env here); CI deploys nothing. State lives in the account's Alchemy
 // state-store Worker.
 //
 // - Convex: self-hosted on hawk (infra repo, services/vmate-convex), served at
@@ -16,8 +16,9 @@
 // - Mail: the `vmate-mail` Worker, which hands forwarded OTP mail to Convex,
 //   with its retry queue.
 // - Proxy: the `vmate-proxy` Worker on vmate-proxy.aster0.dev (the Proxy route).
-// - Old edge: the v2 Worker, frozen on vmate-old.aster0.dev, kept with its
-//   Durable Objects until the cleanup (docs/plans/2026-11-24-v3-changes.md).
+// - The v2 Worker (`vmate-edge`) and its Durable Objects are no longer declared, so
+//   the first deploy without them deletes them; their data is in Convex since
+//   the cutover (docs/plans/2026-11-24-v3-changes.md).
 //
 // Not here: the Email Routing rule otp@vmate.aster0.dev → vmate-mail (made in the
 // dashboard; subdomains have no catch-all), and DNS (infra repo, dns/).
@@ -141,40 +142,6 @@ export const Proxy = Cloudflare.Worker("Proxy", {
   observability: { enabled: true, logs: { enabled: true, invocationLogs: false } },
 }).pipe(adopt(true));
 
-/** The v2 Worker, frozen (writes answer 503), kept for its Durable Objects' export. */
-export const OldEdge = Cloudflare.Worker("Edge", {
-  name: "vmate-edge",
-  main: "./src/index.ts",
-  compatibility: { date: "2026-10-01" },
-  domain: "vmate-old.aster0.dev",
-  workersDev: false,
-  assets: { directory: "./guides", base: "/guides" },
-  observability: {
-    enabled: true,
-    logs: { enabled: true, invocationLogs: false },
-    traces: { enabled: true, headSamplingRate: 0.05 },
-  },
-  env: {
-    DEVICE: Cloudflare.DurableObject("DEVICE", { className: "Device" }),
-    MAILBOX: Cloudflare.DurableObject("MAILBOX", { className: "Mailbox" }),
-    INDEX: Cloudflare.DurableObject("INDEX", { className: "Index" }),
-    FCM_TOKEN: Cloudflare.DurableObject("FCM_TOKEN", { className: "FcmToken" }),
-    ACCOUNT: Cloudflare.DurableObject("ACCOUNT", { className: "Account" }),
-    OAUTH: Cloudflare.DurableObject("OAUTH", { className: "OAuth" }),
-    FREEZE: "1",
-    MAIL_DOMAIN: DOMAIN,
-    ENGINE_URL: "https://engine-v2-production.up.railway.app",
-    FCM_URL: "https://fcm.googleapis.com",
-    PUBLIC_URL: "https://vmate-old.aster0.dev",
-    ALLOWED_ORIGINS: "",
-    FALLBACK_FORWARD: "",
-    INTERNAL_TOKEN: Config.Redacted("INTERNAL_TOKEN"),
-    GATEWAY_TOKEN: Config.Redacted("GATEWAY_TOKEN"),
-    ACCOUNT_TOKEN_SECRET: Config.Redacted("ACCOUNT_TOKEN_SECRET"),
-    FIREBASE_CREDENTIALS_JSON: Config.Redacted("FIREBASE_CREDENTIALS_JSON"),
-  },
-}).pipe(adopt(true));
-
 /** Where the gateway's files live on hawk: its Noise keys (./data) and resolvers. */
 const GATEWAY_DIR = "/root/vitapmate-gateway";
 
@@ -241,8 +208,7 @@ export default Alchemy.Stack(
     const railway = yield* RailwayEngine;
     const mail = yield* Mail;
     const proxy = yield* Proxy;
-    const old = yield* OldEdge;
-    const out = { engine: engine.name, railway: railway.url, mail: mail.workerName, proxy: proxy.url, oldEdge: old.url };
+    const out = { engine: engine.name, railway: railway.url, mail: mail.workerName, proxy: proxy.url };
     // SKIP_GATEWAY=1 deploys without it (when there is no GHCR_TOKEN).
     if (yield* Config.Boolean("SKIP_GATEWAY").pipe(Config.withDefault(false))) return out;
     const gateway = yield* Gateway;

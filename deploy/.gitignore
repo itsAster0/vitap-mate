@@ -1,5 +1,3 @@
-build/
 node_modules/
-.wrangler/
 .env
 .alchemy/

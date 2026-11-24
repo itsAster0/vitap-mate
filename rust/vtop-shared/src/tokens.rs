@@ -1,5 +1,5 @@
 //! How secrets are compared: by their SHA-256, as hex. The edge
-//! (`edge/src/shared/tokens.ts`) hashes the same way.
+//! (`backend/convex/lib/crypto.ts`) hashes the same way.
 
 use sha2::{Digest, Sha256};
 

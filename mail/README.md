@@ -3,7 +3,7 @@
 The Cloudflare Email Worker for backend v3. Mail to the forwarding addresses
 (`otp+<id>@vmate.aster0.dev`) comes here. The Worker keeps no state: it reads the
 address id, the VTOP OTP or Gmail's forwarding confirmation (the same parsing as
-`edge/src/mail.ts`) and POSTs it to Convex. The contract is in
+the v2 edge's) and POSTs it to Convex. The contract is in
 `docs/plans/2026-11-23-backend-v3-api.md`, under "Mail Worker → Convex".
 
 ```

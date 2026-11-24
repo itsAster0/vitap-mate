@@ -23,14 +23,15 @@ Nothing here runs without the user asking for a release. Each step marked
      `AGENTS.md`; Play refuses a code it has seen).
    - `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt`, at most
      500 characters (`wc -m` it).
-   - The release, newest first, in `edge/guides/updates.json`, with
+   - The release, newest first, in `backend/guides/updates.json`, with
      `"since": <versionCode>` on the features it adds.
    - A line in `UPDATE_PRIORITIES` in `fastlane/Fastfile` if the priority isn't
      the default (2).
 4. Check: `mise run check`, then a release build on the emulator
    (`mise run release`, `adb install -r build/vitapmate-release.apk`).
 5. Commit only when asked (`chore(release): <versionName>`), with jj.
-6. **ask** `bun run deploy` in `edge/` (updates.json goes out with the edge).
+6. **ask** `bun dev/gen-guides.ts` and `bunx convex deploy` in `backend/` (updates.json is
+   bundled into Convex).
 7. **ask** Push the tag `v<versionName>`. `android-release.yml` checks it
    matches `versionName`, builds the signed AAB and uploads it to the internal track.
 8. **ask** Promotion: the Play Console, or

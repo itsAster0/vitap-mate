@@ -246,7 +246,7 @@ describe("VTOP on the engine", () => {
 });
 
 describe("guides", () => {
-  it("are bundled from edge/guides as it is now (else run bun dev/gen-guides.ts)", async () => {
+  it("are bundled from guides/ as it is now (else run bun dev/gen-guides.ts)", async () => {
     const files = await guideFiles();
     expect(Object.keys(GUIDE_FILES).sort()).toEqual(files.map((f) => f.path).sort());
     for (const f of files) expect(GUIDE_FILES[f.path]).toEqual({ type: f.type, etag: f.etag, body: f.base64 });

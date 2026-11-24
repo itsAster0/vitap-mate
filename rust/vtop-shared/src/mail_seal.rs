@@ -8,7 +8,7 @@
 //! ephemeral and recipient public keys, info [`INFO`]. The mailbox id is the
 //! associated data, so a box cannot be replayed to another mailbox.
 //! The app and the engine open boxes through this module; the edge seals
-//! with its TypeScript copy (`edge/src/shared/mail-seal.ts`), checked
+//! with its TypeScript copy (`backend/convex/lib/mailSeal.ts`), checked
 //! against the vector in `vectors/mail_seal.json`.
 
 use aes_gcm::aead::{Aead, Payload};

@@ -1,4 +1,4 @@
-// HTTP actions on the same paths as the old edge (edge/API.md), so the
+// HTTP actions on the same paths as the old edge (API.md), so the
 // extension, MCP clients, the engine, the gateway and the mail Worker don't
 // change: key routes, pairing, OAuth, `/mcp`, `/internal/*` and `/healthz`.
 // Phones use functions over the socket instead (see the contract,
@@ -424,7 +424,7 @@ internalRoute("/internal/mail", () => [process.env.MAIL_TOKEN], async (ctx, req)
   return Response.json({ ok: true });
 });
 
-// The help content (edge/guides, bundled by dev/gen-guides.ts), as the edge's Static Assets
+// The help content (guides/, bundled by dev/gen-guides.ts), as the v2 edge's Static Assets
 // served it: phones keep a copy and revalidate with the ETag.
 http.route({
   pathPrefix: "/guides/",

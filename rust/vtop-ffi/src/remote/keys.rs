@@ -17,7 +17,7 @@ use crate::{Core, CoreError, dev, traced};
 pub const BROWSER_LABEL: &str = "Browser";
 /// The label of a key made for an MCP client.
 const MCP_LABEL: &str = "MCP";
-/// Crockford base32, the alphabet the extension draws pairing codes from (`edge/src/pair.ts`).
+/// Crockford base32, the alphabet the extension draws pairing codes from (`backend/convex/lib/pairing.ts`).
 const PAIR_ALPHABET: &str = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const PAIR_LENGTH: usize = 10;
 

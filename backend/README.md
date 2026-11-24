@@ -49,7 +49,8 @@ and `.env.test.local` holds the test secrets; both are gitignored.
 ## Backfill from the edge
 
 `scripts/backfill.ts` reads every Durable Object of the old edge through its
-`POST /internal/export` (`edge/API.md`) and imports it into the deployment in
+`POST /internal/export` (on vmate-old.aster0.dev; its code is in the
+`flutter`-era history, removed from `main`) and imports it into the deployment in
 `.env.local` with the internal mutation `migrate:importBatch`, called with the
 admin key. Rows keep their old ids (device id, regno, key hash, address id,
 OAuth client id). It prints only counts.

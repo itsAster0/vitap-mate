@@ -9,8 +9,8 @@ iOS would need other Kotlin bindings for UniFFI.
 Read `rust/ARCHITECTURE.md` (the crates, the routes from the phone, UDP mode,
 deploys), `backend/README.md` (the Convex functions) and
 `docs/plans/2026-11-23-backend-v3.md` before you change the Rust core or the
-server. `edge/` is the v2 server, kept until the cutover's cleanup; only its
-`guides/` (served by the backend) is still used.
+server. `backend/API.md` is the HTTP contract the extension, MCP clients and the
+engine use.
 
 ## Ways to break things
 
@@ -54,8 +54,7 @@ rust/                 Cargo workspace
 backend/              self-hosted Convex (TypeScript, bun): all server state; the phone's one socket
 mail/                 Cloudflare Email Worker: hands forwarded mail to the backend, keeps nothing
 proxy/                Cloudflare Worker vmate-proxy: VTOP behind a compressing proxy (the Proxy route)
-edge/                 the frozen v2 Worker and Durable Objects (until cleanup), alchemy.run.ts (the
-                      deploy), and guides/, still the source
+deploy/               alchemy.run.ts: deploys the engine, gateway, Workers, then Convex
 extension/            Chrome and Firefox extension (Svelte, bun)
 fastlane/             Play Store lanes and release notes
 keystore/             release keystore (gitignored; never read or print it)
@@ -83,8 +82,8 @@ A page or route change reaches more than one place. Check each:
 - Cached and fresh data: `cached_x` with no cache yet, and `fetch_x` over it.
 - The vtop-mcp tools (`rust/vtop-mcp/src/tools.rs`) for a read page.
 - The extension, when a session or server route changes (`extension/AGENTS.md`).
-- `"since": <versionCode>` in `edge/guides/updates.json` for a new feature.
-- The demo data in `edge/guides/demo.json`, so the demo account shows it.
+- `"since": <versionCode>` in `backend/guides/updates.json` for a new feature.
+- The demo data in `backend/guides/demo.json`, so the demo account shows it.
 
 ### Glossary
 
@@ -97,8 +96,6 @@ A page or route change reaches more than one place. Check each:
 - backend: the self-hosted Convex the phone talks to over one WebSocket (`backend/`);
   the app and the mail Worker default to vmate.aster0.dev; the test one is
   vmate3.aster0.dev (Settings → Developer → Server on a debug build).
-- edge: the v2 Cloudflare Worker and Durable Objects (`edge/`), frozen on
-  vmate-old.aster0.dev since the cutover and kept for their export until the cleanup.
 - engine: `rust/vtop-bridge`, Railway `engine-v2`: signs in and fetches for the server routes.
 - gateway: `rust/vtop-gateway`, the UDP end of vm1 on the Linode.
 - vm1: Noise IK over UDP for slow, lossy links (`rust/vtop-wire`).
@@ -154,7 +151,7 @@ app ships no server secret.
 ## Commands
 
 mise installs the toolchains in `mise.toml`: Java, the Kotlin Toolchain and
-bun. The edge (`edge/`) and the extension use bun.
+bun. The backend, the Workers, the deploy and the extension use bun.
 
 ```sh
 mise run rust-android        # after changing rust/vtop-ffi: builds the .so into app/jniLibs and the Kotlin bindings
@@ -171,20 +168,19 @@ cd rust && cargo fmt && cargo clippy --workspace --all-targets -- -D warnings &&
 cd backend && bunx tsc -p . --noEmit && bunx vitest run
 cd backend && bunx convex deploy -y && bun run smoke   # vmate3 only; prod needs an OK
 cd extension && bun run test && bun run build
-mise run check               # all of what CI runs; or check-rust, check-kotlin, check-edge, check-ext
+mise run check               # all of what CI runs; or check-rust, check-kotlin, check-backend, check-workers, check-deploy, check-ext
 ```
 
 Run `mise run check` (or the part you touched) before saying you're done.
 `ANDROID_HOME` and `ANDROID_SERIAL` pick the SDK and the device for the adb tasks.
 
 Deploy only when asked, and only from a laptop: CI builds the app and the
-extension but deploys nothing. `bun run deploy` in `edge/` deploys, from
+extension but deploys nothing. `bun run deploy` in `deploy/` deploys, from
 `alchemy.run.ts`: the engine on nest (container `vmate-engine`, with Railway
 `engine-v2` kept up to date as a standby), the UDP gateway (pushed to GHCR, run on
-hawk as `vitapmate-gateway`), the mail and proxy Workers, and the frozen v2 edge on
-vmate-old.aster0.dev; then the Convex functions (`bunx convex deploy` in
-`backend/`). The v3 secrets come from the Convex deployment's env, the rest from
-`edge/.env` (`.env.example` lists them). The gateway needs `GHCR_TOKEN` (a GitHub
+hawk as `vitapmate-gateway`), and the mail and proxy Workers; then the Convex
+functions (`bunx convex deploy` in `backend/`). The v3 secrets come from the Convex
+deployment's env, the rest from `deploy/.env` (`.env.example` lists them). The gateway needs `GHCR_TOKEN` (a GitHub
 token with `write:packages`); `SKIP_GATEWAY=1` deploys without it. Convex itself,
 Caddy and DNS are in the infra repo. The README lists the CI workflows.
 
@@ -201,9 +197,9 @@ the AAB. To release:
    `M mmm p bb` from 3000000 (3.0.0 is 3000000, 3.0.4 is 3000410, 3.1.0 is 3001000); Play refuses a code it has seen.
 2. Write `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt` (at most
    500 characters) and add the version with its `code` to `releases` (newest
-   first) in `edge/guides/updates.json`; give features it adds
-   `"since": <versionCode>`, so older apps leave them out. Then `bun run
-   deploy` there.
+   first) in `backend/guides/updates.json`; give features it adds
+   `"since": <versionCode>`, so older apps leave them out. Then `bun
+   dev/gen-guides.ts` and `bunx convex deploy` in `backend/`.
 3. Push the tag `v<versionName>`. `android-release.yml` builds the signed AAB
    (64-bit and 32-bit) and uploads it to the internal track.
 4. Promote in the Play Console, or with `bundle exec fastlane android
@@ -243,7 +239,7 @@ and Kotlin's in `core/test/` and `features/<name>/test/`.
 
 Without a VTOP account, sign in as the demo account (`DEMO2026`, password
 `vitapmate-demo`, `rust/vtop-ffi/src/demo.rs`): it asks VTOP nothing, reads
-every page from the edge's `/guides/demo.json`, and answers outing writes,
+every page from the backend's `/guides/demo.json`, and answers outing writes,
 downloads, the web view and forwarding as unavailable. Debuggable builds take
 `adb shell am broadcast -p com.vitap_pal.app -a vitapmate.DUMP` (the state dump
 `mise run state` prints) and `-a vitapmate.SYNC_NOW` (a background sync now;

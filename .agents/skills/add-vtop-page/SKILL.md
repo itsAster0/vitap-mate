@@ -47,12 +47,12 @@ downloads still keep a method in `rust/vtop-core/src/client/`.
 - Routes: try it on Direct, Proxy, Server and Udp (Settings → Connection).
 - Cached and fresh: open the screen with no cache, then again offline.
 - vtop-mcp: add a `get_x` tool in `rust/vtop-mcp/src/tools.rs` if agents should read it.
-- Demo: add the page to `edge/guides/demo.json` under `pages`,
+- Demo: add the page to `backend/guides/demo.json` under `pages`,
   keyed `name@semester?arg=value` like the others, so the demo account shows it.
 - updates.json: give the feature `"since": <versionCode>` in
-  `edge/guides/updates.json`.
-- The edge needs nothing for a read page unless the spec's shape is new to it;
-  check `edge/API.md`.
+  `backend/guides/updates.json`.
+- The backend needs nothing for a read page unless the spec's shape is new to it;
+  check `backend/API.md`.
 
 ## Check
 

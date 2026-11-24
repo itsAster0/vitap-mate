@@ -58,11 +58,11 @@ run = [
 ]
 
 [tasks.check]
-description = "Run what CI runs: check-rust, check-kotlin, check-edge and check-ext"
-depends = ["check-rust", "check-kotlin", "check-edge", "check-ext"]
+description = "Run what CI runs: check-rust, check-kotlin, check-backend, check-workers, check-deploy and check-ext"
+depends = ["check-rust", "check-kotlin", "check-backend", "check-workers", "check-deploy", "check-ext"]
 
 [tasks.check-changed]
-description = "Only the checks for what the working copy changes (jj diff, else git diff): per-crate fmt, clippy and test, cargo deny, Kotlin tests and detekt, edge, extension (-n: list them)"
+description = "Only the checks for what the working copy changes (jj diff, else git diff): per-crate fmt, clippy and test, cargo deny, Kotlin tests and detekt, backend, Workers, deploy, extension (-n: list them)"
 usage = 'flag "-n" help="Print the checks without running them"'
 run = 'scripts/check-changed.sh ${usage_n:+-n}'
 
@@ -91,14 +91,21 @@ description = "Kotlin as App Build runs it: core and design tests, then detekt"
 run = ["./kotlin test", "mise run detekt"]
 
 [tasks.check-backend]
-description = "The Convex backend: type checks and tests"
+description = "The Convex backend as Server Check runs it: type checks and tests"
 dir = "backend"
 run = ["[ -d node_modules ] || bun install --frozen-lockfile", "bun run check", "bun run test"]
 
-[tasks.check-edge]
-description = "The edge Worker as Edge Check runs it: type checks and tests"
-dir = "edge"
-run = ["[ -d node_modules ] || bun install --frozen-lockfile", "bun run check", "bun run test"]
+[tasks.check-workers]
+description = "The mail and proxy Workers as Server Check runs them: type checks and tests"
+run = [
+  "cd mail && { [ -d node_modules ] || bun install --frozen-lockfile; } && bun run check && bun run test",
+  "cd proxy && { [ -d node_modules ] || bun install --frozen-lockfile; } && bun run check && bun run test",
+]
+
+[tasks.check-deploy]
+description = "The Alchemy stack (deploy/alchemy.run.ts): type checks"
+dir = "deploy"
+run = ["[ -d node_modules ] || bun install --frozen-lockfile", "bun run check"]
 
 [tasks.check-ext]
 description = "The browser extension as Extension Build runs it: checks, tests and the Chrome build"

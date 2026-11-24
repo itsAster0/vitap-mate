@@ -4,7 +4,7 @@
 //!
 //! The verifier is handed its statement before it reads a byte from the
 //! prover: its caller (the engine) builds it from the device and challenge the
-//! edge checked and consumed (see `edge/API.md`, "Account proof"), never from
+//! edge checked and consumed (see `backend/API.md`, "Account proof"), never from
 //! anything the prover sends. A relay that swaps provers gets a statement
 //! whose binding the other prover's request does not carry, so the proof fails.
 //!

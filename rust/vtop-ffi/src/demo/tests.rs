@@ -64,7 +64,7 @@ async fn demo_reads_sample_pages_and_never_calls_vtop() {
 }
 
 /// The edge's demo (`/guides/demo.json`), as the app downloads it.
-const EDGE_DEMO: &str = include_str!("../../../../edge/guides/demo.json");
+const EDGE_DEMO: &str = include_str!("../../../../backend/guides/demo.json");
 
 /// `key`'s parts: the page's name, its semester and its arguments.
 fn parts(key: &str) -> (&str, Option<&str>, Vec<(&str, &str)>) {

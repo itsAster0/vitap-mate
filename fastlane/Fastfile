@@ -7,7 +7,7 @@ METADATA = 'fastlane/metadata/android'.freeze
 DEFAULT_UPDATE_PRIORITY = 2
 UPDATE_PRIORITIES = {
   # 3001000 => 5,
-  3002000 => 5, # the new server: older versions stop syncing
+  3_002_000 => 5 # the new server: older versions stop syncing
 }.freeze
 
 # The versionCode the AAB is built with, from app/module.yaml.
@@ -43,7 +43,7 @@ platform :android do
 
   desc 'Promote the latest internal build to the closed (friends), alpha and beta tracks'
   lane :promote_all_testing do
-    %w[friends alpha beta].each do |track|
+    %w[friends alpha beta production].each do |track|
       upload_to_play_store(
         track: 'internal',
         track_promote_to: track,

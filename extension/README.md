@@ -3,7 +3,7 @@
 Signs Chrome in to VTOP with an access key from the VITAP Mate app. The
 extension shows a pairing code; the app (Connected apps → Pair a browser)
 makes a key for it, and the extension collects the key from the server
-(`POST /v1/pair`, see `edge/API.md`). A key pasted by hand works
+(`POST /v1/pair`, see `backend/API.md`). A key pasted by hand works
 too. With the key, the server hands back a VTOP session from its cache, the
 phone, or a server-side sign-in; the extension installs the cookies and
 opens VTOP. It never sees a password.

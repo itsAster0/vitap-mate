@@ -2,10 +2,13 @@ name: App Build
 on:
   push:
     branches: [main]
-    # Parts of the repo the app is not built from: the edge Worker, the
+    # Parts of the repo the app is not built from: the backend, the Workers, the deploy, the
     # engine's crates, the gateway, the browser extension and docs.
     paths-ignore:
-      - "edge/**"
+      - "backend/**"
+      - "mail/**"
+      - "proxy/**"
+      - "deploy/**"
       - "rust/vtop-bridge/**"
       - "rust/vtop-mcp/**"
       - "rust/vtop-gateway/**"
@@ -15,13 +18,16 @@ on:
       - "fastlane/**"
       - ".github/workflows/extension-build.yml"
       - ".github/workflows/rust-check.yml"
-      - ".github/workflows/edge-check.yml"
+      - ".github/workflows/server-check.yml"
       - ".github/workflows/actions-check.yml"
       - ".github/ISSUE_TEMPLATE/**"
       - "**/*.md"
   pull_request:
     paths-ignore:
-      - "edge/**"
+      - "backend/**"
+      - "mail/**"
+      - "proxy/**"
+      - "deploy/**"
       - "rust/vtop-bridge/**"
       - "rust/vtop-mcp/**"
       - "rust/vtop-gateway/**"
@@ -31,7 +37,7 @@ on:
       - "fastlane/**"
       - ".github/workflows/extension-build.yml"
       - ".github/workflows/rust-check.yml"
-      - ".github/workflows/edge-check.yml"
+      - ".github/workflows/server-check.yml"
       - ".github/workflows/actions-check.yml"
       - ".github/ISSUE_TEMPLATE/**"
       - "**/*.md"

@@ -6,7 +6,7 @@
 //!
 //! The pages are recorded from a real account in a debuggable build: create `demo_record.json`
 //! in the app's data folder and every page fetched is added to it ([`Core::record_demo`]); then
-//! `bun run demo` in `edge/` swaps out the personal details.
+//! `bun dev/demo.ts` in `backend/` swaps out the personal details.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};

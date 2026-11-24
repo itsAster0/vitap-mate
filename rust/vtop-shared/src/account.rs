@@ -1,5 +1,5 @@
 //! Account ids, as the engine and the edge
-//! (`edge/src/shared/engine-api.ts`) both make them.
+//! (`backend/convex/lib/engineApi.ts`) both make them.
 
 /// Account ids are upper-cased registration numbers.
 pub fn account_id(registration_number: &str) -> String {

@@ -1,5 +1,5 @@
 {
-  "comment": "Sample bodies of the edge <-> engine calls (vtop_shared::engine, edge/src/shared/engine-api.ts), by type. Each is in the form serde writes it, so vtop-shared round-trips them unchanged; the edge checks them against its types. Values are made up.",
+  "comment": "Sample bodies of the edge <-> engine calls (vtop_shared::engine, backend/convex/lib/engineApi.ts), by type. Each is in the form serde writes it, so vtop-shared round-trips them unchanged; the edge checks them against its types. Values are made up.",
   "SessionCheck": [
     {
       "cookies": "JSESSIONID=abc; SERVERID=s1"

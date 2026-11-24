@@ -1,10 +1,10 @@
 # vtop-bridge (the engine)
 
-The VTOP work behind the Cloudflare edge (`edge/`), run on Railway as the
-`engine-v2` service from `../Dockerfile.engine`; the edge reaches it at its
-`ENGINE_URL` (https://engine-v2-production.up.railway.app). It stores nothing: accounts,
-keys, devices, mailboxes and pending requests live in the edge's Durable
-Objects. The engine only:
+The VTOP work behind the backend (`backend/`), run on nest as `vmate-engine`
+(with the Railway `engine-v2` service as a standby) from `../Dockerfile.engine`; the backend reaches it at its
+`ENGINE_URL` (nest at http://100.126.222.47:8090 over NetBird). It stores nothing: accounts,
+keys, devices, mailboxes and pending requests live in the backend's Convex
+deployment. The engine only:
 
 - checks whose a VTOP session is (`/engine/session`);
 - seals saved credentials for an account (`/engine/seal`);
@@ -72,5 +72,5 @@ VAULT_KEY="$(openssl rand -base64 32)" EDGE_URL=http://localhost:8787 \
   INTERNAL_TOKEN="$(openssl rand -hex 32)" cargo run -p vtop-bridge
 ```
 
-Deployed with the edge: `bun run deploy` in `edge/` (`alchemy.run.ts`)
-builds `rust/Dockerfile.engine` into the Railway service `engine-v2`.
+Deployed by `bun run deploy` in `deploy/` (`alchemy.run.ts`), which builds
+`rust/Dockerfile.engine` for nest and the Railway service `engine-v2`.

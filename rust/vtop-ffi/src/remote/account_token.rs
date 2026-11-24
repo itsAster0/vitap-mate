@@ -1,4 +1,4 @@
-//! The v2 edge's account token (`edge/API.md`, "Account tokens"), which a phone that proved
+//! The v2 edge's account token (`backend/API.md`, "Account tokens"), which a phone that proved
 //! before v3 still keeps: traded in once for a refresh token (`auth:token { v2AccountToken }`,
 //! [`crate::remote::backend`]), then dropped. Kept in [`FILE`] for the signed-in student;
 //! dropped on sign-out and another student too. The token itself is never logged.

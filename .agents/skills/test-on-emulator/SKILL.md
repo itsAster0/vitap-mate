@@ -25,7 +25,7 @@ tasks drop the cached Android build for it.
 
 Without a VTOP account use the demo account: `DEMO2026`, password
 `vitapmate-demo` (`rust/vtop-ffi/src/demo.rs`). It asks VTOP nothing and reads
-every page from the edge's `/guides/demo.json`. Outing writes, downloads, the
+every page from the backend's `/guides/demo.json`. Outing writes, downloads, the
 web view and forwarding answer as unavailable there, so test those with a real
 account, and only with the user's OK.
 

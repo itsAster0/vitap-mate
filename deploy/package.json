@@ -1,36 +1,20 @@
 {
-  "name": "vtop-edge",
+  "name": "vmate-deploy",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "tsc -p .",
-    "test": "vitest run",
     "deploy": "alchemy deploy alchemy.run.ts --stage prod && cd ../backend && bunx convex deploy -y",
     "plan": "alchemy plan alchemy.run.ts --stage prod",
-    "demo": "bun dev/demo.ts",
-    "docs": "bun dev/docs.ts"
-  },
-  "dependencies": {
-    "@noble/ciphers": "2.4.0",
-    "@noble/curves": "2.4.0",
-    "@noble/hashes": "2.4.0",
-    "fflate": "0.8.3",
-    "postal-mime": "4.2.1"
+    "check": "tsc -p ."
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "2.0.0-beta.87",
     "@alchemy.run/docker": "2.0.0-beta.87",
     "@alchemy.run/railway": "2.0.0-beta.87",
-    "@cloudflare/workers-types": "5.20261121.1",
     "@effect/platform-bun": "4.1.5",
     "@effect/platform-node": "4.1.5",
     "alchemy": "2.0.0-beta.87",
     "effect": "4.1.5",
-    "typescript": "7.0.2",
-    "vitest": "5.1.1",
-    "wrangler": "4.166.0"
-  },
-  "workspaces": [
-    "."
-  ]
+    "typescript": "7.0.2"
+  }
 }
