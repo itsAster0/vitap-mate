@@ -303,10 +303,11 @@ impl Core {
         }
         // Another student signed in over the saved one ("Sign in again"): the last one's
         // semesters, pick and pages are not theirs.
-        if self
-            .read_account()
-            .is_some_and(|saved| saved.username != session.account.username)
-        {
+        if self.read_account().is_some_and(|saved| {
+            !saved
+                .username
+                .eq_ignore_ascii_case(&session.account.username)
+        }) {
             info!("another account signed in: cached pages and forwarding address dropped");
             self.queue_leave();
             self.forget(&STUDENT_FILES);

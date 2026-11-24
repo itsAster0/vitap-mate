@@ -120,12 +120,20 @@ impl Core {
         password: String,
     ) -> Result<(), CoreError> {
         traced("dev_set_account", &flow, async {
-            let account = Account {
+            let mut account = Account {
                 username: username.trim().to_uppercase(),
                 password,
                 rejected: false,
                 registration_number: None,
             };
+            // Keep the known registration number when updating credentials for the same student,
+            // so server identity checks don't lose it before the next VTOP page fetch.
+            if let Some(saved) = self
+                .read_account()
+                .filter(|saved| saved.username.eq_ignore_ascii_case(&account.username))
+            {
+                account.registration_number = saved.registration_number;
+            }
             let fresh = Session::new(account.clone(), &self.shared)?;
             match self.current() {
                 Ok(slot) => {
@@ -319,7 +327,11 @@ impl Core {
     ) -> Result<(), CoreError> {
         traced_sync("dev_set_forwarding_server", &flow, || {
             let path = self.at(edge::SERVER_FILE);
-            match url.as_deref().map(str::trim).filter(|url| !url.is_empty()) {
+            match url
+                .as_deref()
+                .map(|url| url.trim().trim_end_matches('/'))
+                .filter(|url| !url.is_empty())
+            {
                 Some(url) => {
                     if !(url.starts_with("http://") || url.starts_with("https://")) {
                         return Err(CoreError::Other {
@@ -334,7 +346,7 @@ impl Core {
                     info!("forwarding server back to the default");
                 }
             }
-            self.shared.reset_backend();
+            self.on_server_changed();
             Ok(())
         })
     }

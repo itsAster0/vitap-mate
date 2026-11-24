@@ -1,6 +1,7 @@
 use std::fs;
 use std::sync::{Arc, Mutex};
 
+use super::auth::GrantKind;
 use super::*;
 use crate::test_edge::{Edge, REFRESH, keep_token, paths, serve, signed_in};
 
@@ -359,4 +360,75 @@ async fn a_refresh_failing_for_another_reason_keeps_the_token_and_never_proves()
     assert!(view(&core, "f2", true).await.is_err());
     assert_eq!(paths(&edge), ["auth:token", "auth:token"]);
     assert_eq!(core.device().refresh.unwrap().token, REFRESH);
+}
+
+#[tokio::test]
+async fn sign_out_last_student_persists_rotated_token_and_restores_current_jwt() {
+    let (core, edge, server) = setup("signout-restore").await;
+    // Current student holds a live JWT on the socket.
+    keep_token(&core, &server);
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    view(&core, "f-cur", false).await.unwrap().unwrap();
+    let current_jwt = edge.lock().unwrap().auth.clone();
+    assert_eq!(current_jwt.as_deref(), Some("jwt-1"));
+
+    // Last student's refresh token is waiting to sign out; auth:signOut fails once, then succeeds.
+    core.write(
+        LAST_STUDENT,
+        &Refresh {
+            server: server.clone(),
+            token: "vrt_last_old".into(),
+            regno: "22BCE9999".into(),
+        },
+    );
+    can(&edge, "auth:signOut", 503, json!({ "code": "unavailable" }));
+    core.sign_out_last_student("f-so1").await;
+    // The rotated refresh token from auth:token was saved back to LAST_STUDENT, and the current
+    // student's JWT is still on the socket.
+    let kept_last = core.read::<Refresh>(LAST_STUDENT).unwrap();
+    assert_eq!(kept_last.token, "vrt_2");
+    assert_eq!(edge.lock().unwrap().auth, current_jwt);
+
+    can(&edge, "auth:signOut", 200, json!(null));
+    core.sign_out_last_student("f-so2").await;
+    assert!(core.read::<Refresh>(LAST_STUDENT).is_none());
+    assert_eq!(edge.lock().unwrap().auth, current_jwt);
+}
+
+#[tokio::test]
+async fn stale_device_removed_does_not_wipe_a_newer_identity() {
+    let (core, edge, server) = setup("stale-removed").await;
+    keep_token(&core, &server);
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    let old_gen = core.shared.backend_state().auth.stamp().generation;
+    view(&core, "f1", false).await.unwrap().unwrap();
+    // Simulate a newer identity generation (e.g. a fresh proof or re-auth).
+    let (new_stamp, effects) = core.shared.backend_state().auth.on_issued(
+        GrantKind::Proof,
+        &server,
+        "22BCE0001",
+        "jwt-fresh".into(),
+        (crate::test_edge::now() + 900) * 1000,
+        "vrt_fresh".into(),
+    );
+    core.run_effects(effects);
+    assert!(new_stamp.generation > old_gen);
+
+    // Late device_removed from the old generation is ignored.
+    assert!(!core.on_device_removed(old_gen));
+    assert_eq!(core.device().refresh.unwrap().token, "vrt_fresh");
+    assert_eq!(edge.lock().unwrap().auth.as_deref(), Some("jwt-fresh"));
+}
+
+#[tokio::test]
+async fn trailing_slash_on_saved_server_still_uses_kept_refresh_token() {
+    let (core, edge, server) = setup("slash").await;
+    core.keep_refresh(Some(Refresh {
+        server: format!("{server}/"),
+        token: REFRESH.into(),
+        regno: "22BCE0001".into(),
+    }));
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    view(&core, "f", false).await.unwrap().unwrap();
+    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
 }

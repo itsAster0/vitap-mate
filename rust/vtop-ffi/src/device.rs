@@ -102,9 +102,12 @@ impl Core {
         (id, device.push_token.is_some())
     }
 
-    /// Keeps (or, None, drops) the refresh token.
+    /// Keeps (or, None, drops) the refresh token. Clearing it does not create `device.json` if
+    /// none exists yet.
     pub(crate) fn keep_refresh(&self, refresh: Option<Refresh>) {
-        self.device();
+        if refresh.is_some() {
+            self.device();
+        }
         self.update_device(|d| d.refresh = refresh);
     }
 
