@@ -2,10 +2,12 @@
 
 Stateful workflows across the app that currently spread their state across multiple booleans, `Option`s, mutexes, files, or Kotlin/Rust layers — and would benefit from the single-state, pure-transition pattern already used in `rust/vtop-ffi/src/remote/route/plan.rs` (`RoutePlan`, `ServerFetch`) and `rust/vtop-proto/` page machines.
 
+See also [`2026-11-24-architecture-audit.md`](2026-11-24-architecture-audit.md) for broader structural, concurrency, persistence, and type-safety improvements beyond state machines.
+
 ## Done
 
 ### 0. Server Identity & Token Lifecycle (`rust/vtop-ffi/src/remote/backend/auth.rs`)
-- **Status:** Refactored into `AuthMachine` (`Phase::{Unauthenticated, Ready(Jwt)}` + monotonic `generation` and `jwt_epoch` counters + explicit `Effect`s).
+- **Status:** Done — refactored into `AuthMachine` (`Phase::{Unauthenticated, Ready(Jwt)}` + monotonic `generation` and `jwt_epoch` counters + explicit `Effect`s).
 - **What it fixed:**
   - Stale `device_removed` / `unauthenticated` callbacks from earlier identities/JWTs can no longer wipe a newer refresh token or trigger double refreshes.
   - Expired/mismatched JWTs emit `SetSocketAuth(None)` before `auth:token` runs, avoiding `AuthError` reconnect storms during refresh.
@@ -14,72 +16,30 @@ Stateful workflows across the app that currently spread their state across multi
   - Server URL comparison normalises trailing slashes, and `prove_in_background` checks grant availability inside `identity_turn`.
   - Block Store (`AccountBackup`) was removed so reinstalls never restore stale rotated refresh tokens.
 
----
-
-## High Priority
-
 ### 1. VTOP Session, Login, OTP & Re-login Lifecycle
-**Files:**
-- `rust/vtop-ffi/src/lib.rs:206-276` (`Account`, `Session`, `Slot`)
-- `rust/vtop-ffi/src/session.rs:58-298` (`sign_in`, `submit_otp`, `resend_otp`, `cancel_otp`, `fresh_challenge`, `relogin`, `sign_in_again`)
-- `rust/vtop-ffi/src/remote/route.rs:455-636` (`on_server`, `server_relogin`, `server_otp`)
-- `rust/vtop-ffi/src/remote/udp.rs:272-290` (`adopt_renewed`)
-- `rust/vtop-core/src/session.rs:260-380` (`AuthState`, `SessionManager`)
-- `rust/vtop-core/src/client/mod.rs:54-76, 650-696` (`AuthStage`, `ClientState`)
-- `rust/vtop-core/src/client/auth.rs:10-105`, `rust/vtop-core/src/client/otp.rs:13-76`
-- `core/src/vitapmate/data/Page.kt:372-429` (`OtpPrompt`), `core/src/vitapmate/data/AccountState.kt:13-18`, `core/src/vitapmate/data/VtopSync.kt:60-107`
-- `features/login/src/vitapmate/features/login/OtpChallenge.kt:43-258`, `OtpSheet.kt:86-207`, `FetchOtpOverlay.kt:24-53`, `LoginScreen.kt:107-181, 314-343`, `OtpAutofill.kt:91-174`
-
-**Current scattered state:**
-Four parallel state models across three layers: `vtop-core` (`AuthState` + `AuthStage` + `logged_in_at`), `vtop-ffi` (`Session { otp, server_otp, logins, account.rejected }`), `core` Kotlin (`OtpPrompt { message, generation, asks }`, `AccountState`, `VtopSync`'s OTP coordinator), and `features/login` (`OtpChallenge`'s 12 mutable UI fields).
-
-**Concrete issues:**
-- **TOCTOU in `submit_otp` / `resend_otp` → `server_otp` (`session.rs:106-108, 138-140`, `route.rs:589-635`):** Checks `server_otp` under a read lock, drops it to await the consent dialog (up to 60 s), then takes a write lock and calls `resume_session(&state)` without re-checking `server_otp`, `otp.is_some()`, or `self.is_current(slot)`.
-- **`udp::adopt_renewed` (`udp.rs:281-289`) ignores open OTP state:** Resuming a renewed session leaves `session.otp = Some(...)` while the client is authenticated.
-- **`vtop-core` `AuthStage::LoggingIn` leak (`client/auth.rs:12, 68-77`):** Set before login, never reset to `Idle` if `run("login", ...)` fails with a network error or `InvalidCredentials`.
-- **Asymmetric credential rejection:** `sign_in_again` (`session.rs:285-289`) clears cookies and checks `is_current(slot)`; `server_relogin` (`route.rs:553-558`) skips cookie clearing.
-- **`LoginScreen` OTP cancel leak (`LoginScreen.kt:337-340`):** Clears local `otp = null` without calling `core.cancelOtp()`, leaving the installed `Session` with `otp = Some(...)`.
-- **`FetchOtpOverlay` key collision (`FetchOtpOverlay.kt:29`):** `remember(message)` collides when two consecutive challenges share VTOP's default message.
-- **`OtpChallenge` concurrent mutations (`OtpChallenge.kt:90-257`):** Countdown, autofill, and user callbacks mutate shared flags concurrently (`while (submitting) delay(100)`), while `OtpAutofill.solve` duplicates the same retry loop.
-
-**Proposed state machine:**
-- **Rust `SessionPhase`** (single owner in `Slot`, collapsing `vtop-core`'s `AuthStage` + `AuthState` as well):
-  - `Active { logins, logged_in_at }`
-  - `AwaitingOtp { via: Phone | Server, message, issued_at, challenge_id }`
-  - `PasswordRejected`
-  - Every OTP submission/resend carries `challenge_id`, and `UdpAdopted` transitions directly to `Active`.
-- **Kotlin `OtpChallengeState`** keyed by `challengeId` instead of message text:
-  - `Active(code, remaining, autofill: Watching | Filled | Off | Error, minimized)` | `Submitting(code)` | `Expired(autoResendLeft)` | `Resending` | `Done` | `Cancelled`.
-
----
+- **Status:** Done — `SessionPhase` (`Active` | `AwaitingOtp { via, message, challenge_id }` | `PasswordRejected`) in `rust/vtop-ffi/src/lib.rs`, `LoggingInGuard` in `rust/vtop-core/src/client/auth.rs`, `OtpPhase` + `phaseFlow` in `features/login/src/vitapmate/features/login/OtpChallenge.kt`, `OtpPrompt.challengeId` in `core/src/vitapmate/data/Page.kt`, and `cancelOtp` on `LoginScreen` cancel.
+- **What it fixed:** `AuthStage::LoggingIn` leak on login error/cancel, `server_otp` TOCTOU across consent await, `udp::adopt_renewed` clearing stale OTP phase, asymmetric cookie clearing on rejected password in `server_relogin`, `LoginScreen` OTP cancel leak, `FetchOtpOverlay` message key collision, and `while (submitting) delay(100)` spin-wait.
 
 ### 2. `ConvexClient` Connection Lifecycle & `LiveWatch` Renewal Coordinator
-**Files:**
-- `rust/vtop-ffi/src/convex/client.rs:101-133, 254-390, 417-566, 644-661`
-- `rust/vtop-ffi/src/remote/backend.rs:159-340` (`live_watch`, `keep_renewed`, `renew`)
-- `core/src/vitapmate/data/Live.kt:34-129`
-- `app/src/vitapmate/PushService.kt:130-147`
+- **Status:** Done — `Link` enum (`Idle`, `Backoff`, `Opening`, `Open`, `Closed`) in `rust/vtop-ffi/src/convex/client.rs`, single `Condvar`-driven `Renewal` coordinator in `rust/vtop-ffi/src/remote/backend.rs`, and channel-close `LiveWake` in `core/src/vitapmate/data/Live.kt`.
+- **What it fixed:** Combinatorial connection flags, `AuthError` backoff inflation, per-error `"convex-renew"` thread spawning, old client timer leak on `on_server_changed`, and `LiveWake` `@Volatile` shutdown race.
 
-**Current scattered state:**
-- `convex/client.rs:101-133` tracks connection state with 7 overlapping fields (`socket`, `epoch`, `live`, `open`, `reconnect_at`, `closed`, `auth_changed`) alongside `backoff_ms`, `last_server_ms`, `last_used_ms`, and `pending`.
-- `backend.rs` runs a `std::thread::sleep` loop (`keep_renewed`) plus ad-hoc per-error OS threads (`convex-renew`).
-- `PushService.kt:136` polls `hasServerIdentity` every 5 s in a Kotlin loop.
+### 5. Connected Apps Session-Request Handover
+- **Status:** Done — clock-injected `HandoverCoordinator` (`Notified` | `Answering` | `Done`) in `app/src/vitapmate/HandoverCoordinator.kt`, wired into `PushService.kt` and `MainActivity.kt` with unit tests in `app/test/vitapmate/HandoverCoordinatorTest.kt`.
+- **What it fixed:** Unbounded `Push.answered` set, expiry checks before prompting/answering, FCM dropped while foregrounded, foreground/tap promotion without double-answering, per-request notification IDs, and timeout vs completion double-answer race.
 
-**Concrete issues:**
-- **Combinatorial flag states in `ConvexClient`:** 32+ flag combinations for 5 real states, requiring repeated ad-hoc guards across handlers.
-- **Backoff bump on `AuthError` (`client.rs:465-473`):** `drop_socket` doubles `backoff_ms` before `reconnect_at = Some(now)` overrides the delay, leaving `backoff_ms` inflated for the next real disconnect.
-- **Per-error OS thread spawning in `renew()` (`backend.rs:307-328`):** Every failing watch spawns a new `"convex-renew"` thread instead of waking one `Condvar`-backed renewal coordinator.
-- **`LiveWake` shutdown race (`Live.kt:111-124`):** `@Volatile live` + conflated `Channel` can race between shutdown and buffered wakes.
+### 6. In-App VTOP WebView Session & Recovery
+- **Status:** Done — pure, clock-injected `VtopWebState` (`Preparing` | `WaitingForView` | `Active` | `Failed` | `Crashed`) in `features/vtop/src/vitapmate/features/vtop/VtopWebState.kt`, wired into `VtopScreen.kt` and `VtopBrowser.kt` with unit tests in `features/vtop/test/vitapmate/features/vtop/VtopWebStateTest.kt`.
+- **What it fixed:** Infinite spinner after renderer crash (`WaitingForView` waits for `ViewAttached`), racing `prepare()` jobs cancelled by monotonic `requestId`, stale `WebView` callbacks after `destroy()`, and explicit login-page recovery.
 
-**Proposed state machine:**
-- **Pure `Link` machine in `convex/client.rs`:**
-  - `Idle` | `Backoff { at_ms, backoff_ms }` | `Opening { epoch, socket: Option<_>, deadline_ms }` | `Open { epoch, socket, last_server_ms, last_used_ms, auth_syncing }` | `Closed`.
-  - Single `step(event, now_ms) -> (Vec<Io>, Option<next_tick_ms>)` function.
-- **Single `Condvar`-driven watch renewal coordinator** replacing both `keep_renewed`'s `thread::sleep` and per-watch `convex-renew` threads: `Idle` | `Scheduled(due_ms)` | `Renewing`.
+### 9. Cookie Consent (Targeted Fixes)
+- **Status:** Done — `in_flight` coalescing + out-of-mutex disk write in `rust/vtop-ffi/src/remote/consent.rs`, and `StateFlow<List<Request>>` for `CookieConsent.pending` in `core/src/vitapmate/data/CookieConsent.kt` (removing the `AppCore.kt` snapshot workaround).
 
 ---
 
-### 3. Mail Forwarding Lifecycle & Leave Queue
+## Remaining — High Priority
+
+### 3. Mail Forwarding Lifecycle & Leave Queue (Deferred — active uncommitted edits in `forwarding.rs` / `Forwarding*.kt`)
 **Files:**
 - `rust/vtop-ffi/src/remote/forwarding.rs:46-154, 239-501, 531-736`
 - `rust/vtop-ffi/src/remote/server.rs:324-371, 457-485, 518-541`
@@ -127,46 +87,9 @@ Four parallel state models across three layers: `vtop-core` (`AuthState` + `Auth
 
 ---
 
-### 5. Connected Apps Session-Request Handover
-**Files:**
-- `app/src/vitapmate/PushService.kt:54-199`
-- `app/src/vitapmate/MainActivity.kt:93-106`
-- `rust/vtop-ffi/src/remote/keys.rs:33-39, 358-403, 474-528`
+## Remaining — Low / Targeted Priority
 
-**Current scattered state:**
-Three entry points (`PushService.onMessageReceived`, `MainActivity.opened`, `Push.follow`) coordinate only through an unbounded `ConcurrentHashMap.newKeySet<String>()` (`Push.answered`).
-
-**Concrete issues:**
-- FCM arriving while `Foreground.shown == true` is dropped (`PushService.kt:67`) even if `Push.follow` is in backoff or the app immediately backgrounds.
-- Timeout fallback (`PushService.kt:101-104`) can send a second `sessions:answer` while the first Rust call is still finishing.
-- `SessionRequest.expiresAt` is never checked before prompting or calling `verify_session`.
-- All session-request notifications share one notification ID (`ASKED.hashCode()`), overwriting concurrent requests.
-
-**Proposed state machine:**
-- Per-request `HandoverCoordinator` in `Push`: `Notified(expiresAt)` | `Answering(expiresAt, job)` | `Done(expiresAt)` (pruned on expiry, keyed per request ID).
-
----
-
-### 6. In-App VTOP WebView Session & Recovery
-**Files:**
-- `features/vtop/src/vitapmate/features/vtop/VtopScreen.kt:92-228, 300-362`
-- `features/vtop/src/vitapmate/features/vtop/VtopBrowser.kt:59-108, 185-227, 272-337, 377-487`
-
-**Current scattered state:**
-8 Compose states in `VtopScreen` (`session`, `problem`, `reconnecting`, `autoTried`, `askRelogin`, `viewGeneration`, `lastLoss`, `wasReloading`) plus 15 mutable fields in `VtopBrowser`.
-
-**Concrete issues:**
-- **Infinite spinner after renderer crash (`VtopScreen.kt:175-187`, `VtopBrowser.kt:186-196`):** `onLost` destroys the `WebView` (`view = null`) and launches `prepare()` immediately; if `prepare()` completes before `AndroidView` attaches the new `WebView`, `browser.open(fresh)` silently returns early and leaves the loading spinner forever.
-- Multiple `prepare()` triggers (`vtop.open`, `relogin`, `onLost`, `OtpPrompt.generation`, `onLoginPage`) run without cancelling prior jobs.
-
-**Proposed state machine:**
-- `VtopWebState`: `Preparing(force, job)` → `WaitingForView(session)` → `Active(session, recovery: Ready | AutoRelogin | PromptRelogin)` → `Failed(problem)` | `Crashed(lastLossMs)`.
-
----
-
-## Low / Targeted Priority
-
-### 7. Background Sync Pause State & Gmail Connect UI
+### 7. Background Sync Pause State & Gmail Connect UI (Deferred — active uncommitted edits in `BackgroundSync.kt`)
 **Files:** `core/src/vitapmate/data/Gmail.kt:189-214`, `features/login/src/vitapmate/features/login/GmailContent.kt:149-270`, `app/src/vitapmate/BackgroundSync.kt:63-67, 193-250`, `app/src/vitapmate/AccountScreen.kt:151`.
 - Replace magic strings in `Settings.syncPaused` + `SharedPreferences("sync")` `MISSES` with a small `SyncHealth` state (`Active(otpMisses)` | `Paused(Reason)`).
 - Guard `Gmail.save` / `setDeleteAfterReading` with `Gmail.lock`, and hoist `rememberConnecting()` above the `Setup`/`Connected` branch in `GmailContent.kt`.
@@ -174,11 +97,6 @@ Three entry points (`PushService.onMessageReceived`, `MainActivity.opened`, `Pus
 ### 8. App Root Boot & Account Teardown
 **Files:** `app/src/vitapmate/App.kt:49-151`, `app/src/vitapmate/SettingsScreen.kt:312-333`, `app/src/vitapmate/AccountScreen.kt:153-165`.
 - Consolidate `signedIn`, `user`, `semesterRead`, `onboarding`, and `SemesterChoice.selected` into one `AppSession` enum (`Booting` | `BootFailed` | `SignedOut` | `LoadingAccount` | `PickingSemester` | `Onboarding` | `Ready`), and share one `teardownAccount()` helper between sign-out and account switch.
-
-### 9. Cookie Consent (Targeted Fixes Only)
-**Files:** `rust/vtop-ffi/src/remote/consent.rs:79-211`, `core/src/vitapmate/data/CookieConsent.kt:18-62`.
-- `consent.rs::decide` is already concise and fail-closed; it does not need a full state machine.
-- Two targeted fixes worth making: (1) update `CookieConsent.pending` via `MutableStateFlow` (or `Dispatchers.Main`) instead of mutating `mutableStateListOf` from `Dispatchers.IO`, and (2) coalesce concurrent `ask` calls for the same `(flow, CookieKind)` inside `consent.rs` so parallel fetches don't queue duplicate dialogs.
 
 ---
 
