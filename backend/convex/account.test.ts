@@ -288,9 +288,15 @@ describe("sweeps", () => {
     advance(121);
     await t.mutation(internal.sweeps.fiveMinutes, {});
     expect(await t.run((ctx) => ctx.db.query("proofTickets").collect())).toHaveLength(0);
+    // Written without `sweepAt`, as rows from before it were: the one-off backfill sets it.
+    expect(await t.mutation(internal.migrate.setSweepAt, {})).toBe(1);
+    const row = () => t.run(async (ctx) => (await ctx.db.get(ctx.db.normalizeId("accounts", account)!))!);
+    expect((await row()).sweepAt).toBe(at + 7 * 86_400);
     advance(7 * 86_400);
     await t.mutation(internal.sweeps.quarter, {});
     expect((await as.query(api.app.status, { flow: "f" })).sessionSavedAt).toBeNull();
+    expect((await row()).sealedSession).toBeNull();
+    expect((await row()).sweepAt).toBeUndefined();
     advance(180 * 86_400);
     await t.mutation(internal.sweeps.fiveMinutes, {});
     await t.mutation(internal.sweeps.quarter, {});

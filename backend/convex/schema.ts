@@ -33,11 +33,15 @@ export default defineSchema({
     sessionSavedAt: nullable(v.number()),
     sessionSource: nullable(v.string()),
     credentialsRejectedAt: nullable(v.number()),
+    /** When the cached session or the saved credentials next expire, so the sweep reads only the
+     * rows due; unset when neither is kept. */
+    sweepAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_regno", ["regno"])
-    .index("by_ownerHash", ["ownerHash"]),
+    .index("by_ownerHash", ["ownerHash"])
+    .index("by_sweepAt", ["sweepAt"]),
 
   /** An app install, by the id its Ed25519 key gives. With `accountId` it is one of that
    * account's phones (`linkedAt`, `seenAt`); without, it is unlinked or the demo's. */
@@ -204,7 +208,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_addressId", ["addressId"])
-    .index("by_account", ["accountId"]),
+    .index("by_account", ["accountId"])
+    .index("by_confirmationAt", ["confirmationAt"]),
 
   // An old address the backfill found no account for. It waits under its owner hash, which the
   // account proof also gives, and moves into `mailboxes` when that student's account appears, so

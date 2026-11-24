@@ -26,6 +26,7 @@ import {
   MAX_PHONES,
   MAX_SIGN_INS,
   isAccountId,
+  sweepAtOf,
 } from "./lib/accountState";
 import { accountByRegno, phoneRows, unlinkPhone } from "./lib/accounts";
 import { fromBase64Url } from "./lib/base64";
@@ -617,6 +618,22 @@ async function importOAuth(
     count(tally, "oauthClients.inserted");
   }
 }
+
+/** Sets `sweepAt` on accounts written before it existed (imported ones included), so the sweep's
+ * index finds them. Run once after deploying it; returns how many changed. */
+export const setSweepAt = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let changed = 0;
+    for (const row of await ctx.db.query("accounts").collect()) {
+      const sweepAt = sweepAtOf(row);
+      if (row.sweepAt === sweepAt) continue;
+      await ctx.db.patch(row._id, { sweepAt });
+      changed += 1;
+    }
+    return changed;
+  },
+});
 
 /** Drops forwarding memberships (and their sealed mail) whose install is another student's phone,
  * or was signed out or removed on v3: the rule `importMailbox` keeps, for rows imported before it

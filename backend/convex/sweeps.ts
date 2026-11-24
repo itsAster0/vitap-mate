@@ -1,5 +1,5 @@
-// What the Durable Objects' alarms used to drop, swept by crons.ts. Each
-// sweep deletes at most `BATCH` rows a run; the next run takes the rest.
+// Rows past their time, swept by crons.ts. Each sweep reads only rows that are due, through an
+// index, and at most `BATCH` a run; the next run takes the rest.
 
 import { internalMutation } from "./_generated/server";
 import { saveRecord } from "./lib/accounts";
@@ -47,19 +47,21 @@ export const quarter = internalMutation({
     for (const row of inbox) {
       if (row.kind === "otp" || at - row.receivedAt >= CONFIRMATION_TTL_SECS) await ctx.db.delete(row._id);
     }
-    for (const mailbox of await ctx.db.query("mailboxes").collect()) {
-      if (mailbox.confirmationAt !== null && at - mailbox.confirmationAt >= CONFIRMATION_TTL_SECS) {
-        await ctx.db.patch(mailbox._id, { confirmation: null, confirmationAt: null });
-      }
-    }
-    for (const account of await ctx.db.query("accounts").collect()) {
-      const stale = account.sealedSession !== null && at >= (account.sessionSavedAt ?? 0) + SESSION_CACHE_SECS;
-      const ttl = account.settings.vaultTtlSecs;
-      const expired = account.sealedVault !== null && ttl !== null && account.vaultSavedAt !== null && at >= account.vaultSavedAt + ttl;
-      if (!stale && !expired) continue;
+    const confirmations = await ctx.db
+      .query("mailboxes")
+      .withIndex("by_confirmationAt", (q) => q.gte("confirmationAt", 0).lte("confirmationAt", at - CONFIRMATION_TTL_SECS))
+      .take(BATCH);
+    for (const mailbox of confirmations) await ctx.db.patch(mailbox._id, { confirmation: null, confirmationAt: null });
+    const due = await ctx.db
+      .query("accounts")
+      .withIndex("by_sweepAt", (q) => q.gte("sweepAt", 0).lte("sweepAt", at))
+      .take(BATCH);
+    for (const account of due) {
       const doc = await recordOf(ctx, account);
-      if (stale) doc.clearSession();
-      if (expired) doc.clearVault();
+      if (doc.sealedSession !== null && at >= (doc.sessionSavedAt ?? 0) + SESSION_CACHE_SECS) doc.clearSession();
+      const ttl = doc.settings.vaultTtlSecs;
+      if (doc.sealedVault !== null && ttl !== null && doc.vaultSavedAt !== null && at >= doc.vaultSavedAt + ttl) doc.clearVault();
+      // Saving sets the next `sweepAt` (or unsets it), so the row leaves this range either way.
       await saveRecord(ctx, account._id, doc);
     }
   },

@@ -527,12 +527,23 @@ export type AccountFields = {
   sessionSavedAt: number | null;
   sessionSource: string | null;
   credentialsRejectedAt: number | null;
+  sweepAt?: number;
   createdAt: number;
   updatedAt: number;
 };
 
+/** When the sweep must next look at the row: the earlier of the cached session's and the saved
+ * credentials' expiry; undefined (unset) when neither is kept. */
+export function sweepAtOf(f: Omit<AccountFields, "sweepAt">): number | undefined {
+  const due: number[] = [];
+  if (f.sealedSession !== null) due.push((f.sessionSavedAt ?? 0) + SESSION_CACHE_SECS);
+  const ttl = f.settings.vaultTtlSecs;
+  if (f.sealedVault !== null && ttl !== null && f.vaultSavedAt !== null) due.push(f.vaultSavedAt + ttl);
+  return due.length > 0 ? Math.min(...due) : undefined;
+}
+
 export function toFields(r: AccountRecord): AccountFields {
-  return {
+  const fields = {
     settings: r.settings,
     semesterId: r.semesterId,
     sealedVault: r.sealedVault,
@@ -545,6 +556,7 @@ export function toFields(r: AccountRecord): AccountFields {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
+  return { ...fields, sweepAt: sweepAtOf(fields) };
 }
 
 /** The record of a stored row; `mailboxId` is the student's forwarding address, kept elsewhere. */
