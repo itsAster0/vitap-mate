@@ -6,10 +6,9 @@ Errors are `{ "code": "...", "error": "human text" }` with the HTTP status;
 (`stale_time` adds `serverTime`). Every route answers `404 not_found` for no
 such route, `405 method_not_allowed` for a known path with another method,
 `400 bad_request` for a body that is not the JSON it wants, and `500
-internal_error` when the edge fails. Exceptions: `/vtop/*` and `/mcp` pass the
-upstream answer on, OAuth's `/register` and `/token` use RFC 6749's `{ error,
-error_description }`, and the `/vtop/*` proxy answers `502 vtop_unreachable`
-(503 elsewhere). Times are unix seconds unless a field says RFC 3339.
+internal_error` when the edge fails. Exceptions: `/mcp` passes the upstream
+answer on, and OAuth's `/register` and `/token` use RFC 6749's `{ error,
+error_description }`. Times are unix seconds unless a field says RFC 3339.
 
 ## Auth
 
@@ -64,7 +63,6 @@ Every route, with its auth kind; the sections below give the details.
 | Method | Path | Auth | Summary |
 |---|---|---|---|
 | GET | `/healthz` | none | Service, version and Cloudflare location. |
-| ANY | `/vtop/*` | none | Compression proxy to VTOP for phones. |
 | POST | `/v1/devices/register` | signed | Registers an install's keys; returns its device id. |
 | POST | `/v1/devices/update` | signed | Changes the install's FCM token, label or seal key. |
 | POST | `/v1/devices/info` | signed | The install as the edge keeps it. |
@@ -458,7 +456,6 @@ pair_expired` when the sign-in ran out meanwhile.
 
 | Route | Auth | Notes |
 |---|---|---|
-| `/vtop/*` | none | compression proxy to `https://vtop.vitap.ac.in/vtop/*`, any method; cookies and redirects pass through; bodies up to 1 MiB (`413 too_large`) |
 | `POST /v1/vtop/fetch` | signed | body passed to the engine's `/engine/fetch` as is |
 | `POST /v1/vtop/fetch-batch` | signed | body passed to the engine's `/engine/fetch-batch` as is (below) |
 | `POST /v1/vtop/login` | signed | → `/engine/vtop-login` |
@@ -605,7 +602,7 @@ only), `ACCOUNT_TOKEN_SECRET` (signs account tokens; unset, none
 are issued and every token is `token_invalid`; changing it voids them all).
 `FREEZE` (any value, for the cutover to backend v3): every route that writes
 the Durable Objects answers `503 frozen` with `retry-after: 60`. Still open:
-`/healthz`, `/vtop/*`, `/internal/*`, mail coming in, GET routes but `GET
+`/healthz`, `/internal/*`, mail coming in, GET routes but `GET
 /v1/account/prove`, and the POST routes that only read (`/v1/devices/info`,
 `/v1/app/status`, `/v1/mail-otp/inbox`, `/v1/mail-otp/devices`,
 `/v1/pair/info`, `/v1/vtop/*`).

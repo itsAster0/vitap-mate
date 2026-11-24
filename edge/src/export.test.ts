@@ -140,7 +140,6 @@ describe("FREEZE", () => {
       ["POST", "/v1/devices/info"],
       ["POST", "/v1/mail-otp/inbox"],
       ["POST", "/v1/vtop/fetch"],
-      ["POST", "/vtop/vtop/login"],
       ["POST", "/internal/export"],
       ["POST", "/internal/mail-otp/await"],
       ["OPTIONS", "/v1/keys"],

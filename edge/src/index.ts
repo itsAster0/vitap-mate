@@ -12,8 +12,8 @@
 // - Accounts, access keys and VTOP sessions for the extension and agents
 //   (`/v1/link`, `/v1/keys*`, `/v1/account*`, `/v1/whoami`, `/v1/session*`),
 //   see account.ts. The engine does the VTOP work for them.
-// - VTOP for the phone: `/vtop/*` proxies its own requests (vtop-proxy.ts);
-//   `/v1/vtop/*` has the engine sign in and fetch for it (vtop-phone.ts).
+// - VTOP for the phone: `/v1/vtop/*` has the engine sign in and fetch for it
+//   (vtop-phone.ts). The proxy is its own Worker now (../proxy).
 // - `/internal/*` (`INTERNAL_TOKEN`): the engine reports sign-ins and waits
 //   for forwarded OTPs; the UDP gateway reports its keys.
 //
@@ -31,7 +31,6 @@ import { tokenInvalid, verifyToken } from "./account-token";
 import { type Signed, base64Url, checkSignature, deviceIdFor, signed } from "./auth";
 import { eventStream } from "./event-stream";
 import { exportObject, frozen } from "./export";
-import { isVtopPath, proxyVtop } from "./vtop-proxy";
 import { udpGateway, udpKeys } from "./udp-gateway";
 import { PHONE_ROUTES, phoneVtop } from "./vtop-phone";
 import {
@@ -510,7 +509,6 @@ async function route(req: Request, env: Env): Promise<Response> {
   }
   const freeze = frozen(env, method, path);
   if (freeze) return account.handles(path) ? withCors(freeze, req.headers.get("origin"), env) : freeze;
-  if (isVtopPath(path)) return proxyVtop(req);
   if (method === "POST" && path === "/v1/devices/register") return deviceRegister(req, env);
   const phoneRoute = SIGNED[`${method} ${path}`];
   if (phoneRoute) {

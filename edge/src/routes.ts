@@ -16,7 +16,6 @@ const any = (path: string, auth: RouteAuth, summary: string): Route => ({ method
 
 export const ROUTES: Route[] = [
   get("/healthz", "none", "Service, version and Cloudflare location."),
-  any("/vtop/*", "none", "Compression proxy to VTOP for phones."),
   // Installs. `register` is signed by the key it registers.
   post("/v1/devices/register", "signed", "Registers an install's keys; returns its device id."),
   post("/v1/devices/update", "signed", "Changes the install's FCM token, label or seal key."),

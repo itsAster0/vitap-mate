@@ -54,7 +54,8 @@ rust/                 Cargo workspace
 backend/              self-hosted Convex (TypeScript, bun): all server state; the phone's one socket
 mail/                 Cloudflare Email Worker: hands forwarded mail to the backend, keeps nothing
 proxy/                Cloudflare Worker vmate-proxy: VTOP behind a compressing proxy (the Proxy route)
-edge/                 the v2 Worker and Durable Objects (until cleanup); guides/ is still the source
+edge/                 the frozen v2 Worker and Durable Objects (until cleanup), alchemy.run.ts (the
+                      deploy), and guides/, still the source
 extension/            Chrome and Firefox extension (Svelte, bun)
 fastlane/             Play Store lanes and release notes
 keystore/             release keystore (gitignored; never read or print it)
@@ -96,7 +97,8 @@ A page or route change reaches more than one place. Check each:
 - backend: the self-hosted Convex the phone talks to over one WebSocket (`backend/`);
   the app and the mail Worker default to vmate.aster0.dev; the test one is
   vmate3.aster0.dev (Settings → Developer → Server on a debug build).
-- edge: the v2 Cloudflare Worker and Durable Objects (`edge/`), retired at cutover.
+- edge: the v2 Cloudflare Worker and Durable Objects (`edge/`), frozen on
+  vmate-old.aster0.dev since the cutover and kept for their export until the cleanup.
 - engine: `rust/vtop-bridge`, Railway `engine-v2`: signs in and fetches for the server routes.
 - gateway: `rust/vtop-gateway`, the UDP end of vm1 on the Linode.
 - vm1: Noise IK over UDP for slow, lossy links (`rust/vtop-wire`).
@@ -176,13 +178,15 @@ Run `mise run check` (or the part you touched) before saying you're done.
 `ANDROID_HOME` and `ANDROID_SERIAL` pick the SDK and the device for the adb tasks.
 
 Deploy only when asked, and only from a laptop: CI builds the app and the
-extension but deploys nothing. `bun run deploy` in `edge/` deploys the
-edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway `engine-v2`,
-`Dockerfile.engine`) and the UDP gateway (pushed to GHCR, run on the Linode as the
-container `vitapmate-gateway`) from `alchemy.run.ts`, with the values in its
-`.env.example`. The gateway needs `GHCR_TOKEN` (a GitHub token with
-`write:packages`) and `GATEWAY_SSH=ssh://root@172.232.115.40`; `SKIP_GATEWAY=1` deploys
-without it. The README lists the CI workflows.
+extension but deploys nothing. `bun run deploy` in `edge/` deploys, from
+`alchemy.run.ts`: the engine on nest (container `vmate-engine`, with Railway
+`engine-v2` kept up to date as a standby), the UDP gateway (pushed to GHCR, run on
+hawk as `vitapmate-gateway`), the mail and proxy Workers, and the frozen v2 edge on
+vmate-old.aster0.dev; then the Convex functions (`bunx convex deploy` in
+`backend/`). The v3 secrets come from the Convex deployment's env, the rest from
+`edge/.env` (`.env.example` lists them). The gateway needs `GHCR_TOKEN` (a GitHub
+token with `write:packages`); `SKIP_GATEWAY=1` deploys without it. Convex itself,
+Caddy and DNS are in the infra repo. The README lists the CI workflows.
 
 Never print or commit `.env*` files (`extension/.env` is the one tracked
 exception, and it holds only the server URL), `keystore/`,

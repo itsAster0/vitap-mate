@@ -8,7 +8,6 @@
 
 import { type Env, badRequest, error, isDeviceId, isInternal, jsonBody, notInternal, str } from "./common";
 import { isAccountId } from "./account-state";
-import { isVtopPath } from "./vtop-proxy";
 import { isId as isMailboxId } from "./state";
 import { PHONE_ROUTES } from "./vtop-phone";
 import * as sql from "./sql";
@@ -124,7 +123,7 @@ const READS = new Set([
  * account proof's socket issues a token. */
 export function frozen(env: Env, method: string, path: string): Response | null {
   if (!env.FREEZE) return null;
-  if (path.startsWith("/internal/") || isVtopPath(path) || method === "OPTIONS" || method === "HEAD") return null;
+  if (path.startsWith("/internal/") || method === "OPTIONS" || method === "HEAD") return null;
   const writes = method === "GET" ? path === "/v1/account/prove" : !READS.has(path);
   return writes ? error(503, "frozen", "The server is moving; try again in a few minutes.", { headers: { "retry-after": "60" } }) : null;
 }

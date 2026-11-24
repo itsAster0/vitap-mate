@@ -29,7 +29,6 @@ convex/migrate.ts     the one-time backfill from the edge's Durable Objects (adm
 convex/lib/           pure rules (accountState.ts), crypto, mail_seal, vm1, helpers
 test/kit.ts           convex-test setup, fake phones, a stub engine
 dev/smoke.ts          smoke test against a deployment
-dev/gen-test-env.ts   fresh test secrets in .env.test.local
 scripts/backfill.ts   reads the edge's /internal/export, imports with migrate:importBatch
 ```
 
