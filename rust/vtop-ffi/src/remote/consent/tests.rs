@@ -321,3 +321,73 @@ fn a_yes_given_by_choosing_server_fetch_is_kept() {
     // Saved, as a "Don't ask again" in the dialog is.
     assert!(core.at(FILE).exists());
 }
+
+#[tokio::test]
+async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
+    struct GatedGate {
+        asks: AtomicU32,
+        entered: tokio::sync::Notify,
+        release: tokio::sync::Notify,
+    }
+
+    #[async_trait::async_trait]
+    impl CookieGate for GatedGate {
+        fn attended(&self, _flow: String) -> bool {
+            true
+        }
+        async fn ask(
+            &self,
+            _flow: String,
+            _kind: CookieKind,
+            _action: String,
+            _server: String,
+        ) -> Result<CookieAnswer, CoreError> {
+            self.asks.fetch_add(1, Ordering::SeqCst);
+            self.entered.notify_one();
+            self.release.notified().await;
+            Ok(CookieAnswer {
+                send: true,
+                remember: false,
+            })
+        }
+    }
+
+    let core = fresh();
+    let gate = Arc::new(GatedGate {
+        asks: AtomicU32::new(0),
+        entered: tokio::sync::Notify::new(),
+        release: tokio::sync::Notify::new(),
+    });
+    core.shared.consent().gate = Some(gate.clone());
+
+    let shared_a = core.shared.clone();
+    let shared_b = core.shared.clone();
+    let first = tokio::spawn(async move {
+        allowed(
+            &shared_a,
+            "f-same",
+            CookieKind::Route,
+            "Fetch A",
+            "vmate.aster0.dev",
+            true,
+        )
+        .await
+    });
+    gate.entered.notified().await;
+    let second = tokio::spawn(async move {
+        allowed(
+            &shared_b,
+            "f-same",
+            CookieKind::Route,
+            "Fetch B",
+            "vmate.aster0.dev",
+            true,
+        )
+        .await
+    });
+    tokio::task::yield_now().await;
+    gate.release.notify_one();
+    assert!(first.await.unwrap());
+    assert!(second.await.unwrap());
+    assert_eq!(gate.asks.load(Ordering::SeqCst), 1);
+}

@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +45,8 @@ import vitapmate.ui.showToast
  */
 @Composable
 fun CookieConsentDialog() {
-    val request = CookieConsent.pending.firstOrNull() ?: return
+    val pending by CookieConsent.pending.collectAsState()
+    val request = pending.firstOrNull() ?: return
     var remember by remember(request) { mutableStateOf(true) }
     val answer = { send: Boolean -> CookieConsent.answer(request, CookieAnswer(send, send && remember)) }
     val password = if (request.action.contains("password", ignoreCase = true)) ", and your password" else ""
@@ -90,8 +92,9 @@ fun CookieConsentDialog() {
 fun CookieConsentSetting() {
     val scope = rememberCoroutineScope()
     var version by remember { mutableIntStateOf(0) }
+    val pending by CookieConsent.pending.collectAsState()
     // Read again after each dialog (a tick may have added a kind) and after a reset.
-    val remembered by produceState(emptyList(), version, CookieConsent.pending.size) {
+    val remembered by produceState(emptyList(), version, pending.size) {
         // The saved password's consent sends no cookie, so this row isn't about it.
         value = orNull { coreFlow("settings.cookie_consent") { c, f -> c.cookieConsentRemembered(f) } }.orEmpty().filter { it != CookieKind.ACCOUNT }
     }

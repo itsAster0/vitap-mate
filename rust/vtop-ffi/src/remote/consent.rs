@@ -9,9 +9,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, MutexGuard, PoisonError};
 
+use futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
@@ -83,6 +84,8 @@ pub(crate) struct State {
     pub(crate) remembered: BTreeSet<CookieKind>,
     /// The answer in a flow, and when (unix seconds).
     answered: BTreeMap<(String, CookieKind), (i64, bool)>,
+    /// Waiters for an in-flight `gate.ask` of `(flow, kind)`, so concurrent calls share one prompt.
+    in_flight: BTreeMap<(String, CookieKind), Vec<oneshot::Sender<&'static str>>>,
 }
 
 impl Shared {
@@ -105,16 +108,27 @@ pub(crate) fn forget(shared: &Shared) {
     state.answered.clear();
 }
 
-fn save(state: &State) {
-    let Some(path) = &state.path else { return };
-    let saved = Saved {
-        remembered: state.remembered.clone(),
-    };
+fn save_to_disk(path: &Path, remembered: BTreeSet<CookieKind>) {
+    let saved = Saved { remembered };
     let result = serde_json::to_vec(&saved)
         .map_err(std::io::Error::other)
         .and_then(|bytes| fs::write(path, bytes));
     if let Err(error) = result {
         warn!(%error, "consent not saved");
+    }
+}
+
+/// Removes an `in_flight` slot on drop if the leader future is cancelled before completing.
+struct InFlightGuard<'a> {
+    shared: &'a Shared,
+    key: Option<(String, CookieKind)>,
+}
+
+impl Drop for InFlightGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(key) = self.key.take() {
+            self.shared.consent().in_flight.remove(&key);
+        }
     }
 }
 
@@ -147,66 +161,107 @@ async fn decide(
     server: &str,
     ask: bool,
 ) -> &'static str {
-    let gate = {
-        let mut state = shared.consent();
-        let now = unix_now();
-        state.answered.retain(|_, (at, _)| now - *at < FLOW_GRANT_S);
-        match &state.gate {
-            Some(gate) if !flow.is_empty() => gate.clone(),
-            _ => return "denied_no_gate",
-        }
-    };
-    let attended = gate.attended(flow.to_string());
-    {
-        let state = shared.consent();
-        if !attended {
-            // Only the route: account checks and handovers always have the student watching.
-            return if kind == CookieKind::Route && state.remembered.contains(&kind) {
-                "sent_remembered_unattended"
-            } else {
-                "denied_unattended"
-            };
-        }
-        if state.remembered.contains(&kind) {
-            return "sent_remembered";
-        }
-        // Checked before `!ask`: a quiet call rides on a yes earlier in its flow. That holds
-        // while one flow sends for one action only.
-        match state.answered.get(&(flow.to_string(), kind)) {
-            Some((_, true)) => return "sent_flow",
-            Some((_, false)) => return "denied_flow",
-            None => {}
-        }
-    }
-    if !ask {
-        return "denied_quiet";
-    }
-    let answer = gate
-        .ask(
-            flow.to_string(),
-            kind,
-            action.to_string(),
-            server.to_string(),
-        )
-        .await;
-    let send = answer.as_ref().is_ok_and(|answer| answer.send);
-    let mut state = shared.consent();
-    state
-        .answered
-        .insert((flow.to_string(), kind), (unix_now(), send));
-    match answer {
-        Ok(CookieAnswer {
-            send: true,
-            remember,
-        }) => {
-            if remember {
-                state.remembered.insert(kind);
-                save(&state);
+    let key = (flow.to_string(), kind);
+    loop {
+        let gate = {
+            let mut state = shared.consent();
+            let now = unix_now();
+            state.answered.retain(|_, (at, _)| now - *at < FLOW_GRANT_S);
+            match &state.gate {
+                Some(gate) if !flow.is_empty() => gate.clone(),
+                _ => return "denied_no_gate",
             }
-            "sent_asked"
+        };
+        let attended = gate.attended(flow.to_string());
+        let wait_rx = {
+            let mut state = shared.consent();
+            if !attended {
+                // Only the route: account checks and handovers always have the student watching.
+                return if kind == CookieKind::Route && state.remembered.contains(&kind) {
+                    "sent_remembered_unattended"
+                } else {
+                    "denied_unattended"
+                };
+            }
+            if state.remembered.contains(&kind) {
+                return "sent_remembered";
+            }
+            // Checked before `!ask`: a quiet call rides on a yes earlier in its flow. That holds
+            // while one flow sends for one action only.
+            match state.answered.get(&key) {
+                Some((_, true)) => return "sent_flow",
+                Some((_, false)) => return "denied_flow",
+                None => {}
+            }
+            if !ask {
+                return "denied_quiet";
+            }
+            if let Some(waiters) = state.in_flight.get_mut(&key) {
+                let (tx, rx) = oneshot::channel();
+                waiters.push(tx);
+                Some(rx)
+            } else {
+                state.in_flight.insert(key.clone(), Vec::new());
+                None
+            }
+        };
+        if let Some(rx) = wait_rx {
+            // Leader completed -> use its decision; leader cancelled -> loop and re-evaluate.
+            if let Ok(decision) = rx.await {
+                return decision;
+            }
+            continue;
         }
-        Ok(_) => "denied_asked",
-        Err(_) => "denied_error",
+        let mut guard = InFlightGuard {
+            shared,
+            key: Some(key.clone()),
+        };
+        let answer = gate
+            .ask(
+                flow.to_string(),
+                kind,
+                action.to_string(),
+                server.to_string(),
+            )
+            .await;
+        let send = answer.as_ref().is_ok_and(|answer| answer.send);
+        let (decision, to_save, waiters) = {
+            let mut state = shared.consent();
+            state.answered.insert(key.clone(), (unix_now(), send));
+            let to_save = match &answer {
+                Ok(CookieAnswer {
+                    send: true,
+                    remember: true,
+                }) => {
+                    state.remembered.insert(kind);
+                    state
+                        .path
+                        .clone()
+                        .map(|path| (path, state.remembered.clone()))
+                }
+                _ => None,
+            };
+            let waiters = state.in_flight.remove(&key).unwrap_or_default();
+            guard.key = None;
+            let decision = match answer {
+                Ok(CookieAnswer { send: true, .. }) => "sent_asked",
+                Ok(_) => "denied_asked",
+                Err(_) => "denied_error",
+            };
+            (decision, to_save, waiters)
+        };
+        let waiter_decision = if send { "sent_flow" } else { "denied_flow" };
+        for tx in waiters {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "waiter dropped its future before we replied"
+            )]
+            let _ = tx.send(waiter_decision);
+        }
+        if let Some((path, remembered)) = to_save {
+            save_to_disk(&path, remembered);
+        }
+        return decision;
     }
 }
 
@@ -232,9 +287,17 @@ impl Core {
     /// dialog would (choosing Server fetch already says the cookie goes to the server).
     pub fn remember_cookie_consent(&self, flow: String, kind: CookieKind) -> Result<(), CoreError> {
         traced_sync("remember_cookie_consent", &flow, || {
-            let mut state = self.shared.consent();
-            state.remembered.insert(kind);
-            save(&state);
+            let to_save = {
+                let mut state = self.shared.consent();
+                state.remembered.insert(kind);
+                state
+                    .path
+                    .clone()
+                    .map(|path| (path, state.remembered.clone()))
+            };
+            if let Some((path, remembered)) = to_save {
+                save_to_disk(&path, remembered);
+            }
             info!(?kind, "cookie consent remembered");
             Ok(())
         })

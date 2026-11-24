@@ -1,7 +1,9 @@
 package vitapmate.data
 
-import androidx.compose.runtime.mutableStateListOf
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CookieAnswer
 import vitapmate.core.CookieGate
@@ -21,8 +23,10 @@ object CookieConsent : CookieGate {
         internal var waiters = 0
     }
 
-    /** The dialogs to show, oldest first. */
-    val pending = mutableStateListOf<Request>()
+    private val pendingState = MutableStateFlow<List<Request>>(emptyList())
+
+    /** The dialogs to show, oldest first. Thread-safe for updates from Rust / IO threads. */
+    val pending: StateFlow<List<Request>> = pendingState.asStateFlow()
 
     private val no = CookieAnswer(send = false, remember = false)
 
@@ -35,9 +39,10 @@ object CookieConsent : CookieGate {
         if (!Foreground.shown) return no // Left between `attended` and here: nobody would see it.
         // Only the very action the dialog names joins it; anything else waits for its own.
         val request = synchronized(this) {
-            val same = pending.firstOrNull { it.kind == kind && it.action == action && it.server == server }
+            val current = pendingState.value
+            val same = current.firstOrNull { it.kind == kind && it.action == action && it.server == server }
             (same ?: Request(flow, kind, action, server).also {
-                pending += it
+                pendingState.value = current + it
                 Log.info("ui.consent", "shown", flow, mapOf("kind" to kind.name.lowercase()))
             }).also { it.waiters++ }
         }
@@ -51,12 +56,12 @@ object CookieConsent : CookieGate {
 
     /** The student's answer (or Cancel); the dialog goes. */
     fun answer(request: Request, answer: CookieAnswer) {
-        synchronized(this) { pending.remove(request) }
+        synchronized(this) { pendingState.value = pendingState.value - request }
         if (request.answer.complete(answer)) {
             Log.info("ui.consent", "answered", request.flow, mapOf("kind" to request.kind.name.lowercase(), "send" to "${answer.send}", "remember" to "${answer.remember}"))
         }
     }
 
     /** The app left the screen: every open dialog is Cancel. */
-    internal fun left() = synchronized(this) { pending.toList() }.forEach { answer(it, no) }
+    internal fun left() = synchronized(this) { pendingState.value }.forEach { answer(it, no) }
 }
