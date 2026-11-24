@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VITAP Mate – VTOP Sign In",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Sign in to VTOP with an access key from the VITAP Mate app.",
   "browser_specific_settings": {
     "gecko": {
@@ -31,7 +31,8 @@
   "permissions": [
     "storage",
     "tabs",
-    "cookies"
+    "cookies",
+    "alarms"
   ],
   "host_permissions": [
     "https://vtop.vitap.ac.in/*"
@@ -59,5 +60,8 @@
         "https://vtop.vitap.ac.in/*"
       ]
     }
+  ],
+  "optional_permissions": [
+    "notifications"
   ]
 }

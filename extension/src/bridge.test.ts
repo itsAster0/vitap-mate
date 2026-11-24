@@ -187,6 +187,8 @@ describe("bridge URL setting", () => {
     expect(progressText("phone", 10_000, 0)).toContain("takes over in 10 s");
     expect(progressText("phone", 0, 5_000)).toBe("Waiting for your phone…");
     expect(progressText("starting", undefined)).toBe("Starting sign-in…");
+    expect(progressText("server", undefined, 0, "waiting_otp")).toBe("Waiting for VTOP's OTP email");
+    expect(progressText("server", undefined, 0, "checking_otp")).toContain("Got the OTP");
   });
 });
 

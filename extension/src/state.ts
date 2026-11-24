@@ -1,5 +1,19 @@
 import type { SessionSource } from "./bridge";
 
+/** What the popup and the page script keep in `chrome.storage.local`. */
+export type Settings = {
+  token?: string;
+  bridgeUrl?: string;
+  /** Sign in when vtop.vitap.ac.in is opened. */
+  autoLogin?: boolean;
+  /** Sign in again when VTOP sends the browser back to its login page. */
+  reSignIn?: boolean;
+  /** Notify when the phone has to approve, and when a sign-in fails. */
+  notify?: boolean;
+  /** When the student signed out of VTOP themselves (ms): no signing in again after that. */
+  signedOutAt?: number;
+};
+
 /** Where a sign-in is. `phone` and `server` are the two ways a session is made. */
 export type LoginPhase =
   | "idle"
@@ -26,6 +40,8 @@ export type LoginState = {
   deadline?: number;
   /** When the server takes over from a phone that hasn't answered (ms). */
   serverDueAt?: number;
+  /** What the server's sign-in is doing, while it signs in. */
+  loginStep?: "signing_in" | "waiting_otp" | "checking_otp";
   error?: string;
   /** The step that failed, so the popup can mark it. */
   failedPhase?: LoginPhase;

@@ -137,7 +137,16 @@ jobs:
           } > release-notes.md
 
           assets=(extension.zip)
-          if [ -f extension.xpi ]; then assets+=(extension.xpi); fi
+          if [ -f extension.xpi ]; then
+            # Firefox's update manifest (the gecko update_url in vite.config.ts), so a signed
+            # install updates itself; it lives here because the server keeps no copy of builds.
+            ff_version=$(jq -r .version dist-firefox/manifest.json)
+            jq -n --arg v "$ff_version" \
+              --arg link "https://github.com/${GITHUB_REPOSITORY}/releases/download/extension-latest/extension.xpi" \
+              '{addons: {"vtop-signin@vitapmate": {updates: [{version: $v, update_link: $link}]}}}' \
+              > firefox-updates.json
+            assets+=(extension.xpi firefox-updates.json)
+          fi
 
           if gh release view extension-latest >/dev/null 2>&1; then
             gh release upload extension-latest "${assets[@]}" --clobber

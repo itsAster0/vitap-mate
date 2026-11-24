@@ -89,7 +89,7 @@ export function clampPollAfter(value: unknown) {
 
 const ACCESS_KEY_PATTERN = /^vtm_[0-9a-f]{64}$/;
 
-const UNKNOWN_KEY_MESSAGE =
+export const UNKNOWN_KEY_MESSAGE =
   "This access key is unknown or was revoked. Pair the extension again from VITAP Mate → Connected apps.";
 const PHONE_TIMEOUT_MESSAGE =
   "Your phone did not answer in time. Open VITAP Mate once (so it can sign in) and try again.";
@@ -164,8 +164,12 @@ export function progressText(
   stage: SessionStage,
   serverDueAt: number | undefined,
   now: number = Date.now(),
+  loginStep?: "signing_in" | "waiting_otp" | "checking_otp",
 ) {
   if (stage === "server") {
+    if (loginStep === "signing_in") return "Signing in to VTOP";
+    if (loginStep === "waiting_otp") return "Waiting for VTOP's OTP email";
+    if (loginStep === "checking_otp") return "Got the OTP, finishing the sign-in";
     return "The server is signing in to VTOP. It may wait for the OTP email…";
   }
   if (stage === "phone") {

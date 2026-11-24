@@ -1,64 +1,152 @@
+// Runs on VTOP's pages: the sign-in card that shows the current step, auto sign-in, signing in again
+// after VTOP signs the browser out, and the buttons that start a sign-in. This file is a classic
+// script, so it imports nothing the popup shares (that would be a module chunk).
+
 const VTOP_ROOT_PATHS = ["/vtop", "/vtop/"];
 const VTOP_CONTENT_PATH = "/vtop/content";
+const COOLDOWN_MS = 15_000;
+const LAUNCHER_ID = "vtop-mate-panel-launcher";
+const INLINE_ID = "vtop-mate-signin";
 
-function createOverlay() {
-  let overlay = document.getElementById("vtop-mate-loading");
+type Tone = "active" | "ok" | "error";
 
-  if (overlay) return overlay;
+// ---- the page badge ---------------------------------------------------------------------------
 
-  overlay = document.createElement("div");
-  overlay.id = "vtop-mate-loading";
-
-  overlay.style.position = "fixed";
-  overlay.style.top = "12px";
-  overlay.style.right = "12px";
-  overlay.style.zIndex = "2147483647";
-  overlay.style.background = "#09090b";
-  overlay.style.color = "#fafafa";
-  overlay.style.border = "1px solid #3f3f46";
-  overlay.style.borderRadius = "8px";
-  overlay.style.padding = "10px 14px";
-  overlay.style.fontSize = "13px";
-  overlay.style.fontFamily = "system-ui, sans-serif";
-  overlay.style.boxShadow = "0 10px 25px rgba(0,0,0,0.35)";
-  overlay.style.display = "none";
-
-  document.documentElement.appendChild(overlay);
-
-  return overlay;
+/** A cookie with `n` scallops, as the popup draws it (shapes.ts). */
+function cookiePath(n: number, depth = 0.09) {
+  const points: string[] = [];
+  for (let i = 0; i <= 180; i++) {
+    const t = (i / 180) * Math.PI * 2;
+    const r = 46 * (1 - depth + depth * Math.cos(n * t));
+    points.push(`${(50 + r * Math.cos(t)).toFixed(2)} ${(50 + r * Math.sin(t)).toFixed(2)}`);
+  }
+  return `M${points.join(" L")}Z`;
 }
 
-let hideOverlayTimer: number | undefined;
+// Lucide 0.469.0 (ISC): loader-circle, check, triangle-alert, x.
+const GLYPHS: Record<Tone | "x", string> = {
+  active: '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  ok: '<path d="M20 6 9 17l-5-5"/>',
+  error:
+    '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+};
+const svg = (inner: string, size: number) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 
-function showOverlay(text: string) {
-  if (hideOverlayTimer !== undefined) {
-    window.clearTimeout(hideOverlayTimer);
-    hideOverlayTimer = undefined;
-  }
-  const overlay = createOverlay();
+const BADGE_CSS = `
+:host { all: initial; }
+.badge {
+  --primary:#4D44E3; --on-primary:#fff; --pc:#E2DFFF; --opc:#3323CC;
+  --ok:#2E6B32; --okc:#CDEFC9; --ookc:#0F3D14; --err:#BF0715; --errc:#FFDAD6; --oerrc:#93000B;
+  position: fixed; top: 14px; right: 14px; z-index: 2147483647; width: 300px; box-sizing: border-box;
+  display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 22px;
+  font: 13px/1.35 Inter, "Google Sans Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  box-shadow: 0 8px 24px -6px rgba(20,16,60,.35); background: var(--pc); color: var(--opc);
+  transition: opacity .25s, transform .25s; opacity: 1; transform: none;
+}
+@media (prefers-color-scheme: dark) {
+  .badge { --primary:#C3C0FF; --on-primary:#1D00A5; --pc:#3323CC; --opc:#E2DFFF;
+    --ok:#A6D9A2; --okc:#1F4D25; --ookc:#CDEFC9; --err:#FFB4AB; --errc:#93000B; --oerrc:#FFDAD6; }
+}
+.badge.hidden { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+.badge.ok { background: var(--okc); color: var(--ookc); }
+.badge.error { background: var(--errc); color: var(--oerrc); }
+.cookie { width: 40px; height: 40px; flex: none; position: relative; display: grid; place-items: center; color: var(--on-primary); }
+.cookie svg.shape { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cookie svg.shape path { fill: var(--primary); }
+.ok .cookie svg.shape path { fill: var(--ok); }
+.ok .cookie { color: var(--okc); }
+.error .cookie svg.shape path { fill: var(--err); }
+.error .cookie { color: var(--errc); }
+.cookie > svg:not(.shape) { position: relative; }
+.active .cookie svg.shape { animation: spin 9s linear infinite; }
+.active .cookie > svg:not(.shape) { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cookie svg { animation: none !important; } }
+.txt { flex: 1; min-width: 0; }
+.t { font-weight: 700; font-size: 13.5px; }
+.s { font-size: 12px; opacity: .85; margin-top: 1px; }
+.s:empty { display: none; }
+button { all: unset; cursor: pointer; width: 30px; height: 30px; border-radius: 99px; display: grid; place-items: center; opacity: .75; flex: none; }
+button:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
+button:focus-visible { outline: 2px solid currentColor; }
+`;
 
-  overlay.textContent = text;
-  overlay.style.display = "block";
+let badge: { root: HTMLElement; title: HTMLElement; sub: HTMLElement; glyph: HTMLElement } | undefined;
+let tone: Tone = "active";
+let serverDueAt: number | undefined;
+let hideTimer: number | undefined;
+let countdown: number | undefined;
+/** The sign-in this tab started is a "sign in again" one, for its last words. */
+let resigning = false;
+
+function ensureBadge() {
+  if (badge) return badge;
+  const host = document.createElement("div");
+  host.id = "vtop-mate-loading";
+  const shadow = host.attachShadow({ mode: "closed" });
+  shadow.innerHTML = `<style>${BADGE_CSS}</style>
+<div class="badge hidden" role="status" aria-live="polite">
+  <div class="cookie"><svg class="shape" viewBox="0 0 100 100" aria-hidden="true"><path d="${cookiePath(7)}"/></svg><span class="glyph"></span></div>
+  <div class="txt"><div class="t"></div><div class="s"></div></div>
+  <button type="button" aria-label="Close">${svg(GLYPHS.x, 16)}</button>
+</div>`;
+  const root = shadow.querySelector<HTMLElement>(".badge")!;
+  shadow.querySelector("button")!.addEventListener("click", () => {
+    // While signing in, the cross cancels it; after, it only closes the card.
+    if (tone === "active") sendToBackground({ type: "CANCEL_LOGIN" });
+    hideBadge(0);
+  });
+  document.documentElement.appendChild(host);
+  badge = {
+    root,
+    title: shadow.querySelector<HTMLElement>(".t")!,
+    sub: shadow.querySelector<HTMLElement>(".s")!,
+    glyph: shadow.querySelector<HTMLElement>(".glyph")!,
+  };
+  return badge;
 }
 
-function hideOverlay(delay = 1200) {
-  const overlay = document.getElementById("vtop-mate-loading");
+function subText() {
+  if (tone !== "active" || serverDueAt === undefined) return "";
+  const left = Math.ceil((serverDueAt - Date.now()) / 1000);
+  return left > 0 ? `Server takes over in ${left} s` : "";
+}
 
-  if (!overlay) return;
-
-  if (hideOverlayTimer !== undefined) {
-    window.clearTimeout(hideOverlayTimer);
+function showBadge(text: string, next: Tone, sub = "") {
+  window.clearTimeout(hideTimer);
+  hideTimer = undefined;
+  const b = ensureBadge();
+  if (tone !== next || b.glyph.childElementCount === 0) {
+    b.glyph.outerHTML = `<span class="glyph" style="display:grid">${svg(GLYPHS[next], 18)}</span>`;
+    b.glyph = b.root.querySelector<HTMLElement>(".glyph")!;
   }
-  hideOverlayTimer = window.setTimeout(() => {
-    hideOverlayTimer = undefined;
-    overlay.style.display = "none";
+  tone = next;
+  b.root.className = `badge ${next}`;
+  b.title.textContent = text.replace(/…$/, "");
+  b.sub.textContent = sub || subText();
+  window.clearInterval(countdown);
+  if (next === "active" && serverDueAt !== undefined) {
+    countdown = window.setInterval(() => (b.sub.textContent = subText()), 1000);
+  }
+}
+
+function hideBadge(delay = 1200) {
+  if (!badge) return;
+  window.clearTimeout(hideTimer);
+  hideTimer = window.setTimeout(() => {
+    hideTimer = undefined;
+    window.clearInterval(countdown);
+    badge?.root.classList.add("hidden");
   }, delay);
 }
 
+// ---- talking to the extension -----------------------------------------------------------------
+
 /**
- * After the extension is reloaded or updated, the copy of this script
- * already in open tabs loses its link to the extension, and every
- * `chrome.*` call throws "Extension context invalidated".
+ * After the extension is reloaded or updated, the copy of this script already in open tabs loses
+ * its link to the extension, and every `chrome.*` call throws "Extension context invalidated".
  */
 function extensionAlive() {
   try {
@@ -68,14 +156,15 @@ function extensionAlive() {
   }
 }
 
+function staleTab() {
+  document.getElementById(LAUNCHER_ID)?.remove();
+  showBadge("VITAP Mate was updated", "error", "Refresh this page to use it.");
+  hideBadge(4000);
+}
+
 /** Messages the background, or asks for a reload if this tab is stale. */
 function sendToBackground(message: unknown, onReply?: (reply: any) => void) {
-  if (!extensionAlive()) {
-    document.getElementById("vtop-mate-panel-launcher")?.remove();
-    showOverlay("VITAP Mate was updated. Refresh this page to use it.");
-    hideOverlay(4000);
-    return;
-  }
+  if (!extensionAlive()) return staleTab();
   try {
     chrome.runtime.sendMessage(message, (reply) => {
       // Reading lastError stops Chrome logging it when nobody answers.
@@ -83,80 +172,102 @@ function sendToBackground(message: unknown, onReply?: (reply: any) => void) {
       onReply?.(reply);
     });
   } catch {
-    showOverlay("VITAP Mate was updated. Refresh this page to use it.");
-    hideOverlay(4000);
+    staleTab();
   }
 }
 
-function isVtopRootPage() {
-  return (
-    window.location.hostname === "vtop.vitap.ac.in" &&
-    window.location.pathname !== VTOP_CONTENT_PATH &&
-    VTOP_ROOT_PATHS.includes(window.location.pathname)
-  );
-}
-
-function isVtopPageOutsideContent() {
-  return (
-    window.location.hostname === "vtop.vitap.ac.in" &&
-    window.location.pathname !== VTOP_CONTENT_PATH
-  );
-}
-
-async function maybeAutoLogin() {
-  if (!isVtopRootPage() || !extensionAlive()) return;
-
-  let result: Record<string, unknown>;
+async function stored(keys: string[]): Promise<Record<string, unknown> | null> {
   try {
-    result = await chrome.storage.local.get([
-      "token",
-      "autoLogin",
-      "lastAutoLoginAt",
-    ]);
+    return await chrome.storage.local.get(keys);
   } catch {
-    return;
+    return null;
   }
+}
 
-  const token = String(result.token ?? "").trim();
-  const autoLogin = Boolean(result.autoLogin);
-  const lastAutoLoginAt = Number(result.lastAutoLoginAt ?? 0);
-
-  if (!token || !autoLogin) return;
-
-  const now = Date.now();
-
-  if (now - lastAutoLoginAt < 15_000) {
-    console.log("VITAP Mate: skipping auto-login cooldown");
-    return;
-  }
-
-  try {
-    await chrome.storage.local.set({ lastAutoLoginAt: now });
-  } catch {
-    return;
-  }
-  showOverlay("Auto login running...");
-
-  sendToBackground({ type: "LOGIN_WITH_TOKEN", source: "content" }, (response) => {
-    if (!response?.ok) {
-      showOverlay(`Auto login failed: ${response?.error ?? "Unknown error"}`);
-      hideOverlay(3500);
+function startSignIn(source: "content" | "resign", onDone?: (ok: boolean) => void) {
+  resigning = source === "resign";
+  sendToBackground({ type: "LOGIN_WITH_TOKEN", source }, (response) => {
+    if (!response) {
+      showBadge("Sign-in was interrupted", "error", "Try again.");
+      hideBadge(3500);
     }
+    onDone?.(Boolean(response?.ok));
   });
 }
 
-const INLINE_ID = "vtop-mate-signin";
+// ---- when to sign in by itself ----------------------------------------------------------------
+
+const onVtop = () => window.location.hostname === "vtop.vitap.ac.in";
+const isRootPage = () => onVtop() && VTOP_ROOT_PATHS.includes(window.location.pathname);
+const isOutsideContent = () => onVtop() && window.location.pathname !== VTOP_CONTENT_PATH;
+/** VTOP sends a browser it signed out to its login (or open) page, as bridge.ts's isLoginRedirect. */
+const isLoginPage = () =>
+  onVtop() && (window.location.pathname.startsWith("/vtop/login") || window.location.pathname.startsWith("/vtop/initialProcess"));
+
+/** Takes the shared 15 s cooldown, so a page that keeps bouncing doesn't loop. */
+async function takeCooldown(lastAutoLoginAt: unknown) {
+  const now = Date.now();
+  if (now - Number(lastAutoLoginAt ?? 0) < COOLDOWN_MS) return false;
+  try {
+    await chrome.storage.local.set({ lastAutoLoginAt: now });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function maybeSignIn() {
+  if (!extensionAlive() || (!isRootPage() && !isLoginPage())) return;
+  const s = await stored(["token", "autoLogin", "reSignIn", "lastAutoLoginAt", "lastLogin", "signedOutAt"]);
+  if (!s || !String(s.token ?? "").trim()) return;
+
+  if (isRootPage()) {
+    if (!s.autoLogin || !(await takeCooldown(s.lastAutoLoginAt))) return;
+    showBadge("Signing in with VITAP Mate", "active");
+    startSignIn("content");
+    return;
+  }
+
+  // Signed out by VTOP, not by the student: only after a sign-in of ours, and not after a logout click.
+  const lastAt = Number((s.lastLogin as { at?: number } | undefined)?.at ?? 0);
+  if (s.reSignIn === false || !lastAt || Number(s.signedOutAt ?? 0) > lastAt) return;
+  if (!(await takeCooldown(s.lastAutoLoginAt))) return;
+  showBadge("Signing in again", "active", "VTOP signed you out");
+  startSignIn("resign");
+}
+
+/** A logout the student clicked stops "Sign in again" until the next sign-in. */
+function watchLogout() {
+  document.addEventListener(
+    "click",
+    (event) => {
+      const el = (event.target as Element | null)?.closest?.("a, button, input[type=submit], form");
+      if (!el) return;
+      const said = [
+        el.getAttribute("href"),
+        el.getAttribute("onclick"),
+        el.getAttribute("action"),
+        el.id,
+        el.textContent?.slice(0, 40),
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!/log\s?out|sign\s?out/.test(said) || !extensionAlive()) return;
+      chrome.storage.local.set({ signedOutAt: Date.now() }).catch(() => {});
+    },
+    true,
+  );
+}
+
+// ---- buttons on VTOP --------------------------------------------------------------------------
 
 /**
- * Puts a "VITAP Mate" button next to the sign-in button on VTOP's Student
- * card. VTOP loads that card after the page, so this runs again whenever
- * the page changes.
+ * Puts a "VITAP Mate" button next to the sign-in button on VTOP's Student card. VTOP loads that
+ * card after the page, so this runs again whenever the page changes.
  */
 function addStudentCardButton() {
   if (!extensionAlive() || document.getElementById(INLINE_ID)) return;
-  const studentButton = document.querySelector<HTMLButtonElement>(
-    "#stdForm button[type=submit]",
-  );
+  const studentButton = document.querySelector<HTMLButtonElement>("#stdForm button[type=submit]");
   if (!studentButton) return;
 
   const button = document.createElement("button");
@@ -166,117 +277,106 @@ function addStudentCardButton() {
   button.setAttribute("aria-label", "Sign in with VITAP Mate");
   // Same size as VTOP's button so both fit side by side on the card.
   button.className = "btn fw-bold ms-1";
-  button.style.background = "#4f46e5";
-  button.style.borderColor = "#6366f1";
-  button.style.color = "#ffffff";
-  button.style.display = "inline-flex";
-  button.style.alignItems = "center";
-  button.style.justifyContent = "center";
-  button.style.verticalAlign = "top";
-  button.style.width = `${studentButton.offsetWidth || 40}px`;
-  button.style.height = `${studentButton.offsetHeight || 38}px`;
-  button.style.padding = "0";
+  Object.assign(button.style, {
+    background: "#4D44E3",
+    borderColor: "#4D44E3",
+    color: "#ffffff",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    verticalAlign: "top",
+    width: `${studentButton.offsetWidth || 40}px`,
+    height: `${studentButton.offsetHeight || 38}px`,
+    padding: "0",
+  });
 
   const icon = document.createElement("img");
   icon.src = chrome.runtime.getURL("icons/icon-32.png");
   icon.alt = "";
-  icon.style.width = "22px";
-  icon.style.height = "22px";
-  icon.style.borderRadius = "4px";
+  Object.assign(icon.style, { width: "22px", height: "22px", borderRadius: "6px" });
   button.append(icon);
 
   // The card is a link that submits VTOP's own form; keep the click here.
   button.addEventListener("click", async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!extensionAlive()) {
-      sendToBackground({});
-      return;
-    }
-    let stored: Record<string, unknown>;
-    try {
-      stored = await chrome.storage.local.get("token");
-    } catch {
-      showOverlay("VITAP Mate was updated. Refresh this page to use it.");
-      hideOverlay(4000);
-      return;
-    }
-    if (!String(stored.token ?? "").trim()) {
+    const s = await stored(["token"]);
+    if (!s) return staleTab();
+    if (!String(s.token ?? "").trim()) {
       sendToBackground({ type: "OPEN_EXTENSION_PANEL" });
       return;
     }
     button.disabled = true;
     button.style.opacity = "0.6";
-    showOverlay("Signing in with VITAP Mate…");
-    sendToBackground({ type: "LOGIN_WITH_TOKEN", source: "content" }, (response) => {
+    showBadge("Signing in with VITAP Mate", "active");
+    startSignIn("content", () => {
       button.disabled = false;
       button.style.opacity = "";
-      if (!response) {
-        showOverlay("Sign-in was interrupted. Please try again.");
-        hideOverlay(3500);
-      } else if (!response.ok) {
-        hideOverlay(3500);
-      }
     });
   });
 
   studentButton.insertAdjacentElement("afterend", button);
-  document.getElementById("vtop-mate-panel-launcher")?.remove();
+  document.getElementById(LAUNCHER_ID)?.remove();
 }
 
 function createPanelLauncher() {
-  if (!isVtopPageOutsideContent()) return;
-
-  if (
-    document.getElementById("vtop-mate-panel-launcher") ||
-    document.getElementById(INLINE_ID)
-  ) {
-    return;
-  }
+  if (!isOutsideContent() || document.getElementById(LAUNCHER_ID) || document.getElementById(INLINE_ID)) return;
 
   const button = document.createElement("button");
-  button.id = "vtop-mate-panel-launcher";
+  button.id = LAUNCHER_ID;
   button.type = "button";
   button.textContent = "Open VITAP Mate";
-  button.style.position = "fixed";
-  button.style.right = "12px";
-  button.style.bottom = "12px";
-  button.style.zIndex = "2147483647";
-  button.style.border = "1px solid #6366f1";
-  button.style.borderRadius = "10px";
-  button.style.background = "#312e81";
-  button.style.color = "#ffffff";
-  button.style.padding = "10px 14px";
-  button.style.font = "600 13px system-ui, sans-serif";
-  button.style.boxShadow = "0 10px 25px rgba(0,0,0,0.35)";
-  button.style.cursor = "pointer";
-  button.addEventListener("click", () => {
-    sendToBackground({ type: "OPEN_EXTENSION_PANEL" });
+  Object.assign(button.style, {
+    position: "fixed",
+    right: "14px",
+    bottom: "14px",
+    zIndex: "2147483647",
+    border: "0",
+    borderRadius: "16px",
+    background: "#4D44E3",
+    color: "#ffffff",
+    height: "48px",
+    padding: "0 20px",
+    font: '600 14px Inter, "Google Sans Text", system-ui, sans-serif',
+    boxShadow: "0 8px 24px -6px rgba(20,16,60,.45)",
+    cursor: "pointer",
   });
-
+  button.addEventListener("click", () => sendToBackground({ type: "OPEN_EXTENSION_PANEL" }));
   document.documentElement.appendChild(button);
 }
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "VTOP_MATE_LOADING") {
-    showOverlay(message.text ?? "Loading...");
+    serverDueAt = typeof message.serverDueAt === "number" ? message.serverDueAt : undefined;
+    if (message.tone === "ok") {
+      serverDueAt = undefined;
+      if (resigning) showBadge("Signed in again", "ok", "VTOP had signed you out");
+      else showBadge(message.text ?? "Signed in", "ok");
+      resigning = false;
+      hideBadge(3000);
+    } else {
+      showBadge(message.text ?? "Signing in", "active");
+    }
   }
 
   if (message.type === "VTOP_MATE_ERROR") {
-    showOverlay(message.text ?? "Error");
-    hideOverlay(3500);
+    serverDueAt = undefined;
+    resigning = false;
+    const text = String(message.text ?? "Sign-in failed");
+    const cut = text.indexOf(". ");
+    showBadge(cut > 0 ? text.slice(0, cut) : text.replace(/\.$/, ""), "error", cut > 0 ? text.slice(cut + 2) : "");
+    hideBadge(6000);
   }
 
-  if (message.type === "VTOP_MATE_HIDE_LOADING") {
-    hideOverlay();
-  }
+  if (message.type === "VTOP_MATE_HIDE_LOADING") hideBadge();
 });
 
 addStudentCardButton();
 createPanelLauncher();
-maybeAutoLogin();
+watchLogout();
+void maybeSignIn();
 
-if (isVtopPageOutsideContent()) {
+if (isOutsideContent()) {
   const observer = new MutationObserver(() => {
     if (!extensionAlive()) {
       observer.disconnect();
@@ -284,8 +384,5 @@ if (isVtopPageOutsideContent()) {
     }
     addStudentCardButton();
   });
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 }

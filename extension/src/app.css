@@ -1,6 +1,98 @@
 @import "tailwindcss";
 
+/* The app's Indigo scheme (design/src/vitapmate/ui/ColorTables.kt), light and dark. */
+:root {
+  --primary: #4d44e3;
+  --on-primary: #ffffff;
+  --primary-container: #e2dfff;
+  --on-primary-container: #3323cc;
+  --secondary-container: #e3e0f9;
+  --on-secondary-container: #464559;
+  --tertiary-container: #ffd8ea;
+  --on-tertiary-container: #603c50;
+  --surface: #fbf9f9;
+  --c-lowest: #ffffff;
+  --c-low: #f5f3f3;
+  --c: #efeded;
+  --c-high: #e9e8e7;
+  --c-highest: #e3e2e2;
+  --on-surface: #1b1c1c;
+  --on-surface-variant: #464747;
+  --outline: #777777;
+  --outline-variant: #c7c6c6;
+  --error: #bf0715;
+  --error-container: #ffdad6;
+  --on-error-container: #93000b;
+  --success: #2e6b32;
+  --success-container: #cdefc9;
+  --on-success-container: #0f3d14;
+  --warn: #7a5900;
+  --warn-container: #ffe3a6;
+  --on-warn-container: #4a3500;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #c3c0ff;
+    --on-primary: #1d00a5;
+    --primary-container: #3323cc;
+    --on-primary-container: #e2dfff;
+    --secondary-container: #464559;
+    --on-secondary-container: #e3e0f9;
+    --tertiary-container: #603c50;
+    --on-tertiary-container: #ffd8ea;
+    --surface: #121414;
+    --c-lowest: #0d0e0f;
+    --c-low: #1b1c1c;
+    --c: #1f2020;
+    --c-high: #292a2a;
+    --c-highest: #343535;
+    --on-surface: #e3e2e2;
+    --on-surface-variant: #c7c6c6;
+    --outline: #919090;
+    --outline-variant: #464747;
+    --error: #ffb4ab;
+    --error-container: #93000b;
+    --on-error-container: #ffdad6;
+    --success: #a6d9a2;
+    --success-container: #1f4d25;
+    --on-success-container: #cdefc9;
+    --warn: #f5c860;
+    --warn-container: #5a4300;
+    --on-warn-container: #ffe3a6;
+    color-scheme: dark;
+  }
+}
+
 html,
 body {
-  background: #020617;
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: Inter, "Google Sans Text", system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

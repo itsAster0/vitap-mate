@@ -7,11 +7,13 @@ key and signs the browser in to VTOP with a session from the server
 apply.
 
 ```
-src/main.ts, App.svelte, app.css   popup UI
+src/main.ts, App.svelte, app.css   popup UI (Icon.svelte, icons.ts: Lucide; shapes.ts: cookie and wave)
 src/background.ts                  service worker (an event page on Firefox)
 src/content.ts                     content script on VTOP
 src/bridge.ts, cookies.ts, state.ts  server calls, cookie install, stored state (*.test.ts next to each)
-public/manifest.json, icons/       MV3 manifest; vite.config.ts writes host_permissions
+src/live.ts                        the Convex socket: key JWT, extension:* queries, update check
+public/manifest.json, icons/, logo.svg  MV3 manifest; vite.config.ts writes host_permissions
+                                   (icons are the app's launcher icon; content.ts imports nothing shared)
 ```
 
 ```sh
