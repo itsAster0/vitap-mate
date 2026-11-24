@@ -83,6 +83,35 @@
   ],
   "releases": [
     {
+      "version": "3.2.0",
+      "code": 3002000,
+      "summary": "3.2 moves the app to a new server: live updates, OTP forwarding and server fetches share one connection, and the server checks who you are without your VTOP cookie leaving the phone.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "A new server. Live updates, forwarded OTPs and server fetches come over one connection, so they arrive faster and use less battery.",
+            "The server checks which student you are with a signed proof from VTOP, so your VTOP cookie no longer has to leave the phone for it.",
+            "Exact percentages in the attendance calculator.",
+            "A Mess or Exams tab, and picking several files at once in Docs."
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "Sharper PDFs and a smaller app.",
+            "OTP forwarding picks up the code faster."
+          ]
+        },
+        {
+          "title": "Fixed",
+          "items": [
+            "Downloads, links that open the app, the docs viewer and OTP resend."
+          ]
+        }
+      ]
+    },
+    {
       "version": "3.1.0",
       "code": 3001010,
       "summary": "3.1 adds Semester Wrapped, calendar sync, new widgets on the home and lock screen, exam live updates and a Quick Settings tile, asks before your VTOP cookie leaves the phone, gives clearer change alerts and loads VTOP pages faster.",
