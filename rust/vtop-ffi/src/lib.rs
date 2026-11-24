@@ -442,7 +442,7 @@ impl Core {
             fs::create_dir_all(&core.cache)?;
             remote::route::load(&core);
             remote::consent::load(&core);
-            // No password (another phone's, restored from Block Store): signed out.
+            // No password (another phone's, or key gone): signed out.
             let Some(account) = core.read_account().filter(|a| !a.password.is_empty()) else {
                 return Ok(());
             };

@@ -55,9 +55,6 @@ import com.composables.icons.lucide.Utensils
 import kotlinx.coroutines.launch
 import vitapmate.core.Core
 import vitapmate.core.Route as VtopRoute
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import vitapmate.data.AccountBackup
 import vitapmate.data.AccountState
 import vitapmate.data.AppCore
 import vitapmate.data.Downloads
@@ -318,7 +315,6 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         .onFailure { Log.error("ui.settings", "sign out failed: $it") }
                     // Off the student's forwarding address too, or this phone keeps getting their OTPs.
                     AppCore.leaveOldForwarding()
-                    withContext(Dispatchers.IO) { AccountBackup.forgetAccount(context) }
                     // Their Gmail grant and the sync built on it go too.
                     flow("gmail.disconnect") { Gmail.disconnect(it) }
                     Settings.forgetStudent()

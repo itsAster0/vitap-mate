@@ -21,9 +21,6 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
 import vitapmate.core.Core
-import androidx.compose.ui.platform.LocalContext
-import kotlin.concurrent.thread
-import vitapmate.data.AccountBackup
 import vitapmate.data.AccountState
 import vitapmate.data.AppCore
 import vitapmate.data.InspectorOpener
@@ -130,13 +127,10 @@ fun App() {
                             else -> Shell(nav, onSignedOut = toLogin)
                         }
                     } else {
-                        val context = LocalContext.current
                         LoginScreen {
                             signedIn = Result.success(true)
                             // Signed in over another student: leaves their address now, not at the next start.
                             AppCore.leaveOldForwarding()
-                            // Kept across a reinstall from now on (AccountBackup).
-                            thread(name = "backup") { AccountBackup.save(context.applicationContext) }
                         }
                         // Signed out, the only screen over the login is a flow opened from "Details".
                         (nav.top as? Route.FlowLog)?.let {

@@ -1,7 +1,7 @@
 //! `account.json`: the saved sign-in, its password sealed by [`PasswordCipher`] (an Android
 //! Keystore key) so the file holds only ciphertext. A file from before the cipher (the password
 //! in plain text) is sealed and written back the first time it is read. The key never leaves the
-//! phone, nor survives an uninstall: a copy restored from Block Store on another phone (or after a
+//! phone, nor survives an uninstall: a copy restored on another phone (or after a
 //! reinstall) can't be opened, so its password is absent and the student types it again. Neither
 //! the password nor the sealed text is ever logged.
 
@@ -156,7 +156,7 @@ mod tests {
             rejected: false,
             registration_number: Some("22BCE0001".into()),
         });
-        // As Block Store restores it on a new phone, whose Keystore has another key.
+        // As a backup restores it on a new phone, whose Keystore has another key.
         let second = core("restore-b", "phone-b");
         fs::write(second.at(ACCOUNT), file(&first)).unwrap();
 

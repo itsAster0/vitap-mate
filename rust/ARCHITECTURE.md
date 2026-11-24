@@ -100,12 +100,12 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
 - **The saved password** (`store/account.rs`). `account.json` holds it sealed
   by `PasswordCipher` (Kotlin's `AccountPassword`: an AES-GCM key in the
   Android Keystore); a plain-text file from an older version is sealed the
-  first time it is read. A copy restored from Block Store on another phone, or
+  first time it is read. A copy restored on another phone, or
   after a reinstall, doesn't open: the password is absent and the student signs
   in again. Kotlin gets the plain text only from `saved_password`, for the
   Account page. Decoded copies and the
   log pipeline stay process-wide: `obs_init` runs before the core, so Kotlin's
-  start-up lines (the Block Store restore, Gmail) reach the log file.
+  start-up lines (Gmail) reach the log file.
 
 ## VTOP from the phone
 

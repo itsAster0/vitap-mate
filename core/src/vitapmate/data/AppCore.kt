@@ -65,7 +65,6 @@ object AppCore {
                     if (old.exists() && !File(app.cacheDir, name).exists()) old.renameTo(File(app.cacheDir, name)) else old.delete()
                 }
                 obsInit(app.cacheDir.path)
-                AccountBackup.restore(app)
                 runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
                 // Debuggable: Developer → Chat's servers may apply (never in a release build).
                 val debuggable = app.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
@@ -91,7 +90,6 @@ object AppCore {
             runCatching {
                 ActivityHistory.save()
                 runBlocking { flow("store.start") { StoreCap.enforce(app, it) } }
-                AccountBackup.save(app)
             }.onFailure { Log.warn("store", "start housekeeping failed: ${it::class.simpleName}") }
             leaveOldForwarding()
         }

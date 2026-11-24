@@ -70,7 +70,7 @@ object Secrets {
 
 /**
  * Rust's saved VTOP password (`account.json`), sealed under its own Keystore key and Base64'd
- * for the JSON. Restored from Block Store on another phone (or after a reinstall, which drops the
+ * for the JSON. Restored onto another phone (or after a reinstall, which drops the
  * key) it doesn't open, and Rust asks for the password again. A failure must not reach Rust (it
  * would abort), so it is logged by class name only, never with the password or the sealed text.
  */
