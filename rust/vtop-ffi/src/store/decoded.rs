@@ -54,6 +54,26 @@ struct Cache {
     entries: HashMap<(PathBuf, TypeId), Entry>,
     bytes: u64,
     clock: u64,
+    /// Reads parsing outside the lock, by token: one whose path [`forget`] dropped meanwhile
+    /// may hold what was there before, so it isn't kept.
+    reads: HashMap<u64, Reading>,
+    next_read: u64,
+}
+
+struct Reading {
+    path: PathBuf,
+    spoiled: bool,
+}
+
+/// A read's token, given back however the read ends.
+struct Token(Option<u64>);
+
+impl Drop for Token {
+    fn drop(&mut self) {
+        if let Some(token) = self.0 {
+            cache().reads.remove(&token);
+        }
+    }
 }
 
 static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(Mutex::default);
@@ -72,7 +92,7 @@ pub(crate) fn read<T: Clone + Send + Sync + 'static>(
         forget(path);
         return None;
     };
-    {
+    let mut token = {
         let mut cache = cache();
         cache.clock += 1;
         let clock = cache.clock;
@@ -83,11 +103,24 @@ pub(crate) fn read<T: Clone + Send + Sync + 'static>(
             entry.used = clock;
             return Some(value.clone());
         }
-    }
+        let token = cache.next_read;
+        cache.next_read += 1;
+        let reading = Reading {
+            path: path.to_path_buf(),
+            spoiled: false,
+        };
+        cache.reads.insert(token, reading);
+        Token(Some(token))
+    };
     let bytes = fs::read(path).ok()?;
     let value = load(&bytes)?;
-    if stamp.len <= LARGEST {
-        let mut cache = cache();
+    let mut cache = cache();
+    let fresh = token
+        .0
+        .take()
+        .and_then(|token| cache.reads.remove(&token))
+        .is_some_and(|reading| !reading.spoiled);
+    if fresh && stamp.len <= LARGEST {
         let used = cache.clock;
         let entry = Entry {
             stamp,
@@ -128,10 +161,43 @@ pub(crate) fn forget(path: &Path) {
         keep
     });
     cache.bytes -= freed;
+    for reading in cache.reads.values_mut() {
+        if reading.path.starts_with(path) {
+            reading.spoiled = true;
+        }
+    }
 }
 
 /// How many copies are kept, for tests.
 #[cfg(test)]
 pub(crate) fn kept(path: &Path) -> usize {
     cache().entries.keys().filter(|(at, _)| at == path).count()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_copy_forgotten_while_parsing_is_not_kept() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-decoded-gen-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("page.json");
+        fs::write(&path, "1").unwrap();
+        let read = read(&path, |bytes| {
+            // A write lands while this read parses, outside the lock.
+            forget(&path);
+            Some(bytes.to_vec())
+        });
+        assert_eq!(read.as_deref(), Some(&b"1"[..]));
+        assert_eq!(kept(&path), 0);
+        // Undisturbed, the next read is kept.
+        read_bytes(&path);
+        assert_eq!(kept(&path), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    fn read_bytes(path: &Path) -> Option<Vec<u8>> {
+        read(path, |bytes| Some(bytes.to_vec()))
+    }
 }
