@@ -3,7 +3,6 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import tailwindcss from "@tailwindcss/vite";
 
 /** CI uploads it next to extension.xpi on the `extension-latest` release. */
 const FIREFOX_UPDATES =
@@ -63,7 +62,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       svelte(),
-      tailwindcss(),
       finishManifest(
         outDir,
         loadEnv(mode, import.meta.dirname, "VITE_").VITE_BRIDGE_URL ??

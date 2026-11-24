@@ -1,7 +1,7 @@
 # extension/AGENTS.md
 
 The vitapmate browser extension for Chrome and Firefox (Svelte 5, Vite,
-Tailwind, bun from the root `mise.toml`). It pairs with the app for an access
+bun from the root `mise.toml`). It pairs with the app for an access
 key and signs the browser in to VTOP with a session from the server
 (`backend/API.md`). It never sees a password. The root `AGENTS.md` rules
 apply.
