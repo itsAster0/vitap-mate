@@ -32,26 +32,36 @@ pub const VERSION: u8 = 1;
 /// that request's JSON body in `args[SIGN_IN_BODY]`. They carry no session.
 pub const SIGN_IN_BODY: &str = "body";
 /// A batch of pages ([`crate::engine::PageBatch`]) is named by its edge path, with its pages
-/// in `args` by two-digit index ([`batch_args`]); its answer is packed under this name too.
+/// in `args` by index ([`batch_args`]); its answer is packed under this name too.
 pub const BATCH: &str = "/v1/vtop/fetch-batch";
 
-/// `pages` as a batch request's `args`: a page's name, or its JSON when it has arguments.
+/// `pages` as a batch request's `args`: a page's name, or its JSON when it has arguments,
+/// keyed by its index in digits of one width, so the keys sort as the pages go (two digits
+/// up to a hundred pages, as gateways that sort by key read them; a request holds at most
+/// 255 args).
 pub fn batch_args(pages: &[BatchPage]) -> BTreeMap<String, String> {
     let page = |page: &BatchPage| match page.args.is_empty() {
         true => page.name.clone(),
         false => serde_json::to_string(page).unwrap_or_default(),
     };
+    let width = if pages.len() <= 100 { 2 } else { 3 };
     pages
         .iter()
         .enumerate()
-        .map(|(i, p)| (format!("{i:02}"), page(p)))
+        .map(|(i, p)| (format!("{i:0width$}"), page(p)))
         .collect()
 }
 
-/// The pages of a batch request's `args`, in order.
+/// The pages of a batch request's `args`, in the order of their indices.
 pub fn batch_pages(args: &BTreeMap<String, String>) -> Option<Vec<BatchPage>> {
-    args.values()
-        .map(|page| match page.starts_with('{') {
+    let mut indexed = args
+        .iter()
+        .map(|(index, page)| Some((index.parse::<usize>().ok()?, page)))
+        .collect::<Option<Vec<_>>>()?;
+    indexed.sort_by_key(|&(index, _)| index);
+    indexed
+        .into_iter()
+        .map(|(_, page)| match page.starts_with('{') {
             true => serde_json::from_str(page).ok(),
             false => Some(BatchPage {
                 name: page.clone(),
@@ -188,13 +198,18 @@ impl WirePageRequest {
 
 impl WirePageResponse {
     /// Status, a flags byte (1: packed, 2: a renewed session follows), the
-    /// session if any, then the body.
+    /// session if any, then the body. A session over 64 KB (none is near it)
+    /// is left out rather than misframe the body: the phone keeps its own.
     pub fn encode(&self) -> Vec<u8> {
-        let mut v = Vec::with_capacity(3 + self.body.len());
+        let session = self
+            .session
+            .as_deref()
+            .filter(|session| u16::try_from(session.len()).is_ok());
+        let mut v = Vec::with_capacity(3 + session.map_or(0, |s| 2 + s.len()) + self.body.len());
         v.extend_from_slice(&self.status.to_be_bytes());
-        v.push(self.packed as u8 | (self.session.is_some() as u8) << 1);
-        if let Some(session) = &self.session {
-            // A session is far under 64 KB.
+        v.push(self.packed as u8 | (session.is_some() as u8) << 1);
+        if let Some(session) = session {
+            // It fits: checked above.
             let _ = long(&mut v, session);
         }
         v.extend_from_slice(&self.body);
@@ -324,6 +339,47 @@ mod tests {
     }
 
     #[test]
+    fn big_batches_stay_in_order() {
+        for count in [10, 99, 100, 101, 255] {
+            let pages: Vec<_> = (0..count)
+                .map(|i| BatchPage {
+                    name: format!("p{i}"),
+                    args: BTreeMap::new(),
+                })
+                .collect();
+            let args = batch_args(&pages);
+            assert_eq!(batch_pages(&args).unwrap(), pages, "{count} pages");
+            let request = WirePageRequest {
+                request_id: None,
+                name: BATCH.into(),
+                semester: None,
+                args,
+                dictionary: None,
+                session_hash: 0,
+                session: None,
+                account: None,
+            };
+            let decoded = WirePageRequest::decode(&request.encode().unwrap()).unwrap();
+            assert_eq!(batch_pages(&decoded.args).unwrap(), pages, "{count} pages");
+        }
+    }
+
+    #[test]
+    fn under_a_hundred_pages_keep_two_digit_keys() {
+        // As deployed gateways and apps write them.
+        let pages = vec![
+            BatchPage {
+                name: "marks".into(),
+                args: BTreeMap::new(),
+            };
+            12
+        ];
+        let args = batch_args(&pages);
+        assert_eq!(args.keys().next().map(String::as_str), Some("00"));
+        assert_eq!(args.keys().last().map(String::as_str), Some("11"));
+    }
+
+    #[test]
     fn a_session_is_known_by_its_cookies() {
         assert_eq!(
             session_hash(r#"{"cookies":"JSESSIONID=x","csrf_token":"t"}"#),
@@ -346,5 +402,28 @@ mod tests {
         assert_eq!(WirePageResponse::decode(&r.encode()).unwrap(), r);
         r.session = Some(r#"{"cookies":"JSESSIONID=n"}"#.into());
         assert_eq!(WirePageResponse::decode(&r.encode()).unwrap(), r);
+        // Byte for byte as deployed gateways write it.
+        let mut written = vec![0, 200, 3, 0, 26];
+        written.extend_from_slice(br#"{"cookies":"JSESSIONID=n"}"#);
+        written.extend_from_slice(&[1, 2, 3]);
+        assert_eq!(r.encode(), written);
+    }
+
+    #[test]
+    fn a_session_too_long_to_send_leaves_the_body_whole() {
+        let r = WirePageResponse {
+            status: 200,
+            packed: false,
+            body: br#"{"data":1}"#.to_vec(),
+            session: Some("x".repeat(70_000)),
+        };
+        let got = WirePageResponse::decode(&r.encode()).unwrap();
+        assert_eq!(got.session, None);
+        assert_eq!(got.body, r.body);
+        let fits = WirePageResponse {
+            session: Some("x".repeat(65_535)),
+            ..r
+        };
+        assert_eq!(WirePageResponse::decode(&fits.encode()).unwrap(), fits);
     }
 }
