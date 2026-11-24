@@ -169,6 +169,8 @@ impl SubmitOtp {
 
     fn read(&mut self, response: Response) -> VtopResult<Step<SignIn>> {
         match self.stage {
+            // VTOP has dropped the unfinished sign-in: no code can be checked against it.
+            Stage::Submit if response.status == 404 => Err(VtopError::SessionExpired),
             Stage::Submit => {
                 let text = response.text();
                 let reply = OtpReply::parse(&text);
@@ -298,7 +300,8 @@ impl Machine for ResendOtp {
             if self.path < RESEND_PATHS.len() {
                 return self.send();
             }
-            return Step::Done(Err(failed(None, FAILED)));
+            // Neither spelling exists for this session: VTOP dropped the unfinished sign-in.
+            return Step::Done(Err(VtopError::SessionExpired));
         }
         let text = response.text();
         let reply = OtpReply::parse(&text);
@@ -456,6 +459,31 @@ mod tests {
         machine.start();
         let done = machine.feed(answer(200, "https://vtop.example/vtop/content/", CONTENT));
         assert!(matches!(done, Step::Done(Ok(SignIn::SignedIn { .. }))));
+    }
+
+    /// VTOP drops an unfinished sign-in after a while; its OTP endpoints then answer 404.
+    #[test]
+    fn a_dropped_sign_in_is_an_expired_session() {
+        let mut machine = submit();
+        machine.start();
+        let done = machine.feed(answer(
+            404,
+            "https://vtop.example/vtop/validateSecurityOtp",
+            "<html>Not Found</html>",
+        ));
+        assert!(matches!(done, Step::Done(Err(VtopError::SessionExpired))));
+
+        let mut machine = ResendOtp::new("https://vtop.example", "c");
+        let Step::Send(first) = machine.start() else {
+            panic!()
+        };
+        let Step::Send(second) = machine.feed(answer(404, &first.url, "")) else {
+            panic!()
+        };
+        assert!(matches!(
+            machine.feed(answer(404, &second.url, "")),
+            Step::Done(Err(VtopError::SessionExpired))
+        ));
     }
 
     #[test]

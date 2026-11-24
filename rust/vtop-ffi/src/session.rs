@@ -115,14 +115,17 @@ impl Core {
                 }
                 return self.fresh_challenge(&slot, &mut session).await;
             }
-            session
-                .client
-                .submit_security_otp(code.trim())
-                .await
-                .map_err(|error| match error {
-                    VtopError::AuthenticationFailed(reason) => CoreError::OtpRejected { reason },
-                    error => error.into(),
-                })?;
+            match session.client.submit_security_otp(code.trim()).await {
+                Ok(()) => {}
+                Err(VtopError::AuthenticationFailed(reason)) => {
+                    return Err(CoreError::OtpRejected { reason });
+                }
+                // VTOP dropped the sign-in while the prompt was open: start a new one.
+                Err(VtopError::SessionExpired) => {
+                    return self.fresh_challenge(&slot, &mut session).await;
+                }
+                Err(error) => return Err(error.into()),
+            }
             session.mark_signed_in();
             obs::set_regno(session.client.registration_number().ok());
             self.save(&slot, &session);
@@ -138,14 +141,18 @@ impl Core {
                 return self.server_otp(&slot, challenge_id, None, &flow).await;
             }
             let mut session = slot.write().await;
-            if session.client.otp_issued_at().is_none() {
-                // Signing in afresh mails the new code.
-                return match self.fresh_challenge(&slot, &mut session).await {
-                    Err(CoreError::OtpRejected { .. }) => Ok(()),
-                    result => result,
-                };
+            if session.client.otp_issued_at().is_some() {
+                match session.client.resend_security_otp().await {
+                    // VTOP dropped the sign-in: start a new one below.
+                    Err(VtopError::SessionExpired) => {}
+                    result => return Ok(result?),
+                }
             }
-            Ok(session.client.resend_security_otp().await?)
+            // Signing in afresh mails the new code.
+            match self.fresh_challenge(&slot, &mut session).await {
+                Err(CoreError::OtpRejected { .. }) => Ok(()),
+                result => result,
+            }
         })
         .await
     }
