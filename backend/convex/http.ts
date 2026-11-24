@@ -87,10 +87,11 @@ for (const spec of [
   // A key JWT for the extension's socket (extension.ts). `no-store`: it is a credential.
   ...corsRoutes("POST", { path: "/v1/key/token" }, async (ctx, req) => {
     const keyHash = await keyHashOf(req);
-    const ok = keyHash && (await ctx.runMutation(internal.extension.tokenFor, { keyHash }));
+    if (!keyHash) return keyUnknown();
+    const ok = await ctx.runMutation(internal.extension.tokenFor, { keyHash });
     if (!ok) return keyUnknown();
     if (ok.limited) return error(429, "rate_limited", "Too many token requests for this account.", { headers: { "retry-after": "60" } });
-    const { jwt, expiresAt } = await signAccessJwt({ sub: keyHash!, kind: "key" }, now());
+    const { jwt, expiresAt } = await signAccessJwt({ sub: keyHash, kind: "key" }, now());
     return Response.json({ jwt, expiresAt }, { headers: { "cache-control": "no-store", pragma: "no-cache" } });
   }),
   // The extension polls for the key the app made with its code.

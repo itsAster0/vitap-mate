@@ -6,9 +6,10 @@
 // - Convex: self-hosted on hawk (infra repo, services/vmate-convex), served at
 //   vmate.aster0.dev by hawk's Caddy. Its env holds the v3 secrets, and the
 //   resources below read theirs from it (`convexEnv`), so there is one copy.
-// - Engine: on nest, built there and published on its NetBird address (hawk's
-//   Convex and Caddy reach it there). Railway `engine-v2` is kept up to date as a
-//   standby with the same settings (ENGINE_URL in Convex picks which one is used).
+// - Engine: built on nest and pushed to GHCR, run on hawk (127.0.0.1:8090) and on
+//   nest (its NetBird address) as a standby. hawk's Caddy sends Convex, the gateway
+//   and /proof to hawk's engine, else nest's (`ENGINE_URL`, the infra repo's
+//   Caddyfile). Railway `engine-v2` is kept up to date as a second standby.
 // - Gateway: the UDP gateway on hawk (the Linode fedora-in-maa), built on nest,
 //   pushed to GHCR and run over SSH as `vitapmate-gateway`. It reaches Convex on
 //   the same machine and the engine over NetBird. Caddy holds UDP 443 there and
@@ -36,10 +37,13 @@ import * as Redacted from "effect/Redacted";
 
 const DOMAIN = "vmate.aster0.dev";
 const CONVEX_URL = `https://${DOMAIN}`;
-/** nest's NetBird address: the engine is published there only. */
+/** nest's NetBird address: its standby engine is published there only. */
 const NEST_IP = "100.126.222.47";
-const ENGINE_URL = `http://${NEST_IP}:8090`;
 const HAWK_IP = "172.232.115.40";
+/** hawk's Caddy on its NetBird address: hawk's engine, else nest's. Set as Convex's ENGINE_URL too. */
+const ENGINE_URL = "http://100.126.178.2:8095";
+/** The engine's GHCR image, public like the gateway's, as hawk pulls without a login. */
+const ENGINE_IMAGE = "ghcr.io/itsaster0/vitapmate-engine";
 
 /** A secret from the Convex deployment's env (`bunx convex env get`, with ../backend/.env.local). */
 const convexEnv = (name: string) =>
@@ -72,25 +76,64 @@ const nest = Effect.gen(function* () {
   });
 });
 
+const hawk = Effect.gen(function* () {
+  return yield* Docker.Context("Linode", {
+    name: "fedora-in-maa",
+    docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault(`ssh://root@${HAWK_IP}`))}`,
+  });
+});
+
+const ghcr = Effect.gen(function* () {
+  return {
+    server: "ghcr.io",
+    username: yield* Config.String("GHCR_USERNAME").pipe(Config.withDefault("itsAster0")),
+    password: yield* Config.Redacted("GHCR_TOKEN"),
+  };
+});
+
 export const Engine = Effect.gen(function* () {
-  const host = yield* nest;
+  const builder = yield* nest;
   const image = yield* Docker.Image("NestEngineImage", {
-    context: host,
-    name: "vmate-engine",
+    context: builder,
+    name: ENGINE_IMAGE,
+    registry: yield* ghcr,
     build: { context: "../rust", dockerfile: "Dockerfile.engine", platform: "linux/amd64" },
   });
-  return yield* Docker.Container("NestEngine", {
-    context: host,
-    name: "vmate-engine",
-    image,
-    ports: [{ external: `${NEST_IP}:8090`, internal: 8080 }],
-    // Caddy on hawk sends /proof here: one hop, so X-Forwarded-For's last entry is the phone.
-    environment: { ...(yield* engineEnv), PROXY_HOPS: "1" },
+  // Both behind hawk's Caddy, one hop, so X-Forwarded-For's last entry is the phone.
+  const environment = { ...(yield* engineEnv), PROXY_HOPS: "1" };
+  const common = {
+    environment,
     start: true,
     restart: "unless-stopped",
     logDriver: "json-file",
     logOptions: { "max-size": "10m", "max-file": "3" },
+  } as const;
+  const standby = yield* Docker.Container("NestEngine", {
+    ...common,
+    context: builder,
+    name: "vmate-engine",
+    image,
+    ports: [{ external: `${NEST_IP}:8090`, internal: 8080 }],
   }).pipe(adopt(true));
+  const host = yield* hawk;
+  // Built on nest, so hawk has only the tag it pulled last: pulled each deploy, as the gateway.
+  const pulled = yield* Docker.RemoteImage("HawkEnginePull", {
+    context: host,
+    name: image.name,
+    tag: image.tag,
+    platform: "linux/amd64",
+  });
+  // Capped so a heavy proof kills the engine (and Caddy falls back to nest), never Convex beside it.
+  const main = yield* Docker.Container("HawkEngine", {
+    ...common,
+    context: host,
+    name: "vmate-engine",
+    image: pulled,
+    ports: [{ external: "127.0.0.1:8090", internal: 8080 }],
+    memory: "500m",
+    memorySwap: "500m",
+  }).pipe(adopt(true));
+  return { main, standby };
 });
 
 export const RailwayEngine = Effect.gen(function* () {
@@ -146,19 +189,12 @@ export const Proxy = Cloudflare.Worker("Proxy", {
 const GATEWAY_DIR = "/root/vitapmate-gateway";
 
 export const Gateway = Effect.gen(function* () {
-  const host = yield* Docker.Context("Linode", {
-    name: "fedora-in-maa",
-    docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault(`ssh://root@${HAWK_IP}`))}`,
-  });
+  const host = yield* hawk;
   const image = yield* Docker.Image("GatewayImage", {
     context: yield* nest,
     // With the host, or Alchemy pushes the bare name to Docker Hub.
     name: "ghcr.io/itsaster0/vitapmate-gateway",
-    registry: {
-      server: "ghcr.io",
-      username: yield* Config.String("GHCR_USERNAME").pipe(Config.withDefault("itsAster0")),
-      password: yield* Config.Redacted("GHCR_TOKEN"),
-    },
+    registry: yield* ghcr,
     build: { context: "../rust", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
   });
   // The image is built on nest, so hawk has only the tag it pulled last: a container made from
@@ -208,8 +244,8 @@ export default Alchemy.Stack(
     const railway = yield* RailwayEngine;
     const mail = yield* Mail;
     const proxy = yield* Proxy;
-    const out = { engine: engine.name, railway: railway.url, mail: mail.workerName, proxy: proxy.url };
-    // SKIP_GATEWAY=1 deploys without it (when there is no GHCR_TOKEN).
+    const out = { engine: engine.main.name, railway: railway.url, mail: mail.workerName, proxy: proxy.url };
+    // SKIP_GATEWAY=1 deploys without it.
     if (yield* Config.Boolean("SKIP_GATEWAY").pipe(Config.withDefault(false))) return out;
     const gateway = yield* Gateway;
     return { ...out, gateway: gateway.name };
