@@ -20810,10 +20810,12 @@ sealed class CoreException: kotlin.Exception() {
      */
     class ForwardingOff(
         
+        val `kind`: ForwardingOffKind, 
+        
         val `reason`: kotlin.String
         ) : CoreException() {
         override val message
-            get() = "reason=${ `reason` }"
+            get() = "kind=${ `kind` }, reason=${ `reason` }"
     }
     
     class Other(
@@ -20860,6 +20862,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             8 -> CoreException.ConsentDenied()
             9 -> CoreException.RegnoNotShared()
             10 -> CoreException.ForwardingOff(
+                FfiConverterTypeForwardingOffKind.read(buf),
                 FfiConverterString.read(buf),
                 )
             11 -> CoreException.Other(
@@ -20914,6 +20917,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             is CoreException.ForwardingOff -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
+                + FfiConverterTypeForwardingOffKind.allocationSize(value.`kind`)
                 + FfiConverterString.allocationSize(value.`reason`)
             )
             is CoreException.Other -> (
@@ -20968,6 +20972,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             }
             is CoreException.ForwardingOff -> {
                 buf.putInt(10)
+                FfiConverterTypeForwardingOffKind.write(value.`kind`, buf)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
@@ -21144,6 +21149,57 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Why a forwarding call found mail forwarding off.
+ */
+
+enum class ForwardingOffKind {
+    
+    /**
+     * No forwarding address is saved on this phone.
+     */
+    NOT_SET_UP,
+    /**
+     * Kept from v2 or missing an identity: reconnects once signed in.
+     */
+    NEEDS_SIGN_IN,
+    /**
+     * The address was deleted on the server.
+     */
+    ADDRESS_DELETED,
+    /**
+     * This phone was removed from the account on the server.
+     */
+    DEVICE_REMOVED;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeForwardingOffKind: FfiConverterRustBuffer<ForwardingOffKind> {
+    override fun read(buf: ByteBuffer) = try {
+        ForwardingOffKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ForwardingOffKind) = 4UL
+
+    override fun write(value: ForwardingOffKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
     }
 }
 

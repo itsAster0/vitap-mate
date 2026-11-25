@@ -59,7 +59,13 @@ async fn sets_up_checks_fetches_and_turns_off() {
     keep_token(&core, &url);
     assert_eq!(state(&core.forwarding_status("f".into())), "off");
     let fetched = core.fetch_forwarded_otp("f".into(), 0).await;
-    assert!(matches!(fetched, Err(CoreError::ForwardingOff { .. })));
+    assert!(matches!(
+        fetched,
+        Err(CoreError::ForwardingOff {
+            kind: ForwardingOffKind::NotSetUp,
+            ..
+        })
+    ));
 
     let set_up = core.set_up_forwarding("f-setup".into()).await.unwrap();
     let Forwarding::Waiting {
@@ -139,7 +145,13 @@ async fn sets_up_checks_fetches_and_turns_off() {
     core.set_up_forwarding("f".into()).await.unwrap();
     edge.lock().unwrap().gone = true;
     let checked = core.check_forwarding("f".into()).await;
-    assert!(matches!(checked, Err(CoreError::ForwardingOff { .. })));
+    assert!(matches!(
+        checked,
+        Err(CoreError::ForwardingOff {
+            kind: ForwardingOffKind::AddressDeleted,
+            ..
+        })
+    ));
     assert_eq!(state(&core.forwarding_status("f".into())), "off");
 
     // One identity; every call went signed or with its JWT.
@@ -583,8 +595,50 @@ async fn a_phone_moved_to_the_students_old_address_follows_it() {
     // Deleted on another phone: no address to follow, so it is forgotten.
     edge.lock().unwrap().moved_to = None;
     let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
-    assert!(matches!(pulled, Err(CoreError::ForwardingOff { .. })));
+    assert!(matches!(
+        pulled,
+        Err(CoreError::ForwardingOff {
+            kind: ForwardingOffKind::AddressDeleted,
+            ..
+        })
+    ));
     assert_eq!(core.mailbox_state(), MailboxState::Off);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn forwarding_off_reports_device_removed_and_needs_sign_in() {
+    let (core, edge, dir, _url) = forwarding_core("off-kinds").await;
+    edge.lock().unwrap().canned.insert(
+        "mail:inbox".into(),
+        [(
+            403,
+            json!({ "code": REMOVED, "error": "This phone was removed." }),
+        )]
+        .into(),
+    );
+    let removed = core.check_forwarding("f".into()).await;
+    assert!(matches!(
+        removed,
+        Err(CoreError::ForwardingOff {
+            kind: ForwardingOffKind::DeviceRemoved,
+            ..
+        })
+    ));
+    assert_eq!(core.mailbox_state(), MailboxState::Off);
+
+    // Without a server identity (e.g. v2 address before proving), inbox check reports NeedsSignIn.
+    keep_token(&core, &_url);
+    core.set_up_forwarding("f".into()).await.unwrap();
+    core.forget_identity();
+    let unauth = core.check_forwarding("f".into()).await;
+    assert!(matches!(
+        unauth,
+        Err(CoreError::ForwardingOff {
+            kind: ForwardingOffKind::NeedsSignIn,
+            ..
+        })
+    ));
     let _ = fs::remove_dir_all(&dir);
 }
 

@@ -1,27 +1,108 @@
 package vitapmate.data
 
+import vitapmate.core.ForwardingOffKind
+
 /** Why background sync is paused: [text] is shown ("Paused: …"), [id] is saved. */
-enum class PauseReason(val id: String, val text: String) {
-    NotSetUp("not_set_up", "OTP auto-fill isn't set up"),
-    GmailReconnect("gmail_reconnect", "Gmail needs reconnecting"),
-    GmailRefused("gmail_refused", "Gmail refused the request"),
-    NoCode("no_code", "No code came in time"),
-    CodeRefused("code_refused", "VTOP didn't take the code"),
-    ForwardingOff("forwarding_off", "Mail forwarding is off"),
-    PasswordRejected("password_rejected", "VTOP turned down your password"),
-    OtpFailed("otp_failed", "The OTP couldn't be filled in"),
-    ;
+sealed interface PauseReason {
+    val id: String
+    val text: String
 
     /** Connecting Gmail again clears it. */
-    val gmail get() = this == GmailReconnect || this == GmailRefused
+    val gmail: Boolean get() = this is GmailReconnect || this is GmailRefused
+
+    data object NotSetUp : PauseReason {
+        override val id = "not_set_up"
+        override val text = "OTP auto-fill isn't set up"
+    }
+
+    data object GmailReconnect : PauseReason {
+        override val id = "gmail_reconnect"
+        override val text = "Gmail needs reconnecting"
+    }
+
+    data class GmailRefused(val code: String? = null) : PauseReason {
+        private val clean get() = code?.trim()?.takeIf { it.isNotEmpty() }
+        override val id get() = clean?.let { "$ID:$it" } ?: ID
+        override val text get() = clean?.let { "Gmail refused: $it" } ?: "Gmail refused the request"
+
+        companion object {
+            const val ID = "gmail_refused"
+        }
+    }
+
+    data object NoCode : PauseReason {
+        override val id = "no_code"
+        override val text = "No code came in time"
+    }
+
+    data object CodeRefused : PauseReason {
+        override val id = "code_refused"
+        override val text = "VTOP didn't take the code"
+    }
+
+    data class ForwardingOff(val kind: ForwardingOffKind? = null) : PauseReason {
+        override val id
+            get() = when (kind) {
+                null -> ID
+                ForwardingOffKind.NOT_SET_UP -> "$ID:not_set_up"
+                ForwardingOffKind.NEEDS_SIGN_IN -> "$ID:needs_sign_in"
+                ForwardingOffKind.ADDRESS_DELETED -> "$ID:address_deleted"
+                ForwardingOffKind.DEVICE_REMOVED -> "$ID:device_removed"
+            }
+        override val text
+            get() = when (kind) {
+                null, ForwardingOffKind.NOT_SET_UP -> "Mail forwarding is off"
+                ForwardingOffKind.NEEDS_SIGN_IN -> "Mail forwarding reconnects once you're signed in"
+                ForwardingOffKind.ADDRESS_DELETED -> "Your forwarding address no longer exists. Set it up again"
+                ForwardingOffKind.DEVICE_REMOVED -> "This phone was removed from your account. Sign in again"
+            }
+
+        companion object {
+            const val ID = "forwarding_off"
+
+            internal fun parseKind(raw: String): ForwardingOffKind? = when (raw) {
+                "not_set_up" -> ForwardingOffKind.NOT_SET_UP
+                "needs_sign_in" -> ForwardingOffKind.NEEDS_SIGN_IN
+                "address_deleted" -> ForwardingOffKind.ADDRESS_DELETED
+                "device_removed" -> ForwardingOffKind.DEVICE_REMOVED
+                else -> null
+            }
+        }
+    }
+
+    data object PasswordRejected : PauseReason {
+        override val id = "password_rejected"
+        override val text = "VTOP turned down your password"
+    }
+
+    data object OtpFailed : PauseReason {
+        override val id = "otp_failed"
+        override val text = "The OTP couldn't be filled in"
+    }
 
     companion object {
-        /** A saved [id], the text an older app saved, or why the OTP auto-fill failed (its own words). */
-        fun parse(saved: String): PauseReason = entries.firstOrNull { it.id == saved || it.text == saved } ?: when {
-            saved.startsWith("Gmail refused") -> GmailRefused
-            // Rust's ForwardingOff reasons.
-            saved.contains("forwarding", ignoreCase = true) || saved.contains("removed from your account") -> ForwardingOff
-            else -> OtpFailed
+        // Lazy: nested data objects initialize after the enclosing interface's companion.
+        private val simple by lazy { listOf(NotSetUp, GmailReconnect, NoCode, CodeRefused, PasswordRejected, OtpFailed) }
+
+        /** Reads a saved [id], or migrates the display text an older app saved. */
+        fun parse(saved: String): PauseReason {
+            simple.firstOrNull { it.id == saved || it.text == saved }?.let { return it }
+            if (saved == GmailRefused.ID || saved == "Gmail refused the request") return GmailRefused()
+            if (saved.startsWith("${GmailRefused.ID}:")) return GmailRefused(saved.substringAfter(':'))
+            if (saved == ForwardingOff.ID || saved == "Mail forwarding is off") return ForwardingOff()
+            if (saved.startsWith("${ForwardingOff.ID}:")) {
+                return ForwardingOff(ForwardingOff.parseKind(saved.substringAfter(':')))
+            }
+            // One-time migration for older apps that persisted free-text failure messages.
+            return when {
+                saved.startsWith("Gmail refused:") -> GmailRefused(saved.substringAfter(':').trim())
+                saved.startsWith("Gmail refused") -> GmailRefused()
+                saved.contains("removed from your account", ignoreCase = true) -> ForwardingOff(ForwardingOffKind.DEVICE_REMOVED)
+                saved.contains("no longer exists", ignoreCase = true) -> ForwardingOff(ForwardingOffKind.ADDRESS_DELETED)
+                saved.contains("reconnects once", ignoreCase = true) -> ForwardingOff(ForwardingOffKind.NEEDS_SIGN_IN)
+                saved.contains("forwarding", ignoreCase = true) -> ForwardingOff(ForwardingOffKind.NOT_SET_UP)
+                else -> OtpFailed
+            }
         }
     }
 }
@@ -38,12 +119,12 @@ sealed interface SyncHealth {
     val pausedFor: PauseReason? get() = (this as? Paused)?.reason
 
     /**
-     * After a run's OTP auto-fill: [why] is its failure in its own words, null when the code went
-     * through (which says nothing until the run ends). VTOP mails late at times, so one code that
-     * never came is only that run's luck; [MISSES_TO_PAUSE] in a row pause.
+     * After a run's OTP auto-fill: [why] is its typed failure, null when the code went through
+     * (which says nothing until the run ends). VTOP mails late at times, so one code that never
+     * came is only that run's luck; [MISSES_TO_PAUSE] in a row pause.
      */
-    fun afterOtp(why: String?): SyncHealth {
-        val reason = why?.let(PauseReason::parse) ?: return this
+    fun afterOtp(why: PauseReason?): SyncHealth {
+        val reason = why ?: return this
         if (reason != PauseReason.NoCode) return Paused(reason)
         return when (this) {
             is Active -> if (otpMisses + 1 >= MISSES_TO_PAUSE) Paused(PauseReason.NoCode) else Active(otpMisses + 1)

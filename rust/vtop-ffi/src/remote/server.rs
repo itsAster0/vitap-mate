@@ -479,6 +479,7 @@ impl Core {
             let (_, mailbox, _) = self
                 .saved_mailbox()
                 .ok_or_else(|| CoreError::ForwardingOff {
+                    kind: crate::ForwardingOffKind::NotSetUp,
                     reason: "Mail forwarding is off.".into(),
                 })?;
             let body = json!({ "id": mailbox, "removeDevice": id });

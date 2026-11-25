@@ -265,7 +265,13 @@ async fn live_watches_follow_as_the_student() {
         .clone()
         .live_watch("f".into(), LiveTopic::MailInbox, heard.clone())
         .await;
-    assert!(matches!(inbox, Err(CoreError::ForwardingOff { .. })));
+    assert!(matches!(
+        inbox,
+        Err(CoreError::ForwardingOff {
+            kind: crate::ForwardingOffKind::NotSetUp,
+            ..
+        })
+    ));
 }
 
 #[test]

@@ -231,6 +231,7 @@ impl Core {
                     let (_, id, _) =
                         self.saved_mailbox()
                             .ok_or_else(|| CoreError::ForwardingOff {
+                                kind: crate::ForwardingOffKind::NotSetUp,
                                 reason: "Mail forwarding is off.".into(),
                             })?;
                     ("mail:inbox", json!({ "id": id }))

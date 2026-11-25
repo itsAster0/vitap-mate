@@ -97,6 +97,19 @@ pub enum SignIn {
     NeedsOtp { message: String },
 }
 
+/// Why a forwarding call found mail forwarding off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ForwardingOffKind {
+    /// No forwarding address is saved on this phone.
+    NotSetUp,
+    /// Kept from v2 or missing an identity: reconnects once signed in.
+    NeedsSignIn,
+    /// The address was deleted on the server.
+    AddressDeleted,
+    /// This phone was removed from the account on the server.
+    DeviceRemoved,
+}
+
 /// Why a call failed. The text field is `reason`, not `message`: Kotlin
 /// exceptions already have a `message` and UniFFI would declare it twice.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Error)]
@@ -127,6 +140,7 @@ pub enum CoreError {
     RegnoNotShared,
     /// This phone has no forwarding address, or the server deleted it: an OTP wait on it ends.
     ForwardingOff {
+        kind: ForwardingOffKind,
         reason: String,
     },
     Other {
@@ -150,7 +164,7 @@ impl std::fmt::Display for CoreError {
             Self::VtopUnavailable { reason }
             | Self::OtpRequired { reason, .. }
             | Self::OtpRejected { reason }
-            | Self::ForwardingOff { reason }
+            | Self::ForwardingOff { reason, .. }
             | Self::Other { reason } => formatter.write_str(reason),
         }
     }

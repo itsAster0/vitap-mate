@@ -24,7 +24,7 @@ use vtop_core::spec;
 use vtop_core::types::StudentProfile;
 
 use crate::remote::backend::Kind;
-use crate::{Core, CoreError, PAGES, Slot, traced, traced_sync};
+use crate::{Core, CoreError, ForwardingOffKind, PAGES, Slot, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
 /// Addresses this phone still has to leave on the edge, kept past sign-out (not a student
@@ -911,6 +911,7 @@ impl Core {
             let joined = matches!(state, MailboxState::Joined { .. });
             let Some(id) = state.id().map(str::to_string) else {
                 return Err(CoreError::ForwardingOff {
+                    kind: ForwardingOffKind::NotSetUp,
                     reason: "Mail forwarding is off.".into(),
                 });
             };
@@ -935,11 +936,13 @@ impl Core {
                         continue;
                     }
                     Ok(Rejoined::Later) if !joined => CoreError::ForwardingOff {
+                        kind: ForwardingOffKind::NeedsSignIn,
                         reason: "Mail forwarding reconnects once you're signed in.".into(),
                     },
                     Ok(Rejoined::Later | Rejoined::NoAddress) => {
                         self.forget_forwarding(&id);
                         CoreError::ForwardingOff {
+                            kind: ForwardingOffKind::AddressDeleted,
                             reason: "Your forwarding address no longer exists. Set it up again."
                                 .into(),
                         }
@@ -953,11 +956,13 @@ impl Core {
                 // No identity on this install yet (updated from v2 without a live account
                 // token): the app proves and rejoins once signed in (`keep_forwarding`).
                 "unauthenticated" => CoreError::ForwardingOff {
+                    kind: ForwardingOffKind::NeedsSignIn,
                     reason: "Mail forwarding reconnects once you're signed in.".into(),
                 },
                 REMOVED => {
                     self.forget_forwarding(&id);
                     CoreError::ForwardingOff {
+                        kind: ForwardingOffKind::DeviceRemoved,
                         reason: "This phone was removed from your account. Sign in again.".into(),
                     }
                 }
