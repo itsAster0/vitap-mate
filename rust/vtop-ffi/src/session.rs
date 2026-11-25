@@ -156,9 +156,13 @@ impl Core {
             let mut session = slot.write().await;
             if session.client.otp_issued_at().is_some() {
                 match session.client.resend_security_otp().await {
+                    Ok(()) => {
+                        session.otp_resent();
+                        return Ok(());
+                    }
                     // VTOP dropped the sign-in: start a new one below.
                     Err(VtopError::SessionExpired) => {}
-                    result => return Ok(result?),
+                    Err(error) => return Err(error.into()),
                 }
             }
             // Signing in afresh mails the new code.

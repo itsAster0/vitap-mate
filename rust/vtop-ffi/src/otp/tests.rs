@@ -211,3 +211,82 @@ async fn await_otp_opens_the_prompt_for_a_sign_in_waiting_on_its_code() {
     assert_eq!(outcome, Ok(()));
     assert_eq!(told.last(), None);
 }
+
+/// Answers every request as VTOP's resend does, dated `date`.
+async fn resend_vtop(date: &'static str) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                let mut buffer = vec![0u8; 16 * 1024];
+                while let Ok(read) = socket.read(&mut buffer).await {
+                    if read == 0 {
+                        return;
+                    }
+                    let body = r#"{"status":"SUCCESS"}"#;
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nDate: {date}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                        body.len()
+                    );
+                    if socket.write_all(response.as_bytes()).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    base
+}
+
+#[tokio::test]
+async fn a_resent_code_shows_on_the_open_prompt() {
+    use vtop_core::inputs::{Password, Username};
+    use vtop_core::{SessionState, VtopClient, VtopConfig};
+
+    let base = resend_vtop("Wed, 25 Nov 2026 10:00:00 GMT").await;
+    let client = VtopClient::builder()
+        .config(VtopConfig {
+            base_url: base,
+            ..VtopConfig::default()
+        })
+        .with_credentials(
+            Username::parse("21BCE0001").unwrap(),
+            Password::parse("pw").unwrap(),
+        )
+        .unwrap();
+    client
+        .resume_session(&SessionState {
+            cookies: String::new(),
+            csrf_token: Some("csrf".into()),
+            registration_number: None,
+            otp_issued_at: Some(100),
+            logged_in_at: None,
+        })
+        .unwrap();
+    let account = Account {
+        username: "21BCE0001".into(),
+        password: "pw".into(),
+        registration_number: None,
+    };
+    let core = Core::for_test(
+        std::env::temp_dir().join(format!("vtop-ffi-otp-resent-{}", std::process::id())),
+    );
+    let slot = core.install(Session::for_test(client, account));
+    let told = Arc::new(Told::default());
+    {
+        let mut session = slot.write().await;
+        session.otp.set_listener(told.clone());
+        session.begin_otp(OtpVia::Phone, ASKED.into());
+        // A waiting call opened the prompt.
+        session.otp.prompt(session.otp_session, ASKED, Some(100));
+    }
+    let opened = told.last().expect("the prompt opened");
+
+    core.resend_otp("f".into()).await.unwrap();
+    let shown = told.last().expect("the prompt stays open");
+    assert_eq!(shown.id, opened.id, "the same prompt");
+    assert_eq!(shown.issued_at, Some(1_795_600_800), "the new code's time");
+}

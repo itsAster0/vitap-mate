@@ -394,6 +394,15 @@ impl Session {
         challenge_id
     }
 
+    /// VTOP mailed a new code for the same challenge: an open prompt shows when, so auto-fill
+    /// waits for that mail.
+    pub(crate) fn otp_resent(&self) {
+        if let Some(message) = self.otp_message() {
+            self.otp
+                .challenged(self.otp_session, message, self.client.otp_issued_at());
+        }
+    }
+
     pub(crate) fn mark_signed_in(&mut self) {
         self.phase = SessionPhase::Active;
         self.logins = self.logins.saturating_add(1);
