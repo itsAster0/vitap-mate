@@ -8,6 +8,7 @@ import type { Id } from "./_generated/dataModel";
 import { guideFiles } from "../dev/guideFiles";
 import { recordSignIn } from "./lib/accounts";
 import { REQUEST_TIMEOUT_SECS, SESSION_CACHE_SECS } from "./lib/accountState";
+import { DEMO_INACTIVE_SECS } from "./auth";
 import { CONFIRMATION_TTL_SECS, SEALED_TTL_SECS } from "./lib/mailboxes";
 import { sha256Hex } from "./lib/crypto";
 import { GUIDE_FILES } from "./lib/guideFiles";
@@ -471,6 +472,37 @@ describe("sweeps", () => {
     await t.mutation(internal.sweeps.quarter, {});
     await t.mutation(internal.sweeps.quarter, {});
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
+  });
+
+  it("sweeps inactive demo devices and refresh tokens without touching active demo or real accounts", async () => {
+    const t = await setup();
+    const real = await phone(1);
+    const staleDemo = await phone(2);
+    const activeDemo = await phone(3);
+    const legacyDemo = await phone(4);
+    await prove(t, real);
+    await t.action(api.auth.token, await staleDemo.signed("auth:token", { demo: true, device: staleDemo.device }));
+    const activeTokens = await t.action(api.auth.token, await activeDemo.signed("auth:token", { demo: true, device: activeDemo.device }));
+    // Simulate a legacy demo install created before demoExpiresAt existed.
+    await t.action(api.auth.token, await legacyDemo.signed("auth:token", { demo: true, device: legacyDemo.device }));
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("devices").collect()).find((d) => d.deviceId === legacyDemo.deviceId);
+      await ctx.db.patch(row!._id, { demoExpiresAt: undefined });
+    });
+
+    // Active demo refreshes halfway through the window, extending its expiry.
+    advance(Math.floor(DEMO_INACTIVE_SECS / 2));
+    await t.action(api.auth.token, await activeDemo.signed("auth:token", { refreshToken: activeTokens.refreshToken }));
+
+    advance(DEMO_INACTIVE_SECS - Math.floor(DEMO_INACTIVE_SECS / 2) + 1);
+    await t.mutation(internal.sweeps.quarter, {});
+
+    const devices = await t.run((ctx) => ctx.db.query("devices").collect());
+    const tokens = await t.run((ctx) => ctx.db.query("refreshTokens").collect());
+    expect(devices.map((d) => d.deviceId).sort()).toEqual([real.deviceId, activeDemo.deviceId].sort());
+    expect(tokens.some((r) => r.deviceId === real.deviceId)).toBe(true);
+    expect(tokens.some((r) => r.deviceId === activeDemo.deviceId)).toBe(true);
+    expect(tokens.some((r) => r.deviceId === staleDemo.deviceId || r.deviceId === legacyDemo.deviceId)).toBe(false);
   });
 });
 

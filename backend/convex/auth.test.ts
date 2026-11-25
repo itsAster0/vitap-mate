@@ -328,4 +328,32 @@ describe("tokens", () => {
     const t = await setup();
     expect(await codeOf(t.query(api.devices.info, { flow: "f" }))).toBe("unauthenticated");
   });
+
+  it("rate limits demo grants per install and globally, and refresh rotations per install", async () => {
+    const t = await setup();
+    const p1 = await phone(1);
+    for (let i = 0; i < 5; i++) {
+      await t.action(api.auth.token, await p1.signed("auth:token", { demo: true, device: p1.device }));
+    }
+    expect(await codeOf(t.action(api.auth.token, await p1.signed("auth:token", { demo: true, device: p1.device })))).toBe("rate_limited");
+    // Another install still gets demo tokens until the global bucket fills (40 total, 5 already used).
+    for (let i = 0; i < 35; i++) {
+      const pi = await phone(50 + i);
+      await t.action(api.auth.token, await pi.signed("auth:token", { demo: true, device: pi.device }));
+    }
+    const extra = await phone(99);
+    expect(await codeOf(t.action(api.auth.token, await extra.signed("auth:token", { demo: true, device: extra.device })))).toBe("rate_limited");
+
+    // Per-device refresh rate limit (capacity 15).
+    const r = await phone(2);
+    let rt = (await prove(t, r)).refreshToken;
+    for (let i = 0; i < 15; i++) {
+      rt = (await t.action(api.auth.token, await r.signed("auth:token", { refreshToken: rt }))).refreshToken;
+    }
+    expect(await codeOf(t.action(api.auth.token, await r.signed("auth:token", { refreshToken: rt })))).toBe("rate_limited");
+    // Another install can still refresh.
+    const other = await phone(3);
+    const otherTokens = await prove(t, other);
+    expect((await t.action(api.auth.token, await other.signed("auth:token", { refreshToken: otherTokens.refreshToken }))).regno).toBe(REGNO);
+  });
 });

@@ -31,6 +31,8 @@ import { accountId, log, now, str } from "./lib/util";
 export const TICKET_TTL_SECS = 120;
 /** How long a proved ticket waits for its `auth:token`. */
 export const PROVED_TTL_SECS = 300;
+/** How long an inactive demo install and its refresh chain stay before being swept. */
+export const DEMO_INACTIVE_SECS = 7 * 86_400;
 export const REFRESH_PREFIX = "vrt_";
 
 // ---- the proof ticket -------------------------------------------------------------------
@@ -257,6 +259,15 @@ export const grant = internalMutation({
   handler: async (ctx, args): Promise<Granted> => {
     const at = now();
     const { deviceId, grant } = args;
+    if (grant.kind === "demo") {
+      const perDevice = await rateLimits.limit(ctx, "tokenDemoDevice", { key: deviceId });
+      if (!perDevice.ok) fail("rate_limited", "Too many demo token requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+      const global = await rateLimits.limit(ctx, "tokenDemoGlobal", {});
+      if (!global.ok) fail("rate_limited", "Too many demo token requests; try again later.", { retryAfterMs: global.retryAfter });
+    } else if (grant.kind === "refresh") {
+      const perDevice = await rateLimits.limit(ctx, "tokenRefresh", { key: deviceId });
+      if (!perDevice.ok) fail("rate_limited", "Too many refresh requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+    }
     const store = (chainId: string, accountRow: Id<"accounts"> | null) =>
       ctx.db.insert("refreshTokens", { hash: args.newHash, deviceId, chainId, ...(accountRow ? { accountId: accountRow } : {}), usedAt: null, createdAt: at });
     // An install keeps one refresh token: a new chain (proof, trade-in, demo) ends its older ones,
@@ -295,6 +306,7 @@ export const grant = internalMutation({
             }
             await ctx.db.delete(later[0]._id);
             if (account) await linkPhone(ctx, account, device);
+            else await ctx.db.patch(device._id, { demoExpiresAt: at + DEMO_INACTIVE_SECS });
             await store(row.chainId, account?._id ?? null);
             return account ? { regno: account.regno, account: account._id, demo: false } : { regno: DEMO_REGNO, account: "demo", demo: true };
           }
@@ -313,6 +325,7 @@ export const grant = internalMutation({
         await dropUsedBefore(ctx, row);
         if (row.accountId === undefined) {
           await ctx.db.patch(row._id, { usedAt: at });
+          await ctx.db.patch(device._id, { demoExpiresAt: at + DEMO_INACTIVE_SECS });
           await store(row.chainId, null);
           return { regno: DEMO_REGNO, account: "demo", demo: true };
         }
@@ -364,12 +377,14 @@ export const grant = internalMutation({
         await startChain(account._id);
         return { regno: account.regno, account: account._id, demo: false };
       }
-      case "demo":
+      case "demo": {
         // The demo is no account: an install that was a student's phone leaves it.
         const device = await upsertDevice(ctx, deviceId, args.signKey, grant.device);
         await unlinkPhone(ctx, device);
+        await ctx.db.patch(device._id, { demoExpiresAt: at + DEMO_INACTIVE_SECS });
         await startChain(null);
         return { regno: DEMO_REGNO, account: "demo", demo: true };
+      }
     }
   },
 });

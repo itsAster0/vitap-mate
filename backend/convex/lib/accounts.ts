@@ -105,7 +105,13 @@ export async function linkPhone(ctx: MutationCtx, account: Doc<"accounts">, devi
   const again = device.accountId === account._id;
   // Another student's phone until now: it leaves their account and forwarding address first.
   if (!again && device.accountId !== undefined) await unlinkPhone(ctx, device);
-  await ctx.db.patch(device._id, { accountId: account._id, linkedAt: again ? (device.linkedAt ?? at) : at, seenAt: at, linkedOnce: true });
+  await ctx.db.patch(device._id, {
+    accountId: account._id,
+    linkedAt: again ? (device.linkedAt ?? at) : at,
+    seenAt: at,
+    linkedOnce: true,
+    demoExpiresAt: undefined,
+  });
   // Linking again too: the backfill can leave an older student's membership on this install.
   await dropMail(ctx, device.deviceId, account._id);
   const others = (await phoneRows(ctx, account._id)).filter((row) => row.deviceId !== device.deviceId);

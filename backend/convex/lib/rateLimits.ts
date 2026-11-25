@@ -39,4 +39,10 @@ export const rateLimits = new RateLimiter(components.rateLimiter, {
   /** Key JWTs for the extension's socket, by account: a client stuck reconnecting can't keep the
    * backend signing. */
   keyToken: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 10 },
+  /** Demo `auth:token` grants: per install and globally so fresh device keys can't fill `devices`
+   * and `refreshTokens`. */
+  tokenDemoDevice: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
+  tokenDemoGlobal: { kind: "token bucket", rate: 120, period: MINUTE, capacity: 40 },
+  /** Refresh `auth:token` rotations, per install, so a looping client can't hammer JWT signing. */
+  tokenRefresh: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 15 },
 });

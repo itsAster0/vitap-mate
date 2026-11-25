@@ -60,9 +60,12 @@ export default defineSchema({
     /** Linked here by its own `auth:token` at least once: unlinked after that, it signed out or
      * was removed on v3, and a backfill pass must not put it back. */
     linkedOnce: v.optional(v.boolean()),
+    /** When an inactive demo install is due to be swept; unset on linked accounts. */
+    demoExpiresAt: v.optional(v.number()),
   })
     .index("by_deviceId", ["deviceId"])
-    .index("by_account", ["accountId"]),
+    .index("by_account", ["accountId"])
+    .index("by_demoExpiresAt", ["demoExpiresAt"]),
 
   /** One row per refresh token issued, until its chain goes. `usedAt` set: replaced, so showing
    * it again means it leaked. No account: the demo's. */
@@ -77,7 +80,8 @@ export default defineSchema({
     .index("by_hash", ["hash"])
     .index("by_chain", ["chainId"])
     .index("by_device", ["deviceId"])
-    .index("by_account", ["accountId"]),
+    .index("by_account", ["accountId"])
+    .index("by_account_createdAt", ["accountId", "createdAt"]),
 
   /** TLSNotary tickets: `open` from `auth:proveStart`, `taken` once the engine starts the proof,
    * then `proved` (with the registration number the proof showed, until `auth:token` uses the

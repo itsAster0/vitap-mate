@@ -2,7 +2,8 @@
 // index, and at most `BATCH` a run; the next run takes the rest.
 
 import { internalMutation } from "./_generated/server";
-import { saveRecord } from "./lib/accounts";
+import { DEMO_INACTIVE_SECS } from "./auth";
+import { revokeDevice, saveRecord } from "./lib/accounts";
 import { REQUEST_KEEP_SECS, SESSION_CACHE_SECS } from "./lib/accountState";
 import { recordOf } from "./lib/identity";
 import { sweepLogins } from "./logins";
@@ -72,6 +73,42 @@ export const quarter = internalMutation({
       if (doc.sealedVault !== null && ttl !== null && doc.vaultSavedAt !== null && at >= doc.vaultSavedAt + ttl) doc.clearVault();
       // Saving sets the next `sweepAt` (or unsets it), so the row leaves this range either way.
       await saveRecord(ctx, account._id, doc);
+    }
+    // Inactive demo refresh tokens (no accountId) and demo devices: swept bounded by index so
+    // real students' non-expiring refresh tokens and linked devices are never touched.
+    const staleDemoTokens = await ctx.db
+      .query("refreshTokens")
+      .withIndex("by_account_createdAt", (q) => q.eq("accountId", undefined).lte("createdAt", at - DEMO_INACTIVE_SECS))
+      .take(BATCH);
+    const sweptDemoDevices = new Set<string>();
+    for (const row of staleDemoTokens) {
+      await ctx.db.delete(row._id);
+      sweptDemoDevices.add(row.deviceId);
+    }
+    for (const deviceId of sweptDemoDevices) {
+      const stillActive = await ctx.db
+        .query("refreshTokens")
+        .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+        .first();
+      if (stillActive) continue;
+      const device = await ctx.db
+        .query("devices")
+        .withIndex("by_deviceId", (q) => q.eq("deviceId", deviceId))
+        .unique();
+      if (device && device.accountId === undefined && !device.linkedOnce) await ctx.db.delete(device._id);
+    }
+    const staleDemoDevices = await ctx.db
+      .query("devices")
+      .withIndex("by_demoExpiresAt", (q) => q.gte("demoExpiresAt", 0).lte("demoExpiresAt", at))
+      .take(BATCH);
+    for (const device of staleDemoDevices) {
+      if (device.accountId !== undefined) {
+        await ctx.db.patch(device._id, { demoExpiresAt: undefined });
+        continue;
+      }
+      await revokeDevice(ctx, device.deviceId);
+      if (device.linkedOnce) await ctx.db.patch(device._id, { demoExpiresAt: undefined });
+      else await ctx.db.delete(device._id);
     }
   },
 });
