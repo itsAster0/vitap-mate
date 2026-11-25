@@ -356,4 +356,28 @@ describe("tokens", () => {
     const otherTokens = await prove(t, other);
     expect((await t.action(api.auth.token, await other.signed("auth:token", { refreshToken: otherTokens.refreshToken }))).regno).toBe(REGNO);
   });
+
+  it("rate limits ticket and v2 grants per install", async () => {
+    const t = await setup();
+    const p1 = await phone(1);
+    const p2 = await phone(2);
+
+    // Ticket grant: per-device limit (capacity 15).
+    for (let i = 0; i < 15; i++) {
+      expect(await codeOf(t.action(api.auth.token, await p1.signed("auth:token", { ticket: "0".repeat(32), device: p1.device })))).toBe("challenge_invalid");
+    }
+    expect(await codeOf(t.action(api.auth.token, await p1.signed("auth:token", { ticket: "0".repeat(32), device: p1.device })))).toBe("rate_limited");
+    // Another install is unaffected.
+    expect(await codeOf(t.action(api.auth.token, await p2.signed("auth:token", { ticket: "0".repeat(32), device: p2.device })))).toBe("challenge_invalid");
+
+    // v2 grant: per-device limit (capacity 15).
+    const v2p1 = await issueV2Token(TOKENS.ACCOUNT_TOKEN_SECRET, { sub: REGNO, dev: p1.deviceId, iat: T0 - 10, exp: T0 + 1000 });
+    const v2p2 = await issueV2Token(TOKENS.ACCOUNT_TOKEN_SECRET, { sub: REGNO, dev: p2.deviceId, iat: T0 - 10, exp: T0 + 1000 });
+    for (let i = 0; i < 15; i++) {
+      expect(await codeOf(t.action(api.auth.token, await p1.signed("auth:token", { v2AccountToken: v2p1, device: p1.device })))).toBe("token_invalid");
+    }
+    expect(await codeOf(t.action(api.auth.token, await p1.signed("auth:token", { v2AccountToken: v2p1, device: p1.device })))).toBe("rate_limited");
+    // Another install is unaffected.
+    expect(await codeOf(t.action(api.auth.token, await p2.signed("auth:token", { v2AccountToken: v2p2, device: p2.device })))).toBe("token_invalid");
+  });
 });

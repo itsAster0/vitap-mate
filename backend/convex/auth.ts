@@ -193,9 +193,12 @@ export const token = action({
       newHash: await sha256Hex(refreshToken),
       chainId: randomHex(16),
     });
-    // Refusals that mutate state (revoking a chain, consuming a failed ticket) come back as values:
-    // throwing inside the mutation would roll those deletes back.
-    if ("refused" in granted) return fail(granted.refused, REFUSALS[granted.refused]);
+    // Refusals after rate-limiting or state mutation (revoking a chain, consuming a failed ticket)
+    // come back as values: throwing inside the mutation would roll those writes back.
+    if ("refused" in granted) {
+      const { code, message } = REFUSALS[granted.refused];
+      return fail(code, message);
+    }
     if ("proofFailed" in granted) return fail(granted.proofFailed, "VTOP's page did not prove who you are.");
     const { jwt, expiresAt } = await signAccessJwt(
       { sub: call.deviceId, regno: granted.regno, acct: granted.account, ...(granted.demo ? { demo: true as const } : {}) },
@@ -231,9 +234,13 @@ async function deleteChain(ctx: MutationCtx, chainId: string): Promise<void> {
 }
 
 const REFUSALS = {
-  refresh_invalid: "Unknown or revoked refresh token; prove the account again.",
-  refresh_reused: "This refresh token was used already; prove the account again.",
-  device_removed: "This phone was removed from the account; sign in again.",
+  refresh_invalid: { code: "refresh_invalid", message: "Unknown or revoked refresh token; prove the account again." },
+  refresh_reused: { code: "refresh_reused", message: "This refresh token was used already; prove the account again." },
+  device_removed: { code: "device_removed", message: "This phone was removed from the account; sign in again." },
+  challenge_invalid: { code: "challenge_invalid", message: "Unknown, used or expired ticket; start the proof again." },
+  proof_pending: { code: "proof_pending", message: "The proof has not finished yet." },
+  v2_not_live: { code: "token_invalid", message: "The edge did not hold this account token; prove the account instead." },
+  v2_used: { code: "token_invalid", message: "This account token was traded in already; prove the account instead." },
 } as const;
 
 type Granted = { regno: string; account: string; demo: boolean } | { refused: keyof typeof REFUSALS } | { proofFailed: string };
@@ -259,14 +266,29 @@ export const grant = internalMutation({
   handler: async (ctx, args): Promise<Granted> => {
     const at = now();
     const { deviceId, grant } = args;
-    if (grant.kind === "demo") {
-      const perDevice = await rateLimits.limit(ctx, "tokenDemoDevice", { key: deviceId });
-      if (!perDevice.ok) fail("rate_limited", "Too many demo token requests; try again later.", { retryAfterMs: perDevice.retryAfter });
-      const global = await rateLimits.limit(ctx, "tokenDemoGlobal", {});
-      if (!global.ok) fail("rate_limited", "Too many demo token requests; try again later.", { retryAfterMs: global.retryAfter });
-    } else if (grant.kind === "refresh") {
-      const perDevice = await rateLimits.limit(ctx, "tokenRefresh", { key: deviceId });
-      if (!perDevice.ok) fail("rate_limited", "Too many refresh requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+    switch (grant.kind) {
+      case "demo": {
+        const perDevice = await rateLimits.limit(ctx, "tokenDemoDevice", { key: deviceId });
+        if (!perDevice.ok) fail("rate_limited", "Too many demo token requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+        const global = await rateLimits.limit(ctx, "tokenDemoGlobal", {});
+        if (!global.ok) fail("rate_limited", "Too many demo token requests; try again later.", { retryAfterMs: global.retryAfter });
+        break;
+      }
+      case "refresh": {
+        const perDevice = await rateLimits.limit(ctx, "tokenRefresh", { key: deviceId });
+        if (!perDevice.ok) fail("rate_limited", "Too many refresh requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+        break;
+      }
+      case "ticket": {
+        const perDevice = await rateLimits.limit(ctx, "tokenTicket", { key: deviceId });
+        if (!perDevice.ok) fail("rate_limited", "Too many token requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+        break;
+      }
+      case "v2": {
+        const perDevice = await rateLimits.limit(ctx, "tokenV2", { key: deviceId });
+        if (!perDevice.ok) fail("rate_limited", "Too many token requests; try again later.", { retryAfterMs: perDevice.retryAfter });
+        break;
+      }
     }
     const store = (chainId: string, accountRow: Id<"accounts"> | null) =>
       ctx.db.insert("refreshTokens", { hash: args.newHash, deviceId, chainId, ...(accountRow ? { accountId: accountRow } : {}), usedAt: null, createdAt: at });
@@ -346,10 +368,8 @@ export const grant = internalMutation({
               .withIndex("by_ticket", (q) => q.eq("ticket", grant.ticket))
               .unique()
           : null;
-        if (!row || row.deviceId !== deviceId || row.expiresAt <= at) {
-          return fail("challenge_invalid", "Unknown, used or expired ticket; start the proof again.");
-        }
-        if (row.status === "open" || row.status === "taken") fail("proof_pending", "The proof has not finished yet.");
+        if (!row || row.deviceId !== deviceId || row.expiresAt <= at) return { refused: "challenge_invalid" };
+        if (row.status === "open" || row.status === "taken") return { refused: "proof_pending" };
         await ctx.db.delete(row._id);
         if (row.status === "failed" || !row.regno) {
           return { proofFailed: row.code ?? "proof_failed" };
@@ -366,10 +386,8 @@ export const grant = internalMutation({
           .withIndex("by_device_iat", (q) => q.eq("deviceId", deviceId).eq("iat", grant.iat))
           .unique();
         const account = live && (await ctx.db.get(live.accountId));
-        if (!live || !account || account.regno !== grant.regno) {
-          return fail("token_invalid", "The edge did not hold this account token; prove the account instead.");
-        }
-        if (live.usedAt !== null) return fail("token_invalid", "This account token was traded in already; prove the account instead.");
+        if (!live || !account || account.regno !== grant.regno) return { refused: "v2_not_live" };
+        if (live.usedAt !== null) return { refused: "v2_used" };
         await ctx.db.patch(live._id, { usedAt: at });
         const device = await upsertDevice(ctx, deviceId, args.signKey, grant.device);
         if (account.ownerHash !== null) await claimMailbox(ctx, account._id, account.ownerHash);

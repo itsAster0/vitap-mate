@@ -45,4 +45,8 @@ export const rateLimits = new RateLimiter(components.rateLimiter, {
   tokenDemoGlobal: { kind: "token bucket", rate: 120, period: MINUTE, capacity: 40 },
   /** Refresh `auth:token` rotations, per install, so a looping client can't hammer JWT signing. */
   tokenRefresh: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 15 },
+  /** Proof ticket `auth:token` exchanges, per install. */
+  tokenTicket: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 15 },
+  /** Legacy v2 account token `auth:token` trade-ins, per install. */
+  tokenV2: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 15 },
 });
