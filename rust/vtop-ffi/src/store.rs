@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use tracing::warn;
+use tracing::{debug, info, warn};
 
 use crate::pages::changes;
 use crate::remote::{consent, forwarding, regno};
@@ -114,9 +114,66 @@ impl Core {
     }
 }
 
+/// The largest process id Linux hands out (2^22). A temporary file of [`write_atomic`] carries
+/// its writer's id; Kotlin's (`writeAtomically`) carry a nanosecond clock there, far larger, and
+/// are Kotlin's to clean.
+const PID_MAX: u32 = 1 << 22;
+
+impl Core {
+    /// Removes what a write cut short by a crash left: [`write_atomic`]'s temporary files from
+    /// another process, in the data folder, the cached pages and the cache folder. They can hold
+    /// what the file they were replacing holds (the sealed password, tokens), so they don't stay.
+    pub(crate) fn sweep_temporary(&self) {
+        let own = std::process::id();
+        let mut folders = vec![(self.dir.clone(), false), (self.cache.clone(), false)];
+        folders.push((self.at(PAGES), true));
+        let mut removed = 0_u32;
+        while let Some((folder, deep)) = folders.pop() {
+            let Ok(entries) = fs::read_dir(&folder) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_dir = entry.file_type().is_ok_and(|kind| kind.is_dir());
+                if is_dir {
+                    if deep {
+                        folders.push((path, true));
+                    }
+                } else if orphan(&entry.file_name(), own) {
+                    match fs::remove_file(&path) {
+                        Ok(()) => removed += 1,
+                        Err(error) => warn!(%error, "temporary file not removed"),
+                    }
+                }
+            }
+        }
+        if removed > 0 {
+            info!(removed, "temporary files left by a crash removed");
+        }
+    }
+}
+
+/// Whether `name` is [`write_atomic`]'s temporary file (`<file>.<pid>.<n>.tmp`) from another
+/// process than `own`.
+fn orphan(name: &OsStr, own: u32) -> bool {
+    let Some(rest) = name.to_str().and_then(|name| name.strip_suffix(".tmp")) else {
+        return false;
+    };
+    let mut parts = rest.rsplitn(3, '.');
+    let (Some(count), Some(pid), Some(file)) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    !file.is_empty()
+        && count.parse::<u64>().is_ok()
+        && pid
+            .parse::<u32>()
+            .is_ok_and(|pid| pid != own && pid <= PID_MAX)
+}
+
 /// Writes `bytes` to `path` through a temporary file beside it, synced before it replaces
-/// `path`, so a crash leaves the old file or the new one. Each write has a temporary file of
-/// its own, so two writers to one file never trip over each other's.
+/// `path`, so a crash leaves the old file or the new one; the folder is synced after, so the
+/// new name survives a power cut too. Each write has a temporary file of its own, so two
+/// writers to one file never trip over each other's.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let mut temp_name = path
@@ -136,6 +193,14 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
         && error.kind() != io::ErrorKind::NotFound
     {
         warn!(%error, "temporary file not removed");
+    }
+    // The file is whole either way; a folder that can't be synced (some file systems refuse)
+    // only risks the old copy after a power cut.
+    if written.is_ok()
+        && let Some(folder) = path.parent()
+        && let Err(error) = File::open(folder).and_then(|folder| folder.sync_all())
+    {
+        debug!(%error, "folder not synced");
     }
     written
 }
@@ -206,6 +271,39 @@ mod tests {
             1,
             "a temporary file left"
         );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn opening_removes_temporary_files_a_crash_left() {
+        let dir = scratch("sweep");
+        let pages = dir.join(PAGES).join("AP1").join("attendance_detail");
+        fs::create_dir_all(&pages).unwrap();
+        let own = std::process::id();
+        let other = if own == 4321 { 4322 } else { 4321 };
+        let orphans = [
+            dir.join(format!("account.json.{other}.0.tmp")),
+            dir.join(format!("account_token.json.{other}.7.tmp")),
+            pages.join(format!("CSE1001.json.{other}.3.tmp")),
+        ];
+        let kept = [
+            // This process's own write, under way.
+            dir.join(format!("account.json.{own}.1.tmp")),
+            // Kotlin's writeAtomically: a nanosecond clock in place of the pid.
+            dir.join("settings.json.81234567890123.4.tmp"),
+            dir.join("notes.tmp"),
+            dir.join("account.json"),
+        ];
+        for path in orphans.iter().chain(&kept) {
+            fs::write(path, "x").unwrap();
+        }
+        Core::for_test(&dir).sweep_temporary();
+        for path in &orphans {
+            assert!(!path.exists(), "{} left", path.display());
+        }
+        for path in &kept {
+            assert!(path.exists(), "{} removed", path.display());
+        }
         fs::remove_dir_all(&dir).unwrap();
     }
 

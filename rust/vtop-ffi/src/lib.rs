@@ -613,6 +613,7 @@ impl Core {
         traced_sync("new", &flow, || {
             fs::create_dir_all(&core.dir)?;
             fs::create_dir_all(&core.cache)?;
+            core.sweep_temporary();
             remote::route::load(&core);
             remote::consent::load(&core);
             core.upgrade_account();
