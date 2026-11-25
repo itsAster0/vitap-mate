@@ -125,9 +125,11 @@ private val troubleshooting = listOf(
 @Composable
 internal fun GmailContent() {
     val account = Gmail.account
+    // Above the branch: the sign-in that connects Gmail outlives Setup giving way to Connected.
+    val connecting = rememberConnecting()
     var confirmOff by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { flow("gmail.open") { Log.info(SRC, "open", it, mapOf("connected" to "${account != null}")) } }
-    if (account != null) Connected(account) { confirmOff = true } else Setup()
+    if (account != null) Connected(account, connecting) { confirmOff = true } else Setup(connecting)
     if (confirmOff) {
         val scope = rememberCoroutineScope()
         AppDialog(
@@ -210,10 +212,9 @@ private fun WaitingHint() = Callout(
 )
 
 @Composable
-private fun Connected(account: Gmail.Account, onOff: () -> Unit) {
+private fun Connected(account: Gmail.Account, connecting: Connecting, onOff: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
-    val connecting = rememberConnecting()
     val days = account.daysLeft
     when {
         account.needsReconnect -> Callout(Lucide.TriangleAlert, tones.warning, "Google ended the connection for ${account.email}, as it does every 7 days while the Google project is in Testing. Reconnect: same JSON, one sign-in.")
@@ -245,11 +246,10 @@ private fun Connected(account: Gmail.Account, onOff: () -> Unit) {
 }
 
 @Composable
-private fun Setup() {
+private fun Setup(connecting: Connecting) {
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val connecting = rememberConnecting()
     var client by remember { mutableStateOf<Gmail.Client?>(null) }
     var help by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { picked: Uri? ->
