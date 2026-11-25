@@ -72,6 +72,11 @@ impl Core {
                 }
                 _ => None,
             };
+            // Whatever the page fetches leave, even when this call is dropped halfway.
+            let _kept = Prefetched {
+                shared: &self.shared,
+                flow: &flow,
+            };
             let mut refused = BTreeMap::new();
             for (name, answer) in known.iter().zip(answers.into_iter().flatten()) {
                 match page_answer(answer) {
@@ -94,10 +99,6 @@ impl Core {
                 });
                 results.extend(join_all(runs.collect()).await);
             }
-            self.shared
-                .routes()
-                .prefetched
-                .retain(|(of, _), _| *of != flow);
             Ok(names
                 .into_iter()
                 .zip(results)
@@ -108,6 +109,22 @@ impl Core {
                 .collect())
         })
         .await
+    }
+}
+
+/// Drops what a batch brought for `flow` that its page fetches didn't take, when
+/// [`Core::fetch_pages`] ends or is dropped (the sweep cancelled).
+struct Prefetched<'a> {
+    shared: &'a crate::Shared,
+    flow: &'a str,
+}
+
+impl Drop for Prefetched<'_> {
+    fn drop(&mut self) {
+        self.shared
+            .routes()
+            .prefetched
+            .retain(|(of, _), _| of != self.flow);
     }
 }
 
@@ -304,6 +321,28 @@ mod tests {
 
     fn attendance() -> Value {
         serde_json::from_str(ATTENDANCE).unwrap()
+    }
+
+    #[test]
+    fn a_dropped_sweep_leaves_no_pages_behind() {
+        let core = Core::for_test(std::env::temp_dir());
+        let key = |flow: &str, name: &str| (flow.to_string(), name.to_string());
+        core.shared
+            .routes()
+            .prefetched
+            .insert(key("other", "marks"), json!(1));
+        {
+            let _kept = Prefetched {
+                shared: &core.shared,
+                flow: "f",
+            };
+            // The batch's pages, then the sweep cancelled before their fetches took them.
+            let mut routes = core.shared.routes();
+            routes.prefetched.insert(key("f", "attendance"), json!(2));
+            routes.prefetched.insert(key("f", "marks"), json!(3));
+        }
+        let left: Vec<_> = core.shared.routes().prefetched.keys().cloned().collect();
+        assert_eq!(left, [key("other", "marks")], "another flow's batch stays");
     }
 
     #[tokio::test]
