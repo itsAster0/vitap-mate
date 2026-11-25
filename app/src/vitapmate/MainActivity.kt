@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.Density
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
 import kotlinx.coroutines.launch
+import vitapmate.core.HandoverEvent
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Foreground
@@ -104,7 +105,7 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(EXPIRES_AT)
             lifecycleScope.launch {
                 lifecycle.withStarted {}
-                Push.handleRequest(applicationContext, requestId, expiresAtMs, tapped = true)
+                Push.handover(applicationContext, HandoverEvent.Tapped(requestId, expiresAtMs))
             }
             return
         }

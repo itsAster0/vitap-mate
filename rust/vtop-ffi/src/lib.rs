@@ -514,6 +514,8 @@ struct Shared {
     /// One identity fetch at a time ([`remote::backend`]): a refresh token works once.
     identity_turn: futures::lock::Mutex<()>,
     consent: Mutex<remote::consent::State>,
+    /// Connected apps' session requests and how far each got ([`remote::handover`]).
+    handover: Mutex<remote::handover::Board>,
     /// One registration-number sheet at a time, and the flow that last said "Not now"
     /// ([`remote::regno`]).
     regno_ask: futures::lock::Mutex<Option<String>>,

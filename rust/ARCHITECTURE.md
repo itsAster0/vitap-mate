@@ -66,7 +66,7 @@ A few design points:
 | `session.rs` | sign-in, the OTP prompt, signing in again, sign-out |
 | `otp.rs` | the OTP prompt the app's sheet shows (`OtpListener`); a re-login the student watches waits there for the code instead of failing |
 | `pages/` | one file per feature (`attendance.rs`, `timetable.rs`, `marks.rs`, `exams.rs`, `outing.rs`, ...) with its own `#[uniffi::export] impl Core` block and ready-to-draw records (`records.rs`), the change inbox (`changes.rs`) and Gmail's OTP (`gmail.rs`) |
-| `remote/` | everything that talks to our servers: `edge.rs` (the edge's URL and the session cookies sent to it), `route.rs` (+ `route/`), `udp.rs`, `consent.rs`, `account_token.rs`, `keys.rs` (Connected apps), `forwarding.rs` and `server.rs` (the Server page) |
+| `remote/` | everything that talks to our servers: `edge.rs` (the edge's URL and the session cookies sent to it), `route.rs` (+ `route/`), `udp.rs`, `consent.rs`, `account_token.rs`, `keys.rs` (Connected apps), `handover.rs` (+ `handover/`: a connected app's session request, from arrival to its one answer), `forwarding.rs` and `server.rs` (the Server page) |
 | `store.rs` (+ `store/`) | the file reads and writes; `decoded.rs` (decoded copies) and `cookies.rs` (the shared cookie store) |
 | top level | `transport.rs` (Kotlin's HTTP hop), `device.rs` (this install's keys), `dev.rs` (Developer), `demo.rs`, `web.rs`, `obs.rs` (logs), `macros.rs` (`signed_in!`) |
 
@@ -163,6 +163,10 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   `ConsentDenied`. Calls nobody started (the semester push)
   never ask and send only with the tick. A session request while the
   app is away only posts a notification; tapping it opens the app and asks.
+  Each request's lifecycle (notified, answering, done) is Rust's
+  (`remote/handover/board.rs`, pure); Kotlin's `Push.handover` only posts or
+  cancels the notification and starts the answer as its effects say, and
+  `Core::answer_handover` sends one answer within the deadline.
 - **Registration number** (`vtop-ffi/src/remote/regno.rs`). A server identity names
   the student, so none is taken until they said Share on the "Share your registration
   number?" sheet (Kotlin's `RegnoSheet`, asked through `CookieGate::ask_regno`). The answer

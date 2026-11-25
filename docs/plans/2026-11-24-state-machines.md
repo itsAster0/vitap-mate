@@ -25,7 +25,7 @@ See also [`2026-11-24-architecture-audit.md`](2026-11-24-architecture-audit.md) 
 - **What it fixed:** Combinatorial connection flags, `AuthError` backoff inflation, per-error `"convex-renew"` thread spawning, old client timer leak on `on_server_changed`, and `LiveWake` `@Volatile` shutdown race.
 
 ### 5. Connected Apps Session-Request Handover
-- **Status:** Done — clock-injected `HandoverCoordinator` (`Notified` | `Answering` | `Done`) in `app/src/vitapmate/HandoverCoordinator.kt`, wired into `PushService.kt` and `MainActivity.kt` with unit tests in `app/test/vitapmate/HandoverCoordinatorTest.kt`.
+- **Status:** Done — pure board (`Notified` | `Answering` | `Done`, the time passed in) in `rust/vtop-ffi/src/remote/handover/board.rs`, driven by `Core::handover` and `Core::answer_handover` (`rust/vtop-ffi/src/remote/handover.rs`), which `PushService.kt` and `MainActivity.kt` follow; tests in `rust/vtop-ffi/src/remote/handover/tests.rs`.
 - **What it fixed:** Unbounded `Push.answered` set, expiry checks before prompting/answering, FCM dropped while foregrounded, foreground/tap promotion without double-answering, per-request notification IDs, and timeout vs completion double-answer race.
 
 ### 6. In-App VTOP WebView Session & Recovery

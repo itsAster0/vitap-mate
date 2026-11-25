@@ -261,9 +261,7 @@ async fn handover_unattended_answers_with_error_not_cookies() {
     // In the pocket, even with "don't ask again" ticked.
     let gate = consent::tests::install(&core, false, false);
     consent::tests::remember(&core, CookieKind::Handover);
-    let answered = core
-        .answer_session_request("f".into(), "r1".into(), None)
-        .await;
+    let answered = core.answer_session_request("f", "r1").await;
     assert_eq!(answered, Err(CoreError::ConsentDenied));
     assert_eq!(gate.asks(), 0);
     let edge = edge.lock().unwrap();
@@ -293,9 +291,7 @@ async fn session_requests_get_cookies_or_why_not() {
         .unwrap();
     // Signed out (no session in this core): the server hears why, the caller gets the error.
     can(&edge, "sessions:answer", 200, json!({ "ok": true }));
-    let signed_out = core
-        .answer_session_request("f-b".into(), "r2".into(), None)
-        .await;
+    let signed_out = core.answer_session_request("f-b", "r2").await;
     assert_eq!(signed_out, Err(CoreError::NotSignedIn));
 
     let edge = edge.lock().unwrap();

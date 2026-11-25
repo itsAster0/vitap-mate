@@ -430,34 +430,26 @@ impl Core {
         })
         .await
     }
-
-    /// Answers a `vtop_cookie_request` (push or `sessions:pending`): this phone's live VTOP session,
-    /// signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-    /// e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
-    /// the student on screen saying yes: from the background it is always the error.
-    pub async fn answer_session_request(
-        &self,
-        flow: String,
-        request_id: String,
-        error: Option<String>,
-    ) -> Result<(), CoreError> {
-        traced("answer_session_request", &flow, async {
-            let session = match error {
-                Some(error) => Err(CoreError::Other { reason: error }),
-                None => {
-                    let action = "Give a connected app your VTOP session";
-                    self.session_cookies(&flow, CookieKind::Handover, action, true)
-                        .await
-                        .and_then(|cookies| cookies.ok_or(CoreError::NotSignedIn))
-                }
-            };
-            self.answer_with(&flow, &request_id, session).await
-        })
-        .await
-    }
 }
 
 impl Core {
+    /// The answer to a `vtop_cookie_request` ([`Core::answer_handover`]): this phone's live VTOP
+    /// session, signing in again when it had expired, or why it can't. Only with the student on
+    /// screen saying yes: from the background it is always the error. A failure is sent too,
+    /// then returned.
+    pub(crate) async fn answer_session_request(
+        &self,
+        flow: &str,
+        request_id: &str,
+    ) -> Result<(), CoreError> {
+        let action = "Give a connected app your VTOP session";
+        let session = self
+            .session_cookies(flow, CookieKind::Handover, action, true)
+            .await
+            .and_then(|cookies| cookies.ok_or(CoreError::NotSignedIn));
+        self.answer_with(flow, request_id, session).await
+    }
+
     async fn pair_app_with(&self, flow: &str, code: &str) -> Result<Option<PairApp>, CoreError> {
         let answer = self
             .device_call(flow, Kind::Query, "pair:info", json!({ "code": code }))
@@ -507,7 +499,7 @@ impl Core {
     }
 
     /// Sends `session` (cookies, or why there are none) as the answer to `request_id`.
-    async fn answer_with(
+    pub(crate) async fn answer_with(
         &self,
         flow: &str,
         request_id: &str,

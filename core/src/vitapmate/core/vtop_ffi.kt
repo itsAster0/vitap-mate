@@ -1290,7 +1290,9 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_answer_session_request(
+    external fun uniffi_vtop_ffi_checksum_method_core_answer_handover(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_handover(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_connected_apps(
     ): Int
@@ -1643,8 +1645,10 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_turn_off_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_answer_session_request(`ptr`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`error`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_answer_handover(`ptr`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`attempt`: Long,`limitSecs`: Int,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_handover(`ptr`: Long,`flow`: RustBuffer.ByValue,`event`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_connected_apps(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
@@ -2340,7 +2344,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_turn_off_forwarding() and 0xFFFF) != 9462) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_session_request() and 0xFFFF) != 39532) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_handover() and 0xFFFF) != 24383) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_handover() and 0xFFFF) != 5383) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 1093) {
@@ -5485,12 +5492,18 @@ public interface CoreInterface {
     suspend fun `turnOffForwarding`(`flow`: kotlin.String)
     
     /**
-     * Answers a `vtop_cookie_request` (push or `sessions:pending`): this phone's live VTOP session,
-     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
-     * the student on screen saying yes: from the background it is always the error.
+     * Answers request `request_id` for `attempt` (a [`HandoverEffect::Answer`]): this phone's
+     * VTOP session with the student saying yes, or why not. Past `limit_secs` the answer is
+     * dropped and the timeout sent instead, so the server gets one answer. A request expired
+     * or answered meanwhile sends nothing. A failure is sent too, then returned.
      */
-    suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `error`: kotlin.String?)
+    suspend fun `answerHandover`(`flow`: kotlin.String, `requestId`: kotlin.String, `attempt`: kotlin.ULong, `limitSecs`: kotlin.UInt)
+    
+    /**
+     * What to do about `event`: notify while the app is away, answer once on screen or on a
+     * tap, drop expired requests and duplicates. No I/O.
+     */
+    fun `handover`(`flow`: kotlin.String, `event`: HandoverEvent): List<HandoverEffect>
     
     /**
      * The account's access keys and whether this phone is linked to it.
@@ -7728,22 +7741,23 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Answers a `vtop_cookie_request` (push or `sessions:pending`): this phone's live VTOP session,
-     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
-     * the student on screen saying yes: from the background it is always the error.
+     * Answers request `request_id` for `attempt` (a [`HandoverEffect::Answer`]): this phone's
+     * VTOP session with the student saying yes, or why not. Past `limit_secs` the answer is
+     * dropped and the timeout sent instead, so the server gets one answer. A request expired
+     * or answered meanwhile sends nothing. A failure is sent too, then returned.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `error`: kotlin.String?) {
+    override suspend fun `answerHandover`(`flow`: kotlin.String, `requestId`: kotlin.String, `attempt`: kotlin.ULong, `limitSecs`: kotlin.UInt) {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_answer_session_request(
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_answer_handover(
                 uniffiHandle,
                 
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`requestId`),
-        FfiConverterOptionalString.lower(`error`),
+        FfiConverterULong.lower(`attempt`),
+        FfiConverterUInt.lower(`limitSecs`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
@@ -7756,6 +7770,25 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         CoreException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * What to do about `event`: notify while the app is away, answer once on screen or on a
+     * tap, drop expired requests and duplicates. No I/O.
+     */override fun `handover`(`flow`: kotlin.String, `event`: HandoverEvent): List<HandoverEffect> {
+            return FfiConverterSequenceTypeHandoverEffect.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_handover(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeHandoverEvent.lower(`event`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -22689,6 +22722,290 @@ public object FfiConverterTypeForwardingReadiness: FfiConverterRustBuffer<Forwar
 
 
 
+/**
+ * What Android does next, in order.
+ */
+sealed class HandoverEffect {
+    
+    /**
+     * Post the request's notification (its tap brings [`HandoverEvent::Tapped`]); it times out at
+     * `expires_at` (unix ms).
+     */
+    data class Notify(
+        val `requestId`: kotlin.String, 
+        val `notificationId`: kotlin.Int, 
+        val `expiresAt`: kotlin.Long) : HandoverEffect()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Take a notification down.
+     */
+    data class Cancel(
+        val `notificationId`: kotlin.Int) : HandoverEffect()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Answer with [`Core::answer_handover`], off the main thread.
+     */
+    data class Answer(
+        val `requestId`: kotlin.String, 
+        val `attempt`: kotlin.ULong) : HandoverEffect()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHandoverEffect : FfiConverterRustBuffer<HandoverEffect>{
+    override fun read(buf: ByteBuffer): HandoverEffect {
+        return when(buf.getInt()) {
+            1 -> HandoverEffect.Notify(
+                FfiConverterString.read(buf),
+                FfiConverterInt.read(buf),
+                FfiConverterLong.read(buf),
+                )
+            2 -> HandoverEffect.Cancel(
+                FfiConverterInt.read(buf),
+                )
+            3 -> HandoverEffect.Answer(
+                FfiConverterString.read(buf),
+                FfiConverterULong.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: HandoverEffect): ULong = when(value) {
+        is HandoverEffect.Notify -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`requestId`)
+                + FfiConverterInt.allocationSize(value.`notificationId`)
+                + FfiConverterLong.allocationSize(value.`expiresAt`)
+            )
+        }
+        is HandoverEffect.Cancel -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterInt.allocationSize(value.`notificationId`)
+            )
+        }
+        is HandoverEffect.Answer -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`requestId`)
+                + FfiConverterULong.allocationSize(value.`attempt`)
+            )
+        }
+    }
+
+    override fun write(value: HandoverEffect, buf: ByteBuffer) {
+        when(value) {
+            is HandoverEffect.Notify -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`requestId`, buf)
+                FfiConverterInt.write(value.`notificationId`, buf)
+                FfiConverterLong.write(value.`expiresAt`, buf)
+                Unit
+            }
+            is HandoverEffect.Cancel -> {
+                buf.putInt(2)
+                FfiConverterInt.write(value.`notificationId`, buf)
+                Unit
+            }
+            is HandoverEffect.Answer -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`requestId`, buf)
+                FfiConverterULong.write(value.`attempt`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * What reached the phone about connected apps' session requests.
+ */
+sealed class HandoverEvent {
+    
+    /**
+     * FCM's `vtop_cookie_request`, its `data` as sent; `foreground` while the app is on screen.
+     */
+    data class Pushed(
+        val `data`: Map<kotlin.String, kotlin.String>, 
+        val `foreground`: kotlin.Boolean) : HandoverEvent()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * A request `sessions:pending` lists (unix ms).
+     */
+    data class Listed(
+        val `requestId`: kotlin.String, 
+        val `expiresAt`: kotlin.Long, 
+        val `foreground`: kotlin.Boolean) : HandoverEvent()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Its notification was tapped; the expiry the notification kept, if any (unix ms).
+     */
+    data class Tapped(
+        val `requestId`: kotlin.String, 
+        val `expiresAt`: kotlin.Long?) : HandoverEvent()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * The app came on screen.
+     */
+    object Shown : HandoverEvent()
+    
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHandoverEvent : FfiConverterRustBuffer<HandoverEvent>{
+    override fun read(buf: ByteBuffer): HandoverEvent {
+        return when(buf.getInt()) {
+            1 -> HandoverEvent.Pushed(
+                FfiConverterMapStringString.read(buf),
+                FfiConverterBoolean.read(buf),
+                )
+            2 -> HandoverEvent.Listed(
+                FfiConverterString.read(buf),
+                FfiConverterLong.read(buf),
+                FfiConverterBoolean.read(buf),
+                )
+            3 -> HandoverEvent.Tapped(
+                FfiConverterString.read(buf),
+                FfiConverterOptionalLong.read(buf),
+                )
+            4 -> HandoverEvent.Shown
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: HandoverEvent): ULong = when(value) {
+        is HandoverEvent.Pushed -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterMapStringString.allocationSize(value.`data`)
+                + FfiConverterBoolean.allocationSize(value.`foreground`)
+            )
+        }
+        is HandoverEvent.Listed -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`requestId`)
+                + FfiConverterLong.allocationSize(value.`expiresAt`)
+                + FfiConverterBoolean.allocationSize(value.`foreground`)
+            )
+        }
+        is HandoverEvent.Tapped -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`requestId`)
+                + FfiConverterOptionalLong.allocationSize(value.`expiresAt`)
+            )
+        }
+        is HandoverEvent.Shown -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: HandoverEvent, buf: ByteBuffer) {
+        when(value) {
+            is HandoverEvent.Pushed -> {
+                buf.putInt(1)
+                FfiConverterMapStringString.write(value.`data`, buf)
+                FfiConverterBoolean.write(value.`foreground`, buf)
+                Unit
+            }
+            is HandoverEvent.Listed -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`requestId`, buf)
+                FfiConverterLong.write(value.`expiresAt`, buf)
+                FfiConverterBoolean.write(value.`foreground`, buf)
+                Unit
+            }
+            is HandoverEvent.Tapped -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`requestId`, buf)
+                FfiConverterOptionalLong.write(value.`expiresAt`, buf)
+                Unit
+            }
+            is HandoverEvent.Shown -> {
+                buf.putInt(4)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
 
 enum class KeyKind {
     
@@ -28534,6 +28851,34 @@ public object FfiConverterSequenceTypeCookieKind: FfiConverterRustBuffer<List<Co
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeCookieKind.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeHandoverEffect: FfiConverterRustBuffer<List<HandoverEffect>> {
+    override fun read(buf: ByteBuffer): List<HandoverEffect> {
+        val len = buf.getInt()
+        return List<HandoverEffect>(len) {
+            FfiConverterTypeHandoverEffect.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<HandoverEffect>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeHandoverEffect.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<HandoverEffect>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeHandoverEffect.write(it, buf)
         }
     }
 }

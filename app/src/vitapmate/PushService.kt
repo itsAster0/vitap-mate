@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import vitapmate.core.HandoverEffect
+import vitapmate.core.HandoverEvent
 import vitapmate.core.LiveTopic
 import vitapmate.data.AppCore
 import vitapmate.data.orNull
@@ -38,9 +40,9 @@ import vitapmate.observability.flow
 import vitapmate.ui.showToast
 
 /**
- * FCM: a new token goes to the server with this phone's device; a `vtop_cookie_request` is
- * coordinated through [HandoverCoordinator] (notifying off screen, answering on screen alongside
- * [Push.follow]); a `credentials_rejected` flags the account and notifies ([Push.rejected]);
+ * FCM: a new token goes to the server with this phone's device; a `vtop_cookie_request` goes to
+ * Rust ([Push.handover]: notifying off screen, answering on screen alongside [Push.follow]); a
+ * `credentials_rejected` flags the account and notifies ([Push.rejected]);
  * other messages are only logged. Tokens and message contents are never logged.
  * Log src `push`.
  */
@@ -62,18 +64,16 @@ class PushService : FirebaseMessagingService() {
             AppScope.launch { flow("push.message") { f -> Log.info("push", "message", f, mapOf("kind" to kind)) } }
             return
         }
-        val requestId = data["requestId"]?.takeIf { it.isNotBlank() } ?: return
-        val expiresAtMs = HandoverCoordinator.parsePushExpiresAtMs(data)
         if (Foreground.shown) {
             // Don't drop FCM while on screen: Push.follow may be in backoff or the app may
             // background before the live query delivers it.
-            AppScope.launch { Push.handleRequest(applicationContext, requestId, expiresAtMs) }
+            AppScope.launch { Push.handover(applicationContext, HandoverEvent.Pushed(data, foreground = true)) }
             return
         }
         // FCM keeps the process for this call only, so it runs here (a binder thread).
         Settings.load(applicationContext)
         AppCore.start(applicationContext)
-        runBlocking { Push.handleRequest(applicationContext, requestId, expiresAtMs) }
+        runBlocking { Push.handover(applicationContext, HandoverEvent.Pushed(data, foreground = false)) }
     }
 }
 
@@ -86,63 +86,32 @@ object Push {
     }
 
     /**
-     * Handles a key's session request (`vtop_cookie_request`) from FCM, `sessions:pending`, or a
-     * notification tap through [coordinator]: posts a per-request notification when backgrounded,
-     * drops expired requests cleanly, and answers on screen within [Tunable.SessionAnswer] plus
-     * [Tunable.CookieAsk]. Flow `push.session_request`; no cookies in the log.
+     * Tells Rust of a connected app's session request (FCM, `sessions:pending`, a notification
+     * tap) or the app coming on screen, and does what it says: post or take down a notification,
+     * or answer within [Tunable.SessionAnswer] plus [Tunable.CookieAsk]. Flow
+     * `push.session_request`; no cookies in the log.
      */
-    suspend fun handleRequest(
-        context: Context,
-        requestId: String,
-        expiresAtMs: Long? = null,
-        tapped: Boolean = false,
-    ) {
+    suspend fun handover(context: Context, event: HandoverEvent) {
         val app = context.applicationContext
-        when (val action = coordinator.onRequest(requestId, expiresAtMs, foreground = Foreground.shown, tapped = tapped)) {
-            is HandoverAction.Notify -> flow("push.session_request") { f ->
-                asked(app, requestId, action.notificationId, action.expiresAtMs)
-                Log.info("push", "session request asked by notification", f)
-            }
-            is HandoverAction.Answer -> {
-                cancelNotification(app, action.notificationId)
-                AppScope.launch { answerAttempt(app, requestId, action.attemptId) }
-            }
-            is HandoverAction.Expired -> flow("push.session_request") { f ->
-                cancelNotification(app, action.notificationId)
-                Log.info("push", "session request expired", f)
-            }
-            HandoverAction.Ignore -> if (tapped) {
-                cancelNotification(app, HandoverCoordinator.notificationId(requestId))
-                flow("push.session_request") { f ->
-                    Log.info("push", "session request already handled", f)
-                }
-            }
-        }
-    }
-
-    /** Promotes any background-notified session requests when the app enters the foreground. */
-    fun onForeground(context: Context) {
-        val app = context.applicationContext
-        val promotion = coordinator.promoteNotified()
-        for (nid in promotion.expiredNotificationIds) cancelNotification(app, nid)
-        for (request in promotion.toAnswer) {
-            cancelNotification(app, request.notificationId)
-            AppScope.launch { answerAttempt(app, request.requestId, request.attemptId) }
-        }
-    }
-
-    private suspend fun answerAttempt(context: Context, requestId: String, attemptId: Long) =
         flow("push.session_request") { f ->
-            val limit = (Settings.tunable(Tunable.SessionAnswer) + Settings.tunable(Tunable.CookieAsk)) * 1000L
-            val result = coordinator.executeAttempt(
-                requestId = requestId,
-                attemptId = attemptId,
-                timeoutMs = limit,
-                timeoutError = TIMEOUT_ERROR,
-            ) { error ->
-                AppCore.await().answerSessionRequest(f, requestId, error)
+            val effects = attempt { withContext(Dispatchers.IO) { AppCore.await().handover(f, event) } }.getOrDefault(emptyList())
+            for (effect in effects) when (effect) {
+                is HandoverEffect.Notify -> asked(app, effect.requestId, effect.notificationId, effect.expiresAt)
+                is HandoverEffect.Cancel -> NotificationManagerCompat.from(app).cancel(effect.notificationId)
+                is HandoverEffect.Answer -> AppScope.launch { answer(effect.requestId, effect.attempt) }
             }
-            cancelNotification(context, HandoverCoordinator.notificationId(requestId))
+        }
+    }
+
+    /** Answers session requests whose notification went up while the app was away. */
+    fun onForeground(context: Context) {
+        AppScope.launch { handover(context, HandoverEvent.Shown) }
+    }
+
+    private suspend fun answer(requestId: String, attemptId: ULong) =
+        flow("push.session_request") { f ->
+            val limit = Settings.tunable(Tunable.SessionAnswer) + Settings.tunable(Tunable.CookieAsk)
+            val result = attempt { withContext(Dispatchers.IO) { AppCore.await().answerHandover(f, requestId, attemptId, limit.toUInt()) } }
             Log.info("push", "session request", f, mapOf("answered" to "${result.isSuccess}", "error" to (result.exceptionOrNull()?.let { it::class.simpleName } ?: "-")))
             // On screen, say so: the app waiting on it only times out.
             result.exceptionOrNull()?.let { e ->
@@ -154,11 +123,8 @@ object Push {
     private const val ASKED = "connected_apps"
     private const val REJECTED = "account"
     private const val ASKED_TIMEOUT_MS = 60_000L
-    private const val TIMEOUT_ERROR = "The phone took too long to sign in to VTOP."
     private const val FOLLOW_RETRY_MS = 30_000L
     private const val FOLLOW_RETRY_MAX_MS = 5 * 60_000L
-
-    private val coordinator = HandoverCoordinator()
 
     /**
      * Answers each session request waiting on this phone as the server lists it
@@ -171,7 +137,7 @@ object Push {
     suspend fun follow(context: Context): Nothing = Foreground.shownFlow.collectLatest { shown ->
         // Off screen, FCM brings requests and the socket may close.
         if (!shown) return@collectLatest
-        onForeground(context)
+        handover(context, HandoverEvent.Shown)
         flow("push.follow") { f ->
             var wait = FOLLOW_RETRY_MS
             while (true) {
@@ -181,7 +147,7 @@ object Push {
                 Live.changes(LiveTopic.SESSION_REQUESTS).collect {
                     followed = true
                     val pending = attempt { coreFlow("push.pending") { c, id -> c.pendingSessionRequests(id) } }.getOrDefault(emptyList())
-                    for (request in pending) handleRequest(context, request.requestId, request.expiresAt)
+                    for (request in pending) handover(context, HandoverEvent.Listed(request.requestId, request.expiresAt, Foreground.shown))
                 }
                 wait = if (followed) FOLLOW_RETRY_MS else (wait * 2).coerceAtMost(FOLLOW_RETRY_MAX_MS)
                 delay(wait)
@@ -219,7 +185,7 @@ object Push {
     internal fun canNotify(context: Context) =
         Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    /** A session request while the app is away: tapping opens the app, which asks ([handleRequest]). */
+    /** A session request while the app is away: tapping opens the app, which asks ([HandoverEvent.Tapped]). */
     private fun asked(context: Context, requestId: String, notificationId: Int, expiresAtMs: Long) {
         if (!canNotify(context)) return
         context.getSystemService(NotificationManager::class.java)
@@ -242,10 +208,6 @@ object Push {
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(notificationId, n)
-    }
-
-    private fun cancelNotification(context: Context, notificationId: Int) {
-        NotificationManagerCompat.from(context).cancel(notificationId)
     }
 
     internal fun send(token: String) {
