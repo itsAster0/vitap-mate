@@ -462,7 +462,8 @@ impl Core {
         // Asked once and before the first fetch, never across the lock: a code that goes in
         // meanwhile can't let the session (or, on expiry, the password) go out unasked.
         let mut fetch = ServerFetch::default();
-        let mut next = ServerFetch::start(slot.read().await.is_awaiting_otp());
+        let shared = self.identity_shared().await;
+        let mut next = ServerFetch::start(slot.read().await.is_awaiting_otp(), shared);
         let mut seen = 0;
         loop {
             next = match next {

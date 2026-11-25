@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalOpenRequest provides openRequest, LocalDensity provides density) {
                     App()
                     CookieConsentDialog()
+                    RegnoSheet()
                 }
             }
         }

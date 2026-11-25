@@ -189,11 +189,18 @@ impl Drop for LiveWatch {
 #[uniffi::export]
 impl Core {
     /// Whether this install holds a server identity it may use unasked for the signed-in
-    /// student (a JWT, a refresh token or a v2 account token), so a live watch can follow; read
-    /// on the phone alone.
+    /// student (a JWT, a refresh token or a v2 account token) and they shared their
+    /// registration number, so a live watch can follow; read on the phone alone.
     pub async fn has_server_identity(&self, flow: String) -> bool {
         crate::traced("has_server_identity", &flow, async {
             let regno = self.signed_in_regno().await;
+            if self
+                .regno_allowed(&flow, regno.as_deref(), false)
+                .await
+                .is_err()
+            {
+                return Ok(false);
+            }
             let server = self.forwarding_server();
             let refresh = self.device().refresh;
             let has_v2 = self.kept_v2(regno.as_deref()).is_some();
@@ -449,7 +456,7 @@ impl Renewal {
                 self.phase = RenewPhase::Scheduled;
                 (false, Vec::new())
             }
-            Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
+            Err(CoreError::NotSignedIn | CoreError::ConsentDenied | CoreError::RegnoNotShared) => {
                 self.renew_now = false;
                 self.retry_after = None;
                 self.phase = RenewPhase::Idle;
@@ -507,7 +514,11 @@ fn run_renewal_coordinator(core: std::sync::Weak<Core>, shared: Arc<Shared>) {
                         ));
                         match &renewed {
                             Ok(()) => {}
-                            Err(CoreError::NotSignedIn | CoreError::ConsentDenied) => {
+                            Err(
+                                CoreError::NotSignedIn
+                                | CoreError::ConsentDenied
+                                | CoreError::RegnoNotShared,
+                            ) => {
                                 info!("live watches: no identity, stops following");
                             }
                             Err(error) => warn!(%error, "live watches: no new jwt"),
@@ -820,7 +831,8 @@ impl Core {
     /// A `jwt` function as the signed-in student (or, signed out, as this install's last one).
     /// Without a JWT it gets one ([`Self::identity`]), proving who the student is only when
     /// `ask` (a call nobody started never proves, and is `ConsentDenied`, which callers take as
-    /// "not now"); `action` names it in the logs. A JWT the server turns down is renewed once.
+    /// "not now"); `action` names it in the logs. Until the student shares their registration
+    /// number it is `RegnoNotShared` (with `ask`, they are asked first). A JWT the server turns down is renewed once.
     /// The outer error is the phone's (not signed in, the proof), the inner one the server's.
     pub(crate) async fn account_call(
         &self,
@@ -868,10 +880,12 @@ impl Core {
     ) -> Result<Value, EdgeError> {
         match self.account_call(flow, kind, path, path, false, args).await {
             Ok(answer) => answer,
-            Err(CoreError::ConsentDenied | CoreError::NotSignedIn) => Err(EdgeError::Status {
-                code: ServerCode::Unauthenticated,
-                message: "This phone hasn't proved who you are to the server yet.".into(),
-            }),
+            Err(CoreError::ConsentDenied | CoreError::NotSignedIn | CoreError::RegnoNotShared) => {
+                Err(EdgeError::Status {
+                    code: ServerCode::Unauthenticated,
+                    message: "This phone hasn't proved who you are to the server yet.".into(),
+                })
+            }
             Err(CoreError::Offline) => Err(EdgeError::Offline),
             Err(error) => Err(EdgeError::Status {
                 code: ServerCode::IdentityFailed,
@@ -881,7 +895,7 @@ impl Core {
     }
 
     /// The signed-in student's registration number, upper case; None signed out.
-    async fn signed_in_regno(&self) -> Option<String> {
+    pub(crate) async fn signed_in_regno(&self) -> Option<String> {
         let slot = self.current().ok()?;
         let session = slot.read().await;
         // A restored or restarted session that hasn't loaded a page yet knows it from the saved
@@ -995,8 +1009,18 @@ impl Core {
         prove: Option<Duration>,
         background_only: bool,
     ) -> Result<(Stamp, bool), CoreError> {
+        // Before the turn: the sheet may wait on the student, and nothing names them until
+        // they said Share. A background run or a call nobody started never asks.
+        let may_ask = prove.is_some() && !background_only;
+        let asked_for = self.signed_in_regno().await;
+        self.regno_allowed(flow, asked_for.as_deref(), may_ask)
+            .await?;
         let _turn = self.shared.identity_turn.lock().await;
+        // Another student may have signed in while this one waited.
         let regno = self.signed_in_regno().await;
+        if regno != asked_for {
+            self.regno_allowed(flow, regno.as_deref(), false).await?;
+        }
         let server = self.forwarding_server();
         if background_only {
             let Some(regno_str) = regno.as_deref() else {
@@ -1269,7 +1293,8 @@ impl Core {
     /// refresh or v2 token, no live JWT) and is signed in; it gives up after `timeout_ms` and
     /// the next open tries again. It takes the identity's turn, so a call someone starts
     /// meanwhile waits for it and uses its JWT instead of proving again. No session leaves the
-    /// phone in a proof, so no consent is asked. Kotlin runs it in an unattended flow, on an
+    /// phone in a proof, so no cookie consent is asked; it proves only once the student said
+    /// Share to their registration number ([`crate::remote::regno`]), and never asks. Kotlin runs it in an unattended flow, on an
     /// unmetered or validated non-cellular network unless Developer allows mobile data. True
     /// when it proved.
     pub async fn prove_in_background(
@@ -1279,9 +1304,14 @@ impl Core {
     ) -> Result<bool, CoreError> {
         crate::traced("prove_in_background", &flow, async {
             let budget = Duration::from_millis(timeout_ms.into());
-            self.identity_within(&flow, "Background proof", Some(budget), true)
+            match self
+                .identity_within(&flow, "Background proof", Some(budget), true)
                 .await
-                .map(|(_, taken)| taken)
+            {
+                // Not until the student said Share; regno_allowed logged it.
+                Err(CoreError::RegnoNotShared) => Ok(false),
+                proved => proved.map(|(_, taken)| taken),
+            }
         })
         .await
     }

@@ -121,6 +121,9 @@ pub enum CoreError {
     SemesterNeeded,
     /// The student said no (or wasn't there to ask): the VTOP session stayed on the phone.
     ConsentDenied,
+    /// The student hasn't let this install share their registration number with the server
+    /// (`remote/regno.rs`): no server identity is taken.
+    RegnoNotShared,
     /// This phone has no forwarding address, or the server deleted it: an OTP wait on it ends.
     ForwardingOff {
         reason: String,
@@ -139,6 +142,9 @@ impl std::fmt::Display for CoreError {
             Self::SemesterNeeded => formatter.write_str("no semester picked"),
             Self::ConsentDenied => {
                 formatter.write_str("Not sent: your VTOP cookie stays on the phone.")
+            }
+            Self::RegnoNotShared => {
+                formatter.write_str("Not shared: your registration number stays on the phone.")
             }
             Self::VtopUnavailable { reason }
             | Self::OtpRequired { reason, .. }
@@ -163,6 +169,7 @@ impl CoreError {
             Self::NotSignedIn => "NotSignedIn",
             Self::SemesterNeeded => "SemesterNeeded",
             Self::ConsentDenied => "ConsentDenied",
+            Self::RegnoNotShared => "RegnoNotShared",
             Self::ForwardingOff { .. } => "ForwardingOff",
             Self::Other { .. } => "Other",
         }
@@ -403,6 +410,9 @@ struct Shared {
     /// One identity fetch at a time ([`remote::backend`]): a refresh token works once.
     identity_turn: futures::lock::Mutex<()>,
     consent: Mutex<remote::consent::State>,
+    /// One registration-number sheet at a time, and the flow that last said "Not now"
+    /// ([`remote::regno`]).
+    regno_ask: futures::lock::Mutex<Option<String>>,
     dev: Option<dev::DevConfig>,
     /// Without one (host tests), vtop-core's own.
     http: Option<Arc<dyn vtop_core::client::Transport>>,

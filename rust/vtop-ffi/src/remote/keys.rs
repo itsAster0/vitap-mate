@@ -502,7 +502,7 @@ impl Core {
                     CoreError::Offline => "The phone is offline.".to_string(),
                     CoreError::OtpRequired { .. } => "The phone needs an OTP to sign in.".into(),
                     CoreError::InvalidCredentials => "VTOP rejected the phone's password.".into(),
-                    CoreError::ConsentDenied => {
+                    CoreError::ConsentDenied | CoreError::RegnoNotShared => {
                         "The student hasn't allowed it on the phone.".into()
                     }
                     error => format!("The phone couldn't get a session: {error}"),

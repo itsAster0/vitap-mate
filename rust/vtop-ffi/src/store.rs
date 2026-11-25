@@ -12,7 +12,7 @@ use serde::de::DeserializeOwned;
 use tracing::warn;
 
 use crate::pages::changes;
-use crate::remote::{consent, forwarding};
+use crate::remote::{consent, forwarding, regno};
 use crate::{Core, PAGES, SELECTED, SEMESTERS};
 
 pub(crate) mod account;
@@ -29,6 +29,7 @@ impl Core {
             .unwrap_or_else(PoisonError::into_inner);
         if files.contains(&consent::FILE) {
             consent::forget(&self.shared);
+            regno::forget(self);
         }
         for file in files {
             self.remove_file(file);

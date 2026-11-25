@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.DevConfig
 import vitapmate.core.Platform
+import vitapmate.core.RegnoAsk
 import vitapmate.core.obsInit
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
@@ -110,12 +111,17 @@ object AppCore {
      * so Connected apps, forwarding and the server routes find the identity ready: called after
      * a sign-in and on each open signed in, it does nothing once there is one. Only on an
      * unmetered network, or a validated one that isn't mobile data (unless
-     * [Tunable.ProofOnCellular]); gives up after [Tunable.ProofTimeout]; one at a time.
+     * [Tunable.ProofOnCellular]); gives up after [Tunable.ProofTimeout]; one at a time. First the
+     * registration number's sheet, while the student was never asked: Rust proves only after a
+     * Share.
      */
     fun proveInBackground() {
         val context = app ?: return
-        if (proving?.isActive == true || !proofNetworkOk(context)) return
+        if (proving?.isActive == true) return
         proving = AppScope.launch {
+            runCatching { flow("account.regno_ask") { f -> withContext(Dispatchers.IO) { await().askRegnoSharing(f, RegnoAsk.FIRST_TIME) } } }
+                .onFailure { Log.info("account", "regno sheet not shown: ${it::class.simpleName}") }
+            if (!proofNetworkOk(context)) return@launch
             runCatching {
                 flow("account.prove_background", unattended = true) { f ->
                     val ms = Settings.tunable(Tunable.ProofTimeout) * 1000

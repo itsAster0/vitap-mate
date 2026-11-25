@@ -16,6 +16,7 @@ use futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
+use crate::remote::regno::RegnoAnswer;
 use crate::{Core, CoreError, Shared, traced_sync, unix_now};
 
 pub(crate) const FILE: &str = "consent.json";
@@ -129,6 +130,9 @@ pub trait CookieGate: Send + Sync {
         action: String,
         server: String,
     ) -> Result<CookieAnswer, CoreError>;
+    /// Shows the "Share your registration number?" sheet ([`crate::remote::regno`]). A timeout
+    /// or the app leaving the screen is [`RegnoAnswer::Dismissed`].
+    async fn ask_regno(&self, flow: String) -> Result<RegnoAnswer, CoreError>;
 }
 
 /// [`FILE`] on disk: `{"remembered":["route","account","handover"]}`. The kinds' names are

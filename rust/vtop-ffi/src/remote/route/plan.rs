@@ -128,9 +128,15 @@ pub(super) struct ServerFetch {
 }
 
 impl ServerFetch {
-    /// The first step; a pending OTP sends nothing and asks nothing.
-    pub(super) fn start(otp_pending: bool) -> Next {
-        if otp_pending { Next::GiveUp } else { Next::Ask }
+    /// The first step; a pending OTP, or a registration number the student hasn't shared (the
+    /// server fetches as them, `identity_shared` false), sends nothing, asks nothing and skips
+    /// nothing.
+    pub(super) fn start(otp_pending: bool, identity_shared: bool) -> Next {
+        if otp_pending || !identity_shared {
+            Next::GiveUp
+        } else {
+            Next::Ask
+        }
     }
 
     /// A no goes to the phone and skips nothing, so the next fetch asks again.
@@ -304,7 +310,7 @@ mod tests {
     fn steps(otp: bool, yes: bool, answers: &[Result<(), ServerError>]) -> Vec<Next> {
         let mut fetch = ServerFetch::default();
         let mut answers = answers.iter().cloned();
-        let mut next = ServerFetch::start(otp);
+        let mut next = ServerFetch::start(otp, true);
         let mut steps = vec![next.clone()];
         loop {
             next = match next {
@@ -318,6 +324,13 @@ mod tests {
             };
             steps.push(next.clone());
         }
+    }
+
+    #[test]
+    fn server_page_waits_for_the_regno() {
+        assert_eq!(ServerFetch::start(false, true), Next::Ask);
+        assert_eq!(ServerFetch::start(false, false), Next::GiveUp);
+        assert_eq!(ServerFetch::start(true, true), Next::GiveUp);
     }
 
     #[test]

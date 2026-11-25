@@ -4,6 +4,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -12,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import vitapmate.core.CookieAnswer
 import vitapmate.core.CookieKind
+import vitapmate.core.RegnoAnswer
 import vitapmate.observability.Unattended
 
 class CookieConsentTest {
@@ -120,5 +122,68 @@ class CookieConsentTest {
         val answer = CookieConsent.ask("f", CookieKind.ACCOUNT, "Load your connected apps", "vmate.aster0.dev")
         assertEquals(CookieAnswer.Deny, answer)
         assertTrue(CookieConsent.pending.value.isEmpty())
+    }
+
+    // The registration number's sheet ([RegnoConsent]), asked through the same gate.
+
+    @Test
+    fun regnoAnswerGoesBackAndTheSheetGoes() = runBlocking {
+        Foreground.started()
+        val asked = async { CookieConsent.askRegno("f") }
+        while (RegnoConsent.pending.value == null) yield()
+        assertEquals("f", RegnoConsent.pending.value?.flow)
+        RegnoConsent.answer(checkNotNull(RegnoConsent.pending.value), RegnoAnswer.SHARE)
+        assertEquals(RegnoAnswer.SHARE, asked.await())
+        assertNull(RegnoConsent.pending.value)
+    }
+
+    @Test
+    fun regnoNotShownIsDismissedAtOnce() = runBlocking {
+        assertEquals(RegnoAnswer.DISMISSED, RegnoConsent.ask("f"))
+        assertNull(RegnoConsent.pending.value)
+    }
+
+    @Test
+    fun regnoTimeoutIsDismissed() = runBlocking {
+        Foreground.started()
+        val wait = RegnoConsent.waitMs
+        RegnoConsent.waitMs = { 10L }
+        try {
+            assertEquals(RegnoAnswer.DISMISSED, RegnoConsent.ask("f"))
+            assertNull(RegnoConsent.pending.value)
+        } finally {
+            RegnoConsent.waitMs = wait
+        }
+    }
+
+    @Test
+    fun regnoLeavingTheAppIsDismissed() = runBlocking {
+        Foreground.started()
+        val asked = async { RegnoConsent.ask("f") }
+        while (RegnoConsent.pending.value == null) yield()
+        Foreground.stopped()
+        assertEquals(RegnoAnswer.DISMISSED, asked.await())
+        assertNull(RegnoConsent.pending.value)
+    }
+
+    @Test
+    fun regnoCancelledAskTakesItsSheetAway() = runBlocking {
+        Foreground.started()
+        val asked = launch { RegnoConsent.ask("f") }
+        while (RegnoConsent.pending.value == null) yield()
+        asked.cancelAndJoin()
+        assertNull(RegnoConsent.pending.value)
+    }
+
+    @Test
+    fun regnoNewerAskClosesTheOlderSheet() = runBlocking {
+        Foreground.started()
+        val first = async { RegnoConsent.ask("f1") }
+        while (RegnoConsent.pending.value == null) yield()
+        val second = async { RegnoConsent.ask("f2") }
+        while (RegnoConsent.pending.value?.flow != "f2") yield()
+        assertEquals(RegnoAnswer.DISMISSED, first.await())
+        RegnoConsent.answer(checkNotNull(RegnoConsent.pending.value), RegnoAnswer.NOT_NOW)
+        assertEquals(RegnoAnswer.NOT_NOW, second.await())
     }
 }

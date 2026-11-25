@@ -47,6 +47,9 @@ pub(crate) struct TestGate {
     pub(crate) deny: bool,
     pub(crate) answers: Mutex<VecDeque<CookieAnswer>>,
     pub(crate) asks: AtomicU32,
+    /// The registration-number sheet's answers (Dismissed once they run out) and its asks.
+    pub(crate) regno_answers: Mutex<VecDeque<RegnoAnswer>>,
+    pub(crate) regno_asks: AtomicU32,
 }
 
 impl TestGate {
@@ -75,6 +78,11 @@ impl CookieGate for TestGate {
             CookieAnswer::Allow { remember: false }
         }))
     }
+    async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
+        self.regno_asks.fetch_add(1, Ordering::SeqCst);
+        let next = self.regno_answers.lock().unwrap().pop_front();
+        Ok(next.unwrap_or(RegnoAnswer::Dismissed))
+    }
 }
 
 /// Gives `core` a fresh gate (and no remembered kinds).
@@ -84,6 +92,8 @@ pub(crate) fn install(core: &Core, attended: bool, deny: bool) -> Arc<TestGate> 
         deny,
         answers: Mutex::default(),
         asks: AtomicU32::new(0),
+        regno_answers: Mutex::default(),
+        regno_asks: AtomicU32::new(0),
     });
     *core.shared.consent() = State {
         gate: Some(gate.clone()),
@@ -112,6 +122,7 @@ pub(crate) fn signed_in(core: &Core) {
     };
     let session = Session::new(account, &core.shared).unwrap();
     core.install(Some(Arc::new(RwLock::new(session))));
+    crate::remote::regno::tests::shared(core, "22BCE0001");
 }
 
 pub(crate) fn remember(core: &Core, kind: CookieKind) {
@@ -344,6 +355,9 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
             self.entered.notify_one();
             self.release.notified().await;
             Ok(CookieAnswer::Allow { remember: false })
+        }
+        async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
+            Ok(RegnoAnswer::Dismissed)
         }
     }
 

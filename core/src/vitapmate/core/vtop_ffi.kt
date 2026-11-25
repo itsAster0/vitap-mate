@@ -701,6 +701,9 @@ internal interface UniffiCallbackInterfaceCookieGateMethod0 : com.sun.jna.Callba
 internal interface UniffiCallbackInterfaceCookieGateMethod1 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
+internal interface UniffiCallbackInterfaceCookieGateMethod2 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+}
 internal interface UniffiCallbackInterfaceUdpNetworkMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: LongByReference,uniffiCallStatus: UniffiRustCallStatus,)
 }
@@ -869,25 +872,28 @@ internal open class UniffiVTableCallbackInterfaceLiveListener(
     }
 
 }
-@Structure.FieldOrder("uniffiFree", "uniffiClone", "attended", "ask")
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "attended", "ask", "askRegno")
 internal open class UniffiVTableCallbackInterfaceCookieGate(
     @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
     @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
     @JvmField internal var `attended`: UniffiCallbackInterfaceCookieGateMethod0? = null,
     @JvmField internal var `ask`: UniffiCallbackInterfaceCookieGateMethod1? = null,
+    @JvmField internal var `askRegno`: UniffiCallbackInterfaceCookieGateMethod2? = null,
 ) : Structure() {
     class UniffiByValue(
         `uniffiFree`: UniffiCallbackInterfaceFree? = null,
         `uniffiClone`: UniffiCallbackInterfaceClone? = null,
         `attended`: UniffiCallbackInterfaceCookieGateMethod0? = null,
         `ask`: UniffiCallbackInterfaceCookieGateMethod1? = null,
-    ): UniffiVTableCallbackInterfaceCookieGate(`uniffiFree`,`uniffiClone`,`attended`,`ask`,), Structure.ByValue
+        `askRegno`: UniffiCallbackInterfaceCookieGateMethod2? = null,
+    ): UniffiVTableCallbackInterfaceCookieGate(`uniffiFree`,`uniffiClone`,`attended`,`ask`,`askRegno`,), Structure.ByValue
 
    internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceCookieGate) {
         `uniffiFree` = other.`uniffiFree`
         `uniffiClone` = other.`uniffiClone`
         `attended` = other.`attended`
         `ask` = other.`ask`
+        `askRegno` = other.`askRegno`
     }
 
 }
@@ -1244,6 +1250,12 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_key_outings(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_ask_regno_sharing(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_regno_sharing(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_regno_sharing(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_route_status(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_route(
@@ -1327,6 +1339,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_cookiegate_attended(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_cookiegate_ask(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_cookiegate_ask_regno(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_udpnetwork_open(
     ): Int
@@ -1577,6 +1591,12 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_set_key_outings(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`outings`: Byte,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_ask_regno_sharing(`ptr`: Long,`flow`: RustBuffer.ByValue,`ask`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_regno_sharing(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_set_regno_sharing(`ptr`: Long,`flow`: RustBuffer.ByValue,`answer`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_route_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_set_route(`ptr`: Long,`flow`: RustBuffer.ByValue,`route`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1704,6 +1724,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_cookiegate_attended(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_vtop_ffi_fn_method_cookiegate_ask(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_cookiegate_ask_regno(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_clone_udpnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -2153,13 +2175,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_wrapped_missing_days() and 0xFFFF) != 15264) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_has_server_identity() and 0xFFFF) != 4317) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_has_server_identity() and 0xFFFF) != 48438) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_live_watch() and 0xFFFF) != 14389) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_prove_in_background() and 0xFFFF) != 53203) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_prove_in_background() and 0xFFFF) != 60927) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 55337) {
@@ -2220,6 +2242,15 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_key_outings() and 0xFFFF) != 13580) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_ask_regno_sharing() and 0xFFFF) != 26180) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_regno_sharing() and 0xFFFF) != 22665) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_regno_sharing() and 0xFFFF) != 32421) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_route_status() and 0xFFFF) != 46716) {
@@ -2346,6 +2377,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 41334) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask_regno() and 0xFFFF) != 25024) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_open() and 0xFFFF) != 17439) {
@@ -4049,6 +4083,12 @@ public interface CookieGate {
      */
     suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `action`: kotlin.String, `server`: kotlin.String): CookieAnswer
     
+    /**
+     * Shows the "Share your registration number?" sheet ([`crate::remote::regno`]). A timeout
+     * or the app leaving the screen is [`RegnoAnswer::Dismissed`].
+     */
+    suspend fun `askRegno`(`flow`: kotlin.String): RegnoAnswer
+    
     companion object
 }
 
@@ -4203,6 +4243,32 @@ open class CookieGateImpl: Disposable, AutoCloseable, CookieGate
     }
 
     
+    /**
+     * Shows the "Share your registration number?" sheet ([`crate::remote::regno`]). A timeout
+     * or the app leaving the screen is [`RegnoAnswer::Dismissed`].
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `askRegno`(`flow`: kotlin.String) : RegnoAnswer {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_cookiegate_ask_regno(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeRegnoAnswer.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
 
     
 
@@ -4269,6 +4335,40 @@ internal object uniffiCallbackInterfaceCookieGate {
             )
         }
     }
+    internal object `askRegno`: UniffiCallbackInterfaceCookieGateMethod2 {
+        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+            val uniffiObj = FfiConverterTypeCookieGate.handleMap.get(uniffiHandle)
+            val makeCall = suspend { ->
+                uniffiObj.`askRegno`(
+                    FfiConverterString.lift(`flow`),
+                )
+            }
+            val uniffiHandleSuccess = { returnValue: RegnoAnswer ->
+                val uniffiResult = UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                    FfiConverterTypeRegnoAnswer.lower(returnValue),
+                    UniffiRustCallStatus.ByValue()
+                )
+                uniffiResult.write()
+                uniffiFutureCallback.callback(uniffiCallbackData, uniffiResult)
+            }
+            val uniffiHandleError = { callStatus: UniffiRustCallStatus.ByValue ->
+                uniffiFutureCallback.callback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                        RustBuffer.ByValue(),
+                        callStatus,
+                    ),
+                )
+            }
+            uniffiTraitInterfaceCallAsyncWithError(
+                makeCall,
+                uniffiHandleSuccess,
+                uniffiHandleError,
+                { e: CoreException -> FfiConverterTypeCoreError.lower(e) },
+                uniffiOutDroppedCallback
+            )
+        }
+    }
 
     internal object uniffiFree: UniffiCallbackInterfaceFree {
         override fun callback(handle: Long) {
@@ -4287,6 +4387,7 @@ internal object uniffiCallbackInterfaceCookieGate {
         uniffiClone,
         `attended`,
         `ask`,
+        `askRegno`,
     )
 
     // Registers the foreign callback with the Rust side.
@@ -4824,8 +4925,8 @@ public interface CoreInterface {
     
     /**
      * Whether this install holds a server identity it may use unasked for the signed-in
-     * student (a JWT, a refresh token or a v2 account token), so a live watch can follow; read
-     * on the phone alone.
+     * student (a JWT, a refresh token or a v2 account token) and they shared their
+     * registration number, so a live watch can follow; read on the phone alone.
      */
     suspend fun `hasServerIdentity`(`flow`: kotlin.String): kotlin.Boolean
     
@@ -4843,7 +4944,8 @@ public interface CoreInterface {
      * refresh or v2 token, no live JWT) and is signed in; it gives up after `timeout_ms` and
      * the next open tries again. It takes the identity's turn, so a call someone starts
      * meanwhile waits for it and uses its JWT instead of proving again. No session leaves the
-     * phone in a proof, so no consent is asked. Kotlin runs it in an unattended flow, on an
+     * phone in a proof, so no cookie consent is asked; it proves only once the student said
+     * Share to their registration number ([`crate::remote::regno`]), and never asks. Kotlin runs it in an unattended flow, on an
      * unmetered or validated non-cellular network unless Developer allows mobile data. True
      * when it proved.
      */
@@ -4965,6 +5067,25 @@ public interface CoreInterface {
     suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String)
     
     suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean)
+    
+    /**
+     * Asks the signed-in student when `ask` calls for it (with them on screen), and gives the
+     * answer after. A sign-in asks [`RegnoAsk::FirstTime`] before the background proof; a
+     * server route picked asks [`RegnoAsk::ForFeature`] and is chosen only on Shared.
+     */
+    suspend fun `askRegnoSharing`(`flow`: kotlin.String, `ask`: RegnoAsk): RegnoSharing
+    
+    /**
+     * The signed-in student's answer (Settings → Connections); Unasked signed out.
+     */
+    suspend fun `regnoSharing`(`flow`: kotlin.String): RegnoSharing
+    
+    /**
+     * Settings' switch: Share, or NotNow to stop. Stopping drops this install's JWT and
+     * refresh token, so nothing goes as the student from then on; the server keeps what it
+     * has until they delete it on the Server page. A server route chosen goes back to Direct.
+     */
+    suspend fun `setRegnoSharing`(`flow`: kotlin.String, `answer`: RegnoAnswer): RegnoSharing
     
     fun `routeStatus`(`flow`: kotlin.String): RouteStatus
     
@@ -6739,8 +6860,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Whether this install holds a server identity it may use unasked for the signed-in
-     * student (a JWT, a refresh token or a v2 account token), so a live watch can follow; read
-     * on the phone alone.
+     * student (a JWT, a refresh token or a v2 account token) and they shared their
+     * registration number, so a live watch can follow; read on the phone alone.
      */
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `hasServerIdentity`(`flow`: kotlin.String) : kotlin.Boolean {
@@ -6799,7 +6920,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
      * refresh or v2 token, no live JWT) and is signed in; it gives up after `timeout_ms` and
      * the next open tries again. It takes the identity's turn, so a call someone starts
      * meanwhile waits for it and uses its JWT instead of proving again. No session leaves the
-     * phone in a proof, so no consent is asked. Kotlin runs it in an unattended flow, on an
+     * phone in a proof, so no cookie consent is asked; it proves only once the student said
+     * Share to their registration number ([`crate::remote::regno`]), and never asks. Kotlin runs it in an unattended flow, on an
      * unmetered or validated non-cellular network unless Developer allows mobile data. True
      * when it proved.
      */
@@ -7315,6 +7437,86 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         // lift function
         { },
         
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Asks the signed-in student when `ask` calls for it (with them on screen), and gives the
+     * answer after. A sign-in asks [`RegnoAsk::FirstTime`] before the background proof; a
+     * server route picked asks [`RegnoAsk::ForFeature`] and is chosen only on Shared.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `askRegnoSharing`(`flow`: kotlin.String, `ask`: RegnoAsk) : RegnoSharing {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_ask_regno_sharing(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeRegnoAsk.lower(`ask`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeRegnoSharing.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The signed-in student's answer (Settings → Connections); Unasked signed out.
+     */
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `regnoSharing`(`flow`: kotlin.String) : RegnoSharing {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_regno_sharing(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeRegnoSharing.lift(it) },
+        // Error FFI converter
+        UniffiNullRustCallStatusErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Settings' switch: Share, or NotNow to stop. Stopping drops this install's JWT and
+     * refresh token, so nothing goes as the student from then on; the server keeps what it
+     * has until they delete it on the Server page. A server route chosen goes back to Direct.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setRegnoSharing`(`flow`: kotlin.String, `answer`: RegnoAnswer) : RegnoSharing {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_regno_sharing(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeRegnoAnswer.lower(`answer`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeRegnoSharing.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -20443,6 +20645,16 @@ sealed class CoreException: kotlin.Exception() {
     }
     
     /**
+     * The student hasn't let this install share their registration number with the server
+     * (`remote/regno.rs`): no server identity is taken.
+     */
+    class RegnoNotShared(
+        ) : CoreException() {
+        override val message
+            get() = ""
+    }
+    
+    /**
      * This phone has no forwarding address, or the server deleted it: an OTP wait on it ends.
      */
     class ForwardingOff(
@@ -20495,10 +20707,11 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             6 -> CoreException.NotSignedIn()
             7 -> CoreException.SemesterNeeded()
             8 -> CoreException.ConsentDenied()
-            9 -> CoreException.ForwardingOff(
+            9 -> CoreException.RegnoNotShared()
+            10 -> CoreException.ForwardingOff(
                 FfiConverterString.read(buf),
                 )
-            10 -> CoreException.Other(
+            11 -> CoreException.Other(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -20540,6 +20753,10 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 4UL
             )
             is CoreException.ConsentDenied -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is CoreException.RegnoNotShared -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -20594,13 +20811,17 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 buf.putInt(8)
                 Unit
             }
-            is CoreException.ForwardingOff -> {
+            is CoreException.RegnoNotShared -> {
                 buf.putInt(9)
+                Unit
+            }
+            is CoreException.ForwardingOff -> {
+                buf.putInt(10)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
             is CoreException.Other -> {
-                buf.putInt(10)
+                buf.putInt(11)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
@@ -21242,6 +21463,134 @@ public object FfiConverterTypePunchKind: FfiConverterRustBuffer<PunchKind> {
     override fun allocationSize(value: PunchKind) = 4UL
 
     override fun write(value: PunchKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * What the sheet gave.
+ */
+
+enum class RegnoAnswer {
+    
+    SHARE,
+    NOT_NOW,
+    /**
+     * Closed without an answer (timed out, swiped away, the app left): nothing changes.
+     */
+    DISMISSED;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRegnoAnswer: FfiConverterRustBuffer<RegnoAnswer> {
+    override fun read(buf: ByteBuffer) = try {
+        RegnoAnswer.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RegnoAnswer) = 4UL
+
+    override fun write(value: RegnoAnswer, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * When [`Core::ask_regno_sharing`] shows the sheet.
+ */
+
+enum class RegnoAsk {
+    
+    /**
+     * After a sign-in or at an open: only while never asked.
+     */
+    FIRST_TIME,
+    /**
+     * A feature that needs it (a server route picked): also after a "Not now".
+     */
+    FOR_FEATURE;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRegnoAsk: FfiConverterRustBuffer<RegnoAsk> {
+    override fun read(buf: ByteBuffer) = try {
+        RegnoAsk.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RegnoAsk) = 4UL
+
+    override fun write(value: RegnoAsk, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * The student's answer for the signed-in account.
+ */
+
+enum class RegnoSharing {
+    
+    /**
+     * Never asked (a fresh sign-in): the first use asks.
+     */
+    UNASKED,
+    SHARED,
+    /**
+     * "Not now", or turned off in Settings: a feature that needs it asks again.
+     */
+    DECLINED;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRegnoSharing: FfiConverterRustBuffer<RegnoSharing> {
+    override fun read(buf: ByteBuffer) = try {
+        RegnoSharing.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RegnoSharing) = 4UL
+
+    override fun write(value: RegnoSharing, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

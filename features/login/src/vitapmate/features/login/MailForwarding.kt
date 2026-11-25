@@ -217,6 +217,7 @@ object MailForwarding {
         is CoreException.OtpRequired -> "Verify your sign-in" to "VTOP wants the OTP first; enter it, then try again."
         is CoreException.NotSignedIn -> "Sign-in needed" to "Sign in to VTOP, then try again."
         is CoreException.ConsentDenied -> "Not set up yet" to "The server doesn't know this phone yet. Try again while signed in to VTOP."
+        is CoreException.RegnoNotShared -> "Not shared" to "Mail forwarding needs your registration number on the vitapmate server."
         is CoreException.VtopUnavailable -> "VTOP is down" to "Try again in a few minutes."
         is CoreException.ForwardingOff -> "Mail forwarding is off" to e.reason
         is CoreException.Other -> "Mail forwarding" to e.reason

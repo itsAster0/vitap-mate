@@ -8,6 +8,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CookieAnswer
 import vitapmate.core.CookieGate
 import vitapmate.core.CookieKind
+import vitapmate.core.RegnoAnswer
 import vitapmate.observability.Log
 import vitapmate.observability.Unattended
 
@@ -54,6 +55,8 @@ object CookieConsent : CookieGate {
         }
     }
 
+    override suspend fun askRegno(flow: String): RegnoAnswer = RegnoConsent.ask(flow)
+
     /** The student's answer (or Cancel); the dialog goes. */
     fun answer(request: Request, answer: CookieAnswer) {
         synchronized(this) { pendingState.value = pendingState.value - request }
@@ -62,6 +65,9 @@ object CookieConsent : CookieGate {
         }
     }
 
-    /** The app left the screen: every open dialog is Cancel. */
-    internal fun left() = synchronized(this) { pendingState.value }.forEach { answer(it, no) }
+    /** The app left the screen: every open dialog is Cancel, and the registration number's sheet goes. */
+    internal fun left() {
+        synchronized(this) { pendingState.value }.forEach { answer(it, no) }
+        RegnoConsent.left()
+    }
 }

@@ -302,7 +302,7 @@ impl Core {
             .account_op("send_server_semester", None, flow, path, body)
             .await
         {
-            Err(CoreError::ConsentDenied) => Ok(()),
+            Err(CoreError::ConsentDenied | CoreError::RegnoNotShared) => Ok(()),
             result => result.map(drop),
         }
     }
@@ -337,14 +337,14 @@ impl Core {
                 .account_call(&flow, Kind::Query, "account:view", action, false, json!({}))
                 .await;
             let account = match account {
-                Err(CoreError::ConsentDenied) => return Ok(false),
+                Err(CoreError::ConsentDenied | CoreError::RegnoNotShared) => return Ok(false),
                 account => account?.map_err(refused)?,
             };
             if account.get("savedCredentials") != Some(&json!(true)) {
                 return Ok(false);
             }
             match self.save_password_with(&flow, action, true, gmail).await {
-                Err(CoreError::ConsentDenied) => Ok(false),
+                Err(CoreError::ConsentDenied | CoreError::RegnoNotShared) => Ok(false),
                 saved => saved.map(|()| true),
             }
         })

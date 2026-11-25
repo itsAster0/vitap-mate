@@ -52,9 +52,12 @@ import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vitapmate.core.CookieKind
+import vitapmate.core.RegnoAsk
+import vitapmate.core.RegnoSharing
 import vitapmate.core.Route as VtopRoute
 import vitapmate.core.SkippedRoute
 import vitapmate.core.RouteStatus
+import vitapmate.data.AppCore
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.features.login.ago
@@ -66,6 +69,7 @@ import vitapmate.ui.StatusChip
 import vitapmate.ui.heroCookie
 import vitapmate.ui.neutralTone
 import vitapmate.ui.rememberHaptics
+import vitapmate.ui.showToast
 
 /** Route id of Settings → Connection. */
 const val CONNECTION = "connection"
@@ -106,6 +110,15 @@ fun ConnectionScreen() {
         haptics.toggle(true)
         scope.logAction("connection.choose", "ui.connection", "route ${route.name.lowercase()}")
         scope.launch {
+            // The server fetches as the student: not without their registration number.
+            if (route == VtopRoute.SERVER || route == VtopRoute.UDP) {
+                val sharing = orNull { coreFlow("connection.regno") { c, f -> c.askRegnoSharing(f, RegnoAsk.FOR_FEATURE) } }
+                if (sharing != RegnoSharing.SHARED) {
+                    showToast("Not changed", "${route.title()} needs your registration number on the server.")
+                    return@launch
+                }
+                AppCore.proveInBackground()
+            }
             // The dialog said the cookie goes to the server: its yes stands for the cookie dialog's.
             if (consented) orNull { coreFlow("connection.consent") { c, f -> c.rememberCookieConsent(f, CookieKind.ROUTE) } }
             orNull { coreFlow("connection.set") { c, f -> c.setRoute(f, route) } }

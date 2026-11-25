@@ -153,6 +153,8 @@ fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem {
             retryable = false,
         )
         is CoreException.ConsentDenied -> p(ProblemKind.ConsentDenied, "Not Sent", "Not sent: your VTOP cookie stays on the phone.")
+        // A "Not now" on the registration number's sheet: as quiet as the cookie's no.
+        is CoreException.RegnoNotShared -> p(ProblemKind.ConsentDenied, "Not Shared", "This needs your registration number on the vitapmate server. Share it from Settings → Connections.")
         is CoreException.Other -> if (server) p(ProblemKind.Unexpected, "Server Problem", e.reason.trim().ifEmpty { UNEXPECTED }) else p(ProblemKind.Unexpected, "VTOP Problem", UNEXPECTED)
         else -> p(ProblemKind.Unexpected, "Something Went Wrong", UNEXPECTED)
     }

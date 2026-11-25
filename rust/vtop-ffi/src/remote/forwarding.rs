@@ -568,7 +568,9 @@ impl Core {
             if mailbox.server != self.forwarding_server() {
                 return Ok(());
             }
-            self.rejoin(&flow, &mailbox.id, true, true).await.map(drop)
+            // At an open nobody asked for forwarding: no sheet, only an answer given already.
+            let prove = self.identity_shared().await;
+            self.rejoin(&flow, &mailbox.id, true, prove).await.map(drop)
         })
         .await
     }
@@ -675,7 +677,7 @@ impl Core {
             .await
         {
             Ok(answer) => answer?,
-            Err(CoreError::ConsentDenied | CoreError::NotSignedIn) => {
+            Err(CoreError::ConsentDenied | CoreError::NotSignedIn | CoreError::RegnoNotShared) => {
                 info!("no identity yet: rejoined later");
                 return Ok(Rejoined::Later);
             }

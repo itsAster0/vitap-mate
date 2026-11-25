@@ -328,6 +328,8 @@ pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
     );
     let core = Core::for_test(dir);
     core.install(Some(Arc::new(RwLock::new(session))));
+    // The student said Share; `remote::regno`'s own tests start from Unasked.
+    crate::remote::regno::tests::shared(&core, "22BCE0001");
     core
 }
 

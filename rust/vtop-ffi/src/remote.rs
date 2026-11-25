@@ -10,6 +10,7 @@ pub(crate) mod consent;
 pub(crate) mod edge;
 pub(crate) mod forwarding;
 pub(crate) mod keys;
+pub(crate) mod regno;
 pub(crate) mod route;
 pub(crate) mod server;
 pub(crate) mod server_code;

@@ -150,6 +150,21 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   `ConsentDenied`. Calls nobody started (the semester push)
   never ask and send only with the tick. A session request while the
   app is away only posts a notification; tapping it opens the app and asks.
+- **Registration number** (`vtop-ffi/src/remote/regno.rs`). A server identity names
+  the student, so none is taken until they said Share on the "Share your registration
+  number?" sheet (Kotlin's `RegnoSheet`, asked through `CookieGate::ask_regno`). The answer
+  (Unasked, Shared, Declined) is kept per student in `regno_sharing.json`; a sign-out or
+  another student empties it but keeps the file, and an install with no file (from before
+  the question) counts each student it holds a refresh token, v2 token or forwarding
+  address for as Shared. `take_identity` checks it first (`Core::regno_allowed`): until
+  Shared there is no proof, no refresh, no push token sent and no server route
+  (`ServerFetch::start` goes Direct, nothing skipped), and calls fail `RegnoNotShared`.
+  A flow with the student on screen that needs the identity (`ask` true) shows the sheet;
+  "Not now" holds for the rest of that flow. Background runs never ask. After a sign-in
+  the app asks once (`RegnoAsk::FirstTime`), picking Server or UDP asks again
+  (`ForFeature`), and Settings → Connections switches it; turning it off drops the JWT
+  and refresh token here and goes back to Direct, but leaves the server's records (the
+  Server page deletes those). The demo account is always Shared.
 - **Account token** (`vtop-ffi/src/remote/account_token.rs`, API.md "Account
   tokens"). A 14-day token naming the student and this install, for the
   account calls (Connected apps, the Server page, mail forwarding), linked
