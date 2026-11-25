@@ -156,7 +156,16 @@ impl wire::Socket for Opened {
     }
 }
 
-/// `GET /v1/udp` as kept, with the server it came from and when.
+/// The server's `udp:keys` answer.
+#[derive(Deserialize)]
+struct WireGateway {
+    host: String,
+    ports: Vec<u16>,
+    keys: Vec<GatewayKey>,
+}
+
+/// [`WireGateway`] as kept, with the server it came from and when: in memory and, as it is,
+/// [`GATEWAY`] on disk.
 #[derive(Serialize, Deserialize)]
 struct Gateway {
     host: String,
@@ -168,6 +177,7 @@ struct Gateway {
     fetched: i64,
 }
 
+/// One of the gateway's keys, the same in the server's answer and on disk.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GatewayKey {
@@ -350,10 +360,15 @@ impl Core {
             .public_call(flow, Kind::Query, path, json!({}))
             .await
             .map_err(|error| format!("{path}: {}", error.code()))?;
-        let mut gateway: Gateway =
+        let wire: WireGateway =
             serde_json::from_value(body).map_err(|_| format!("{path}: unexpected answer"))?;
-        gateway.server = server.to_string();
-        gateway.fetched = unix_now();
+        let gateway = Gateway {
+            host: wire.host,
+            ports: wire.ports,
+            keys: wire.keys,
+            server: server.to_string(),
+            fetched: unix_now(),
+        };
         self.write_plain(GATEWAY, &gateway);
         info!(
             host = gateway.host.as_str(),

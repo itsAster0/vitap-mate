@@ -401,3 +401,13 @@ fn gateway_answers_parse_once_into_errors() {
         Err(UdpFetchError::Transport(_))
     ));
 }
+
+#[test]
+fn udp_gateway_json_keeps_its_format() {
+    let file = r#"{"host":"gw.example","ports":[3478,3479],"keys":[{"publicKey":"a2V5","from":1,"until":2}],"server":"https://vmate.aster0.dev","fetched":9}"#;
+    let gateway: Gateway = serde_json::from_str(file).unwrap();
+    assert_eq!(serde_json::to_string(&gateway).unwrap(), file);
+    // From before the server and the time were kept.
+    let old: Gateway = serde_json::from_str(r#"{"host":"h","ports":[1],"keys":[]}"#).unwrap();
+    assert!(old.server.is_empty() && old.fetched == 0);
+}

@@ -48,20 +48,7 @@ const PROXY_FILE: &str = "proxy.json";
 /// How long the proxy's URL is used before the server is asked again.
 const PROXY_KEEP_SECS: i64 = 6 * 3600;
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Default,
-    Serialize,
-    Deserialize,
-    uniffi::Enum,
-)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, uniffi::Enum)]
 pub enum Route {
     #[default]
     Direct,
@@ -88,12 +75,47 @@ pub struct RouteStatus {
     pub skipped: Vec<SkippedRoute>,
 }
 
+/// [`FILE`] on disk: `{"route":"server"}`.
 #[derive(Default, Serialize, Deserialize)]
-struct Saved {
-    route: Route,
+struct Stored {
+    route: StoredRoute,
 }
 
-/// The proxy Worker's origin from `proxy:info`, for the server that gave it.
+/// A [`Route`] as [`FILE`] spells it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum StoredRoute {
+    #[default]
+    Direct,
+    Proxy,
+    Server,
+    Udp,
+}
+
+impl From<StoredRoute> for Route {
+    fn from(route: StoredRoute) -> Self {
+        match route {
+            StoredRoute::Direct => Self::Direct,
+            StoredRoute::Proxy => Self::Proxy,
+            StoredRoute::Server => Self::Server,
+            StoredRoute::Udp => Self::Udp,
+        }
+    }
+}
+
+impl From<Route> for StoredRoute {
+    fn from(route: Route) -> Self {
+        match route {
+            Route::Direct => Self::Direct,
+            Route::Proxy => Self::Proxy,
+            Route::Server => Self::Server,
+            Route::Udp => Self::Udp,
+        }
+    }
+}
+
+/// The proxy Worker's origin from `proxy:info`, for the server that gave it: in memory and, as
+/// it is, [`PROXY_FILE`] on disk.
 #[derive(Clone, Serialize, Deserialize)]
 struct ProxyUrl {
     server: String,
@@ -176,7 +198,7 @@ impl Shared {
 
 /// Loads the saved choice; called when the core opens.
 pub(crate) fn load(core: &Core) {
-    let chosen = core.read::<Saved>(FILE).unwrap_or_default().route;
+    let chosen = Route::from(core.read::<Stored>(FILE).unwrap_or_default().route);
     let server = core.forwarding_server();
     info!(?chosen, "route");
     let proxy = core
@@ -249,7 +271,12 @@ impl Core {
     /// Saves the choice; earlier failures are forgotten so it is tried straight away.
     pub fn set_route(&self, flow: String, route: Route) -> Result<(), CoreError> {
         traced_sync("set_route", &flow, || {
-            self.write(FILE, &Saved { route });
+            self.write(
+                FILE,
+                &Stored {
+                    route: route.into(),
+                },
+            );
             self.shared.routes().plan.choose(route);
             info!(?route, "route chosen");
             Ok(())
@@ -699,6 +726,27 @@ mod tests {
 
     use super::*;
     use crate::test_edge::{Edge, serve};
+
+    #[test]
+    fn route_and_proxy_files_keep_their_format() {
+        for (route, file) in [
+            (Route::Direct, r#"{"route":"direct"}"#),
+            (Route::Proxy, r#"{"route":"proxy"}"#),
+            (Route::Server, r#"{"route":"server"}"#),
+            (Route::Udp, r#"{"route":"udp"}"#),
+        ] {
+            let stored = Stored {
+                route: route.into(),
+            };
+            assert_eq!(serde_json::to_string(&stored).unwrap(), file);
+            let read: Stored = serde_json::from_str(file).unwrap();
+            assert_eq!(Route::from(read.route), route);
+        }
+        let proxy =
+            r#"{"server":"https://vmate.aster0.dev","url":"https://proxy.example","fetched":5}"#;
+        let read: ProxyUrl = serde_json::from_str(proxy).unwrap();
+        assert_eq!(serde_json::to_string(&read).unwrap(), proxy);
+    }
 
     /// A signed-in core on `route`, its server the test edge.
     pub(super) async fn core_on(name: &str, route: Route) -> (Core, Arc<Mutex<Edge>>) {

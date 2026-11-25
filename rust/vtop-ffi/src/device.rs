@@ -192,6 +192,20 @@ mod tests {
     }
 
     #[test]
+    fn device_json_keeps_its_format() {
+        let file = r#"{"seed":"c2VlZA","seal_secret":"c2Vj","seal_key":"a2V5","refresh":{"server":"https://vmate.aster0.dev","token":"tok","regno":"22BCE0001"},"push_token":"fcm","clock_offset":-3}"#;
+        let device: Device = serde_json::from_str(file).unwrap();
+        assert_eq!(serde_json::to_string(&device).unwrap(), file);
+        // From before the refresh token, the FCM token and the clock offset.
+        let old: Device =
+            serde_json::from_str(r#"{"seed":"s","seal_secret":"x","seal_key":"k"}"#).unwrap();
+        assert_eq!(
+            serde_json::to_string(&old).unwrap(),
+            r#"{"seed":"s","seal_secret":"x","seal_key":"k","refresh":null,"push_token":null,"clock_offset":0}"#
+        );
+    }
+
+    #[test]
     fn the_device_is_read_once_and_kept_per_core() {
         let dir = dir("kept");
         let core = Core::for_test(&dir);

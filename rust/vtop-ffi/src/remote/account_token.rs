@@ -32,6 +32,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn account_token_json_keeps_its_format() {
+        let file = r#"{"server":"https://vmate.aster0.dev","registration_number":"22BCE0001","token":"tok","expires_at":7}"#;
+        let saved: Saved = serde_json::from_str(file).unwrap();
+        assert_eq!(serde_json::to_string(&saved).unwrap(), file);
+    }
+
+    #[test]
     fn sign_out_drops_the_token() {
         let dir = std::env::temp_dir().join(format!("vtop-ffi-token-out-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
