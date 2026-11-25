@@ -250,7 +250,8 @@ private fun Hero(course: AttendanceCourse) {
                 color = ink.copy(alpha = 0.75f),
             )
         }
-        val (attended, held) = course.sessions
+        val attended = course.sessionsAttended
+        val held = course.sessionsHeld
         val stats = listOf("$attended" to "Attended", "${held - attended}" to "Missed", "$held" to if (course.isLab) "Sessions" else "Classes")
         Row(Modifier.fillMaxWidth().testTag("attendance.detail.stats"), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             stats.forEachIndexed { i, (value, label) ->

@@ -57,9 +57,10 @@ use vtop_core::{VtopClient, VtopError};
 pub use obs::log_event;
 pub use pages::calendar::CalendarKind;
 pub use pages::records::{
-    Attendance, AttendanceCourse, AttendanceDetail, AttendancePlan, AttendedClass, ClassDay,
-    ClassKind, ClassSlot, ClassStatus, CourseOutlook, NextClass, Semester, Semesters, Timetable,
-    TimetableDay,
+    Attendance, AttendanceCourse, AttendanceDetail, AttendancePlan, AttendanceProjection,
+    AttendedClass, ClassDay, ClassKind, ClassSlot, ClassStatus, CourseOutlook, GoalSplit,
+    NextClass, Semester, Semesters, Timetable, TimetableDay, attendance_goal_split,
+    project_attendance,
 };
 pub use store::account::PasswordCipher;
 pub use store::cookies::SharedCookies;

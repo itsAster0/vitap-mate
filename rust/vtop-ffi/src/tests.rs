@@ -285,7 +285,7 @@ fn outlook_plans_every_saved_course() {
     assert_eq!(outlook.len(), 1);
     assert_eq!(outlook[0].key, "MAT1001.theory");
     let plan = &outlook[0].plan;
-    assert_eq!((plan.until.as_str(), plan.upcoming), ("CAT-I", 1));
+    assert_eq!((plan.until.as_deref(), plan.upcoming), (Some("CAT-I"), 1));
     assert_eq!((plan.must_attend, plan.can_miss), (Some(1), 0));
     let _ = fs::remove_dir_all(&dir);
 }

@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 use vtop_core::types::{AttendanceData, FullAttendanceData, TimetableData};
 
-use super::attendance::{counted_total, standing};
+use super::attendance::{counted_total, course_sessions, standing};
 use super::*;
 
 // Cases from test/attendance_standing_test.dart.
@@ -214,7 +214,7 @@ fn plans_count_classes_left_by_the_calendar() {
     let plans = attendance_plans(theory, &slots, &calendar, 20_762, 540, None);
     assert_eq!(plans.len(), 1);
     let plan = &plans[0];
-    assert_eq!((plan.until.as_str(), plan.until_day), ("", 20_772));
+    assert_eq!((plan.until.as_deref(), plan.until_day), (None, 20_772));
     assert_eq!((plan.upcoming, plan.unposted), (2, 0));
     // Today (Thursday 5 Nov) and next Thursday (12 Nov), one class each.
     assert_eq!(
@@ -763,4 +763,218 @@ fn labs_merge_and_slots_sort() {
     assert_eq!((slots[0].day, slots[0].start, slots[0].end), (0, 840, 940));
     assert_eq!(slots[0].slot, "L1+L2");
     assert_eq!((slots[1].day, slots[1].credits), (1, Some(1.0)));
+}
+
+fn synthetic_course(attended: i32, total: i32, counted: i32, kind: ClassKind) -> AttendanceCourse {
+    let lab = kind == ClassKind::Lab;
+    let (sessions_attended, sessions_held, sessions_unposted) =
+        course_sessions(attended, total, counted, lab);
+    AttendanceCourse {
+        key: format!("CSE1001.{}", if lab { "lab" } else { "theory" }),
+        course_id: "AP2026".into(),
+        course_type: if lab { "ELA" } else { "ETH" }.into(),
+        code: "CSE1001".into(),
+        name: "Course".into(),
+        kind,
+        category: "PC".into(),
+        faculty: "Faculty".into(),
+        attended,
+        total,
+        counted,
+        sessions_attended,
+        sessions_held,
+        sessions_unposted,
+        percent: 0.0,
+        safe: true,
+        can_skip: 0,
+        must_attend: 0,
+        advice: String::new(),
+        debarred: false,
+        debar: None,
+        debar_line: None,
+    }
+}
+
+#[test]
+fn project_attendance_handles_no_classes() {
+    let empty = synthetic_course(0, 0, 0, ClassKind::Theory);
+    let p = project_attendance(empty.clone(), 0, 0, 0);
+    assert_eq!(
+        (p.base_percent, p.percent, p.safe, p.attended, p.total),
+        (0.0, 0.0, true, 0, 0)
+    );
+    let missed = project_attendance(empty.clone(), 0, 1, 0);
+    assert_eq!(
+        (missed.percent, missed.safe, missed.attended, missed.total),
+        (0.0, false, 0, 1)
+    );
+    let attended = project_attendance(empty, 1, 0, 0);
+    assert_eq!(
+        (
+            attended.percent,
+            attended.safe,
+            attended.attended,
+            attended.total
+        ),
+        (100.0, true, 1, 1)
+    );
+}
+
+#[test]
+fn project_attendance_checks_seventy_five_boundary() {
+    let p = project_attendance(synthetic_course(3, 4, 4, ClassKind::Theory), 0, 0, 0);
+    assert_eq!((p.percent, p.safe), (75.0, true));
+    let p = project_attendance(synthetic_course(30, 40, 40, ClassKind::Theory), 0, 0, 0);
+    assert_eq!((p.percent, p.safe), (75.0, true));
+    let p = project_attendance(synthetic_course(149, 200, 200, ClassKind::Theory), 0, 0, 0);
+    assert_eq!((p.percent, p.safe), (74.5, false));
+}
+
+#[test]
+fn project_attendance_adds_attended_skipped_and_od() {
+    let two_of_four = synthetic_course(2, 4, 4, ClassKind::Theory);
+    let p = project_attendance(two_of_four.clone(), 4, 0, 0);
+    assert_eq!((p.percent, p.safe, p.attended, p.total), (75.0, true, 6, 8));
+    assert!(!project_attendance(two_of_four.clone(), 3, 0, 0).safe);
+    let nine_of_ten = synthetic_course(9, 10, 10, ClassKind::Theory);
+    let p = project_attendance(nine_of_ten.clone(), 0, 2, 0);
+    assert_eq!((p.percent, p.safe), (75.0, true));
+    assert!(!project_attendance(nine_of_ten, 0, 3, 0).safe);
+    // OD turns an absence present without adding a class.
+    let p = project_attendance(two_of_four.clone(), 0, 0, 1);
+    assert_eq!((p.percent, p.safe, p.attended, p.total), (75.0, true, 3, 4));
+    let p = project_attendance(two_of_four, 1, 1, 0);
+    assert_eq!(
+        (p.percent, p.safe, p.attended, p.total),
+        (50.0, false, 3, 6)
+    );
+}
+
+#[test]
+fn project_attendance_uses_counted_not_total() {
+    let p = project_attendance(synthetic_course(3, 6, 4, ClassKind::Theory), 0, 0, 0);
+    assert_eq!((p.percent, p.safe, p.attended, p.total), (75.0, true, 3, 4));
+}
+
+#[test]
+fn project_attendance_counts_labs_in_two_period_sessions() {
+    let lab = synthetic_course(6, 8, 8, ClassKind::Lab);
+    let p = project_attendance(lab.clone(), 0, 0, 0);
+    assert_eq!((p.percent, p.safe, p.attended, p.total), (75.0, true, 3, 4));
+    let p = project_attendance(lab.clone(), 1, 0, 0);
+    assert_eq!((p.percent, p.safe, p.attended, p.total), (80.0, true, 4, 5));
+    let p = project_attendance(lab.clone(), 0, 1, 0);
+    assert_eq!(
+        (p.percent, p.safe, p.attended, p.total),
+        (60.0, false, 3, 5)
+    );
+    let p = project_attendance(lab, 1, 1, 0);
+    assert_eq!(
+        (p.percent, p.safe, p.attended, p.total),
+        (8.0 * 100.0 / 12.0, false, 4, 6)
+    );
+}
+
+#[test]
+fn sessions_halve_labs_and_round_odd_totals_up() {
+    assert_eq!(course_sessions(5, 7, 7, false), (5, 7, 0));
+    assert_eq!(course_sessions(5, 7, 7, true), (2, 4, 0));
+    assert_eq!(course_sessions(6, 8, 8, true), (3, 4, 0));
+    assert_eq!(course_sessions(0, 0, 0, true), (0, 0, 0));
+    assert_eq!(course_sessions(6, 10, 8, true), (3, 4, 1));
+}
+
+#[test]
+fn goal_split_handles_boundaries_and_out_of_reach() {
+    assert_eq!(
+        attendance_goal_split(75, 0, 0, 0),
+        GoalSplit {
+            must_attend: Some(0),
+            can_miss: 0
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(75, 3, 4, 0),
+        GoalSplit {
+            must_attend: Some(0),
+            can_miss: 0
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(75, 2, 4, 0),
+        GoalSplit {
+            must_attend: None,
+            can_miss: 0
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(75, 30, 40, 20),
+        GoalSplit {
+            must_attend: Some(15),
+            can_miss: 5
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(75, 0, 0, 10),
+        GoalSplit {
+            must_attend: Some(8),
+            can_miss: 2
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(75, 40, 40, 10),
+        GoalSplit {
+            must_attend: Some(0),
+            can_miss: 10
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(90, 30, 40, 10),
+        GoalSplit {
+            must_attend: None,
+            can_miss: 0
+        }
+    );
+    assert_eq!(
+        attendance_goal_split(80, 30, 40, 10),
+        GoalSplit {
+            must_attend: Some(10),
+            can_miss: 0
+        }
+    );
+}
+
+#[test]
+fn goal_split_matches_fewest_classes_to_reach_goal() {
+    for goal in [75, 80, 85, 90] {
+        for held in 0..=14 {
+            for attended in 0..=held {
+                for left in 0..=14 {
+                    let total = held + left;
+                    let fewest = (0..=left).find(|&m| (attended + m) * 100 >= goal * total);
+                    let split = attendance_goal_split(goal, attended, held, left);
+                    assert_eq!(
+                        split.must_attend, fewest,
+                        "goal {goal}, {attended} of {held}, {left} left"
+                    );
+                    assert_eq!(
+                        split.can_miss,
+                        fewest.map_or(0, |m| left - m),
+                        "goal {goal}, {attended} of {held}, {left} left"
+                    );
+                    if goal == 75
+                        && let Some(must) = split.must_attend
+                    {
+                        let p = project_attendance(
+                            synthetic_course(attended, held, held, ClassKind::Theory),
+                            must,
+                            split.can_miss,
+                            0,
+                        );
+                        assert!(p.safe, "goal {goal}, {attended} of {held}, {left} left");
+                    }
+                }
+            }
+        }
+    }
 }

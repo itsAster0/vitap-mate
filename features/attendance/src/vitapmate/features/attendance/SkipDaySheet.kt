@@ -32,6 +32,7 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -51,6 +52,8 @@ import com.composables.icons.lucide.X
 import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
+import vitapmate.core.AttendanceProjection
+import vitapmate.core.projectAttendance
 import vitapmate.observability.Log
 import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
@@ -62,6 +65,8 @@ import vitapmate.ui.nums
 
 /** What a tap on a day marks it as. */
 private enum class Mark { Skip, Attend }
+
+private data class PlannedCourse(val course: AttendanceCourse, val attend: Int, val skip: Int, val projection: AttendanceProjection)
 
 /**
  * "Plan days": the days still to come before each course's next exam (from [outlook]), the next 7
@@ -131,12 +136,15 @@ internal fun SkipDaySheet(courses: List<AttendanceCourse>, outlook: Map<String, 
                 }
                 log("day", mapOf("day" to formatDay(d, "yyyy-MM-dd"), "mark" to if (state == mark) "none" else mark.name.lowercase()))
             }
-            val hit = courses.mapNotNull { course ->
-                val plan = outlook[course.key] ?: return@mapNotNull null
-                val skip = plan.days.filter { it.day in skipped }.sumOf { it.classes }
-                val attend = plan.days.filter { it.day in attended }.sumOf { it.classes }
-                if (skip + attend == 0) null else Triple(course, attend, skip)
-            }.sortedBy { (course, attend, skip) -> course.projected(attend, skip).first }
+            val hit = remember(courses, outlook, skipped, attended) {
+                courses.mapNotNull { course ->
+                    val plan = outlook[course.key] ?: return@mapNotNull null
+                    val skip = plan.days.filter { it.day in skipped }.sumOf { it.classes }
+                    val attend = plan.days.filter { it.day in attended }.sumOf { it.classes }
+                    if (skip + attend == 0) null
+                    else PlannedCourse(course, attend, skip, projectAttendance(course, attend, skip, 0))
+                }.sortedBy { it.projection.percent }
+            }
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(bottom = Space.xl),
@@ -209,11 +217,11 @@ internal fun SkipDaySheet(courses: List<AttendanceCourse>, outlook: Map<String, 
                     return@LazyColumn
                 }
                 // Held but not on VTOP yet: not counted, so the numbers can still move.
-                val behind = hit.count { (course, _, _) -> (outlook[course.key]?.unposted ?: 0) > 0 }
+                val behind = hit.count { (outlook[it.course.key]?.unposted ?: 0) > 0 }
                 if (behind > 0) item("unposted") { UnpostedNote(behind, Modifier.padding(horizontal = Space.lg)) }
                 // Lowest first: the course in most danger leads.
-                items(hit, key = { it.first.key }) { (course, attend, skip) ->
-                    PlanRow(course, attend, skip, outlook[course.key]?.unposted ?: 0, Modifier.padding(horizontal = Space.lg))
+                items(hit, key = { it.course.key }) { row ->
+                    PlanRow(row, outlook[row.course.key]?.unposted ?: 0, Modifier.padding(horizontal = Space.lg))
                 }
                 val others = outlook.size - hit.size
                 if (others > 0) item("others") {
@@ -257,10 +265,13 @@ private fun UnpostedNote(courses: Int, modifier: Modifier = Modifier) {
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PlanRow(course: AttendanceCourse, attend: Int, skip: Int, unposted: Int, modifier: Modifier = Modifier) {
+private fun PlanRow(row: PlannedCourse, unposted: Int, modifier: Modifier = Modifier) {
     val tones = AppTheme.tones
-    val (percent, safe) = course.projected(attend, skip)
-    val tone = if (safe) tones.success else tones.danger
+    val course = row.course
+    val attend = row.attend
+    val skip = row.skip
+    val projection = row.projection
+    val tone = if (projection.safe) tones.success else tones.danger
     val unit = { n: Int -> course.labs(n).ifEmpty { if (n == 1) " class" else " classes" } }
     Row(modifier.fillMaxWidth().testTag("attendance.skip_day.course.${course.key}"), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -276,9 +287,9 @@ private fun PlanRow(course: AttendanceCourse, attend: Int, skip: Int, unposted: 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text("${percentText(course.projected(0, 0).first)}% → ", style = MaterialTheme.typography.labelLarge.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${percentText(projection.basePercent)}% → ", style = MaterialTheme.typography.labelLarge.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            "${percentText(percent)}%",
+            "${percentText(projection.percent)}%",
             Modifier.background(tone.subtle, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelLargeEmphasized.nums(),
             color = tone.onSubtle,

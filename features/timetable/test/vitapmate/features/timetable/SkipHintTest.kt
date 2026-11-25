@@ -8,7 +8,7 @@ import vitapmate.core.ClassKind
 class SkipHintTest {
     private fun course(safe: Boolean, canSkip: Int, mustAttend: Int) = AttendanceCourse(
         "CSE1001.theory", "AP2026", "ETH", "CSE1001", "Course", ClassKind.THEORY, "PC", "Faculty",
-        0, 0, 0, 0.0, safe, canSkip, mustAttend, "", false, null, null,
+        0, 0, 0, 0, 0, 0, 0.0, safe, canSkip, mustAttend, "", false, null, null,
     )
 
     @Test

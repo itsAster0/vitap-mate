@@ -79,7 +79,8 @@ internal fun CourseCard(
     // The chip is what VTOP's count allows right now; the outlook counts till the exam or the end.
     val advice = course.advice(showSkipAdvice)
     val name = course.name.ifBlank { course.code }
-    val (attended, held) = course.sessions
+    val attended = course.sessionsAttended
+    val held = course.sessionsHeld
     val debarLine = course.debarLine
     SectionCard(
         modifier.fillMaxWidth()

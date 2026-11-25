@@ -43,14 +43,6 @@ internal val AttendanceCourse.isLab get() = kind == ClassKind.LAB
 internal val AttendanceCourse.percentLabel get() = if (total == 0) "–" else "${percent.roundToInt()}%"
 
 /**
- * Attended and held, as VTOP's percentage counts them (`counted` leaves out classes not posted
- * yet); labs in two-slot sessions, which VTOP counts twice (an odd total rounds up, an odd
- * attended count down), like Rust's standing.
- */
-internal val AttendanceCourse.sessions: Pair<Int, Int>
-    get() = if (isLab) attended / 2 to (counted + 1) / 2 else attended to counted
-
-/**
  * The short advice, or null when there is none to give. "Can skip" and "Don't skip" show only
  * with [showSkip] (Settings → skip advice); "Attend N" always shows.
  */
@@ -63,19 +55,6 @@ internal fun AttendanceCourse.advice(showSkip: Boolean): String? = when {
 
 /** " lab" / " labs" after a count for labs, which count in sessions; nothing for theory. */
 internal fun AttendanceCourse.labs(n: Int) = if (!isLab) "" else if (n == 1) " lab" else " labs"
-
-/**
- * The exact percentage, not rounded, after attending [attend] and missing [skip] more classes
- * (sessions for labs, each two of VTOP's periods), with [od] absences turned to present by on-duty
- * approvals still to come, and whether it is still at 75% or above.
- */
-internal fun AttendanceCourse.projected(attend: Int, skip: Int, od: Int = 0): Pair<Double, Boolean> {
-    val unit = if (isLab) 2 else 1
-    val total = counted + unit * (attend + skip)
-    if (total == 0) return 0.0 to true
-    val attended = attended + unit * (attend + od)
-    return attended * 100.0 / total to (attended * 4 >= total * 3)
-}
 
 /** [percent] to one decimal, cut rather than rounded so 74.96 never reads 75: "74.9", "75". */
 internal fun percentText(percent: Double): String {

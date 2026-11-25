@@ -183,7 +183,7 @@ object LiveUpdates {
         val ms = System.currentTimeMillis()
         val now = istMinute(ms)
         fun slot(start: Int, name: String, block: String, room: String, code: String) = ClassSlot(0, start, start + 50, "", name, ClassKind.THEORY, room, block, code, "", null)
-        val risky = AttendanceCourse("A1.theory", "", "", "A1", "Data Structures", ClassKind.THEORY, "", "", 30, 41, 41, 73.2, false, 0, 3, "Attend 3", false, null, null)
+        val risky = AttendanceCourse("A1.theory", "", "", "A1", "Data Structures", ClassKind.THEORY, "", "", 30, 41, 41, 30, 41, 0, 73.2, false, 0, 3, "Attend 3", false, null, null)
         post(app, manager, slot(now - 25, "Data Structures", "AB1", "204", "A1"), true, now - 25, now + 25, slot(now + 35, "Operating Systems", "CB", "312", "B1"), risky, ms, now)
         val paper = ScheduledPaper("B1.theory", "B1", "Operating Systems", ClassKind.THEORY, "ETH", "B1", null, now + 20, now + 110, now + 5, "FN", "AB1-204", "R6 · C6", "36")
         postExam(app, manager, Paper("CAT-II", paper, now + 20, now + 110), ms, now)

@@ -51,6 +51,7 @@ import vitapmate.core.PlanDay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -64,6 +65,8 @@ import kotlin.math.floor
 import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
+import vitapmate.core.attendanceGoalSplit
+import vitapmate.core.projectAttendance
 import vitapmate.observability.Log
 import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
@@ -117,17 +120,18 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
     ) {
         item("whatif") {
             val reset = attending > 0 || missing > 0 || od > 0
-            val (percent, safe) = course.projected(attending, missing, od)
-            val shown = percentText(percent)
+            val projection = remember(course, attending, missing, od) { projectAttendance(course, attending, missing, od) }
+            val shown = percentText(projection.percent)
             // The change between the two figures as shown, so "+1.7" matches 74.3 → 76.
-            val delta = shown.toDouble() - percentText(course.projected(0, 0).first).toDouble()
-            val tone = if (safe) tones.success else tones.danger
+            val delta = shown.toDouble() - percentText(projection.basePercent).toDouble()
+            val tone = if (projection.safe) tones.success else tones.danger
             val card = AppTheme.colors.card
             // The card takes the tone the what-if lands in; neutral while nothing is changed.
             val fill = if (reset) tone.subtle else card
             val ink = if (reset) tone.onSubtle else MaterialTheme.colorScheme.onSurface
-            val (attended, counted) = course.sessions
-            val unposted = if (course.isLab) (course.total + 1) / 2 - counted else course.total - counted
+            val attended = course.sessionsAttended
+            val counted = course.sessionsHeld
+            val unposted = course.sessionsUnposted
             Column(Modifier.fillMaxWidth().background(fill, RoundedCornerShape(32.dp)).padding(6.dp)) {
                 Column(Modifier.padding(start = Space.md, end = Space.md, top = Space.xs, bottom = Space.lg)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -166,7 +170,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                         Spacer(Modifier.weight(1f))
                         if (reset) {
                             Text(
-                                "${attended + attending + od} of ${counted + attending + missing}",
+                                "${projection.attended} of ${projection.total}",
                                 Modifier.padding(bottom = Space.sm),
                                 style = MaterialTheme.typography.titleSmall.nums(),
                                 fontWeight = FontWeight.SemiBold,
@@ -175,7 +179,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                         }
                     }
                     AttendanceLine(
-                        percent,
+                        projection.percent,
                         tone.base,
                         Modifier.padding(top = Space.lg),
                         thickness = 14.dp,
@@ -215,7 +219,9 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
             val shown = target.coerceIn(0, plans.lastIndex)
             val plan = plans[shown]
             val left = plan.upcoming + plan.unposted
-            val (must, canMiss) = goalSplit(goal, plan.attended, plan.held, left)
+            val split = remember(goal, plan.attended, plan.held, left) { attendanceGoalSplit(goal, plan.attended, plan.held, left) }
+            val must = split.mustAttend
+            val canMiss = split.canMiss
             SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calc.plan"), title = "To finish at $goal%", shape = MaterialTheme.shapes.extraLargeIncreased) {
                 ConnectedChoice(
                     GOALS,
@@ -230,10 +236,10 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                     ConnectedChoice(
                         plans.indices.toList(),
                         shown,
-                        { i -> target = i; log("target", mapOf("until" to plans[i].until.ifEmpty { "end" })) },
+                        { i -> target = i; log("target", mapOf("until" to (plans[i].until ?: "end"))) },
                         tag = "attendance.detail.calc.until",
-                        key = { plans[it].until.ifEmpty { "end" } },
-                        label = { plans[it].until.ifEmpty { null }?.let { exam -> "Till $exam" } ?: "Semester end" },
+                        key = { plans[it].until ?: "end" },
+                        label = { plans[it].until?.let { exam -> "Till $exam" } ?: "Semester end" },
                         modifier = Modifier.padding(bottom = Space.lg),
                     )
                 }
@@ -284,17 +290,6 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
 
 /** The finishing targets on offer; VTOP's line is 75%. */
 private val GOALS = listOf(75, 80, 85, 90)
-
-/**
- * To finish at [goal]% with [attended] of [held] and [left] still to come: the classes that must
- * be attended (null when attending all of them still falls short) and the ones that can be
- * missed. Strict arithmetic at the chosen goal, like Rust's 75% plan.
- */
-internal fun goalSplit(goal: Int, attended: Int, held: Int, left: Int): Pair<Int?, Int> {
-    val total = held + left
-    val need = ((goal * total - 100 * attended + 99).floorDiv(100)).coerceAtLeast(0)
-    return need.takeIf { it <= left } to (left - need).coerceIn(0, left)
-}
 
 /**
  * The classes left as a strip of cells: the first [must] filled in [tone] (to attend), the rest

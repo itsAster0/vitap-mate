@@ -1056,6 +1056,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_general_return_last_day(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_func_attendance_goal_split(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_project_attendance(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_func_default_server(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_pair_code(
@@ -1799,6 +1803,10 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_general_return_last_day(`day`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_vtop_ffi_fn_func_attendance_goal_split(`goal`: Int,`attended`: Int,`held`: Int,`left`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_project_attendance(`course`: RustBuffer.ByValue,`attend`: Int,`skip`: Int,`od`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_default_server(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_pair_code(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1951,6 +1959,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_general_return_last_day() and 0xFFFF) != 52181) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_attendance_goal_split() and 0xFFFF) != 17514) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_project_attendance() and 0xFFFF) != 3284) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_default_server() and 0xFFFF) != 56080) {
@@ -12017,6 +12031,16 @@ data class AttendanceCourse (
     val `counted`: kotlin.Int
     , 
     /**
+     * Attended, held and not-posted counts in sessions (labs halved, matching
+     * VTOP's percentage and [`AttendancePlan`]).
+     */
+    val `sessionsAttended`: kotlin.Int
+    , 
+    val `sessionsHeld`: kotlin.Int
+    , 
+    val `sessionsUnposted`: kotlin.Int
+    , 
+    /**
      * VTOP's rounded figure when it sends one, else computed.
      */
     val `percent`: kotlin.Double
@@ -12071,6 +12095,9 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
             FfiConverterDouble.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterInt.read(buf),
@@ -12094,6 +12121,9 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterInt.allocationSize(value.`attended`) +
             FfiConverterInt.allocationSize(value.`total`) +
             FfiConverterInt.allocationSize(value.`counted`) +
+            FfiConverterInt.allocationSize(value.`sessionsAttended`) +
+            FfiConverterInt.allocationSize(value.`sessionsHeld`) +
+            FfiConverterInt.allocationSize(value.`sessionsUnposted`) +
             FfiConverterDouble.allocationSize(value.`percent`) +
             FfiConverterBoolean.allocationSize(value.`safe`) +
             FfiConverterInt.allocationSize(value.`canSkip`) +
@@ -12116,6 +12146,9 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterInt.write(value.`attended`, buf)
             FfiConverterInt.write(value.`total`, buf)
             FfiConverterInt.write(value.`counted`, buf)
+            FfiConverterInt.write(value.`sessionsAttended`, buf)
+            FfiConverterInt.write(value.`sessionsHeld`, buf)
+            FfiConverterInt.write(value.`sessionsUnposted`, buf)
             FfiConverterDouble.write(value.`percent`, buf)
             FfiConverterBoolean.write(value.`safe`, buf)
             FfiConverterInt.write(value.`canSkip`, buf)
@@ -12234,9 +12267,9 @@ public object FfiConverterTypeAttendanceDetail: FfiConverterRustBuffer<Attendanc
  */
 data class AttendancePlan (
     /**
-     * The exam's name ("CAT-II", "FAT"), or empty for the semester's end.
+     * The exam's name ("CAT-II", "FAT"), or none for the semester's end.
      */
-    val `until`: kotlin.String
+    val `until`: kotlin.String?
     , 
     /**
      * The day counting stops before (the exam's first day, or the day after
@@ -12297,7 +12330,7 @@ data class AttendancePlan (
 public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendancePlan> {
     override fun read(buf: ByteBuffer): AttendancePlan {
         return AttendancePlan(
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
@@ -12311,7 +12344,7 @@ public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendanceP
     }
 
     override fun allocationSize(value: AttendancePlan) = (
-            FfiConverterString.allocationSize(value.`until`) +
+            FfiConverterOptionalString.allocationSize(value.`until`) +
             FfiConverterInt.allocationSize(value.`untilDay`) +
             FfiConverterInt.allocationSize(value.`attended`) +
             FfiConverterInt.allocationSize(value.`held`) +
@@ -12324,7 +12357,7 @@ public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendanceP
     )
 
     override fun write(value: AttendancePlan, buf: ByteBuffer) {
-            FfiConverterString.write(value.`until`, buf)
+            FfiConverterOptionalString.write(value.`until`, buf)
             FfiConverterInt.write(value.`untilDay`, buf)
             FfiConverterInt.write(value.`attended`, buf)
             FfiConverterInt.write(value.`held`, buf)
@@ -12334,6 +12367,77 @@ public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendanceP
             FfiConverterOptionalInt.write(value.`mustAttend`, buf)
             FfiConverterDouble.write(value.`bestPercent`, buf)
             FfiConverterSequenceTypePlanDay.write(value.`days`, buf)
+    }
+}
+
+
+
+/**
+ * Projected attendance after hypothetical attended, skipped and on-duty classes.
+ */
+data class AttendanceProjection (
+    /**
+     * Exact percentage before any hypothetical changes (0 when no classes).
+     */
+    val `basePercent`: kotlin.Double
+    , 
+    /**
+     * Exact percentage after the hypothetical changes (0 when no classes).
+     */
+    val `percent`: kotlin.Double
+    , 
+    /**
+     * Whether the projected standing meets the 75% threshold.
+     */
+    val `safe`: kotlin.Boolean
+    , 
+    /**
+     * Projected attended count (in sessions for labs).
+     */
+    val `attended`: kotlin.Int
+    , 
+    /**
+     * Projected held count (in sessions for labs).
+     */
+    val `total`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAttendanceProjection: FfiConverterRustBuffer<AttendanceProjection> {
+    override fun read(buf: ByteBuffer): AttendanceProjection {
+        return AttendanceProjection(
+            FfiConverterDouble.read(buf),
+            FfiConverterDouble.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AttendanceProjection) = (
+            FfiConverterDouble.allocationSize(value.`basePercent`) +
+            FfiConverterDouble.allocationSize(value.`percent`) +
+            FfiConverterBoolean.allocationSize(value.`safe`) +
+            FfiConverterInt.allocationSize(value.`attended`) +
+            FfiConverterInt.allocationSize(value.`total`)
+    )
+
+    override fun write(value: AttendanceProjection, buf: ByteBuffer) {
+            FfiConverterDouble.write(value.`basePercent`, buf)
+            FfiConverterDouble.write(value.`percent`, buf)
+            FfiConverterBoolean.write(value.`safe`, buf)
+            FfiConverterInt.write(value.`attended`, buf)
+            FfiConverterInt.write(value.`total`, buf)
     }
 }
 
@@ -14496,6 +14600,53 @@ public object FfiConverterTypeGmailGrant: FfiConverterRustBuffer<GmailGrant> {
             FfiConverterString.write(value.`clientId`, buf)
             FfiConverterOptionalString.write(value.`clientSecret`, buf)
             FfiConverterBoolean.write(value.`deleteAfterReading`, buf)
+    }
+}
+
+
+
+/**
+ * How remaining classes split into must-attend and can-miss for a target percentage.
+ */
+data class GoalSplit (
+    /**
+     * Classes that must be attended to reach the goal; none when attending all still falls short.
+     */
+    val `mustAttend`: kotlin.Int?
+    , 
+    /**
+     * Classes that can be missed while still reaching the goal.
+     */
+    val `canMiss`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeGoalSplit: FfiConverterRustBuffer<GoalSplit> {
+    override fun read(buf: ByteBuffer): GoalSplit {
+        return GoalSplit(
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: GoalSplit) = (
+            FfiConverterOptionalInt.allocationSize(value.`mustAttend`) +
+            FfiConverterInt.allocationSize(value.`canMiss`)
+    )
+
+    override fun write(value: GoalSplit, buf: ByteBuffer) {
+            FfiConverterOptionalInt.write(value.`mustAttend`, buf)
+            FfiConverterInt.write(value.`canMiss`, buf)
     }
 }
 
@@ -26304,6 +26455,44 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
         
         FfiConverterInt.lower(`day`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * To finish at `goal`% with `attended` of `held` and `left` still to come:
+         * how many must be attended (none when attending all still falls short) and
+         * how many can be missed. Strict arithmetic at the chosen goal.
+         */ fun `attendanceGoalSplit`(`goal`: kotlin.Int, `attended`: kotlin.Int, `held`: kotlin.Int, `left`: kotlin.Int): GoalSplit {
+            return FfiConverterTypeGoalSplit.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_attendance_goal_split(
+    
+        
+        FfiConverterInt.lower(`goal`),
+        FfiConverterInt.lower(`attended`),
+        FfiConverterInt.lower(`held`),
+        FfiConverterInt.lower(`left`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Exact attendance percentage (not VTOP's rounded figure) and 75% standing
+         * after attending `attend`, missing `skip`, and turning `od` absences into
+         * present (sessions for labs).
+         */ fun `projectAttendance`(`course`: AttendanceCourse, `attend`: kotlin.Int, `skip`: kotlin.Int, `od`: kotlin.Int): AttendanceProjection {
+            return FfiConverterTypeAttendanceProjection.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_project_attendance(
+    
+        
+        FfiConverterTypeAttendanceCourse.lower(`course`),
+        FfiConverterInt.lower(`attend`),
+        FfiConverterInt.lower(`skip`),
+        FfiConverterInt.lower(`od`),_status)
 }
     )
     }

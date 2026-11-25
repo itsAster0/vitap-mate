@@ -6,6 +6,7 @@ use vtop_core::types as raw;
 mod attendance;
 mod timetable;
 
+pub use attendance::{attendance_goal_split, project_attendance};
 pub(crate) use attendance::{
     attendance_plans, counted_through, fill_posted, history_day, history_in_sync, longest_run,
 };
@@ -113,6 +114,11 @@ pub struct AttendanceCourse {
     /// but not posted yet, which VTOP's total counts and its percentage does
     /// not.
     pub counted: i32,
+    /// Attended, held and not-posted counts in sessions (labs halved, matching
+    /// VTOP's percentage and [`AttendancePlan`]).
+    pub sessions_attended: i32,
+    pub sessions_held: i32,
+    pub sessions_unposted: i32,
     /// VTOP's rounded figure when it sends one, else computed.
     pub percent: f64,
     pub safe: bool,
@@ -175,8 +181,8 @@ pub struct CourseOutlook {
 /// course; labs in sessions. From the saved timetable and academic calendar.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct AttendancePlan {
-    /// The exam's name ("CAT-II", "FAT"), or empty for the semester's end.
-    pub until: String,
+    /// The exam's name ("CAT-II", "FAT"), or none for the semester's end.
+    pub until: Option<String>,
     /// The day counting stops before (the exam's first day, or the day after
     /// the last class day).
     pub until_day: i32,
@@ -196,6 +202,30 @@ pub struct AttendancePlan {
     pub best_percent: f64,
     /// The days of `upcoming`, oldest first, with how many classes each holds.
     pub days: Vec<PlanDay>,
+}
+
+/// Projected attendance after hypothetical attended, skipped and on-duty classes.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct AttendanceProjection {
+    /// Exact percentage before any hypothetical changes (0 when no classes).
+    pub base_percent: f64,
+    /// Exact percentage after the hypothetical changes (0 when no classes).
+    pub percent: f64,
+    /// Whether the projected standing meets the 75% threshold.
+    pub safe: bool,
+    /// Projected attended count (in sessions for labs).
+    pub attended: i32,
+    /// Projected held count (in sessions for labs).
+    pub total: i32,
+}
+
+/// How remaining classes split into must-attend and can-miss for a target percentage.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct GoalSplit {
+    /// Classes that must be attended to reach the goal; none when attending all still falls short.
+    pub must_attend: Option<i32>,
+    /// Classes that can be missed while still reaching the goal.
+    pub can_miss: i32,
 }
 
 /// A day still to come with classes of the course (sessions for labs).

@@ -74,7 +74,7 @@ internal fun OutlookLine(course: AttendanceCourse, plan: AttendancePlan, showSki
     val scheme = MaterialTheme.colorScheme
     val left = plan.upcoming + plan.unposted
     val must = plan.mustAttend
-    val until = if (plan.until.isEmpty()) "left" else "left till ${plan.until}"
+    val until = plan.until?.let { "left till $it" } ?: "left"
     val spare = when {
         !showSkip -> null
         must == null -> null to "short of 75%"
@@ -90,7 +90,7 @@ internal fun OutlookLine(course: AttendanceCourse, plan: AttendancePlan, showSki
             spare?.let { (n, what) -> listOfNotNull(n, what).joinToString(" ") },
             "$best max",
         ).joinToString("  ·  ")
-        plan.until.isEmpty() -> "No classes left this semester"
+        plan.until == null -> "No classes left this semester"
         else -> "No classes before ${plan.until}"
     }
     Row(

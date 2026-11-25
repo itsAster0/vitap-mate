@@ -330,7 +330,7 @@ abstract class AssistantFunctions : AppFunctionService() {
             val a = courses[o.key]
             val p = o.plan
             AssistantAttendancePlan(
-                a?.name.orEmpty(), a?.code ?: o.key.substringBefore('.'), o.key.endsWith(".lab"), p.until, formatDay(p.untilDay, "yyyy-MM-dd"),
+                a?.name.orEmpty(), a?.code ?: o.key.substringBefore('.'), o.key.endsWith(".lab"), p.until.orEmpty(), formatDay(p.untilDay, "yyyy-MM-dd"),
                 p.attended, p.held, p.upcoming, p.unposted, p.canMiss, p.mustAttend, p.bestPercent, a?.advice.orEmpty(), a?.debarred == true,
             )
         }
