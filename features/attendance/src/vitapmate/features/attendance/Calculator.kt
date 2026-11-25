@@ -17,6 +17,7 @@ import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Check
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import vitapmate.ui.connected
 import vitapmate.ui.formatDay
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.FilterChip

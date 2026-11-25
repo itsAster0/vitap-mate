@@ -36,6 +36,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.IconButton
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
+import vitapmate.ui.connected
 import vitapmate.ui.nums
 import vitapmate.ui.rememberHaptics
 

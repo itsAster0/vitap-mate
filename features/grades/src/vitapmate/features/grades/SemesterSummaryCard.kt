@@ -31,6 +31,7 @@ import vitapmate.core.GradeCourse
 import vitapmate.core.SemesterSummary
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
+import vitapmate.ui.connected
 import vitapmate.ui.nums
 import vitapmate.ui.tappable
 

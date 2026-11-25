@@ -65,6 +65,7 @@ import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.KindChip
 import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
+import vitapmate.ui.connected
 import vitapmate.ui.nums
 import vitapmate.ui.rememberSyncedPager
 

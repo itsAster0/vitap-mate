@@ -43,6 +43,7 @@ import vitapmate.data.attempt
 import vitapmate.observability.flow
 import vitapmate.ui.Space
 import vitapmate.ui.Tone
+import vitapmate.ui.connected
 import vitapmate.ui.nums
 
 /**

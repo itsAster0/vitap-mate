@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
+import vitapmate.ui.connected
 import vitapmate.ui.nums
 
 /**

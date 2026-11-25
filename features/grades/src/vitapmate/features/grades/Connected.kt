@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
@@ -16,18 +15,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Radii
 import vitapmate.ui.Space
-
-/** Item [i] of [count] joined in a row (or a column with [vertical]): [outer] corners at the ends, [inner] between. */
-internal fun connected(i: Int, count: Int, outer: Dp, inner: Dp, vertical: Boolean = false): RoundedCornerShape {
-    val start = if (i == 0) outer else inner
-    val end = if (i == count - 1) outer else inner
-    return if (vertical) RoundedCornerShape(start, start, end, end) else RoundedCornerShape(start, end, end, start)
-}
+import vitapmate.ui.connected
 
 /** Card [i] of [count] in a segmented list: 28 dp at the run's ends, 6 dp between (with 3 dp gaps). */
 internal fun segment(i: Int, count: Int): Shape = connected(i, count, 28.dp, 6.dp, vertical = true)

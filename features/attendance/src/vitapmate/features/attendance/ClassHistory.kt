@@ -37,6 +37,7 @@ import vitapmate.ui.Space
 import vitapmate.ui.StatusChip
 import vitapmate.ui.Tone
 import vitapmate.ui.clock
+import vitapmate.ui.connected
 import vitapmate.ui.formatDay
 import vitapmate.ui.is24Hour
 import vitapmate.ui.nums

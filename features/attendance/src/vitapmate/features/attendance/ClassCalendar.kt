@@ -51,6 +51,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
 import vitapmate.ui.Tone
+import vitapmate.ui.connected
 import vitapmate.ui.formatDay
 import vitapmate.ui.isoWeekday
 import vitapmate.ui.nums
