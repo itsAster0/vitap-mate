@@ -11,15 +11,15 @@ convex/schema.ts        every table; regno only on accounts, the rest link by ac
 convex/auth.config.ts   customJwt provider (PUBLIC_URL + JWT_PUBLIC_JWK)
 convex/convex.config.ts Convex app config (@convex-dev/rate-limiter)
 convex/auth.ts          TLSNotary tickets (taken and judged by vtop-verifier over /internal/proof-*), auth:token (24 h JWT + non-expiring rotating refresh chain), signOut
-convex/account.ts       account:view and the account's settings, phones, sign-ins, delete
+convex/account.ts       account:view, account:signIns and the account's settings (cacheSession off by default), phones, sign-ins, delete
 convex/app.ts           app:status, app:sessionClear, app:login and app:loginResult (live)
 convex/logins.ts        server sign-ins as scheduled engine steps: the OTP mail resumes them
-convex/screen.ts        screen:view, the Server screen's one live read
+convex/screen.ts        screen:view, the Server screen's one live read (kept for older apps)
 convex/proxy.ts         proxy:info, the Proxy route's Worker (PROXY_URL)
 convex/pair.ts          pair:info and pairing a browser or AI app
 convex/devices.ts       the install itself
-convex/sessions.ts      key holders' session requests, sessions:pending and sessions:answer
-convex/keys.ts          access keys for the extension and MCP
+convex/sessions.ts      key holders' session requests, sessions:pending, sessions:answer, sessions:scrubRequest (30 s cookie scrub when storage off), sessions:evictMcpCache
+convex/keys.ts          access keys for the extension and MCP (revoking evicts MCP RAM cache)
 convex/extension.ts     the extension's live queries (extension:key, request, pairing)
 convex/guides.ts        public queries serving guides/*.json
 convex/identity.ts      internal caller check for actions

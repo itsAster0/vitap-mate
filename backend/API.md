@@ -62,14 +62,14 @@ CORS (`ALLOWED_ORIGINS`, empty allows `*`; methods `GET, POST, DELETE, OPTIONS`;
 headers `Content-Type, Authorization`) and answer `OPTIONS` with `204`. Invalid
 keys return `401 key_unknown`. `x-vtop-client: mcp` tags MCP key usage.
 
-- **`GET /v1/whoami`** → `{ registrationNumber, keyLabel, keyCreatedAt, keyLastUsedAt, keyOutings, semesterId, settings, phoneLinked, phone: { label, notifications } | null, savedCredentials, vaultSavedAt, credentialsRejectedAt, cachedSession }`.
+- **`GET /v1/whoami`** → `{ registrationNumber, keyLabel, keyCreatedAt, keyLastUsedAt, keyOutings, semesterId, settings: { cacheSession, alwaysUseVault, phoneWaitSecs, vaultTtlSecs }, phoneLinked, phone: { label, notifications } | null, savedCredentials, vaultSavedAt, credentialsRejectedAt, cachedSession }`.
 - **`POST /v1/session`** (`cache-control: no-store`) →
-  - `200 { status: "ready", session: { cookies }, cookies: [Cookie-Editor], source: { from, cached, madeAt } }` when the cached session still validates on VTOP;
-  - `202 { status: "pending", stage: "starting" | "phone" | "server", serverDueAt, requestId, pollAfterMs, expiresAt }` with `retry-after: 2` when a new or in-flight request is opened/joined;
+  - `200 { status: "ready", session: { cookies }, cookies: [Cookie-Editor], source: { from, cached, madeAt }, cacheable }` when `settings.cacheSession` is on and the cached session still validates on VTOP (`cacheable: true`);
+  - `202 { status: "pending", stage: "starting" | "phone" | "server", serverDueAt, pushSent, requestId, pollAfterMs, expiresAt }` with `retry-after: 2` when a new or in-flight request is opened/joined;
   - `429 rate_limited` (`retry-after: 60`) past 60 calls/min per account.
 - **`GET /v1/session/requests/{id}`** (`cache-control: no-store`) →
-  - `202 { status: "pending", stage, serverDueAt }`,
-  - `200 { status: "ready", session, cookies, source }`,
+  - `202 { status: "pending", stage, serverDueAt, pushSent }`,
+  - `200 { status: "ready", session, cookies, source, cacheable }` (`cacheable` mirrors `settings.cacheSession`; when `false`, the request's cookies are scrubbed 30 s after completion and later polls return `410 request_expired`),
   - `200 { status: "error", code, error }`,
   - `404 request_not_found`, or `410 request_expired`.
 - **`POST /v1/session/expire`** → `204`.
@@ -77,10 +77,12 @@ keys return `401 key_unknown`. `x-vtop-client: mcp` tags MCP key usage.
 - **`POST /v1/pair`** (`cache-control: no-store`, per-IP + global rate limit) → `{ code }` (10-char Crockford base32, dashes/spaces/case ignored) → `202 { status: "pending", pollAfterMs }` or `200 { status: "ready", key }` (handed out once); `400 bad_request`, `429 rate_limited`.
 
 **Extension live queries.** With the key JWT from `/v1/key/token`, the extension
-subscribes over Convex to `extension:key` (live account view, `null` when
-revoked), `extension:request({ requestId })` (live progress and server sign-in
-step, never cookies), and `extension:pairing({ codeHash })` (`{ ready }`, no
-auth). Cookies and paired keys still transfer once over HTTPS.
+subscribes over Convex to `extension:key` (live account view including
+`settings.cacheSession`, `null` when revoked), `extension:request({ requestId })`
+(live progress including `pushSent` and server sign-in step, never cookies;
+returns `not_found` after expiry or 30 s scrub), and
+`extension:pairing({ codeHash })` (`{ ready }`, no auth). Cookies and paired
+keys still transfer once over HTTPS.
 
 ## OAuth 2.1 for MCP clients
 
@@ -142,12 +144,18 @@ readable as Convex queries (`guides:updates`, `guides:forwarding`, `guides:demo`
 ## Convex functions (phones & extension)
 
 Phones talk to Convex over `/api/*` using signed `vm1` calls (`auth:proveStart`,
-`auth:token`, `vtop:login*`) or their ES256 access JWT (`account:*`, `app:*`,
-`auth:signOut`, `devices:*`, `keys:*`, `mail:*`, `pair:info`, `screen:view`,
-`sessions:*`, `vtop:fetch*`), plus public queries (`guides:*`, `proxy:info`,
-`udp:keys`). TLSNotary account proofs connect to `wss://vmate.aster0.dev/proof?ticket=`
-(routed by hawk's Caddy directly to `rust/vtop-verifier`, falling back to the
-standby verifier on nest).
+`auth:token`, `vtop:login*`) or their ES256 access JWT (`account:view`,
+`account:signIns`, `account:setSettings`, `account:saveCredentials`,
+`account:forgetCredentials`, `account:setSemester`, `account:removeDevice`,
+`account:clearSignIns`, `account:remove`, `app:*`, `auth:signOut`, `devices:*`,
+`keys:*`, `mail:*`, `pair:info`, `screen:view`, `sessions:*`, `vtop:fetch*`),
+plus public queries (`guides:*`, `proxy:info`, `udp:keys`). `account:view`
+includes `sessionSavedAt`, `sessionSource`, `vaultExpiresAt` and
+`settings.cacheSession` (`false` by default for new accounts; missing on legacy
+rows reads as `sealedVault !== null`); `sessions:pending` reports `pushSent` per
+request and always sets `wantCredentials: false`. TLSNotary account proofs
+connect to `wss://vmate.aster0.dev/proof?ticket=` (routed by hawk's Caddy
+directly to `rust/vtop-verifier`, falling back to the standby verifier on nest).
 
 ## Convex → engine (`rust/vtop-bridge`)
 
@@ -158,9 +166,10 @@ with `GATEWAY_TOKEN`.
 
 | Route | Purpose |
 |---|---|
-| `POST /engine/session` | Validate cookies or a sealed session (`{ cookies }` or `{ sealedSession, account }`) → `SessionChecked`. |
+| `POST /engine/session` | Validate cookies or a sealed session (`{ cookies, seal? }` or `{ sealedSession, account, seal? }`, `seal` defaults `true`; `seal: false` omits `sealedSession`) → `SessionChecked`. |
 | `POST /engine/seal` | Seal saved credentials (`SealVault`) under `VAULT_KEY` → `{ sealedVault }`. |
 | `POST /engine/login` | One step of server sign-in: `{ account, sealedVault, forwarding }` or `{ account, sealedState, otp }` → tagged `LoginStepped` (`ok`, `otp_needed`, `invalid_credentials`, `vault_unusable`, `forwarding_required`, `gmail_revoked`, `failed` with optional `code` + `reason`). |
+| `POST /engine/mcp/evict` | Evict the MCP server's in-memory session and key caches for `{ keyHashes: [sha256Hex] }` → `{ evicted }`. Called when storage turns off, a session is cleared, a key is revoked, or an account is deleted. |
 | `POST /engine/owner-hash` | `{ registrationNumber }` → `{ ownerHash }` (keyed by `VAULT_KEY`). |
 | `POST /engine/fetch`, `/engine/fetch-batch` | Fetch one or 1–16 pages on a phone's session (JSON or `application/vnd.vmate.page+br`). |
 | `POST /engine/vtop-login`, `…/otp`, `…/resend` | Server-route sign-in for a phone. |
