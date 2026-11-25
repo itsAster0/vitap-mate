@@ -81,6 +81,10 @@
         {
           "text": "Account has your server account: sharing your registration number, linked phones, signing out everywhere and deleting the account. The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps.",
           "since": 3002100
+        },
+        {
+          "text": "Swipe the week strip on the timetable to see next week, or the weeks after.",
+          "since": 3002100
         }
       ]
     }
