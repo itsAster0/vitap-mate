@@ -1,6 +1,5 @@
 package vitapmate
 
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.History
 import androidx.compose.animation.AnimatedContent

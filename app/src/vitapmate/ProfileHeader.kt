@@ -1,6 +1,5 @@
 package vitapmate
 
-import androidx.compose.runtime.collectAsState
 import vitapmate.data.AccountWatch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

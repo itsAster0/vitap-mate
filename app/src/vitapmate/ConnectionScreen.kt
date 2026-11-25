@@ -104,8 +104,8 @@ fun ConnectionScreen() {
         status = orNull { coreFlow("connection.status") { c, f -> c.routeStatus(f) } }
     }
     // Read again after each VTOP run (the route it took, one skipped after failing), and when
-    // the soonest skip ends.
-    val lastRun = Activity.state.collectAsState().value.recent.firstOrNull()?.flow
+    // the soonest skip ends. Keyed on the run itself: a long flow can hold more than one.
+    val lastRun = Activity.state.collectAsState().value.recent.firstOrNull()
     LaunchedEffect(lastRun) { load() }
     val skipEnds = status?.skipped?.minOfOrNull { it.until }
     LaunchedEffect(skipEnds) {
