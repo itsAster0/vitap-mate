@@ -266,8 +266,13 @@ impl Core {
                     .as_ref()
                     .and_then(|saved| saved.registration_number.clone());
             }
-            let server_rejected = same.is_some_and(|saved| saved.server_rejected);
-            self.write_stored(&account, rejected, server_rejected);
+            let server_rejected = same.as_ref().is_some_and(|saved| saved.server_rejected);
+            // A plain-text password from an older version, not sealed yet: kept as it is if
+            // the Keystore can't seal it now either.
+            let plain = same
+                .and_then(|saved| saved.password)
+                .filter(|plain| *plain == account.password);
+            self.write_stored(&account, rejected, server_rejected, plain);
         }
         self.account_changed();
     }
@@ -294,27 +299,37 @@ impl Core {
     }
 
     /// Writes `account` with its password sealed; without a cipher (host tests), as it is. The
-    /// password sealed last is reused, so the Keystore is asked only for a new one.
-    fn write_stored(&self, account: &Account, rejected: bool, server_rejected: bool) {
+    /// password sealed last is reused, so the Keystore is asked only for a new one. `plain`:
+    /// the file holds this password in plain text, which stays when the Keystore fails.
+    fn write_stored(
+        &self,
+        account: &Account,
+        rejected: bool,
+        server_rejected: bool,
+        plain: Option<String>,
+    ) {
         let (password, sealed) = match &self.shared.cipher {
             Some(cipher) => {
-                let sealed = self
-                    .shared
-                    .sealed
-                    .sealed_for(&account.password)
-                    .or_else(|| match cipher.seal(account.password.clone()) {
+                let sealed = self.shared.sealed.sealed_for(&account.password);
+                match sealed {
+                    Some(sealed) => (None, Some(sealed)),
+                    None => match cipher.seal(account.password.clone()) {
                         Sealing::Sealed { sealed } => {
                             self.shared.sealed.keep(&account.password, &sealed);
-                            Some(sealed)
+                            (None, Some(sealed))
+                        }
+                        Sealing::Unavailable if plain.is_some() => {
+                            warn!("password not sealed yet: the keystore failed, kept as it was");
+                            (plain, None)
                         }
                         Sealing::Unavailable => {
                             // A new password the Keystore can't take: the old sealed one is
                             // not this one, so the student types it again after a restart.
                             warn!("password not sealed: saved without it");
-                            None
+                            (None, None)
                         }
-                    });
-                (None, sealed)
+                    },
+                }
             }
             None => (Some(account.password.clone()), None),
         };
@@ -651,6 +666,28 @@ mod tests {
         cipher.set_down(false);
         let core = open(&dir, &cipher);
         assert!(file(&core).contains("\"sealed\":\"phone-a:1-terces-wp\""));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rewriting_a_plain_password_while_the_keystore_fails_keeps_it() {
+        let cipher = Fake::new("phone-a");
+        cipher.set_down(true);
+        let dir = dir("plain-down");
+        fs::write(dir.join(ACCOUNT), PLAIN).unwrap();
+        let core = open(&dir, &cipher);
+        // As a sign-in on the plain password saves the registration number.
+        let mut same = account("pw-secret-1");
+        same.registration_number = None;
+        core.write_account(&same, false);
+        assert_eq!(
+            file(&core),
+            r#"{"username":"22BCE0001","password":"pw-secret-1"}"#,
+            "kept as it was, for the next start to seal"
+        );
+        // Another password the Keystore can't take is still not saved in plain text.
+        core.write_account(&account("pw-2"), false);
+        assert!(!file(&core).contains("pw-2") && !file(&core).contains("password"));
         let _ = fs::remove_dir_all(&dir);
     }
 
