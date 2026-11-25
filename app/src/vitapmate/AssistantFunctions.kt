@@ -21,12 +21,12 @@ import vitapmate.data.AppCore
 import vitapmate.data.Docs
 import vitapmate.data.Meal
 import vitapmate.data.MessTimings
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
 import vitapmate.data.messMenuYear
 import vitapmate.data.parseMessMenu
 import vitapmate.data.readSpreadsheet
 import vitapmate.data.Settings
-import vitapmate.features.timetable.istDay
-import vitapmate.features.timetable.istMinute
 import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow

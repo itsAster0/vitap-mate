@@ -34,6 +34,9 @@ import vitapmate.core.ClassDay
 import vitapmate.core.ClassKind
 import vitapmate.core.DayClass
 import vitapmate.core.TimetableDay
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
+import vitapmate.data.zoneNote
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.UpdatedFooter
 import vitapmate.ui.ScrollToTopOnReselect

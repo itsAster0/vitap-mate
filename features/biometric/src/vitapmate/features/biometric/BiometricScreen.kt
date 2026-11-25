@@ -1,5 +1,6 @@
 package vitapmate.features.biometric
 
+import vitapmate.data.istDay
 import vitapmate.ui.rememberHaptics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,10 +50,6 @@ import vitapmate.ui.Space
 import vitapmate.ui.formatDay
 import vitapmate.ui.rememberNow
 
-private const val DAY_MS = 86_400_000L
-
-/** Days since 1970-01-01 in India (VTOP's dates), for the wall clock [ms]. */
-private fun istDay(ms: Long): Int = Math.floorDiv(ms + 19_800_000L, DAY_MS).toInt()
 
 /** The first day the picker offers (the Flutter app's calendar start). */
 private const val FIRST_DAY = 18_262 // 2020-01-01

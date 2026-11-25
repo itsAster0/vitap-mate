@@ -9,12 +9,12 @@ import com.composables.icons.lucide.Utensils
 import vitapmate.data.Meal
 import vitapmate.data.MessTimings
 import vitapmate.data.coreFlow
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
 import vitapmate.data.orNull
 import vitapmate.features.docs.MessMenu
 import vitapmate.features.docs.messFeature
 import vitapmate.features.exams.examsFeature
-import vitapmate.features.timetable.istDay
-import vitapmate.features.timetable.istMinute
 import vitapmate.observability.Log
 import vitapmate.ui.Feature
 

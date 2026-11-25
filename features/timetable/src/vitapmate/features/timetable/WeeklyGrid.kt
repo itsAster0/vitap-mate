@@ -64,6 +64,8 @@ import vitapmate.core.ClassDay
 import vitapmate.core.ClassKind
 import vitapmate.core.ClassSlot
 import vitapmate.core.TimetableDay
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
 import vitapmate.ui.AppTheme
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PressScale

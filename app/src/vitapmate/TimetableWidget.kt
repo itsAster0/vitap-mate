@@ -20,8 +20,8 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import vitapmate.core.ClassKind
 import vitapmate.core.ClassSlot
-import vitapmate.features.timetable.istDay
-import vitapmate.features.timetable.istMinute
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
 import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.ui.clock

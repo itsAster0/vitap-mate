@@ -1,12 +1,12 @@
-package vitapmate.features.timetable
+package vitapmate.data
 
 import java.util.TimeZone
 
-// VTOP's times are India time. "Now" is read in IST too, so the live class, countdowns and the
-// now line stay right on a phone set to another zone; the agenda then says so (zoneNote).
+// VTOP's times are India time. "Now" is read in IST too, so the live class, countdowns, the
+// now line, widgets and "today" everywhere stay right on a phone set to another zone; the
+// agenda then says so (zoneNote).
 
 private val IST: TimeZone = TimeZone.getTimeZone("Asia/Kolkata")
-private const val DAY_MS = 86_400_000L
 
 /**
  * Test hook for agents and humans: `adb shell setprop debug.vitapmate.clock_shift_min -540`, then

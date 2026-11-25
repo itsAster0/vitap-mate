@@ -18,8 +18,8 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import vitapmate.features.timetable.istDay
-import vitapmate.features.timetable.istMinute
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
 import vitapmate.observability.Log
 import vitapmate.ui.clock
 import vitapmate.ui.formatDay

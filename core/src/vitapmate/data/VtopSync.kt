@@ -117,7 +117,7 @@ object VtopSync {
                 SemesterChoice.selected?.let { semester -> add("grades" to { it.fetchGrades(f, semester) }) }
                 add("grade_history" to { it.fetchGradeHistory(f) })
                 // Recent biometric days not final yet, so campus times build up over the semester.
-                val today = Math.floorDiv(System.currentTimeMillis() + 19_800_000L, DAY_MS).toInt() // India
+                val today = istDay(System.currentTimeMillis())
                 val complete = withContext(Dispatchers.IO) { core.cachedBiometricRange(f, today - 13, today) }.filter { it.complete }.mapTo(HashSet()) { it.day }
                 for (day in biometricDays(today, complete, Settings.tunable(Tunable.SyncBiometricDays))) add("biometric.$day" to { it.fetchBiometricRange(f, day, day) })
                 if (everything) {

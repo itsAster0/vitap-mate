@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.DayClass
+import vitapmate.data.istSecond
 import vitapmate.ui.AppTheme
 import vitapmate.ui.StatusChip
 import vitapmate.ui.Tone

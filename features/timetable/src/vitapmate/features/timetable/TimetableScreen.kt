@@ -41,7 +41,10 @@ import vitapmate.data.ExamDayRefresh
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
 import vitapmate.data.TimetableViewMode
+import vitapmate.data.clockShiftMin
+import vitapmate.data.istDay
 import vitapmate.data.rememberPage
+import vitapmate.data.zoneNote
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow

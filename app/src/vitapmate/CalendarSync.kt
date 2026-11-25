@@ -44,7 +44,7 @@ import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.SyncEvent
 import vitapmate.data.attempt
-import vitapmate.features.timetable.istDay
+import vitapmate.data.istDay
 import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow

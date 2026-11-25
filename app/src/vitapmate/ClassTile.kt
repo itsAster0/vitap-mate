@@ -13,8 +13,8 @@ import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Settings
 import vitapmate.data.attempt
-import vitapmate.features.timetable.istDay
-import vitapmate.features.timetable.istMinute
+import vitapmate.data.istDay
+import vitapmate.data.istMinute
 import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow
