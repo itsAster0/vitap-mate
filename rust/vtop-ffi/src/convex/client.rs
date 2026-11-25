@@ -73,6 +73,14 @@ impl Clock for SystemClock {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct SubscriptionId(pub(crate) u64);
 
+/// Where a call's answer came from, for its log line.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Served {
+    /// A query a live watch already holds: answered here, nothing sent.
+    Local,
+    Server,
+}
+
 type Update = Result<Value, CallError>;
 type Callback = Arc<dyn Fn(Update) + Send + Sync>;
 
@@ -630,6 +638,16 @@ impl ConvexClient {
         args: Value,
         on_update: impl Fn(Update) + Send + Sync + 'static,
     ) -> SubscriptionId {
+        self.subscribe_served(path, args, on_update).0
+    }
+
+    /// [`Self::subscribe`], also saying whether a watch already held the first result.
+    fn subscribe_served(
+        &self,
+        path: &str,
+        args: Value,
+        on_update: impl Fn(Update) + Send + Sync + 'static,
+    ) -> (SubscriptionId, Served) {
         let _entered = self.span.enter();
         let mut state = self.state();
         let id = SubscriptionId(state.next_subscription);
@@ -644,7 +662,7 @@ impl ConvexClient {
             Err(error) => {
                 state.io.push_back(Io::Update(on_update, Err(error)));
                 self.finish(state);
-                return id;
+                return (id, Served::Local);
             }
         };
         self.use_now(&mut state);
@@ -655,6 +673,11 @@ impl ConvexClient {
             .get(&subscriber)
             .filter(|result| !state.auth_changed || matches!(result, FunctionResult::Value(_)))
             .cloned();
+        let served = if last.is_some() {
+            Served::Local
+        } else {
+            Served::Server
+        };
         if let Some(result) = &last {
             let update = Io::Update(on_update.clone(), outcome_of(result.clone()));
             state.io.push_back(update);
@@ -669,7 +692,7 @@ impl ConvexClient {
         );
         self.flush(&mut state);
         self.finish(state);
-        id
+        (id, served)
     }
 
     pub(crate) fn unsubscribe(&self, id: SubscriptionId) {
@@ -689,10 +712,10 @@ impl ConvexClient {
     }
 
     /// A query's current result: followed until its first result, then dropped.
-    pub(crate) async fn query(&self, path: &str, args: Value) -> Update {
+    pub(crate) async fn query(&self, path: &str, args: Value) -> (Update, Served) {
         let (sender, receiver) = oneshot::channel();
         let sender = Mutex::new(Some(sender));
-        let id = self.subscribe(path, args, move |update| {
+        let (id, served) = self.subscribe_served(path, args, move |update| {
             if let Some(sender) = sender.lock().unwrap_or_else(PoisonError::into_inner).take() {
                 // The caller gave up (timed out): nobody wants the answer.
                 #[expect(clippy::let_underscore_must_use, reason = "see above")]
@@ -707,7 +730,7 @@ impl ConvexClient {
             }
         }
         let _unsubscribe = Unsubscribe(self, id);
-        receiver.await.unwrap_or(Err(CallError::Closed))
+        (receiver.await.unwrap_or(Err(CallError::Closed)), served)
     }
 
     /// Runs a mutation; it resolves once the server's state includes it.

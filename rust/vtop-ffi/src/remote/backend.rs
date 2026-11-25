@@ -25,7 +25,7 @@ use futures::future::BoxFuture;
 use serde_json::{Value, json};
 use tracing::{info, warn};
 
-use crate::convex::{CallError, ConvexClient, SubscriptionId};
+use crate::convex::{CallError, ConvexClient, Served, SubscriptionId};
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, Shared};
 
@@ -49,7 +49,7 @@ pub(crate) trait Backend: Send + Sync {
         kind: Kind,
         path: &'a str,
         args: Value,
-    ) -> BoxFuture<'a, Result<Value, CallError>>;
+    ) -> BoxFuture<'a, (Result<Value, CallError>, Served)>;
     /// The JWT every later call goes with (None: none).
     fn set_auth(&self, jwt: Option<String>);
     /// Follows query `path(args)`: `on_update` hears its result now and after every change.
@@ -67,12 +67,12 @@ impl Backend for ConvexClient {
         kind: Kind,
         path: &'a str,
         args: Value,
-    ) -> BoxFuture<'a, Result<Value, CallError>> {
+    ) -> BoxFuture<'a, (Result<Value, CallError>, Served)> {
         Box::pin(async move {
             match kind {
                 Kind::Query => self.query(path, args).await,
-                Kind::Mutation => self.mutation(path, args).await,
-                Kind::Action => self.action(path, args).await,
+                Kind::Mutation => (self.mutation(path, args).await, Served::Server),
+                Kind::Action => (self.action(path, args).await, Served::Server),
             }
         })
     }

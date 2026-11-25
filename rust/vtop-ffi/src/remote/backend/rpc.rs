@@ -4,13 +4,14 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use futures::FutureExt;
 use futures::future::{Either, select};
 use serde_json::{Value, json};
 use tracing::{info, warn};
 use vtop_shared::device_sig;
 
 use super::{Backend, Kind};
-use crate::convex::{CallError, ConvexClient};
+use crate::convex::{CallError, ConvexClient, Served};
 use crate::device::EdgeError;
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, unix_now};
@@ -155,7 +156,9 @@ impl Core {
             TIMEOUT
         };
         let started = Instant::now();
-        let answer = within(timeout, backend.run(kind, path, args)).await;
+        let (answer, served) = within(timeout, backend.run(kind, path, args).map(Ok))
+            .await
+            .unwrap_or_else(|late| (Err(late), Served::Server));
         let outcome = match &answer {
             Ok(_) => "ok",
             Err(CallError::Closed) => "offline",
@@ -166,7 +169,9 @@ impl Core {
                 .unwrap_or("refused"),
         };
         let ms = started.elapsed().as_millis() as u64;
-        info!(flow, path, ?kind, ms, outcome, "server call");
+        // `served = Local`: a live watch held the answer (Convex never saw this read), so a
+        // query's flow is traced here, never in its arguments, which would split the cache.
+        info!(flow, path, ?kind, ?served, ms, outcome, "server call");
         answer
     }
 

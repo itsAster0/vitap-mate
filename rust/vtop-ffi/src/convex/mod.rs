@@ -10,5 +10,5 @@ pub(crate) mod value;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use client::{CallError, ConvexClient, SubscriptionId};
+pub(crate) use client::{CallError, ConvexClient, Served, SubscriptionId};
 pub use socket::{ConvexNetwork, ConvexSocket, ConvexSocketListener};

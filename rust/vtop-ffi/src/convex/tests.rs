@@ -16,7 +16,7 @@ use tracing::span::Attributes;
 use tracing::{Event, Id, Subscriber};
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 
-use super::client::{CallError, Clock, ConvexClient};
+use super::client::{CallError, Clock, ConvexClient, Served};
 use super::value::{self, ConvexValue};
 use super::{ConvexNetwork, ConvexSocket, ConvexSocketListener};
 
@@ -562,7 +562,7 @@ fn query_answers_its_first_result_then_unsubscribes() {
     ));
     assert_eq!(
         asking.as_mut().now_or_never(),
-        Some(Ok(json!({ "host": "h" })))
+        Some((Ok(json!({ "host": "h" })), Served::Server))
     );
     assert!(matches!(
         harness.last_sent(),
@@ -589,7 +589,7 @@ fn a_query_of_a_watched_query_is_answered_here() {
     let mut asking = Box::pin(harness.client.query("mail:inbox", args));
     assert_eq!(
         asking.as_mut().now_or_never(),
-        Some(Ok(json!({ "sealed": "s" })))
+        Some((Ok(json!({ "sealed": "s" })), Served::Local))
     );
     // Nothing went to the server: not the query, nor its removal (the watch still holds it).
     assert_eq!(harness.sent(harness.opens() - 1).len(), frames);

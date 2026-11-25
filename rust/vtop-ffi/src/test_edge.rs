@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 use vtop_shared::device_sig;
 
 use crate::Core;
-use crate::convex::CallError;
+use crate::convex::{CallError, Served};
 use crate::remote::backend::identity::Refresh;
 use crate::remote::backend::{Backend, Kind};
 use crate::remote::server_code::ServerCode;
@@ -89,6 +89,33 @@ struct Fake(Arc<Mutex<Edge>>);
 impl Backend for Fake {
     fn run<'a>(
         &'a self,
+        kind: Kind,
+        path: &'a str,
+        args: Value,
+    ) -> BoxFuture<'a, (Result<Value, CallError>, Served)> {
+        Box::pin(
+            self.answer(kind, path, args)
+                .map(|answer| (answer, Served::Server)),
+        )
+    }
+
+    fn set_auth(&self, jwt: Option<String>) {
+        self.0.lock().unwrap().auth = jwt;
+    }
+
+    /// Answers once, at once, as the query's first result.
+    fn watch(&self, path: &str, args: Value, on_update: crate::remote::backend::OnUpdate) -> u64 {
+        let answer = self.answer(Kind::Query, path, args).now_or_never();
+        on_update(answer.unwrap_or(Err(CallError::Closed)));
+        0
+    }
+
+    fn unwatch(&self, _id: u64) {}
+}
+
+impl Fake {
+    fn answer<'a>(
+        &'a self,
         _kind: Kind,
         path: &'a str,
         mut args: Value,
@@ -150,19 +177,6 @@ impl Backend for Fake {
         });
         Box::pin(async move { reply })
     }
-
-    fn set_auth(&self, jwt: Option<String>) {
-        self.0.lock().unwrap().auth = jwt;
-    }
-
-    /// Answers once, at once, as the query's first result.
-    fn watch(&self, path: &str, args: Value, on_update: crate::remote::backend::OnUpdate) -> u64 {
-        let answer = self.run(Kind::Query, path, args).now_or_never();
-        on_update(answer.unwrap_or(Err(CallError::Closed)));
-        0
-    }
-
-    fn unwatch(&self, _id: u64) {}
 }
 
 fn convex(data: Value) -> CallError {
