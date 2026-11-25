@@ -98,7 +98,12 @@ const ATTENDANCE_DETAIL: &str = spec::FULL_ATTENDANCE.file;
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum SignIn {
     Done,
-    NeedsOtp { message: String },
+    /// VTOP mailed the security OTP at `issued_at` (unix seconds); mail from before it can't
+    /// hold this code.
+    NeedsOtp {
+        message: String,
+        issued_at: u64,
+    },
 }
 
 /// Why VTOP rejected an OTP submission.
@@ -287,6 +292,9 @@ pub(crate) enum SessionPhase {
         via: OtpVia,
         message: String,
         challenge_id: u64,
+        /// When the current code was mailed (unix seconds): VTOP's time for it, else when the
+        /// challenge began or the code was resent.
+        sent_at: u64,
     },
     /// VTOP rejected the saved password; no automatic sign-in is tried again (repeated failures
     /// can lock the VTOP account) until the student signs in with a new one.
@@ -381,25 +389,47 @@ impl Session {
         matches!(self.phase, SessionPhase::PasswordRejected)
     }
 
-    pub(crate) fn begin_otp(&mut self, via: OtpVia, message: String) -> u64 {
+    /// VTOP wants the code it mailed at `sent_at` (unix seconds).
+    pub(crate) fn begin_otp(&mut self, via: OtpVia, message: String, sent_at: u64) -> u64 {
         self.next_challenge = self.next_challenge.saturating_add(1);
         let challenge_id = self.next_challenge;
-        self.otp
-            .challenged(self.otp_session, &message, self.client.otp_issued_at());
+        self.otp.challenged(self.otp_session, &message, sent_at);
         self.phase = SessionPhase::AwaitingOtp {
             via,
             message,
             challenge_id,
+            sent_at,
         };
         challenge_id
     }
 
-    /// VTOP mailed a new code for the same challenge: an open prompt shows when, so auto-fill
-    /// waits for that mail.
-    pub(crate) fn otp_resent(&self) {
-        if let Some(message) = self.otp_message() {
-            self.otp
-                .challenged(self.otp_session, message, self.client.otp_issued_at());
+    /// VTOP mailed a new code for the same challenge at `at` (unix seconds): an open prompt
+    /// shows when, so auto-fill waits for that mail.
+    pub(crate) fn otp_resent(&mut self, at: u64) {
+        if let SessionPhase::AwaitingOtp {
+            message, sent_at, ..
+        } = &mut self.phase
+        {
+            *sent_at = at;
+            self.otp.challenged(self.otp_session, message, at);
+        }
+    }
+
+    /// When the pending challenge's code was mailed (unix seconds); None with none pending.
+    pub(crate) fn otp_sent_at(&self) -> Option<u64> {
+        match self.phase {
+            SessionPhase::AwaitingOtp { sent_at, .. } => Some(sent_at),
+            _ => None,
+        }
+    }
+
+    /// The pending challenge's text and when its code was mailed.
+    pub(crate) fn otp_challenge(&self) -> Option<(&str, u64)> {
+        match &self.phase {
+            SessionPhase::AwaitingOtp {
+                message, sent_at, ..
+            } => Some((message.as_str(), *sent_at)),
+            _ => None,
         }
     }
 

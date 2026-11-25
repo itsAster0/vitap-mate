@@ -3,6 +3,7 @@ package vitapmate.features.login
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.coroutines.cancellation.CancellationException
@@ -43,7 +44,8 @@ sealed interface OtpPhase {
 }
 
 /**
- * One security-OTP prompt (Flutter's `VtopOtpChallenge`, manual entry only) for VTOP's [vtopMessage]:
+ * One security-OTP prompt (Flutter's `VtopOtpChallenge`, manual entry only) for VTOP's [vtopMessage]
+ * and the code Rust says was mailed at [issuedAt] (unix seconds):
  * a 3-minute countdown, after which the code is expired and Resend unlocks. A code VTOP turns down,
  * or a network failure, keeps the prompt open with the reason; anything else is thrown to the
  * caller. Flows are `<prefix>.submit_otp` / `<prefix>.resend_otp` and lines go to [src]; the sheet
@@ -52,7 +54,7 @@ sealed interface OtpPhase {
  * [countDown] asks VTOP for a new code once if the first round expires without one.
  */
 @Stable
-class OtpChallenge(vtopMessage: String, val prefix: String, private val src: String) {
+class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, private val src: String) {
     private val phaseFlow = MutableStateFlow<OtpPhase>(OtpPhase.Active(TIMEOUT_S))
     var phase: OtpPhase by mutableStateOf(OtpPhase.Active(TIMEOUT_S))
         private set
@@ -77,8 +79,12 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
     /** Codes VTOP turned down: auto-fill skips them. */
     private val rejected = mutableSetOf<String>()
 
-    /** Unix seconds when VTOP sent this round's code (about when the prompt opened). */
-    private var roundStart = System.currentTimeMillis() / 1000
+    /**
+     * When this round's code was mailed (unix seconds), as Rust tells it: [resend] takes the new
+     * one, and the fetch sheet passes on a fresh sign-in's under the same prompt. Auto-fill reads
+     * mail from then on.
+     */
+    var issuedAt by mutableLongStateOf(issuedAt)
 
     /** Bumps on each resend; key the countdown's effect on it. */
     var round by mutableIntStateOf(0)
@@ -204,11 +210,12 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
         error = null
         var resent = false
         try {
-            flow("$prefix.resend_otp") { id -> core.resendOtp(id) }
+            val sentAt = flow("$prefix.resend_otp") { id -> core.resendOtp(id) }
             Log.info(src, "otp resent")
             resent = true
             code = ""
-            roundStart = System.currentTimeMillis() / 1000
+            // None: signing in afresh needed no code, so there is no newer mail to wait for.
+            sentAt?.let { issuedAt = it.toLong() }
             message = "VTOP sent a new code to your registered email."
             transition(OtpPhase.Active(TIMEOUT_S))
             round++
@@ -237,11 +244,11 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
     suspend fun autofill(onCode: () -> Unit) {
         MailForwarding.load("otp")
         when (OtpAutofill.inUse()) {
-            OtpSource.Forwarding -> watch("forwarding.poll", "forwarded mail", onCode, LiveTopic.MAIL_INBOX) { id -> AppCore.await().fetchForwardedOtp(id, roundStart) }
+            OtpSource.Forwarding -> watch("forwarding.poll", "forwarded mail", onCode, LiveTopic.MAIL_INBOX) { id -> AppCore.await().fetchForwardedOtp(id, issuedAt) }
             OtpSource.Gmail -> {
                 val tried = mutableSetOf<String>()
                 watch("gmail.poll", "Gmail", onCode) { id ->
-                    Gmail.findOtp(roundStart, tried, id)?.let { otp ->
+                    Gmail.findOtp(issuedAt, tried, id)?.let { otp ->
                         tried += otp.messageId
                         gmailOtp = otp
                         otp.code
@@ -257,7 +264,7 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
         // The code fills in by itself: stay a pill until it comes or the wait ends.
         minimized = true
         flow(flowName) { id ->
-            Log.info(src, "waiting for an otp from $where", id, mapOf("since" to "$roundStart"))
+            Log.info(src, "waiting for an otp from $where", id, mapOf("since" to "$issuedAt"))
             var pulls = 0
             // Polling goes on after a fill: an older code (sent up to a minute before this
             // round) can come first and be turned down, and the right one comes a moment later.

@@ -32,8 +32,9 @@ pub struct OtpChallenge {
     pub id: u64,
     /// VTOP's text.
     pub message: String,
-    /// When VTOP mailed the current code (unix seconds); None when unknown.
-    pub issued_at: Option<u64>,
+    /// When the current code was mailed (unix seconds): VTOP's time for it, else when the
+    /// challenge began or the code was resent. Auto-fill takes mail from then on.
+    pub issued_at: u64,
 }
 
 /// Told the prompt as it opens, changes and closes (None), outside any lock. The app sets one
@@ -111,7 +112,7 @@ impl Board {
     }
 
     /// Opens the prompt for `session`'s challenge, or keeps it open with this text and time.
-    fn prompt(&self, session: u64, message: &str, issued_at: Option<u64>) {
+    fn prompt(&self, session: u64, message: &str, issued_at: u64) {
         self.update(|state| {
             let id = match &state.shown {
                 Some(shown) if shown.session == session => shown.challenge.id,
@@ -132,7 +133,7 @@ impl Board {
     }
 
     /// `session` began a new challenge: an open prompt for it shows the new one.
-    pub(crate) fn challenged(&self, session: u64, message: &str, issued_at: Option<u64>) {
+    pub(crate) fn challenged(&self, session: u64, message: &str, issued_at: u64) {
         if self.is_shown(session) {
             self.prompt(session, message, issued_at);
         } else {
@@ -208,7 +209,7 @@ impl Core {
                         .otp_message()
                         .unwrap_or("The OTP prompt was closed.")
                         .into(),
-                    issued_at: session.client.otp_issued_at(),
+                    issued_at: session.otp_sent_at(),
                 };
                 (session.logins, failed)
             };
@@ -252,10 +253,8 @@ impl Core {
             if let Some(outcome) = self.waited(slot, &session, logins) {
                 return outcome;
             }
-            match session.otp_message() {
-                Some(message) => {
-                    board.prompt(session.otp_session, message, session.client.otp_issued_at());
-                }
+            match session.otp_challenge() {
+                Some((message, sent_at)) => board.prompt(session.otp_session, message, sent_at),
                 // A fresh sign-in under the prompt failed (offline): it stays for a retry.
                 None if board.is_shown(session.otp_session) => {}
                 None => return Err(failed), // Closed meanwhile.

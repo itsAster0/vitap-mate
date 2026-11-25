@@ -2,6 +2,7 @@ package vitapmate.features.login
 
 import vitapmate.ui.rememberHaptics
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -30,7 +31,9 @@ fun FetchOtpOverlay() {
     val haptics = rememberHaptics()
     val shown by OtpPrompt.challenge.collectAsState()
     val open = shown ?: return
-    val challenge = remember(open.id) { OtpChallenge(open.message, "fetch_otp", "ui.otp") }
+    val challenge = remember(open.id) { OtpChallenge(open.message, open.issuedAt.toLong(), "fetch_otp", "ui.otp") }
+    // A fresh sign-in under the same prompt mails a new code.
+    LaunchedEffect(challenge, open.issuedAt) { challenge.issuedAt = open.issuedAt.toLong() }
     OtpSheet(
         challenge,
         onSubmit = {

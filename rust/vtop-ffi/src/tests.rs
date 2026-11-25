@@ -444,7 +444,11 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
             .client
             .resume_session(&waiting("JSESSIONID=pre", Some(7)))
             .unwrap();
-        session.begin_otp(OtpVia::Phone, "Additional verification is required.".into());
+        session.begin_otp(
+            OtpVia::Phone,
+            "Additional verification is required.".into(),
+            7,
+        );
         session.logins = 3;
     }
     // Calls that need VTOP's session (Connected apps) answer with the open challenge too,

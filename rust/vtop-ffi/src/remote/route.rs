@@ -624,7 +624,8 @@ impl Core {
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("Enter the OTP VTOP emailed you.");
-            session.begin_otp(crate::OtpVia::Server, message.to_string());
+            let sent_at = engine_mailed_at(&session);
+            session.begin_otp(crate::OtpVia::Server, message.to_string(), sent_at);
             info!("server sign-in waits for the otp");
             return Err(ServerError::Expired);
         }
@@ -687,6 +688,10 @@ impl Core {
             serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
                 .map_err(|_| CoreError::from(VtopError::InvalidResponse))?;
         session.client.resume_session(&state)?;
+        if code.is_none() {
+            let sent_at = engine_mailed_at(&session);
+            session.otp_resent(sent_at);
+        }
         if code.is_some() && answer.get("status").is_some_and(|status| status == "ok") {
             session.mark_signed_in();
             crate::obs::set_regno(session.client.registration_number().ok());
@@ -694,6 +699,12 @@ impl Core {
         }
         Ok(())
     }
+}
+
+/// When the engine had VTOP mail the code `session` resumed with; for an engine that sends no
+/// time for it, now, so auto-fill takes mail from here on.
+fn engine_mailed_at(session: &crate::Session) -> u64 {
+    (session.client.otp_issued_at()).unwrap_or_else(|| unix_now().unsigned_abs())
 }
 
 /// The engine's refusal of a server sign-in's OTP, as the OTP sheet tells it.
@@ -865,7 +876,7 @@ mod tests {
         let slot = core.current().unwrap();
         slot.write()
             .await
-            .begin_otp(crate::OtpVia::Phone, "code".into());
+            .begin_otp(crate::OtpVia::Phone, "code".into(), 7);
         let fetch = || {
             transport::with_flow(
                 "f".into(),
@@ -888,13 +899,65 @@ mod tests {
         let challenge_id = slot
             .write()
             .await
-            .begin_otp(crate::OtpVia::Server, "code".into());
+            .begin_otp(crate::OtpVia::Server, "code".into(), 7);
         let sent = core
             .server_otp(&slot, challenge_id, Some("123456"), "f")
             .await;
         assert_eq!(sent, Err(CoreError::ConsentDenied));
         assert_eq!(gate.asks(), 1);
         assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_server_resend_gives_the_new_code_s_time_and_the_code_goes_on() {
+        let (core, edge) = core_on("otp-resend", Route::Server).await;
+        let _gate = consent::tests::yes(&core);
+        let slot = core.current().unwrap();
+        slot.write()
+            .await
+            .begin_otp(crate::OtpVia::Server, "code".into(), 7);
+        let session = SessionState {
+            cookies: "JSESSIONID=pending".into(),
+            csrf_token: Some("csrf".into()),
+            registration_number: None,
+            otp_issued_at: Some(1_795_600_800),
+            logged_in_at: None,
+        };
+        edge.lock()
+            .unwrap()
+            .canned
+            .entry("vtop:loginResend".into())
+            .or_default()
+            .push_back((200, json!({ "status": "otp_required", "session": session })));
+
+        let sent_at = core.resend_otp("login.resend_otp".into()).await;
+        assert_eq!(sent_at, Ok(Some(1_795_600_800)));
+        {
+            let session = slot.read().await;
+            assert_eq!(session.otp_sent_at(), Some(1_795_600_800));
+            assert!(
+                session.server_otp_challenge().is_some(),
+                "still waiting for it"
+            );
+        }
+
+        // The code goes through the engine too, without deadlocking on the session's lock.
+        let signed_in = SessionState {
+            cookies: "JSESSIONID=live".into(),
+            csrf_token: Some("csrf".into()),
+            registration_number: Some("22BCE0001".into()),
+            otp_issued_at: None,
+            logged_in_at: None,
+        };
+        edge.lock()
+            .unwrap()
+            .canned
+            .entry("vtop:loginOtp".into())
+            .or_default()
+            .push_back((200, json!({ "status": "ok", "session": signed_in })));
+        let submitted = core.submit_otp("login.submit_otp".into(), "123456".into());
+        assert_eq!(submitted.await, Ok(()));
+        assert!(!slot.read().await.is_awaiting_otp());
     }
 
     #[tokio::test]
@@ -905,12 +968,12 @@ mod tests {
         let first = slot
             .write()
             .await
-            .begin_otp(crate::OtpVia::Server, "first".into());
+            .begin_otp(crate::OtpVia::Server, "first".into(), 7);
         // A newer challenge replaces the first before the stale submit lands.
         let _second = slot
             .write()
             .await
-            .begin_otp(crate::OtpVia::Server, "second".into());
+            .begin_otp(crate::OtpVia::Server, "second".into(), 8);
         let sent = core.server_otp(&slot, first, Some("123456"), "f").await;
         assert!(
             matches!(

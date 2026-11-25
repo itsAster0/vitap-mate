@@ -2433,7 +2433,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_ensure_fresh_session() and 0xFFFF) != 19372) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_otp() and 0xFFFF) != 42733) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_otp() and 0xFFFF) != 27852) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 11633) {
@@ -5668,7 +5668,11 @@ public interface CoreInterface {
      */
     suspend fun `ensureFreshSession`(`flow`: kotlin.String, `maxAgeSecs`: kotlin.ULong)
     
-    suspend fun `resendOtp`(`flow`: kotlin.String)
+    /**
+     * Has VTOP mail a new code: when it was mailed (unix seconds), which an open prompt shows
+     * too; None when signing in afresh needed no code.
+     */
+    suspend fun `resendOtp`(`flow`: kotlin.String): kotlin.ULong?
     
     /**
      * The saved username, for the Gmail sign-in's registration number. The password is
@@ -8546,9 +8550,13 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     }
 
     
+    /**
+     * Has VTOP mail a new code: when it was mailed (unix seconds), which an open prompt shows
+     * too; None when signing in afresh needed no code.
+     */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `resendOtp`(`flow`: kotlin.String) {
+    override suspend fun `resendOtp`(`flow`: kotlin.String) : kotlin.ULong? {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_vtop_ffi_fn_method_core_resend_otp(
@@ -8557,12 +8565,11 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         FfiConverterString.lower(`flow`),
             )
         },
-        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
-        { },
-        
+        { FfiConverterOptionalULong.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -17307,9 +17314,10 @@ data class OtpChallenge (
     val `message`: kotlin.String
     , 
     /**
-     * When VTOP mailed the current code (unix seconds); None when unknown.
+     * When the current code was mailed (unix seconds): VTOP's time for it, else when the
+     * challenge began or the code was resent. Auto-fill takes mail from then on.
      */
-    val `issuedAt`: kotlin.ULong?
+    val `issuedAt`: kotlin.ULong
     
 ){
     
@@ -17328,20 +17336,20 @@ public object FfiConverterTypeOtpChallenge: FfiConverterRustBuffer<OtpChallenge>
         return OtpChallenge(
             FfiConverterULong.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterOptionalULong.read(buf),
+            FfiConverterULong.read(buf),
         )
     }
 
     override fun allocationSize(value: OtpChallenge) = (
             FfiConverterULong.allocationSize(value.`id`) +
             FfiConverterString.allocationSize(value.`message`) +
-            FfiConverterOptionalULong.allocationSize(value.`issuedAt`)
+            FfiConverterULong.allocationSize(value.`issuedAt`)
     )
 
     override fun write(value: OtpChallenge, buf: ByteBuffer) {
             FfiConverterULong.write(value.`id`, buf)
             FfiConverterString.write(value.`message`, buf)
-            FfiConverterOptionalULong.write(value.`issuedAt`, buf)
+            FfiConverterULong.write(value.`issuedAt`, buf)
     }
 }
 
@@ -24064,8 +24072,13 @@ sealed class SignIn {
     object Done : SignIn()
     
     
+    /**
+     * VTOP mailed the security OTP at `issued_at` (unix seconds); mail from before it can't
+     * hold this code.
+     */
     data class NeedsOtp(
-        val `message`: kotlin.String) : SignIn()
+        val `message`: kotlin.String, 
+        val `issuedAt`: kotlin.ULong) : SignIn()
         
     {
         
@@ -24092,6 +24105,7 @@ public object FfiConverterTypeSignIn : FfiConverterRustBuffer<SignIn>{
             1 -> SignIn.Done
             2 -> SignIn.NeedsOtp(
                 FfiConverterString.read(buf),
+                FfiConverterULong.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -24109,6 +24123,7 @@ public object FfiConverterTypeSignIn : FfiConverterRustBuffer<SignIn>{
             (
                 4UL
                 + FfiConverterString.allocationSize(value.`message`)
+                + FfiConverterULong.allocationSize(value.`issuedAt`)
             )
         }
     }
@@ -24122,6 +24137,7 @@ public object FfiConverterTypeSignIn : FfiConverterRustBuffer<SignIn>{
             is SignIn.NeedsOtp -> {
                 buf.putInt(2)
                 FfiConverterString.write(value.`message`, buf)
+                FfiConverterULong.write(value.`issuedAt`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }

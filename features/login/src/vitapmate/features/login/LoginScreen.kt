@@ -185,13 +185,14 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                 { result ->
                     when (result) {
                         is SignIn.Done -> LoginPhase.Form.also { signedIn() }
-                        is SignIn.NeedsOtp -> LoginPhase.Otp(OtpChallenge(result.message, "login", "ui.login"))
+                        is SignIn.NeedsOtp -> LoginPhase.Otp(OtpChallenge(result.message, result.issuedAt.toLong(), "login", "ui.login"))
                     }
                 },
                 { e ->
                     when (e) {
                         is CoreException.InvalidCredentials -> LoginPhase.Rejected
-                        is CoreException.OtpRequired -> LoginPhase.Otp(OtpChallenge(e.reason, "login", "ui.login"))
+                        // VTOP's OTP error always carries when it mailed the code.
+                        is CoreException.OtpRequired -> e.issuedAt?.let { LoginPhase.Otp(OtpChallenge(e.reason, it.toLong(), "login", "ui.login")) } ?: LoginPhase.Failed(problemOf(e, flowId))
                         else -> LoginPhase.Failed(problemOf(e, flowId))
                     }
                 },

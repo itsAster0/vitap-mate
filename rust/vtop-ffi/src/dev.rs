@@ -460,7 +460,7 @@ mod tests {
         core.write_account(&account, false);
         fs::write(dir.join(SESSION), "{}").unwrap();
         let mut session = Session::new(account, &core.shared).unwrap();
-        session.begin_otp(crate::OtpVia::Phone, "pending".into());
+        session.begin_otp(crate::OtpVia::Phone, "pending".into(), 7);
         core.install(session);
 
         core.dev_clear_session("f".into()).await.unwrap();

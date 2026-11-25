@@ -97,7 +97,7 @@ object OtpAutofill {
         var why: PauseReason? = PauseReason.NoCode
         for (round in 0..1) {
             if (round == 1) {
-                try {
+                val sentAt = try {
                     withContext(Dispatchers.IO) { core.resendOtp(flow) }
                 } catch (e: CancellationException) {
                     throw e
@@ -106,7 +106,8 @@ object OtpAutofill {
                     break
                 }
                 Log.info("sync", "otp resent", flow)
-                issued = System.currentTimeMillis() / 1000
+                // Rust's time for the new code; none: signing in afresh needed no code.
+                issued = sentAt?.toLong() ?: (System.currentTimeMillis() / 1000)
             }
             // Mail since the code was issued; with the source's own slack, about a minute for the clocks.
             val since = issued - 30

@@ -116,7 +116,7 @@ fn pending(state: &AppState, session: &SessionState) -> Result<VtopClient, ApiEr
         .map_err(|error| login_error(&error))
 }
 
-async fn timed(sign_in: impl Future<Output = VtopResult<()>>) -> VtopResult<()> {
+async fn timed<T>(sign_in: impl Future<Output = VtopResult<T>>) -> VtopResult<T> {
     tokio::time::timeout(LOGIN_TIMEOUT, sign_in)
         .await
         .unwrap_or_else(|_| {

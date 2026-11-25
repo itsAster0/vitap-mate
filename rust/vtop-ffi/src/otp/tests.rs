@@ -40,7 +40,7 @@ fn awaiting(name: &str, attended: bool) -> (Core, Arc<Slot>, Arc<Told>) {
     consent::tests::install(&core, attended, false);
     let told = Arc::new(Told::default());
     core.shared.otp.set_listener(told.clone());
-    futures::executor::block_on(slot.write()).begin_otp(OtpVia::Phone, ASKED.into());
+    futures::executor::block_on(slot.write()).begin_otp(OtpVia::Phone, ASKED.into(), 7);
     (core, slot, told)
 }
 
@@ -116,7 +116,7 @@ async fn a_fresh_sign_in_under_the_prompt_keeps_it_open() {
         // The code's sign-in had ended: a new one mails a new code under the same prompt.
         let mut session = futures::executor::block_on(slot.write());
         session.restart(&core.shared).unwrap();
-        session.begin_otp(OtpVia::Phone, "VTOP sent a new code.".into());
+        session.begin_otp(OtpVia::Phone, "VTOP sent a new code.".into(), 9);
         drop(session);
         let now = told.last().unwrap();
         assert_eq!(
@@ -279,14 +279,20 @@ async fn a_resent_code_shows_on_the_open_prompt() {
     {
         let mut session = slot.write().await;
         session.otp.set_listener(told.clone());
-        session.begin_otp(OtpVia::Phone, ASKED.into());
+        session.begin_otp(OtpVia::Phone, ASKED.into(), 100);
         // A waiting call opened the prompt.
-        session.otp.prompt(session.otp_session, ASKED, Some(100));
+        session.otp.prompt(session.otp_session, ASKED, 100);
     }
     let opened = told.last().expect("the prompt opened");
 
-    core.resend_otp("f".into()).await.unwrap();
+    let sent_at = core.resend_otp("f".into()).await.unwrap();
+    assert_eq!(
+        sent_at,
+        Some(1_795_600_800),
+        "the new code's time, for the login screen"
+    );
     let shown = told.last().expect("the prompt stays open");
     assert_eq!(shown.id, opened.id, "the same prompt");
-    assert_eq!(shown.issued_at, Some(1_795_600_800), "the new code's time");
+    assert_eq!(shown.issued_at, 1_795_600_800, "the new code's time");
+    assert_eq!(slot.read().await.otp_sent_at(), Some(1_795_600_800));
 }

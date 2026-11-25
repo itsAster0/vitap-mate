@@ -70,9 +70,9 @@ impl Core {
             let mut session = Session::new(account, &self.shared)?;
             let outcome = match session.client.login().await {
                 Ok(()) => SignIn::Done,
-                Err(VtopError::OTPRequired(message, _)) => {
-                    session.begin_otp(OtpVia::Phone, message.clone());
-                    SignIn::NeedsOtp { message }
+                Err(VtopError::OTPRequired(message, issued_at)) => {
+                    session.begin_otp(OtpVia::Phone, message.clone(), issued_at);
+                    SignIn::NeedsOtp { message, issued_at }
                 }
                 Err(error) => return Err(error.into()),
             };
@@ -105,7 +105,10 @@ impl Core {
     pub async fn submit_otp(&self, flow: String, code: String) -> Result<(), CoreError> {
         traced("submit_otp", &flow, async {
             let slot = self.current()?;
-            if let Some(challenge_id) = slot.read().await.server_otp_challenge() {
+            // Bound first: an `if let` keeps its scrutinee's read guard for the whole block, and
+            // `server_otp` takes the write lock.
+            let server = slot.read().await.server_otp_challenge();
+            if let Some(challenge_id) = server {
                 return self
                     .server_otp(&slot, challenge_id, Some(code.trim()), &flow)
                     .await;
@@ -147,18 +150,23 @@ impl Core {
         .await
     }
 
-    pub async fn resend_otp(&self, flow: String) -> Result<(), CoreError> {
+    /// Has VTOP mail a new code: when it was mailed (unix seconds), which an open prompt shows
+    /// too; None when signing in afresh needed no code.
+    pub async fn resend_otp(&self, flow: String) -> Result<Option<u64>, CoreError> {
         traced("resend_otp", &flow, async {
             let slot = self.current()?;
-            if let Some(challenge_id) = slot.read().await.server_otp_challenge() {
-                return self.server_otp(&slot, challenge_id, None, &flow).await;
+            // Bound first, as in `submit_otp`.
+            let server = slot.read().await.server_otp_challenge();
+            if let Some(challenge_id) = server {
+                self.server_otp(&slot, challenge_id, None, &flow).await?;
+                return Ok(slot.read().await.otp_sent_at());
             }
             let mut session = slot.write().await;
             if session.client.otp_issued_at().is_some() {
                 match session.client.resend_security_otp().await {
-                    Ok(()) => {
-                        session.otp_resent();
-                        return Ok(());
+                    Ok(sent_at) => {
+                        session.otp_resent(sent_at);
+                        return Ok(Some(sent_at));
                     }
                     // VTOP dropped the sign-in: start a new one below.
                     Err(VtopError::SessionExpired) => {}
@@ -167,8 +175,8 @@ impl Core {
             }
             // Signing in afresh mails the new code.
             match self.fresh_challenge(&slot, &mut session).await {
-                Err(CoreError::OtpRejected { .. }) => Ok(()),
-                result => result,
+                Ok(()) | Err(CoreError::OtpRejected { .. }) => Ok(session.otp_sent_at()),
+                Err(error) => Err(error),
             }
         })
         .await
@@ -330,12 +338,12 @@ impl Core {
             // Replaced or signed out meanwhile: its cookies are gone; never sign it in.
             return Err(CoreError::NotSignedIn);
         }
-        if let Some(message) = session.otp_message() {
+        if let Some((message, sent_at)) = session.otp_challenge() {
             // The challenge still open (no new mail): its issue time, so auto-fill knows how
             // long its code is good.
             return Err(CoreError::OtpRequired {
                 reason: message.to_owned(),
-                issued_at: session.client.otp_issued_at(),
+                issued_at: Some(sent_at),
             });
         }
         self.log_in(slot, session).await
@@ -357,7 +365,7 @@ impl Core {
         match session.client.login().await {
             Ok(()) => {}
             Err(VtopError::OTPRequired(message, issued_at)) => {
-                session.begin_otp(OtpVia::Phone, message.clone());
+                session.begin_otp(OtpVia::Phone, message.clone(), issued_at);
                 return Err(VtopError::OTPRequired(message, issued_at).into());
             }
             Err(VtopError::InvalidCredentials) => {
