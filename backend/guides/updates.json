@@ -77,6 +77,10 @@
         {
           "text": "Semester Wrapped: after a semester's last class, More shows that semester as a story you can tap through and share as images, with Hide grades for the shared copy.",
           "since": 3000400
+        },
+        {
+          "text": "Account has your server account: sharing your registration number, linked phones, signing out everywhere and deleting the account. The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps.",
+          "since": 3002200
         }
       ]
     }
