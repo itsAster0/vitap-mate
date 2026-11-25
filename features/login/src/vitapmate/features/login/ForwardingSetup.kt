@@ -65,7 +65,8 @@ private const val GMAIL_FILTERS = "https://mail.google.com/mail/u/0/#settings/fi
 
 /**
  * Mail forwarding with an address: the address (copy), the status, Gmail's confirmation (code
- * and link) once it arrives, the three Gmail steps with links, Check and Turn off.
+ * and link) once it arrives, the three Gmail steps with links, Check and Turn off, then the
+ * phones on it and Delete everywhere ([ForwardingPhones]).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -216,6 +217,7 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             Text(if (MailForwarding.busy == ForwardingOp.TurnOff) "Turning off…" else "Turn off")
         }
     }
+    ForwardingPhones()
 }
 
 /** How far a setup step is, when the app can tell: [Done] shows a tick, [Current] a filled number. */

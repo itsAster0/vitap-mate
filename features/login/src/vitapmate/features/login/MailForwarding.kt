@@ -24,7 +24,7 @@ import vitapmate.observability.flow
 import vitapmate.ui.showToast
 
 /** An action the student starts on the address; [tag] names its flow, `forwarding.<tag>`. */
-enum class ForwardingOp(val tag: String) { Setup("setup"), Check("check"), MarkDone("done"), TurnOff("off") }
+enum class ForwardingOp(val tag: String) { Setup("setup"), Check("check"), MarkDone("done"), TurnOff("off"), Delete("delete") }
 
 /** The sheet's view of the address: the last status Rust gave, and the student's action running, if any. */
 sealed interface ForwardingPhase {
@@ -79,7 +79,7 @@ val Forwarding.lastMailAt get() = when (this) {
 
 /**
  * This phone's mail-forwarding address (Rust's `forwarding.rs`), for Settings → Account → Mail
- * forwarding, its sheet and the OTP prompt's auto-fill. Flows `forwarding.status/setup/check/done/off`,
+ * forwarding, its sheet and the OTP prompt's auto-fill. Flows `forwarding.status/setup/check/done/off/delete`,
  * lines `ui.forwarding`, reported to [StateRegistry] as `forwarding`. Never logs the address's
  * keys, codes or mail.
  */
@@ -156,6 +156,16 @@ object MailForwarding {
         AppScope.launch {
             run(ForwardingOp.TurnOff) { id ->
                 AppCore.await().turnOffForwarding(id)
+                AppCore.await().forwardingStatus(id)
+            }
+        }
+    }
+
+    /** Deletes the address for every phone on it; runs on after the sheet closes. */
+    fun deleteEverywhere() {
+        AppScope.launch {
+            run(ForwardingOp.Delete) { id ->
+                AppCore.await().deleteForwardingEverywhere(id)
                 AppCore.await().forwardingStatus(id)
             }
         }
