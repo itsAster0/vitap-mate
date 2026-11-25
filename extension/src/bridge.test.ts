@@ -1,13 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_BRIDGE_URL,
   normalizeBridgeUrl,
   clampPollAfter,
+  fetchWithTimeout,
   friendlyLoginError,
   progressText,
   parseAPIError,
   validateCookies,
 } from "./bridge";
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("bridge helpers", () => {
   it("validates VTOP cookies", () => {
@@ -29,6 +35,29 @@ describe("bridge helpers", () => {
       friendlyLoginError(200, '{"status":"error","code":"forwarding_required","error":"forwarding_required: Set up OTP email forwarding."}'),
     ).toBe("Set up OTP email forwarding.");
     expect(friendlyLoginError(200, "not json")).toContain("Could not connect");
+    expect(friendlyLoginError(0, "", new DOMException("Aborted", "AbortError"))).toContain("took too long");
+    expect(friendlyLoginError(0, "", new DOMException("Timed out", "TimeoutError"))).toContain("took too long");
+    expect(friendlyLoginError(0, "", new TypeError("Failed to fetch"))).toContain("Could not reach the backend");
+  });
+
+  it("maps fetchWithTimeout timeouts to the timeout message", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        return new Promise<Response>((_res, rej) => {
+          init?.signal?.addEventListener("abort", () => rej(init.signal?.reason), { once: true });
+        });
+      }),
+    );
+
+    const pending = fetchWithTimeout("https://vmate.test/v1/session", { method: "POST" }, 5000);
+    const caught = pending.catch((err) => err);
+    vi.advanceTimersByTime(5000);
+    const err = await caught;
+    expect(err).toBeInstanceOf(DOMException);
+    expect((err as DOMException).name).toBe("TimeoutError");
+    expect(friendlyLoginError(0, "", err)).toContain("took too long");
   });
 
   it("parses errors and clamps polling intervals", () => {

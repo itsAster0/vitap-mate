@@ -64,7 +64,10 @@ export function friendlyLoginError(
   responseText: string,
   networkError?: unknown,
 ) {
-  if (networkError instanceof DOMException && networkError.name === "AbortError") {
+  if (
+    networkError instanceof DOMException &&
+    (networkError.name === "AbortError" || networkError.name === "TimeoutError")
+  ) {
     return "The backend took too long to respond. Please try again.";
   }
   if (networkError) {

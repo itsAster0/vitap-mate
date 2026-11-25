@@ -492,10 +492,89 @@ describe("background login flow", () => {
     expect(env.tabMessages.some((m) => m.message.type === "VTOP_MATE_ERROR")).toBe(false);
   });
 
-  it("handles OPEN_EXTENSION_PANEL safely when openPopup is missing or rejects options", async () => {
+  it("aborts browserSignedIn probe, expireSession, and skips goToVtopContent on CANCEL_LOGIN", async () => {
+    // 1. Cancel while browserSignedIn probes VTOP: aborts the probe and never starts /v1/session.
+    const env1 = installMockChrome({
+      local: { token: ACCESS_KEY },
+      cookies: [{ name: "JSESSIONID", value: "alive" }],
+    });
+    const probeStarted = deferred<AbortSignal>();
+    const fetch1 = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      probeStarted.resolve(init!.signal!);
+      return new Promise<Response>((_res, rej) => {
+        init?.signal?.addEventListener("abort", () => rej(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.stubGlobal("fetch", fetch1);
+    const bg1 = createBackground();
+    const login1 = bg1.runLogin(6);
+    const probeSignal = await probeStarted.promise;
+    bg1.handleMessage({ type: "CANCEL_LOGIN" }, {}, () => {});
+    expect(probeSignal.aborted).toBe(true);
+    await expect(login1).rejects.toThrow("Sign-in cancelled.");
+    expect(fetch1).toHaveBeenCalledTimes(1);
+    expect(env1.tabsUpdated).toEqual([]);
+
+    // 2. Cancel during expireSession after a bounced probe: aborts /v1/session/expire and does not retry.
+    const env2 = installMockChrome({ local: { token: ACCESS_KEY } });
+    const expireStarted = deferred<AbortSignal>();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetch2 = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/v1/session")) {
+        return Promise.resolve(
+          responseWithUrl({
+            status: "ready",
+            cookies: [{ domain: "vtop.vitap.ac.in", name: "JSESSIONID", value: "s-1", path: "/vtop", hostOnly: true }],
+            source: { from: "server", cached: true },
+          }),
+        );
+      }
+      if (url.endsWith("/v1/session/expire")) {
+        expireStarted.resolve(init!.signal!);
+        return new Promise<Response>((_res, rej) => {
+          init?.signal?.addEventListener("abort", () => rej(new DOMException("Aborted", "AbortError")), { once: true });
+        });
+      }
+      return Promise.resolve(responseWithUrl("<html>login</html>", { status: 200, url: "https://vtop.vitap.ac.in/vtop/login" }));
+    });
+    vi.stubGlobal("fetch", fetch2);
+    const bg2 = createBackground();
+    const login2 = bg2.runLogin(7);
+    const expireSignal = await expireStarted.promise;
+    bg2.handleMessage({ type: "CANCEL_LOGIN" }, {}, () => {});
+    expect(expireSignal.aborted).toBe(true);
+    await expect(login2).rejects.toThrow("Sign-in cancelled.");
+    expect(fetch2.mock.calls.filter(([u]) => String(u).endsWith("/v1/session"))).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+    expect(env2.tabsUpdated).toEqual([]);
+
+    // 3. Cancel right before goToVtopContent after cookies are verified: does not navigate the tab.
+    const env3 = installMockChrome({ local: { token: ACCESS_KEY } });
+    const bg3 = createBackground();
+    const fetch3 = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/v1/session")) {
+        return responseWithUrl({
+          status: "ready",
+          cookies: [{ domain: "vtop.vitap.ac.in", name: "JSESSIONID", value: "s-ok", path: "/vtop", hostOnly: true }],
+          source: { from: "phone", cached: false },
+        });
+      }
+      // Cancel just as the post-install VTOP probe succeeds.
+      bg3.handleMessage({ type: "CANCEL_LOGIN" }, {}, () => {});
+      return responseWithUrl("<html>content</html>", { status: 200, url: VTOP_CONTENT_URL });
+    });
+    vi.stubGlobal("fetch", fetch3);
+    await expect(bg3.runLogin(8)).rejects.toThrow("Sign-in cancelled.");
+    expect(env3.tabsUpdated).toEqual([]);
+    expect(env3.tabsCreated).toEqual([]);
+  });
+
+  it("handles OPEN_EXTENSION_PANEL safely, synchronously, bound to chrome.action, and without windowId on Firefox", async () => {
     const env = installMockChrome();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const bg = createBackground();
+    const bg = createBackground({ browserName: "Chrome" });
 
     // Missing openPopup (Chrome < 127): does not throw.
     (env.mockChrome.action as { openPopup?: unknown }).openPopup = undefined;
@@ -503,18 +582,29 @@ describe("background login flow", () => {
       bg.handleMessage({ type: "OPEN_EXTENSION_PANEL" }, { tab: { id: 1, windowId: 2 } as chrome.tabs.Tab }, () => {}),
     ).not.toThrow();
 
-    // Sync throw on options object (Firefox): falls back to no-arg openPopup().
-    const openPopup = vi.fn((opts?: { windowId?: number }) => {
-      if (opts !== undefined) throw new TypeError("Unexpected options");
+    // Must be called synchronously and bound to chrome.action; sync throw on options falls back synchronously.
+    const calls: { thisOk: boolean; args: unknown[] }[] = [];
+    const openPopup = vi.fn(function (this: unknown, ...args: unknown[]) {
+      calls.push({ thisOk: this === env.mockChrome.action, args });
+      if (args.length > 0) throw new TypeError("Unexpected options");
       return Promise.resolve();
     });
     env.mockChrome.action.openPopup = openPopup;
     expect(() =>
       bg.handleMessage({ type: "OPEN_EXTENSION_PANEL" }, { tab: { id: 1, windowId: 2 } as chrome.tabs.Tab }, () => {}),
     ).not.toThrow();
-    await vi.waitFor(() => expect(openPopup).toHaveBeenCalledTimes(2));
-    expect(openPopup).toHaveBeenNthCalledWith(1, { windowId: 2 });
-    expect(openPopup).toHaveBeenNthCalledWith(2);
+    // Both the primary call and the sync-throw fallback ran synchronously (no microtask deferral).
+    expect(calls).toEqual([
+      { thisOk: true, args: [{ windowId: 2 }] },
+      { thisOk: true, args: [] },
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+
+    // Firefox calls openPopup() with no arguments directly, synchronously, bound to chrome.action.
+    calls.length = 0;
+    const ffBg = createBackground({ browserName: "Firefox" });
+    ffBg.handleMessage({ type: "OPEN_EXTENSION_PANEL" }, { tab: { id: 1, windowId: 2 } as chrome.tabs.Tab }, () => {});
+    expect(calls).toEqual([{ thisOk: true, args: [] }]);
     expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -347,11 +347,11 @@ export function createBackground(deps: BackgroundDeps = {}) {
   }
 
   /** Probes VTOP's content page with the browser's current cookies. */
-  async function probeVtopSession(): Promise<VtopProbe> {
+  async function probeVtopSession(signal?: AbortSignal): Promise<VtopProbe> {
     try {
       const check = await fetchWithTimeout(
         VTOP_CONTENT_URL,
-        { credentials: "include", redirect: "follow" },
+        { credentials: "include", redirect: "follow", signal },
         STATUS_TIMEOUT_MS,
       );
       if (isLoginRedirect(check.url)) return "bounced";
@@ -362,20 +362,21 @@ export function createBackground(deps: BackgroundDeps = {}) {
   }
 
   /** Whether VTOP still accepts the browser's cookies. */
-  async function browserSignedIn(): Promise<boolean> {
+  async function browserSignedIn(signal?: AbortSignal): Promise<boolean> {
     const cookies = await chrome.cookies.getAll({ domain: VTOP_DOMAIN });
     if (cookies.length === 0) return false;
-    return (await probeVtopSession()) === "signed_in";
+    return (await probeVtopSession(signal)) === "signed_in";
   }
 
-  async function expireSession(base: string, key: string) {
+  async function expireSession(base: string, key: string, signal?: AbortSignal) {
     try {
       await fetchWithTimeout(
         `${base}/v1/session/expire`,
-        { method: "POST", headers: { Authorization: `Bearer ${key}` } },
+        { method: "POST", headers: { Authorization: `Bearer ${key}` }, signal },
         STATUS_TIMEOUT_MS,
       );
     } catch (err) {
+      if (signal?.aborted) return;
       console.warn("VITAP Mate: session expire failed", err);
     }
   }
@@ -394,11 +395,14 @@ export function createBackground(deps: BackgroundDeps = {}) {
 
     // Still signed in from last time: no need to ask the phone or the server.
     await report(tabId, `Checking ${browser}'s VTOP session…`, { phase: "check" });
-    if (await browserSignedIn()) {
+    throwIfCancelled(signal);
+    if (await browserSignedIn(signal)) {
+      throwIfCancelled(signal);
       await report(tabId, `${browser} is still signed in. Opening VTOP…`, {
         phase: "open",
         via: "browser",
       });
+      throwIfCancelled(signal);
       await goToVtopContent(tabId);
       return;
     }
@@ -407,23 +411,30 @@ export function createBackground(deps: BackgroundDeps = {}) {
     let cookies = await getSession(base, key, tabId, signal);
     throwIfCancelled(signal);
     await install(cookies, tabId);
+    throwIfCancelled(signal);
 
-    if ((await probeVtopSession()) === "bounced") {
+    if ((await probeVtopSession(signal)) === "bounced") {
       throwIfCancelled(signal);
-      await expireSession(base, key);
+      await expireSession(base, key, signal);
+      throwIfCancelled(signal);
       cookies = await getSession(base, key, tabId, signal);
       throwIfCancelled(signal);
       await install(cookies, tabId);
+      throwIfCancelled(signal);
 
-      if ((await probeVtopSession()) === "bounced") {
+      if ((await probeVtopSession(signal)) === "bounced") {
+        throwIfCancelled(signal);
         throw new Error(
           "VTOP rejected the session. Open VITAP Mate, refresh your login, and try again.",
         );
       }
     }
+    throwIfCancelled(signal);
 
     await report(tabId, "Opening VTOP…", { phase: "open" });
+    throwIfCancelled(signal);
     await sendToTab(tabId, { type: "VTOP_MATE_LOADING", text: "Signed in", tone: "ok" });
+    throwIfCancelled(signal);
     await goToVtopContent(tabId);
   }
 
@@ -514,14 +525,25 @@ export function createBackground(deps: BackgroundDeps = {}) {
   }
 
   function openActionPopup(windowId?: number) {
-    const openPopup = chrome.action?.openPopup;
-    if (typeof openPopup !== "function") return;
-    const call = (opts?: chrome.action.OpenPopupOptions) =>
-      Promise.resolve().then(() => (opts ? openPopup(opts) : openPopup()));
-    const attempt = windowId !== undefined ? call({ windowId }).catch(() => call()) : call();
-    attempt.catch((err) => {
-      console.warn("Unable to open the popup", err);
-    });
+    if (typeof chrome.action?.openPopup !== "function") return;
+    const warn = (err: unknown) => console.warn("Unable to open the popup", err);
+    const call = (opts?: chrome.action.OpenPopupOptions): Promise<void> => {
+      try {
+        return Promise.resolve(opts ? chrome.action.openPopup(opts) : chrome.action.openPopup());
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    };
+    // Firefox's openPopup() takes no options and must run synchronously inside the user action.
+    if (browser === "Firefox" || windowId === undefined) {
+      call().catch(warn);
+      return;
+    }
+    try {
+      Promise.resolve(chrome.action.openPopup({ windowId })).catch(() => call().catch(warn));
+    } catch {
+      call().catch(warn);
+    }
   }
 
   function handleMessage(
