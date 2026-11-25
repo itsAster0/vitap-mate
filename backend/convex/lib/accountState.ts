@@ -91,19 +91,21 @@ export function semesterId(raw: string): string | null {
   return /^[0-9A-Za-z]{1,40}$/.test(id) ? id : null;
 }
 
+const PACKED_ERROR = /^([a-z][a-z0-9_]*):(?:\s+(.*)|$)/s;
+
 /** The code before the colon of a legacy request error (`code: message`). */
 export function errorCode(error: string): string {
-  const colon = error.indexOf(":");
-  return (colon < 0 ? "login_failed" : error.slice(0, colon)).trim();
+  return parseRequestError(error).code;
 }
 
-/** Splits a `"code: message"` string (from an external caller or legacy row) into `{ code, message }`. */
+/** Splits a `"code: message"` string (from an external caller or legacy row) into `{ code, message }`.
+ * Only accepts lowercase `snake_case` codes; anything else falls back to `login_failed`. */
 export function parseRequestError(raw: string): RequestError {
-  const colon = raw.indexOf(":");
-  if (colon < 0) return { code: "login_failed", message: raw };
-  const code = raw.slice(0, colon).trim();
-  const message = raw.slice(colon + 1).trim();
-  return code ? { code, message: message || raw } : { code: "login_failed", message: raw };
+  const match = PACKED_ERROR.exec(raw.trim());
+  if (!match) return { code: "login_failed", message: raw };
+  const [, code, rest] = match;
+  const message = rest?.trim() ?? "";
+  return { code, message: message || raw };
 }
 
 // ---- cookies --------------------------------------------------------------------------

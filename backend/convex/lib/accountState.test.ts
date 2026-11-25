@@ -73,8 +73,13 @@ describe("settings and ids", () => {
     expect(semesterId("VL 2025")).toBeNull();
     expect(errorCode("phone_unreachable: x")).toBe("phone_unreachable");
     expect(errorCode("plain")).toBe("login_failed");
+    expect(errorCode("Error: failed")).toBe("login_failed");
     expect(parseRequestError("phone_unreachable: x")).toEqual({ code: "phone_unreachable", message: "x" });
     expect(parseRequestError("plain")).toEqual({ code: "login_failed", message: "plain" });
+    expect(parseRequestError("Error: VTOP returned 500")).toEqual({ code: "login_failed", message: "Error: VTOP returned 500" });
+    expect(parseRequestError("Timeout at 12:34: failed")).toEqual({ code: "login_failed", message: "Timeout at 12:34: failed" });
+    expect(parseRequestError("https://vtop.vitap.ac.in")).toEqual({ code: "login_failed", message: "https://vtop.vitap.ac.in" });
+    expect(parseRequestError("bad_code:")).toEqual({ code: "bad_code", message: "bad_code:" });
   });
 });
 
