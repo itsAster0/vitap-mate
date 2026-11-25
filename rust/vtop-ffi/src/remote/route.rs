@@ -678,20 +678,7 @@ impl Core {
         let answer = self
             .signed_call(flow, Kind::Action, path, &body)
             .await
-            .map_err(|error| match error {
-                EdgeError::Status {
-                    code: ServerCode::AuthenticationFailed,
-                    message,
-                } => CoreError::OtpRejected {
-                    kind: if message.to_ascii_lowercase().contains("expire") {
-                        crate::OtpRejection::Expired
-                    } else {
-                        crate::OtpRejection::Wrong
-                    },
-                    reason: message,
-                },
-                error => error.into(),
-            })?;
+            .map_err(otp_refusal)?;
         if !self.is_current(slot) {
             return Err(CoreError::NotSignedIn);
         }
@@ -705,6 +692,33 @@ impl Core {
             self.save(slot, &session);
         }
         Ok(())
+    }
+}
+
+/// The engine's refusal of a server sign-in's OTP, as the OTP sheet tells it.
+fn otp_refusal(error: EdgeError) -> CoreError {
+    match error {
+        EdgeError::Status {
+            code: ServerCode::OtpExpired,
+            message,
+        } => CoreError::OtpRejected {
+            kind: crate::OtpRejection::Expired,
+            reason: message,
+        },
+        EdgeError::Status {
+            code: ServerCode::AuthenticationFailed,
+            message,
+        } => CoreError::OtpRejected {
+            // An engine from before `otp_expired` sends an expired OTP as this code; only VTOP's
+            // words tell it apart. Goes once every engine sends `otp_expired`.
+            kind: if message.to_ascii_lowercase().contains("expire") {
+                crate::OtpRejection::Expired
+            } else {
+                crate::OtpRejection::Wrong
+            },
+            reason: message,
+        },
+        error => error.into(),
     }
 }
 
@@ -733,6 +747,29 @@ mod tests {
 
     use super::*;
     use crate::test_edge::{Edge, serve};
+
+    #[test]
+    fn an_expired_otp_is_told_by_its_code() {
+        let refused = |code: &str, message: &str| {
+            let error = EdgeError::Status {
+                code: ServerCode::parse(code),
+                message: message.into(),
+            };
+            match otp_refusal(error) {
+                CoreError::OtpRejected { kind, .. } => Some(kind),
+                _ => None,
+            }
+        };
+        use crate::OtpRejection::{Expired, Wrong};
+        assert_eq!(refused("otp_expired", "Session timed out"), Some(Expired));
+        assert_eq!(refused("authentication_failed", "Invalid OTP"), Some(Wrong));
+        // An older engine's.
+        assert_eq!(
+            refused("authentication_failed", "OTP has expired"),
+            Some(Expired)
+        );
+        assert_eq!(refused("server_error", "OTP has expired"), None);
+    }
 
     #[test]
     fn route_and_proxy_files_keep_their_format() {

@@ -34,6 +34,8 @@ pub(crate) enum ServerCode {
     InvalidCredentials,
     /// The engine's: VTOP turned the OTP down.
     AuthenticationFailed,
+    /// The engine's: the OTP ran out before it was sent.
+    OtpExpired,
     /// The phone's: a failure with no code (or a server that crashed).
     ServerError,
     /// The phone's: proving who the student is failed.
@@ -45,7 +47,7 @@ pub(crate) enum ServerCode {
 impl ServerCode {
     /// Every code but [`Self::Unknown`], for the contract test.
     #[cfg(test)]
-    pub(crate) const KNOWN: [Self; 22] = [
+    pub(crate) const KNOWN: [Self; 23] = [
         Self::Unauthenticated,
         Self::DeviceRemoved,
         Self::RefreshReused,
@@ -66,6 +68,7 @@ impl ServerCode {
         Self::SessionExpired,
         Self::InvalidCredentials,
         Self::AuthenticationFailed,
+        Self::OtpExpired,
         Self::ServerError,
         Self::IdentityFailed,
     ];
@@ -92,6 +95,7 @@ impl ServerCode {
             "session_expired" => Self::SessionExpired,
             "invalid_credentials" => Self::InvalidCredentials,
             "authentication_failed" => Self::AuthenticationFailed,
+            "otp_expired" => Self::OtpExpired,
             "server_error" => Self::ServerError,
             "identity_failed" => Self::IdentityFailed,
             other => Self::Unknown(other.to_string()),
@@ -120,6 +124,7 @@ impl ServerCode {
             Self::SessionExpired => "session_expired",
             Self::InvalidCredentials => "invalid_credentials",
             Self::AuthenticationFailed => "authentication_failed",
+            Self::OtpExpired => "otp_expired",
             Self::ServerError => "server_error",
             Self::IdentityFailed => "identity_failed",
             Self::Unknown(code) => code,

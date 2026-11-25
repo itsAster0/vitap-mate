@@ -157,11 +157,15 @@ pub fn login_error(error: &VtopError) -> ApiError {
             "invalid_credentials",
             error.to_string(),
         ),
-        VtopError::AuthenticationFailed(message) | VtopError::OtpExpired(message) => ApiError::new(
+        VtopError::AuthenticationFailed(message) => ApiError::new(
             StatusCode::UNAUTHORIZED,
             "authentication_failed",
             message.clone(),
         ),
+        // Apart from a wrong code: the phone asks for a new one instead of a retype.
+        VtopError::OtpExpired(message) => {
+            ApiError::new(StatusCode::UNAUTHORIZED, "otp_expired", message.clone())
+        }
         VtopError::CaptchaRequired | VtopError::RegistrationParsingError => ApiError::new(
             StatusCode::BAD_GATEWAY,
             "authentication_failed",
@@ -180,7 +184,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_wrong_password_and_a_wrong_otp_are_told_apart() {
+    fn a_wrong_password_a_wrong_otp_and_an_expired_one_are_told_apart() {
         let api = login_error(&VtopError::InvalidCredentials);
         assert_eq!(
             (api.status, api.code),
@@ -189,6 +193,11 @@ mod tests {
         let api = login_error(&VtopError::AuthenticationFailed("Invalid OTP".into()));
         assert_eq!(api.code, "authentication_failed");
         assert_eq!(api.message, "Invalid OTP");
+        let api = login_error(&VtopError::OtpExpired("OTP has expired".into()));
+        assert_eq!(
+            (api.status, api.code),
+            (StatusCode::UNAUTHORIZED, "otp_expired")
+        );
         let api = login_error(&VtopError::NetworkError);
         assert_eq!(
             (api.status, api.code),

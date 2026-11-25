@@ -19,6 +19,6 @@
     "session_invalid",
     "vtop_unreachable"
   ],
-  "engine": ["session_expired", "invalid_credentials", "authentication_failed"],
+  "engine": ["session_expired", "invalid_credentials", "authentication_failed", "otp_expired"],
   "phone": ["server_error", "identity_failed"]
 }
