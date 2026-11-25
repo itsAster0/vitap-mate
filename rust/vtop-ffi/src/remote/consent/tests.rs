@@ -46,6 +46,7 @@ pub(crate) struct TestGate {
     pub(crate) attended: bool,
     pub(crate) deny: bool,
     pub(crate) answers: Mutex<VecDeque<CookieAnswer>>,
+    pub(crate) payloads: Mutex<Vec<CookiePayload>>,
     pub(crate) asks: AtomicU32,
     /// The registration-number sheet's answers (Dismissed once they run out) and its asks.
     pub(crate) regno_answers: Mutex<VecDeque<RegnoAnswer>>,
@@ -67,10 +68,12 @@ impl CookieGate for TestGate {
         &self,
         _flow: String,
         _kind: CookieKind,
+        payload: CookiePayload,
         _action: String,
         _server: String,
     ) -> Result<CookieAnswer, CoreError> {
         self.asks.fetch_add(1, Ordering::SeqCst);
+        self.payloads.lock().unwrap().push(payload);
         let next = self.answers.lock().unwrap().pop_front();
         Ok(next.unwrap_or(if self.deny {
             CookieAnswer::Deny
@@ -91,6 +94,7 @@ pub(crate) fn install(core: &Core, attended: bool, deny: bool) -> Arc<TestGate> 
         attended,
         deny,
         answers: Mutex::default(),
+        payloads: Mutex::default(),
         asks: AtomicU32::new(0),
         regno_answers: Mutex::default(),
         regno_asks: AtomicU32::new(0),
@@ -145,7 +149,15 @@ fn fresh() -> Core {
 
 fn check(core: &Core, flow: &str, kind: CookieKind, ask: bool) -> bool {
     let shared = &core.shared;
-    block_on(allowed(shared, flow, kind, "Test", "vmate.aster0.dev", ask))
+    block_on(allowed(
+        shared,
+        flow,
+        kind,
+        CookiePayload::Cookie,
+        "Test",
+        "vmate.aster0.dev",
+        ask,
+    ))
 }
 
 const YES_REMEMBER: CookieAnswer = CookieAnswer::Allow { remember: true };
@@ -294,6 +306,7 @@ fn consent_lines_carry_kind_and_decision_and_no_secret() {
             &core.shared,
             "f",
             CookieKind::Route,
+            CookiePayload::Cookie,
             "Fetch JSESSIONID=secret-cookie",
             "vmate.aster0.dev/?token=secret-query",
             true,
@@ -348,6 +361,7 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
             &self,
             _flow: String,
             _kind: CookieKind,
+            _payload: CookiePayload,
             _action: String,
             _server: String,
         ) -> Result<CookieAnswer, CoreError> {
@@ -376,6 +390,7 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
             &shared_a,
             "f-same",
             CookieKind::Route,
+            CookiePayload::Cookie,
             "Fetch A",
             "vmate.aster0.dev",
             true,
@@ -388,6 +403,7 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
             &shared_b,
             "f-same",
             CookieKind::Route,
+            CookiePayload::Cookie,
             "Fetch B",
             "vmate.aster0.dev",
             true,
@@ -450,4 +466,23 @@ fn a_no_is_not_remembered() {
     // The next flow asks again (and the script's default says yes).
     assert!(check(&core, "f2", CookieKind::Account, true));
     assert_eq!(gate.asks(), 2);
+}
+
+#[test]
+fn gate_receives_typed_payload() {
+    let core = fresh();
+    let gate = yes(&core);
+    assert!(block_on(allowed(
+        &core.shared,
+        "f-pw",
+        CookieKind::Account,
+        CookiePayload::CookieAndPassword,
+        "Save credentials",
+        "vmate.aster0.dev",
+        true,
+    )));
+    assert_eq!(
+        *gate.payloads.lock().unwrap(),
+        [CookiePayload::CookieAndPassword]
+    );
 }

@@ -25,6 +25,7 @@ pub fn map_error(error: VtopError) -> VerifyError {
     match error {
         VtopError::SessionExpired
         | VtopError::AuthenticationFailed(_)
+        | VtopError::OtpExpired(_)
         | VtopError::RegistrationParsingError => VerifyError::Expired,
         other => VerifyError::Unavailable(other.to_string()),
     }

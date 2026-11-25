@@ -212,7 +212,7 @@ private fun ChangeRow(change: Change, new: Boolean, shape: Shape, onClick: () ->
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val tone = when {
-        change.urgent || change.title.contains("below 75") -> tones.danger
+        change.urgent -> tones.danger
         new -> tones.accentTone
         else -> null
     }

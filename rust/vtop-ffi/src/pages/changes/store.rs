@@ -52,6 +52,9 @@ pub(super) const FORMAT: u8 = 1;
 pub(super) fn migrate(mut change: Change) -> Change {
     let what = change.title.trim().to_string();
     let body = change.body.trim().to_string();
+    if what.contains("below 75") {
+        change.urgent = true;
+    }
     // "Exam scheduled" bodies are "<course> <exam>: <when>"; "Exam removed" "<course> <exam>".
     let exam = |rest: &str| -> Option<(String, String, String)> {
         let (head, tail) = rest.split_once(": ").unwrap_or((rest, ""));

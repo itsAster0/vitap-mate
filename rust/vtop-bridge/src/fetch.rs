@@ -187,6 +187,7 @@ pub fn vtop_error(error: &VtopError) -> ApiError {
         // A borrowed session cannot sign in, so any refusal is an expiry.
         VtopError::SessionExpired
         | VtopError::AuthenticationFailed(_)
+        | VtopError::OtpExpired(_)
         | VtopError::InvalidCredentials
         | VtopError::OTPRequired(..) => expired(),
         VtopError::NetworkError | VtopError::VtopServerError(_) | VtopError::VtopUnavailable(_) => {

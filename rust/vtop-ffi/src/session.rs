@@ -10,8 +10,8 @@ use vtop_core::types::PersistedVtopSession;
 
 use crate::remote::route;
 use crate::{
-    ACCOUNT, Account, Core, CoreError, OtpVia, SESSION, STUDENT_FILES, SavedAccount, Session,
-    SignIn, Slot, demo, obs, traced, traced_sync, unix_now,
+    ACCOUNT, Account, Core, CoreError, OtpRejection, OtpVia, SESSION, STUDENT_FILES, SavedAccount,
+    Session, SignIn, Slot, demo, obs, traced, traced_sync, unix_now,
 };
 
 #[uniffi::export]
@@ -118,7 +118,16 @@ impl Core {
             match session.client.submit_security_otp(code.trim()).await {
                 Ok(()) => {}
                 Err(VtopError::AuthenticationFailed(reason)) => {
-                    return Err(CoreError::OtpRejected { reason });
+                    return Err(CoreError::OtpRejected {
+                        kind: OtpRejection::Wrong,
+                        reason,
+                    });
+                }
+                Err(VtopError::OtpExpired(reason)) => {
+                    return Err(CoreError::OtpRejected {
+                        kind: OtpRejection::Expired,
+                        reason,
+                    });
                 }
                 // VTOP dropped the sign-in while the prompt was open: start a new one.
                 Err(VtopError::SessionExpired) => {
@@ -242,6 +251,7 @@ impl Core {
             Err(VtopError::OTPRequired(message, _)) => {
                 session.begin_otp(OtpVia::Phone, message);
                 Err(CoreError::OtpRejected {
+                    kind: OtpRejection::SignInEnded,
                     reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
                         .into(),
                 })

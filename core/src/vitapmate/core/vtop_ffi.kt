@@ -699,7 +699,7 @@ internal interface UniffiCallbackInterfaceCookieGateMethod0 : com.sun.jna.Callba
     fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiOutReturn`: ByteByReference,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceCookieGateMethod1 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
 internal interface UniffiCallbackInterfaceCookieGateMethod2 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
@@ -1727,7 +1727,7 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_cookiegate_attended(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
-    external fun uniffi_vtop_ffi_fn_method_cookiegate_ask(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_cookiegate_ask(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_cookiegate_ask_regno(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -2390,7 +2390,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_attended() and 0xFFFF) != 63750) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 41334) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 7104) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask_regno() and 0xFFFF) != 25024) {
@@ -4095,7 +4095,7 @@ public interface CookieGate {
      * Shows the dialog: `action` is the why ("Set up mail forwarding"), `server` the host it goes
      * to. A timeout or the app leaving the screen answers no.
      */
-    suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `action`: kotlin.String, `server`: kotlin.String): CookieAnswer
+    suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `payload`: CookiePayload, `action`: kotlin.String, `server`: kotlin.String): CookieAnswer
     
     /**
      * Shows the "Share your registration number?" sheet ([`crate::remote::regno`]). A timeout
@@ -4234,7 +4234,7 @@ open class CookieGateImpl: Disposable, AutoCloseable, CookieGate
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `action`: kotlin.String, `server`: kotlin.String) : CookieAnswer {
+    override suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `payload`: CookiePayload, `action`: kotlin.String, `server`: kotlin.String) : CookieAnswer {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_vtop_ffi_fn_method_cookiegate_ask(
@@ -4242,6 +4242,7 @@ open class CookieGateImpl: Disposable, AutoCloseable, CookieGate
                 
         FfiConverterString.lower(`flow`),
         FfiConverterTypeCookieKind.lower(`kind`),
+        FfiConverterTypeCookiePayload.lower(`payload`),
         FfiConverterString.lower(`action`),
         FfiConverterString.lower(`server`),
             )
@@ -4313,12 +4314,13 @@ internal object uniffiCallbackInterfaceCookieGate {
         }
     }
     internal object `ask`: UniffiCallbackInterfaceCookieGateMethod1 {
-        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`payload`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
             val uniffiObj = FfiConverterTypeCookieGate.handleMap.get(uniffiHandle)
             val makeCall = suspend { ->
                 uniffiObj.`ask`(
                     FfiConverterString.lift(`flow`),
                     FfiConverterTypeCookieKind.lift(`kind`),
+                    FfiConverterTypeCookiePayload.lift(`payload`),
                     FfiConverterString.lift(`action`),
                     FfiConverterString.lift(`server`),
                 )
@@ -20717,6 +20719,49 @@ public object FfiConverterTypeCookieKind: FfiConverterRustBuffer<CookieKind> {
 
 
 
+/**
+ * What leaves the phone when cookie consent is granted.
+ */
+
+enum class CookiePayload {
+    
+    /**
+     * Only the VTOP session cookie.
+     */
+    COOKIE,
+    /**
+     * The VTOP session cookie and the saved password.
+     */
+    COOKIE_AND_PASSWORD;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCookiePayload: FfiConverterRustBuffer<CookiePayload> {
+    override fun read(buf: ByteBuffer) = try {
+        CookiePayload.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: CookiePayload) = 4UL
+
+    override fun write(value: CookiePayload, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 
 
 /**
@@ -20760,14 +20805,16 @@ sealed class CoreException: kotlin.Exception() {
     }
     
     /**
-     * `submit_otp` got a wrong or expired code; VTOP's text.
+     * `submit_otp` got a wrong or expired code, or the sign-in ended; VTOP's text.
      */
     class OtpRejected(
+        
+        val `kind`: OtpRejection, 
         
         val `reason`: kotlin.String
         ) : CoreException() {
         override val message
-            get() = "reason=${ `reason` }"
+            get() = "kind=${ `kind` }, reason=${ `reason` }"
     }
     
     class NotSignedIn(
@@ -20855,6 +20902,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 FfiConverterOptionalULong.read(buf),
                 )
             5 -> CoreException.OtpRejected(
+                FfiConverterTypeOtpRejection.read(buf),
                 FfiConverterString.read(buf),
                 )
             6 -> CoreException.NotSignedIn()
@@ -20896,6 +20944,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             is CoreException.OtpRejected -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
+                + FfiConverterTypeOtpRejection.allocationSize(value.`kind`)
                 + FfiConverterString.allocationSize(value.`reason`)
             )
             is CoreException.NotSignedIn -> (
@@ -20951,6 +21000,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             }
             is CoreException.OtpRejected -> {
                 buf.putInt(5)
+                FfiConverterTypeOtpRejection.write(value.`kind`, buf)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
@@ -21537,6 +21587,53 @@ public object FfiConverterTypeLiveTopic: FfiConverterRustBuffer<LiveTopic> {
     override fun allocationSize(value: LiveTopic) = 4UL
 
     override fun write(value: LiveTopic, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Why VTOP rejected an OTP submission.
+ */
+
+enum class OtpRejection {
+    
+    /**
+     * Wrong or unreadable code; the challenge stays open.
+     */
+    WRONG,
+    /**
+     * VTOP said this code has expired; ask for a new one.
+     */
+    EXPIRED,
+    /**
+     * The sign-in ended; VTOP mailed a fresh code.
+     */
+    SIGN_IN_ENDED;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOtpRejection: FfiConverterRustBuffer<OtpRejection> {
+    override fun read(buf: ByteBuffer) = try {
+        OtpRejection.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: OtpRejection) = 4UL
+
+    override fun write(value: OtpRejection, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

@@ -157,7 +157,7 @@ pub fn login_error(error: &VtopError) -> ApiError {
             "invalid_credentials",
             error.to_string(),
         ),
-        VtopError::AuthenticationFailed(message) => ApiError::new(
+        VtopError::AuthenticationFailed(message) | VtopError::OtpExpired(message) => ApiError::new(
             StatusCode::UNAUTHORIZED,
             "authentication_failed",
             message.clone(),

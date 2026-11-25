@@ -8,6 +8,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CookieAnswer
 import vitapmate.core.CookieGate
 import vitapmate.core.CookieKind
+import vitapmate.core.CookiePayload
 import vitapmate.core.RegnoAnswer
 import vitapmate.observability.Log
 import vitapmate.observability.Unattended
@@ -19,7 +20,7 @@ import vitapmate.observability.Unattended
  * answer within [Tunable.CookieAsk], or the app leaving the screen, is Cancel. Log src `ui.consent`.
  */
 object CookieConsent : CookieGate {
-    class Request(val flow: String, val kind: CookieKind, val action: String, val server: String) {
+    class Request(val flow: String, val kind: CookieKind, val payload: CookiePayload, val action: String, val server: String) {
         internal val answer = CompletableDeferred<CookieAnswer>()
         internal var waiters = 0
     }
@@ -36,13 +37,13 @@ object CookieConsent : CookieGate {
 
     override fun attended(flow: String): Boolean = Foreground.shown && flow !in Unattended.ids
 
-    override suspend fun ask(flow: String, kind: CookieKind, action: String, server: String): CookieAnswer {
+    override suspend fun ask(flow: String, kind: CookieKind, payload: CookiePayload, action: String, server: String): CookieAnswer {
         if (!Foreground.shown) return no // Left between `attended` and here: nobody would see it.
         // Only the very action the dialog names joins it; anything else waits for its own.
         val request = synchronized(this) {
             val current = pendingState.value
-            val same = current.firstOrNull { it.kind == kind && it.action == action && it.server == server }
-            (same ?: Request(flow, kind, action, server).also {
+            val same = current.firstOrNull { it.kind == kind && it.payload == payload && it.action == action && it.server == server }
+            (same ?: Request(flow, kind, payload, action, server).also {
                 pendingState.value = current + it
                 Log.info("ui.consent", "shown", flow, mapOf("kind" to kind.name.lowercase()))
             }).also { it.waiters++ }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CoreException
 import vitapmate.core.CoreInterface
 import vitapmate.core.LiveTopic
+import vitapmate.core.OtpRejection
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Gmail
@@ -175,8 +176,8 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
             return true
         } catch (e: CoreException.OtpRejected) {
             val reason = e.reason.trim().ifEmpty { "VTOP didn't accept this code." }
-            val expired = reason.contains("expire", ignoreCase = true)
-            Log.info(src, "otp rejected", lastFlow, mapOf("expired" to "$expired"))
+            val expired = e.kind == OtpRejection.EXPIRED
+            Log.info(src, "otp rejected", lastFlow, mapOf("kind" to e.kind.name.lowercase()))
             rejected += code
             minimized = false // the student sees why and can type a code
             if (expired) {

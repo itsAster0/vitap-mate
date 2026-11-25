@@ -144,6 +144,7 @@ impl Shared {
             self,
             flow,
             CookieKind::Route,
+            consent::CookiePayload::Cookie,
             action,
             &consent::host(url),
             true,
@@ -623,6 +624,7 @@ impl Core {
                 return Ok(());
             }
             return Err(CoreError::OtpRejected {
+                kind: crate::OtpRejection::SignInEnded,
                 reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
                     .into(),
             });
@@ -646,7 +648,14 @@ impl Core {
                 EdgeError::Status {
                     code: ServerCode::AuthenticationFailed,
                     message,
-                } => CoreError::OtpRejected { reason: message },
+                } => CoreError::OtpRejected {
+                    kind: if message.to_ascii_lowercase().contains("expire") {
+                        crate::OtpRejection::Expired
+                    } else {
+                        crate::OtpRejection::Wrong
+                    },
+                    reason: message,
+                },
                 error => error.into(),
             })?;
         if !self.is_current(slot) {
@@ -811,7 +820,13 @@ mod tests {
             .begin_otp(crate::OtpVia::Server, "second".into());
         let sent = core.server_otp(&slot, first, Some("123456"), "f").await;
         assert!(
-            matches!(sent, Err(CoreError::OtpRejected { .. })),
+            matches!(
+                sent,
+                Err(CoreError::OtpRejected {
+                    kind: crate::OtpRejection::SignInEnded,
+                    ..
+                })
+            ),
             "{sent:?}"
         );
         assert!(edge.lock().unwrap().requests.is_empty());

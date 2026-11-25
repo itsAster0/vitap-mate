@@ -700,6 +700,7 @@ impl Core {
                 &self.shared,
                 flow,
                 CookieKind::Account,
+                consent::CookiePayload::CookieAndPassword,
                 action,
                 &host,
                 false,

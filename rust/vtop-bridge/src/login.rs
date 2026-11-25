@@ -127,7 +127,9 @@ impl ForwardedLogin for CoreLogin {
             .map_err(failed)?;
         match client.submit_security_otp(otp).await {
             Ok(()) => Ok(client.session_state()),
-            Err(VtopError::AuthenticationFailed(_)) => Err(LoginError::OtpRejected),
+            Err(VtopError::AuthenticationFailed(_) | VtopError::OtpExpired(_)) => {
+                Err(LoginError::OtpRejected)
+            }
             Err(error) => Err(login_error(error)),
         }
     }

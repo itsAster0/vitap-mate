@@ -31,6 +31,7 @@ import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.CookieAnswer
 import vitapmate.core.CookieKind
+import vitapmate.core.CookiePayload
 import vitapmate.data.CookieConsent
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
@@ -49,7 +50,10 @@ fun CookieConsentDialog() {
     val request = pending.firstOrNull() ?: return
     var remember by remember(request) { mutableStateOf(true) }
     val answer = { send: Boolean -> CookieConsent.answer(request, if (send) CookieAnswer.Allow(remember) else CookieAnswer.Deny) }
-    val password = if (request.action.contains("password", ignoreCase = true)) ", and your password" else ""
+    val password = when (request.payload) {
+        CookiePayload.COOKIE -> ""
+        CookiePayload.COOKIE_AND_PASSWORD -> ", and your password"
+    }
     AppDialog(
         { answer(false) },
         "Send your VTOP cookie?",

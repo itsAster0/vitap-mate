@@ -519,6 +519,9 @@ fn old_changes_read_subject_first() {
         None,
     ));
     assert_eq!(c.body, "New marks · CAT-2 40/50");
+    // Unstructured legacy below-75% entry still gets marked urgent on migration.
+    let legacy = migrate(old("Attendance below 75%", "now 74%", None));
+    assert!(legacy.urgent);
     // Already new, or unknown: left alone.
     let new = old("General outing", "Accepted · Vijayawada, Sun 22 Nov", None);
     assert_eq!(migrate(new.clone()), new);

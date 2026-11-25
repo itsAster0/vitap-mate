@@ -97,6 +97,17 @@ pub enum SignIn {
     NeedsOtp { message: String },
 }
 
+/// Why VTOP rejected an OTP submission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum OtpRejection {
+    /// Wrong or unreadable code; the challenge stays open.
+    Wrong,
+    /// VTOP said this code has expired; ask for a new one.
+    Expired,
+    /// The sign-in ended; VTOP mailed a fresh code.
+    SignInEnded,
+}
+
 /// Why a forwarding call found mail forwarding off.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum ForwardingOffKind {
@@ -125,8 +136,9 @@ pub enum CoreError {
         reason: String,
         issued_at: Option<u64>,
     },
-    /// `submit_otp` got a wrong or expired code; VTOP's text.
+    /// `submit_otp` got a wrong or expired code, or the sign-in ended; VTOP's text.
     OtpRejected {
+        kind: OtpRejection,
         reason: String,
     },
     NotSignedIn,
@@ -163,7 +175,7 @@ impl std::fmt::Display for CoreError {
             }
             Self::VtopUnavailable { reason }
             | Self::OtpRequired { reason, .. }
-            | Self::OtpRejected { reason }
+            | Self::OtpRejected { reason, .. }
             | Self::ForwardingOff { reason, .. }
             | Self::Other { reason } => formatter.write_str(reason),
         }
@@ -200,6 +212,10 @@ impl From<VtopError> for CoreError {
             VtopError::OTPRequired(reason, issued_at) => Self::OtpRequired {
                 reason,
                 issued_at: Some(issued_at),
+            },
+            VtopError::OtpExpired(reason) => Self::OtpRejected {
+                kind: OtpRejection::Expired,
+                reason,
             },
             error => Self::Other {
                 reason: error.to_string(),

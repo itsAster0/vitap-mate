@@ -47,6 +47,15 @@ impl CookieKind {
     }
 }
 
+/// What leaves the phone when cookie consent is granted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum CookiePayload {
+    /// Only the VTOP session cookie.
+    Cookie,
+    /// The VTOP session cookie and the saved password.
+    CookieAndPassword,
+}
+
 /// The student's answer to the dialog. A no is never remembered, so it carries no tick.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum CookieAnswer {
@@ -127,6 +136,7 @@ pub trait CookieGate: Send + Sync {
         &self,
         flow: String,
         kind: CookieKind,
+        payload: CookiePayload,
         action: String,
         server: String,
     ) -> Result<CookieAnswer, CoreError>;
@@ -211,11 +221,12 @@ pub(crate) async fn allowed(
     shared: &Shared,
     flow: &str,
     kind: CookieKind,
+    payload: CookiePayload,
     action: &str,
     server: &str,
     ask: bool,
 ) -> bool {
-    let decision = decide(shared, flow, kind, action, server, ask).await;
+    let decision = decide(shared, flow, kind, payload, action, server, ask).await;
     info!(
         kind = kind.as_str(),
         decision = decision.as_str(),
@@ -228,6 +239,7 @@ async fn decide(
     shared: &Shared,
     flow: &str,
     kind: CookieKind,
+    payload: CookiePayload,
     action: &str,
     server: &str,
     ask: bool,
@@ -292,6 +304,7 @@ async fn decide(
             .ask(
                 flow.to_string(),
                 kind,
+                payload,
                 action.to_string(),
                 server.to_string(),
             )

@@ -42,7 +42,17 @@ impl Core {
     ) -> Result<Option<String>, CoreError> {
         self.current()?;
         let server = consent::host(&self.forwarding_server());
-        if !consent::allowed(&self.shared, flow, kind, action, &server, ask).await {
+        if !consent::allowed(
+            &self.shared,
+            flow,
+            kind,
+            consent::CookiePayload::Cookie,
+            action,
+            &server,
+            ask,
+        )
+        .await
+        {
             return Err(CoreError::ConsentDenied);
         }
         #[expect(clippy::disallowed_methods, reason = "consent::allowed said yes above")]

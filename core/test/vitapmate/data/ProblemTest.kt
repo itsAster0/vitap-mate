@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import vitapmate.core.CoreException
+import vitapmate.core.OtpRejection
 
 class ProblemTest {
     private fun kind(e: Throwable) = problemOf(e, "f1").kind
@@ -16,7 +17,7 @@ class ProblemTest {
         assertEquals(ProblemKind.SignInNeeded, kind(CoreException.InvalidCredentials()))
         assertEquals(ProblemKind.SignInNeeded, kind(CoreException.NotSignedIn()))
         assertEquals(ProblemKind.OtpNeeded, kind(CoreException.OtpRequired("otp sent", null)))
-        assertEquals(ProblemKind.OtpRejected, kind(CoreException.OtpRejected("Invalid OTP")))
+        assertEquals(ProblemKind.OtpRejected, kind(CoreException.OtpRejected(OtpRejection.WRONG, "Invalid OTP")))
         assertEquals(ProblemKind.SemesterNeeded, kind(CoreException.SemesterNeeded()))
         assertEquals(ProblemKind.Unexpected, kind(CoreException.Other("parse error")))
         assertEquals(ProblemKind.Unexpected, kind(IllegalStateException("boom")))
@@ -42,8 +43,8 @@ class ProblemTest {
 
     @Test
     fun otpRejectedShowsVtopTextOrADefault() {
-        assertEquals("Invalid OTP", problemOf(CoreException.OtpRejected(" Invalid OTP "), "f").message)
-        assertTrue(problemOf(CoreException.OtpRejected(""), "f").message.startsWith("That OTP didn't work"))
+        assertEquals("Invalid OTP", problemOf(CoreException.OtpRejected(OtpRejection.WRONG, " Invalid OTP "), "f").message)
+        assertTrue(problemOf(CoreException.OtpRejected(OtpRejection.WRONG, ""), "f").message.startsWith("That OTP didn't work"))
     }
 
     @Test

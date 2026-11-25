@@ -34,6 +34,9 @@ pub enum VtopError {
     /// offline. Carries what happened, worded for the user.
     #[error("VTOP is unavailable: {0}")]
     VtopUnavailable(String),
+    /// VTOP said the submitted security OTP has expired; carries VTOP's text.
+    #[error("OTP expired: {0}")]
+    OtpExpired(String),
 }
 
 pub type VtopResult<T> = Result<T, VtopError>;

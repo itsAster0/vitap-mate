@@ -179,7 +179,11 @@ impl SubmitOtp {
                     return Err(failed(reply.message, "Invalid OTP. Please try again."));
                 }
                 if status.as_deref() == Some("EXPIRED") {
-                    return Err(failed(reply.message, "OTP has expired. Please resend."));
+                    return Err(VtopError::OtpExpired(
+                        reply
+                            .message
+                            .unwrap_or_else(|| "OTP has expired. Please resend.".to_string()),
+                    ));
                 }
                 let redirect = reply.redirect_url.clone().filter(|_| status.as_deref() == Some("SUCCESS"));
                 self.answer = Answer { reply, status: response.status, url: response.url.clone(), text };
@@ -417,7 +421,6 @@ mod tests {
                 "Wrong code",
             ),
             ("Invalid OTP", "Invalid OTP. Please try again."),
-            (r#"{"status":"EXPIRED"}"#, "OTP has expired. Please resend."),
             (
                 r#"{"status":"LOCKED"}"#,
                 "Verification failed. Please try again.",
@@ -432,6 +435,25 @@ mod tests {
             ));
             assert!(
                 matches!(done, Step::Done(Err(VtopError::AuthenticationFailed(ref m))) if m == message),
+                "{body}"
+            );
+        }
+        for (body, message) in [
+            (r#"{"status":"EXPIRED"}"#, "OTP has expired. Please resend."),
+            (
+                r#"{"status":"EXPIRED","message":"Code timed out"}"#,
+                "Code timed out",
+            ),
+        ] {
+            let mut machine = submit();
+            machine.start();
+            let done = machine.feed(answer(
+                200,
+                "https://vtop.example/vtop/validateSecurityOtp",
+                body,
+            ));
+            assert!(
+                matches!(done, Step::Done(Err(VtopError::OtpExpired(ref m))) if m == message),
                 "{body}"
             );
         }
