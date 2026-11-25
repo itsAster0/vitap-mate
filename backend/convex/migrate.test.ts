@@ -142,6 +142,7 @@ describe("the backfill", () => {
       vaultGmail: true,
       sealedSession: "sealed-session",
       sessionSource: "phone",
+      sweepAt: OLD + 86_400,
       createdAt: OLD,
       updatedAt: OLD + 10,
     });
@@ -194,12 +195,13 @@ describe("the backfill", () => {
     const one = await deviceExport(1);
     const two = await deviceExport(2);
     await run(t, [one.item, two.item, await accountExport([one.p.deviceId, two.p.deviceId]), mailboxExport([one.p.deviceId, two.p.deviceId])]);
-    // On the edge meanwhile: the key revoked, phone 2 removed, a setting changed, phone 2 left the address.
-    const later = await accountExport([one.p.deviceId], { updated_at: OLD + 50, phone_wait_secs: 10 }, []);
+    // On the edge meanwhile: the key revoked, phone 2 removed, a setting changed, session and vault cleared, phone 2 left the address.
+    const later = await accountExport([one.p.deviceId], { updated_at: OLD + 50, phone_wait_secs: 10, sealed_vault: null, sealed_session: null }, []);
     const tally = await run(t, [later, mailboxExport([one.p.deviceId], { updated_at: OLD + 60 })]);
     expect(tally).toMatchObject({ "accounts.updated": 1, "accessKeys.deleted": 1, "phones.unlinked": 1, "mailboxes.updated": 1 });
     const r = await rows(t);
     expect(r.accounts[0]).toMatchObject({ updatedAt: OLD + 50, settings: { phoneWaitSecs: 10 } });
+    expect(r.accounts[0].sweepAt).toBeUndefined();
     expect(r.keys).toEqual([]);
     expect(r.devices.find((d) => d.deviceId === two.p.deviceId)?.accountId).toBeUndefined();
     expect(r.members.map((m) => m.deviceId)).toEqual([one.p.deviceId]);

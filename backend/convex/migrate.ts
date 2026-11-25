@@ -80,7 +80,7 @@ function count(tally: Tally, key: string, n = 1): void {
 
 /** The account's fields as the edge's `account` row has them (account-db.ts). */
 function accountFields(row: Row) {
-  return {
+  const fields = {
     settings: {
       alwaysUseVault: flag(row, "always_use_vault"),
       phoneWaitSecs: int(row, "phone_wait_secs") ?? 20,
@@ -97,6 +97,7 @@ function accountFields(row: Row) {
     createdAt: int(row, "created_at") ?? 0,
     updatedAt: int(row, "updated_at") ?? 0,
   };
+  return { ...fields, sweepAt: sweepAtOf(fields) };
 }
 
 type OldKey = Omit<Doc<"accessKeys">, "_id" | "_creationTime" | "accountId">;
