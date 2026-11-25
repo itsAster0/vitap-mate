@@ -1,5 +1,6 @@
 package vitapmate
 
+import vitapmate.data.AccountWatch
 import vitapmate.data.Settings
 import vitapmate.observability.Log
 import vitapmate.ui.rememberHaptics
@@ -139,7 +140,8 @@ fun MoreScreen() {
                         on = FetchAll.running,
                         below = { if (FetchAll.running) LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp)) },
                     )
-                    GroupItem("Connected apps", "more.connected_apps", Lucide.Unplug, "Browser extension and AI apps (MCP)", onClick = { nav.push(Route.Screen(CONNECTED_APPS)) }, trailing = { Chevron() })
+                    // The demo account reaches no server, so it has no keys to make.
+                    if (!AccountWatch.demo) GroupItem("Connected apps", "more.connected_apps", Lucide.Unplug, "Browser extension and AI apps (MCP)", onClick = { nav.push(Route.Screen(CONNECTED_APPS)) }, trailing = { Chevron() })
                     // Settings when it isn't already in the bar.
                     builtIns.filter { it.id != MORE && it.id != INSPECTOR && it.id !in tabs }.forEach { f ->
                         GroupItem(f.label, "more.${f.id}", f.icon, onClick = { nav.push(Route.Screen(f.id)) }, trailing = { Chevron() })

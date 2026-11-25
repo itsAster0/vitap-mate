@@ -49,7 +49,6 @@ import com.composables.icons.lucide.Network
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.RefreshCcw
-import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.Utensils
 import kotlinx.coroutines.launch
@@ -80,7 +79,6 @@ import vitapmate.ui.rememberHaptics
 fun SettingsScreen() {
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
-    val deviceAuth = rememberDeviceAuth()
     val haptics = rememberHaptics()
     val user by produceState<String?>(null, accountVersion) {
         value = orNull { coreFlow("settings.user", Core::signedInUser) }
@@ -99,7 +97,7 @@ fun SettingsScreen() {
     var otpSheet by remember { mutableStateOf(false) }
     // What already shows as a warning on a row, repeated at the top; each does what its row does.
     val needs = buildList {
-        if (AccountWatch.rejected) add(Need("Username and password", "VTOP rejected the saved password", "account") { deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) } })
+        if (AccountWatch.rejected) add(Need("Username and password", "VTOP rejected the saved password", "account") { nav.push(Route.Screen(ACCOUNT)) })
         syncPaused()?.let { add(Need("Background sync", "Paused: $it", "sync") { nav.push(Route.Screen(SYNC_HISTORY)) }) }
         if (!AccountWatch.demo) otpWarning()?.let { add(Need("OTP auto-fill", it, "otp") { otpSheet = true }) }
         val resumes = Foreground.resumes
@@ -151,7 +149,7 @@ fun SettingsScreen() {
                         "settings.account",
                         Lucide.Key,
                         if (AccountWatch.rejected) "VTOP rejected the saved password" else null,
-                        onClick = { deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) } },
+                        onClick = { nav.push(Route.Screen(ACCOUNT)) },
                         trailing = { Chevron() },
                         tone = if (AccountWatch.rejected) AppTheme.tones.warning else null,
                     )
@@ -175,7 +173,7 @@ fun SettingsScreen() {
             }
             // The demo account reaches nothing: the item stays, empty, so the chips keep their indices.
             item {
-                if (!AccountWatch.demo) ListGroup("Connections", footer = "How the app reaches VTOP, and what it shares with the vitapmate server.") {
+                if (!AccountWatch.demo) ListGroup("Connections", footer = "How the app reaches VTOP, and the apps that use your VTOP account. Account has your server account.") {
                     GroupItem(
                         "Connection",
                         "settings.connection",
@@ -193,16 +191,6 @@ fun SettingsScreen() {
                         onClick = { nav.push(Route.Screen(CONNECTED_APPS)) },
                         trailing = { Chevron() },
                     )
-                    GroupItem(
-                        "Server",
-                        "settings.server",
-                        Lucide.Server,
-                        "What the server keeps and your linked phones",
-                        onClick = { nav.push(Route.Screen(SERVER)) },
-                        trailing = { Chevron() },
-                    )
-                    RegnoSharingSetting()
-                    CookieConsentSetting()
                 }
             }
             item {

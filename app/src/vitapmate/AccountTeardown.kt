@@ -69,15 +69,16 @@ object AccountTeardown {
     }
 
     /**
-     * Rust's sign-out (the server, then the phone, then the forwarding addresses left behind),
-     * then what Kotlin keeps for the student, on the main thread. The app follows Rust's status
-     * back to the login screen.
+     * Rust's sign-out (the server, for every phone on the account with [everywhere], then the
+     * phone, then the forwarding addresses left behind), then what Kotlin keeps for the student,
+     * on the main thread. The app follows Rust's status back to the login screen.
      */
-    fun signOut(context: Context) {
+    fun signOut(context: Context, everywhere: Boolean = false) {
         val app = context.applicationContext
         AppScope.launch {
             flow("sign_out") { f ->
-                attempt { withContext(Dispatchers.IO) { AppCore.await().signOut(f, false) } }
+                Log.info("ui.settings", "sign out", f, mapOf("everywhere" to "$everywhere"))
+                attempt { withContext(Dispatchers.IO) { AppCore.await().signOut(f, everywhere) } }
                     .onFailure { Log.error("ui.settings", "sign out failed: ${it::class.simpleName}", f) }
                 forgetStudent(app, f)
             }

@@ -20,17 +20,14 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -64,7 +61,7 @@ import vitapmate.ui.showToast
 fun RegnoSheet() {
     val pending by RegnoConsent.pending.collectAsState()
     val request = pending ?: return
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     // The sheet slides away first, then Rust hears the answer.
@@ -124,25 +121,21 @@ fun RegnoSheet() {
     }
 }
 
-/** Settings → Connections: whether the server may know the registration number, with a switch. */
+/**
+ * Account: whether the server may know the registration number ([sharing], read by the page),
+ * with a switch; [onChanged] reads it again after a change.
+ */
 @Composable
-fun RegnoSharingSetting() {
+fun RegnoSharingSetting(sharing: RegnoSharing, onChanged: () -> Unit) {
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
-    var version by remember { mutableIntStateOf(0) }
-    val pending by RegnoConsent.pending.collectAsState()
-    // Read again after each sheet and after a change here.
-    val sharing by produceState<RegnoSharing?>(null, version, pending) {
-        value = orNull { coreFlow("settings.regno") { c, f -> c.regnoSharing(f) } }
-    }
-    val current = sharing ?: return
-    val on = current == RegnoSharing.SHARED
+    val on = sharing == RegnoSharing.SHARED
     val set = { share: Boolean ->
         haptics.toggle(share)
         scope.launch {
             val answer = if (share) RegnoAnswer.SHARE else RegnoAnswer.NOT_NOW
-            val now = orNull { coreFlow("settings.regno_set") { c, f -> c.setRegnoSharing(f, answer) } } ?: return@launch
-            version++
+            val now = orNull { coreFlow("account.regno_set") { c, f -> c.setRegnoSharing(f, answer) } } ?: return@launch
+            onChanged()
             if (now == RegnoSharing.SHARED) {
                 AppCore.proveInBackground()
             } else {
@@ -153,9 +146,9 @@ fun RegnoSharingSetting() {
     }
     GroupItem(
         "Share registration number",
-        "settings.regno",
+        "account.regno",
         Lucide.Contact,
-        when (current) {
+        when (sharing) {
             RegnoSharing.SHARED -> "The server knows who you are, for its features"
             RegnoSharing.DECLINED -> "Not shared: server features are off"
             RegnoSharing.UNASKED -> "Not shared yet"

@@ -80,14 +80,13 @@ fun App() {
     LaunchedEffect(session is AppSession.Onboarding) {
         if (session is AppSession.Onboarding) Settings.onboardingPending = true
     }
-    val deviceAuth = rememberDeviceAuth()
     // A problem's "Sign in": signed in (VTOP rejected the password, or turned the saved details
     // down), they are fixed on the Account page in place, so the cache stays; signed out, the
     // login screen is already up.
     val signIn: () -> Unit = {
         if (AccountWatch.username != null) {
             Log.info("ui.shell", "update password")
-            deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) }
+            nav.push(Route.Screen(ACCOUNT))
         } else {
             Log.info("ui.shell", "sign in again")
             nav.goTab(navTabs.first())

@@ -194,7 +194,6 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder) {
             DEVELOPER -> DeveloperScreen()
             ACCOUNT -> AccountScreen()
             CONNECTED_APPS -> ConnectedAppsScreen()
-            SERVER -> ServerScreen()
             CONNECTION -> ConnectionScreen()
             UPDATES -> UpdatesScreen()
             INBOX -> InboxScreen()
