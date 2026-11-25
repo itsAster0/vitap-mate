@@ -268,7 +268,6 @@ export default defineSchema({
     .index("by_address_device_kind", ["addressId", "deviceId", "kind"])
     .index("by_device", ["deviceId"])
     .index("by_account", ["accountId"])
-    .index("by_receivedAt", ["receivedAt"])
     .index("by_expiresAt", ["expiresAt"]),
 
   /** Server sign-ins with saved credentials waiting for VTOP's OTP mail (logins.ts). */

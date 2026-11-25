@@ -73,7 +73,7 @@ keys return `401 key_unknown`. `x-vtop-client: mcp` tags MCP key usage.
   - `200 { status: "error", code, error }`,
   - `404 request_not_found`, or `410 request_expired`.
 - **`POST /v1/session/expire`** → `204`.
-- **`POST /v1/key/token`** (`cache-control: no-store`) → `200 { jwt, expiresAt }` (24 h ES256 JWT with `{ sub: keyHash, kind: "key" }` for the extension's Convex socket; does not record a key use; `429 rate_limited` with `retry-after: 60` past the per-account bucket).
+- **`POST /v1/key/token`** (`cache-control: no-store`) → `200 { jwt, expiresAt }` (`expiresAt` in ms; 24 h ES256 JWT with `{ sub: keyHash, kind: "key" }` for the extension's Convex socket; does not record a key use; `429 rate_limited` with `retry-after: 60` past the per-account bucket).
 - **`POST /v1/pair`** (`cache-control: no-store`, per-IP + global rate limit) → `{ code }` (10-char Crockford base32, dashes/spaces/case ignored) → `202 { status: "pending", pollAfterMs }` or `200 { status: "ready", key }` (handed out once); `400 bad_request`, `429 rate_limited`.
 
 **Extension live queries.** With the key JWT from `/v1/key/token`, the extension
@@ -100,13 +100,16 @@ IP and globally.
 
 ## MCP (`/mcp`, `/mcp/{key}`)
 
-Any method on `/mcp` or `/mcp/{key}`. Non-`OPTIONS` calls must present a valid
-`vtm_…` key in `Authorization: Bearer …` or the path; otherwise Convex answers
-`401` with `WWW-Authenticate: Bearer resource_metadata="<PUBLIC_URL>/.well-known/oauth-protected-resource/mcp"`
+Any method on `/mcp` or `/mcp/{key}`. `OPTIONS` preflights answer `204` directly
+with CORS (`access-control-allow-origin: *`; methods `GET, POST, DELETE, OPTIONS`;
+headers `Content-Type, Authorization, MCP-Protocol-Version`). Other calls must
+present a valid `vtm_…` key in `Authorization: Bearer …` or the path; otherwise
+Convex answers `401` with `WWW-Authenticate: Bearer resource_metadata="<PUBLIC_URL>/.well-known/oauth-protected-resource/mcp"`
 and CORS headers. Valid requests (body ≤ 64 KiB, else `413 too_large` with CORS)
 are forwarded to `ENGINE_URL` with `x-forwarded-for` set from `PROXY_HOPS`
 (timeout 32 s → `504 vtop_timeout`; unreachable → `503 engine_unavailable`, both
-with CORS). Engine `401` responses get `WWW-Authenticate` added if missing.
+with CORS). Forwarded engine responses carry CORS headers, and engine `401`
+responses get `WWW-Authenticate` added if missing.
 
 ## UDP gateway sign-in (`/v1/app/login`)
 
@@ -125,7 +128,7 @@ otherwise):
 |---|---|---|---|
 | `POST /internal/udp-keys` | `GATEWAY_TOKEN` | `{ host, ports: [int], keys: [{ id, publicKey, from, until }] }` (1–16 ports, 1–8 unpadded X25519 keys) | `204`; `400 bad_request` |
 | `POST /internal/proof-ticket` | `VERIFIER_TOKEN` | `{ ticket }` (32 lower-case hex) | `200 { device }`; `404 challenge_invalid`; `429 too_many_proofs` (ticket stays open) |
-| `POST /internal/proof-done` | `VERIFIER_TOKEN` | `{ ticket, regno }` or `{ ticket, code }` | `204`; `404 challenge_invalid`. On `regno`, Convex asks the engine's `/engine/owner-hash` for the mailbox owner hash |
+| `POST /internal/proof-done` | `VERIFIER_TOKEN` | `{ ticket, regno }` or `{ ticket, code }` | `204`; `400 bad_request`; `404 challenge_invalid`. On `regno`, Convex asks the engine's `/engine/owner-hash` for the mailbox owner hash |
 | `POST /internal/mail` | `MAIL_TOKEN` | `{ addressId, receivedAt, otp?, gmailConfirm?: { code?, link?, requester? } }` (`receivedAt` in ms) | `200 { ok: true }` (or `{ ok: true, delivered: 0 }` for unclaimed); `400 bad_request`; `404 mailbox_not_found` |
 
 ## Guides (`/guides/{path}`)

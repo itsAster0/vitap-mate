@@ -441,6 +441,15 @@ describe("/mcp", () => {
     const { as } = await prove(t, await phone(1));
     const made = await as.action(api.keys.create, { flow: "f" });
     const calls = engine((path) => (path.startsWith("/mcp") ? Response.json({ jsonrpc: "2.0" }) : undefined));
+    // OPTIONS preflight is answered directly with CORS (including DELETE) without hitting the engine.
+    for (const path of ["/mcp", `/mcp/${made.key}`]) {
+      const pre = await t.fetch(path, { method: "OPTIONS" });
+      expect(pre.status).toBe(204);
+      expect(pre.headers.get("access-control-allow-origin")).toBe("*");
+      expect(pre.headers.get("access-control-allow-methods")).toBe("GET, POST, DELETE, OPTIONS");
+      expect(pre.headers.get("access-control-expose-headers")).toBe("WWW-Authenticate");
+    }
+    expect(calls).toHaveLength(0);
     const none = await t.fetch("/mcp", { method: "POST", body: "{}" });
     expect(none.status).toBe(401);
     expect(none.headers.get("www-authenticate")).toContain("/.well-known/oauth-protected-resource/mcp");
@@ -455,8 +464,20 @@ describe("/mcp", () => {
       headers: { "cf-connecting-ip": "9.9.9.9", "x-forwarded-for": "8.8.8.8, 1.2.3.4" },
     });
     expect(ok.status).toBe(200);
+    expect(ok.headers.get("access-control-allow-origin")).toBe("*");
+    expect(ok.headers.get("access-control-allow-methods")).toBe("GET, POST, DELETE, OPTIONS");
     expect(calls.at(-1)?.path).toBe(`/mcp/${made.key}`);
     expect(calls.at(-1)?.headers.get("x-forwarded-for")).toBe("1.2.3.4");
+    // Forwarded DELETE and upstream 401 also carry CORS (and WWW-Authenticate on 401).
+    engine(() => new Response(null, { status: 204 }));
+    const del = await t.fetch(`/mcp/${made.key}`, { method: "DELETE" });
+    expect(del.status).toBe(204);
+    expect(del.headers.get("access-control-allow-origin")).toBe("*");
+    engine(() => Response.json({ error: "revoked" }, { status: 401 }));
+    const upstream401 = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "{}" });
+    expect(upstream401.status).toBe(401);
+    expect(upstream401.headers.get("access-control-allow-origin")).toBe("*");
+    expect(upstream401.headers.get("www-authenticate")).toContain("/.well-known/oauth-protected-resource/mcp");
     // Oversized body rejected before reaching the engine, with CORS.
     const big = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "x".repeat(65 * 1024) });
     expect(big.status).toBe(413);

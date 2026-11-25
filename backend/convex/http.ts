@@ -145,9 +145,10 @@ function oauthError(code: string, description: string, status = 400): Response {
 }
 
 function cors(response: Response): Response {
-  const out = new Response(response.body, response);
+  const body = response.status === 204 || response.status === 304 ? null : response.body;
+  const out = new Response(body, response);
   out.headers.set("access-control-allow-origin", "*");
-  out.headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
+  out.headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
   out.headers.set("access-control-allow-headers", "Content-Type, Authorization, MCP-Protocol-Version");
   out.headers.set("access-control-expose-headers", "WWW-Authenticate");
   return out;
@@ -328,16 +329,15 @@ post("/token", async (ctx, req) => {
  * came, with the caller's address for its rate limits. A client with no key is told where to
  * get one (MCP authorization), and so are the engine's own 401s. */
 async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
+  if (req.method === "OPTIONS") return cors(empty());
   const url = new URL(req.url);
   const pathKey = url.pathname.startsWith("/mcp/") ? url.pathname.slice("/mcp/".length).split("/")[0].trim() : "";
   const unauthorized = (code: string, message: string) =>
     cors(error(401, code, message, { headers: { "www-authenticate": challenge() } }));
-  if (req.method !== "OPTIONS") {
-    const presented = pathKey || bearer(req);
-    if (!presented) return unauthorized("unauthorized", "Connect with OAuth or an access key from the app.");
-    const accountId = presented.startsWith(KEY_PREFIX) ? await ctx.runQuery(internal.sessions.keyHolder, { keyHash: await sha256Hex(presented) }) : null;
-    if (!accountId) return unauthorized("key_unknown", "Unknown or revoked access key.");
-  }
+  const presented = pathKey || bearer(req);
+  if (!presented) return unauthorized("unauthorized", "Connect with OAuth or an access key from the app.");
+  const accountId = presented.startsWith(KEY_PREFIX) ? await ctx.runQuery(internal.sessions.keyHolder, { keyHash: await sha256Hex(presented) }) : null;
+  if (!accountId) return unauthorized("key_unknown", "Unknown or revoked access key.");
   const headers = new Headers();
   for (const [name, value] of req.headers) {
     if (!["host", "x-forwarded-for", "x-real-ip", "content-length"].includes(name) && !name.startsWith("cf-")) headers.append(name, value);
@@ -345,7 +345,7 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   const ip = clientIp(req);
   if (ip) headers.set("x-forwarded-for", ip);
   const init: RequestInit = { method: req.method, headers, signal: AbortSignal.timeout(MCP_TIMEOUT_MS) };
-  if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+  if (!["GET", "HEAD"].includes(req.method)) {
     const body = await readBodyCapped(req, MAX_MCP_BODY_BYTES);
     if (body === null) return cors(error(413, "too_large", "The request is too large."));
     if (body.byteLength > 0) init.body = body;
@@ -361,9 +361,10 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
     logError({}, "mcp: engine unreachable", e);
     return cors(error(503, "engine_unavailable", "The server can't reach the MCP tools right now."));
   }
-  if (response.status !== 401 || response.headers.has("www-authenticate")) return response;
-  const out = new Response(response.body, response);
-  out.headers.set("www-authenticate", challenge());
+  const out = cors(response);
+  if (out.status === 401 && !out.headers.has("www-authenticate")) {
+    out.headers.set("www-authenticate", challenge());
+  }
   return out;
 }
 
