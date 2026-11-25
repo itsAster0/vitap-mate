@@ -13,7 +13,7 @@
 //! VTOP's next OTP.
 
 use std::fs;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -38,11 +38,6 @@ pub const VTOP_SENDER: &str = "noreply.sdc@vitap.ac.in";
 const VTOP_SLACK_SECS: i64 = 3;
 /// With no challenge to go by, the caller's time is the phone's clock, which may be off.
 const CLOCK_SKEW_SECS: i64 = 60;
-
-/// Serialises read-modify-write of [`FILE`].
-pub(crate) static FILE_LOCK: Mutex<()> = Mutex::new(());
-/// Serialises read-modify-write of [`LEAVE_FILE`].
-static LEAVE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Gmail's "confirm forwarding" mail: the code to type in Gmail, or the link to open.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -649,7 +644,7 @@ impl Core {
         })
     }
 
-    /// Saves `state`; Off removes the file. The caller holds [`FILE_LOCK`].
+    /// Saves `state`; Off removes the file. The caller holds the forwarding lock (`Locks::forwarding`).
     fn store_mailbox(&self, state: &MailboxState) {
         match state.stored() {
             Some(stored) => self.write(FILE, &stored),
@@ -657,9 +652,14 @@ impl Core {
         }
     }
 
-    /// The saved state through `next`, under [`FILE_LOCK`]; written only when it changed.
+    /// The saved state through `next`, under the forwarding lock; written only when it changed.
     fn update_mailbox(&self, next: impl FnOnce(MailboxState) -> MailboxState) -> MailboxState {
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _lock = self
+            .shared
+            .locks
+            .forwarding
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let before = self.mailbox_state();
         let after = next(before.clone());
         if after != before {
@@ -671,7 +671,12 @@ impl Core {
     /// Saves the address `mail:register` gave while `slot` was signed in, unless this phone got
     /// one meanwhile.
     fn save_new_mailbox(&self, slot: &Arc<Slot>, mailbox: Mailbox) -> Result<(), CoreError> {
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _lock = self
+            .shared
+            .locks
+            .forwarding
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if !self.is_current(slot) {
             // Signed out (or another student signed in) during the call: this install is on the
             // address now, and the next student mustn't get its OTPs.
@@ -752,7 +757,12 @@ impl Core {
     /// Queues this phone's address to be left; called before the student's files are forgotten.
     pub(crate) fn queue_leave(&self) {
         // Not while a setup saves the address: it would be saved after this and then forgotten.
-        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _lock = self
+            .shared
+            .locks
+            .forwarding
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if let Some(mailbox) = self.mailbox_state().mailbox() {
             self.queue_leave_of(mailbox);
         }
@@ -760,7 +770,12 @@ impl Core {
 
     /// Queues `mailbox` to be left.
     fn queue_leave_of(&self, mailbox: &Mailbox) {
-        let _lock = LEAVE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _lock = self
+            .shared
+            .locks
+            .forwarding_leave
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let mut queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
         if !queue.iter().any(|leave| leave.id == mailbox.id) {
             queue.push(Leave {
@@ -819,7 +834,12 @@ impl Core {
         if done.is_empty() {
             return;
         }
-        let _lock = LEAVE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _lock = self
+            .shared
+            .locks
+            .forwarding_leave
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let mut queue = self.read::<Vec<Leave>>(LEAVE_FILE).unwrap_or_default();
         queue.retain(|leave| !done.contains(leave));
         if queue.is_empty() {

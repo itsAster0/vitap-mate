@@ -642,7 +642,7 @@ impl Shared {
     fn on_socket_auth_error(&self) {
         let (_, effects) = self.backend_state().auth.on_jwt_rejected(None);
         if effects.contains(&Effect::ResetUdpJwt) {
-            crate::remote::udp::forget_jwt_sent();
+            crate::remote::udp::forget_jwt_sent(self);
         }
     }
 }
@@ -970,7 +970,7 @@ impl Core {
                         backend.set_auth(jwt);
                     }
                 }
-                Effect::ResetUdpJwt => crate::remote::udp::forget_jwt_sent(),
+                Effect::ResetUdpJwt => crate::remote::udp::forget_jwt_sent(&self.shared),
                 Effect::SaveRefresh(refresh) => self.keep_refresh(refresh),
                 Effect::SetAsideRefresh(refresh) => self.write(LAST_STUDENT, &refresh),
                 Effect::ForgetV2Token => self.forget_account_token(),

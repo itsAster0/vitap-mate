@@ -1,8 +1,7 @@
 //! Attendance: the summary, each course's class-by-class history and plans, and which
 //! histories to fetch again.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, PoisonError};
 
 use tracing::info;
 use vtop_core::spec;
@@ -70,7 +69,7 @@ impl Core {
             // One fetch per course at a time (the attendance list and the
             // timetable both sync histories); a caller that waited, or one
             // right after, gets the history just fetched.
-            let lock = detail_lock(&course_key);
+            let lock = self.detail_lock(&course_key);
             let _one = lock.write().await;
             if let Some(course) = self.cached_course(&course_key)
                 && let Some(data) = self.read_page::<FullAttendanceData>(&detail_file(&course))
@@ -257,16 +256,18 @@ impl Core {
 /// A history this young (seconds) is served again instead of fetched.
 const DETAIL_FRESH_S: i64 = 20;
 
-/// The lock that keeps one history fetch per course key at a time.
-fn detail_lock(key: &str) -> Arc<RwLock<()>> {
-    static LOCKS: std::sync::LazyLock<Mutex<HashMap<String, Arc<RwLock<()>>>>> =
-        std::sync::LazyLock::new(Mutex::default);
-    LOCKS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .entry(key.to_string())
-        .or_default()
-        .clone()
+impl Core {
+    /// The lock that keeps one history fetch per course key at a time.
+    fn detail_lock(&self, key: &str) -> Arc<RwLock<()>> {
+        self.shared
+            .locks
+            .attendance_details
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(key.to_string())
+            .or_default()
+            .clone()
+    }
 }
 
 /// Named from the course found, never from the caller's key, so a key can't

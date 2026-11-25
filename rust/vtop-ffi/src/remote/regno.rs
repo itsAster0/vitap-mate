@@ -12,7 +12,7 @@
 //! "Not now" holds for the rest of its flow, so one screen asks once.
 
 use std::collections::BTreeMap;
-use std::sync::{Mutex, PoisonError};
+use std::sync::PoisonError;
 
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
@@ -23,9 +23,6 @@ use crate::remote::{account_token, forwarding};
 use crate::{Core, CoreError, traced};
 
 pub(crate) const FILE: &str = "regno_sharing.json";
-
-/// Serialises read-modify-write of [`FILE`].
-static LOCK: Mutex<()> = Mutex::new(());
 
 /// The student's answer for the signed-in account.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -138,7 +135,12 @@ fn should_ask(sharing: RegnoSharing, ask: RegnoAsk) -> bool {
 /// Empties the answers at a sign-out or another student, keeping the file (so the next
 /// student isn't taken for an old install).
 pub(crate) fn forget(core: &Core) {
-    let _guard = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+    let _guard = core
+        .shared
+        .locks
+        .regno
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
     if core.at(FILE).exists() {
         core.write_plain(FILE, &Stored::default());
     }
@@ -167,11 +169,16 @@ impl RegnoAnswer {
 impl Core {
     /// [`FILE`], made from what this install holds the first time ([`migrated`]).
     fn stored(&self) -> Stored {
-        let _guard = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _guard = self
+            .shared
+            .locks
+            .regno
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         self.stored_locked()
     }
 
-    /// [`Self::stored`] with [`LOCK`] held.
+    /// [`Self::stored`] with the regno lock held.
     fn stored_locked(&self) -> Stored {
         if let Some(stored) = self.read::<Stored>(FILE) {
             return stored;
@@ -204,7 +211,12 @@ impl Core {
         for effect in effects {
             match effect {
                 Effect::Save(answer) => {
-                    let _guard = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+                    let _guard = self
+                        .shared
+                        .locks
+                        .regno
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner);
                     let mut stored = self.stored_locked();
                     stored.answers.insert(regno.to_ascii_uppercase(), answer);
                     self.write_plain(FILE, &stored);

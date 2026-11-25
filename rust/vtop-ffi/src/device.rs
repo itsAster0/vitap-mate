@@ -3,7 +3,7 @@
 //! forwarded OTPs are sealed to, the refresh token `auth:token` gave it, and the FCM token. All in
 //! `device.json`; nothing of it is ever logged. Calls go through [`crate::remote::backend`].
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::{MutexGuard, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -15,9 +15,6 @@ use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, traced, unix_now};
 
 const FILE: &str = "device.json";
-
-/// Serialises read-modify-write of [`FILE`].
-static LOCK: Mutex<()> = Mutex::new(());
 
 /// No `Debug`: it holds the private keys.
 #[derive(Clone, Serialize, Deserialize)]
@@ -75,9 +72,9 @@ impl From<EdgeError> for CoreError {
 impl Core {
     /// This install's keys, made on first use.
     pub(crate) fn device(&self) -> Device {
-        let _guard = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(device) = self.read::<Device>(FILE) {
-            return device;
+        let mut kept = self.kept_device();
+        if let Some(device) = &*kept {
+            return device.clone();
         }
         let (seal_secret, seal_key) = mail_seal::generate_keypair();
         let device = Device {
@@ -90,14 +87,29 @@ impl Core {
         };
         self.write_plain(FILE, &device);
         info!("device keys made");
+        *kept = Some(device.clone());
         device
     }
 
+    /// `device.json` as last read or written, read on first use; the guard holds the file's lock.
+    fn kept_device(&self) -> MutexGuard<'_, Option<Device>> {
+        let mut kept = self
+            .shared
+            .locks
+            .device
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if kept.is_none() {
+            *kept = self.read::<Device>(FILE);
+        }
+        kept
+    }
+
     fn update_device(&self, change: impl FnOnce(&mut Device)) {
-        let _guard = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(mut device) = self.read::<Device>(FILE) {
-            change(&mut device);
-            self.write_plain(FILE, &device);
+        let mut kept = self.kept_device();
+        if let Some(device) = &mut *kept {
+            change(device);
+            self.write_plain(FILE, &*device);
         }
     }
 
@@ -161,5 +173,40 @@ impl Core {
             }
         })
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    fn dir(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("vtop-ffi-device-{name}-{}", std::process::id()));
+        // A leftover from an earlier run, if any.
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn the_device_is_read_once_and_kept_per_core() {
+        let dir = dir("kept");
+        let core = Core::for_test(&dir);
+        let seed = core.device().seed;
+        core.set_clock_offset(42);
+        // Every signed call asks for the clock: it comes from memory, not the file.
+        fs::write(dir.join(FILE), "not json").unwrap();
+        assert_eq!(core.server_now() - unix_now(), 42);
+        assert_eq!(core.device().seed, seed);
+        core.set_clock_offset(7);
+
+        // Another core reads what this one wrote.
+        let other = Core::for_test(&dir);
+        let device = other.device();
+        assert!(device.seed == seed && device.clock_offset == 7);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

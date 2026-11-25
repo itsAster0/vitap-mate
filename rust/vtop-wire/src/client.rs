@@ -18,11 +18,13 @@
 //! uses tokio's (feature `tokio`, on by default).
 
 use std::collections::{BTreeMap, HashMap};
+use std::ffi::OsStr;
 use std::fs::{self, File, OpenOptions};
 use std::future::Future;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::fec::{self, DATA_WIRE};
@@ -1032,10 +1034,31 @@ fn network_key(ip: IpAddr, port: u16) -> String {
     }
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let tmp = path.with_extension(format!("tmp{}", std::process::id()));
-    fs::write(&tmp, bytes)?;
-    fs::rename(tmp, path)
+/// Writes `bytes` to `path` through a temporary file of this write's own beside it
+/// (`<file>.<pid>.<n>.tmp`, the app's pattern, so it sweeps one a crash left), synced before it
+/// replaces `path`: a crash leaves the old file or the new one, and two writers never share one.
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let mut name = path
+        .file_name()
+        .map(OsStr::to_os_string)
+        .unwrap_or_default();
+    name.push(format!(
+        ".{}.{}.tmp",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let tmp = path.with_file_name(name);
+    let written = File::create(&tmp)
+        .and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()))
+        .and_then(|()| fs::rename(&tmp, path));
+    if written.is_err()
+        && let Err(error) = fs::remove_file(&tmp)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        log::warn!("temporary file not removed: {error}");
+    }
+    written
 }
 
 fn io(e: std::io::Error) -> WireError {

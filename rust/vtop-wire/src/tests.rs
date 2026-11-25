@@ -777,3 +777,33 @@ fn known_answers() {
     let n = responder.read_message(&hs1[..len], &mut payload).unwrap();
     assert_eq!(&payload[..n], b"vm1");
 }
+
+#[test]
+fn state_files_are_replaced_whole_and_leave_no_temporary_file() {
+    let dir = std::env::temp_dir().join(format!("vtop-wire-atomic-{}", std::process::id()));
+    // A leftover from an earlier run, if any.
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("session.key");
+    std::thread::scope(|scope| {
+        for writer in 0..8 {
+            let path = &path;
+            scope.spawn(move || {
+                for _ in 0..20 {
+                    crate::client::write_atomic(path, format!("{writer}").as_bytes()).unwrap();
+                }
+            });
+        }
+    });
+    let last: u32 = std::fs::read_to_string(&path).unwrap().parse().unwrap();
+    assert!(last < 8);
+    // A folder can't be replaced by a file: the failed write cleans up after itself.
+    std::fs::create_dir(dir.join("taken")).unwrap();
+    assert!(crate::client::write_atomic(&dir.join("taken"), b"x").is_err());
+    assert_eq!(
+        std::fs::read_dir(&dir).unwrap().count(),
+        2,
+        "a temporary file left"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}

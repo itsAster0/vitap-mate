@@ -486,8 +486,11 @@ struct Shared {
     cipher: Option<Arc<dyn PasswordCipher>>,
     /// The OTP prompt and the calls waiting on it.
     otp: Arc<otp::Board>,
-    /// Held over every read-modify-write of [`ACCOUNT`].
-    account_file: Mutex<()>,
+    /// This core's file locks and its copy of `device.json`.
+    locks: store::Locks,
+    /// A hash of the JWT last sent to the UDP gateway (0: none), which it signs in with when the
+    /// session it holds expires. Each new JWT goes once, whatever its lifetime.
+    udp_jwt_sent: std::sync::atomic::AtomicU64,
     /// The password last sealed or opened ([`store::account`]).
     sealed: store::account::Sealed,
     /// Who hears [`AccountStatus`] changes, and what it heard last.

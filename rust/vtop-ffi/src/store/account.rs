@@ -218,7 +218,8 @@ impl Core {
         };
         let _file = self
             .shared
-            .account_file
+            .locks
+            .account
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let Some(mut stored) = self.read::<Stored>(ACCOUNT) else {
@@ -252,7 +253,8 @@ impl Core {
         {
             let _file = self
                 .shared
-                .account_file
+                .locks
+                .account
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner);
             let same = self
@@ -275,7 +277,8 @@ impl Core {
         {
             let _file = self
                 .shared
-                .account_file
+                .locks
+                .account
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner);
             let Some(mut stored) = self.read::<Stored>(ACCOUNT) else {

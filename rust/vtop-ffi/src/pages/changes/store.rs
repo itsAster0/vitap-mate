@@ -2,7 +2,7 @@
 
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Mutex, PoisonError};
+use std::sync::PoisonError;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -23,8 +23,6 @@ const DEDUPE_MS: i64 = 10 * 60 * 1000;
 const KEEP: usize = 1000;
 /// The semester part of the primed key for pages kept outside a semester (outings).
 const NO_SEMESTER: &str = "-";
-
-static LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(super) struct Store {
@@ -212,12 +210,22 @@ impl Core {
     }
 
     pub(super) fn store(&self) -> Store {
-        let _one = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _one = self
+            .shared
+            .locks
+            .changes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         upgraded(self.read::<Store>(FILE).unwrap_or_default())
     }
 
     pub(super) fn update_store(&self, change: impl FnOnce(&mut Store)) {
-        let _one = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _one = self
+            .shared
+            .locks
+            .changes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let mut store = upgraded(self.read::<Store>(FILE).unwrap_or_default());
         change(&mut store);
         self.write_plain(FILE, &store);

@@ -9,7 +9,7 @@
 //! `bun dev/demo.ts` in `backend/` swaps out the personal details.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, PoisonError};
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -163,11 +163,15 @@ impl Core {
         args: &[(&str, &str)],
         data: &impl Serialize,
     ) {
-        static LOCK: Mutex<()> = Mutex::new(());
         if !dev::debuggable(&self.shared) || !self.at(RECORD).is_file() {
             return;
         }
-        let _lock = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let _lock = self
+            .shared
+            .locks
+            .demo
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let mut bundle = self.read::<Bundle>(RECORD).unwrap_or_default();
         bundle.schema = SCHEMA;
         match serde_json::to_value(data) {

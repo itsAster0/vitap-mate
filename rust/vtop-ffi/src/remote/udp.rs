@@ -7,7 +7,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -24,15 +24,12 @@ use crate::transport::TransportError;
 use crate::{Core, unix_now};
 
 const GATEWAY: &str = "udp-gateway.json";
-const WIRE_DIR: &str = "udp";
+pub(crate) const WIRE_DIR: &str = "udp";
 /// Asked again after this, or at once when no key is current or the gateway has another.
 const GATEWAY_KEEP_SECS: i64 = 6 * 3600;
 /// The whole UDP attempt, the engine's VTOP time in it; the route falls back to HTTPS after it.
 /// A gateway that never answers is given up on sooner (vtop-wire's `SILENT`, 5 s).
 const TIMEOUT: Duration = Duration::from_secs(30);
-/// A hash of the JWT last sent to the gateway (0: none), which it signs in with when the session
-/// it holds expires. Each new JWT goes once, whatever its lifetime.
-static JWT_SENT: AtomicU64 = AtomicU64::new(0);
 
 /// Why a UDP fetch gave no page, read once from the gateway's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,8 +68,8 @@ impl From<&str> for UdpFetchError {
 }
 
 /// The next fetch sends the JWT again: the identity changed (sign-out, another student).
-pub(crate) fn forget_jwt_sent() {
-    JWT_SENT.store(0, Ordering::Relaxed);
+pub(crate) fn forget_jwt_sent(shared: &crate::Shared) {
+    shared.udp_jwt_sent.store(0, Ordering::Relaxed);
 }
 
 fn jwt_hash(jwt: &str) -> u64 {
@@ -264,7 +261,7 @@ impl Core {
         page.session_hash = session_hash(&session);
         page.account = self
             .live_jwt()
-            .filter(|jwt| jwt_hash(jwt) != JWT_SENT.load(Ordering::Relaxed));
+            .filter(|jwt| jwt_hash(jwt) != self.shared.udp_jwt_sent.load(Ordering::Relaxed));
         loop {
             let key = gateway
                 .key(self.server_now())
@@ -300,7 +297,9 @@ impl Core {
             let answer =
                 WirePageResponse::decode(&fetched.body).ok_or("unreadable answer from UDP")?;
             if let Some(jwt) = &page.account {
-                JWT_SENT.store(jwt_hash(jwt), Ordering::Relaxed);
+                self.shared
+                    .udp_jwt_sent
+                    .store(jwt_hash(jwt), Ordering::Relaxed);
             }
             if answer.status == NEED_SESSION && page.session.is_none() {
                 page.session = Some(session.clone());

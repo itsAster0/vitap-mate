@@ -1,30 +1,58 @@
 //! The app's files: where each lives, and JSON reads and crash-safe writes.
 
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::PoisonError;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tracing::{debug, info, warn};
 
+use vtop_core::sync::RwLock;
+
+use crate::device::Device;
 use crate::pages::changes;
-use crate::remote::{consent, forwarding, regno};
+use crate::remote::{consent, regno, udp};
 use crate::{Core, PAGES, SELECTED, SEMESTERS};
 
 pub(crate) mod account;
 pub(crate) mod cookies;
 pub(crate) mod decoded;
 
+/// Each lock serialises the read-modify-write of one of the core's files.
+#[derive(Default)]
+pub(crate) struct Locks {
+    pub(crate) account: Mutex<()>,
+    /// `device.json`, kept decoded once read: every signed call reads it (its clock offset).
+    /// Only this core writes it, under this lock.
+    pub(crate) device: Mutex<Option<Device>>,
+    /// `forwarding.json`.
+    pub(crate) forwarding: Mutex<()>,
+    /// The forwarding addresses still to leave on the server.
+    pub(crate) forwarding_leave: Mutex<()>,
+    /// The change inbox.
+    pub(crate) changes: Mutex<()>,
+    /// Developer's demo recording.
+    pub(crate) demo: Mutex<()>,
+    /// `regno_sharing.json`.
+    pub(crate) regno: Mutex<()>,
+    /// One class-history fetch per course key at a time; emptied with the student's files.
+    pub(crate) attendance_details: Mutex<HashMap<String, Arc<RwLock<()>>>>,
+}
+
 impl Core {
     /// Removes `files` and every cached page: the student's data, at a sign-out or another
     /// student. One file alone goes with [`Core::remove_file`].
     pub(crate) fn forget(&self, files: &[&str]) {
         // Not while a pull records mail into forwarding.json (it would write it back).
-        let _forwarding = forwarding::FILE_LOCK
+        let _forwarding = self
+            .shared
+            .locks
+            .forwarding
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         if files.contains(&consent::FILE) {
@@ -41,6 +69,12 @@ impl Core {
             _ => {}
         }
         decoded::forget(&self.dir);
+        self.shared
+            .locks
+            .attendance_details
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
     }
 
     /// Removes `file` and its decoded copy, leaving everything else.
@@ -120,13 +154,18 @@ impl Core {
 const PID_MAX: u32 = 1 << 22;
 
 impl Core {
-    /// Removes what a write cut short by a crash left: [`write_atomic`]'s temporary files from
-    /// another process, in the data folder, the cached pages and the cache folder. They can hold
+    /// Removes what a write cut short by a crash left: [`write_atomic`]'s (and vtop-wire's)
+    /// temporary files from another process, in the data folder, the cached pages, the UDP
+    /// sessions and the cache folder. They can hold
     /// what the file they were replacing holds (the sealed password, tokens), so they don't stay.
     pub(crate) fn sweep_temporary(&self) {
         let own = std::process::id();
-        let mut folders = vec![(self.dir.clone(), false), (self.cache.clone(), false)];
-        folders.push((self.at(PAGES), true));
+        let mut folders = vec![
+            (self.dir.clone(), false),
+            (self.cache.clone(), false),
+            (self.at(udp::WIRE_DIR), false),
+            (self.at(PAGES), true),
+        ];
         let mut removed = 0_u32;
         while let Some((folder, deep)) = folders.pop() {
             let Ok(entries) = fs::read_dir(&folder) else {
@@ -271,6 +310,23 @@ mod tests {
             1,
             "a temporary file left"
         );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn forgetting_the_student_drops_the_class_history_locks() {
+        let dir = scratch("detail-locks");
+        let core = Core::for_test(&dir);
+        let locks = || core.shared.locks.attendance_details.lock().unwrap().len();
+        core.shared
+            .locks
+            .attendance_details
+            .lock()
+            .unwrap()
+            .insert("CSE1001.theory".into(), Default::default());
+        assert_eq!(locks(), 1);
+        core.forget(&[]);
+        assert_eq!(locks(), 0);
         fs::remove_dir_all(&dir).unwrap();
     }
 
