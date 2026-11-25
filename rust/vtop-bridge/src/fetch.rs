@@ -91,20 +91,20 @@ pub async fn fetch_batch(
         .iter()
         .map(|p| tokio::time::timeout_at(deadline, page(&client, &p.name, &semester, &p.args)))
         .collect();
-    let answers: Vec<Result<Value, ApiError>> = futures::stream::iter(pages)
+    let answers: Vec<Result<Value, PageError>> = futures::stream::iter(pages)
         .buffered(BATCH_AT_ONCE)
-        .map(|answer| answer.unwrap_or_else(|_| Err(timed_out())))
+        .map(|answer| answer.unwrap_or_else(|_| Err(PageError::Failed(timed_out()))))
         .collect()
         .await;
-    if let Some(Err(error)) = answers
+    if answers
         .iter()
-        .find(|answer| matches!(answer, Err(e) if e.code == "session_expired"))
+        .any(|answer| matches!(answer, Err(PageError::Expired)))
     {
-        return Err(error.clone());
+        return Err(expired());
     }
     let data: Vec<Value> = answers
         .into_iter()
-        .map(|answer| match answer {
+        .map(|answer| match answer.map_err(ApiError::from) {
             Ok(data) => json!({ "data": data }),
             Err(e) => json!({ "code": e.code, "error": e.message }),
         })
@@ -131,13 +131,34 @@ fn client(state: &AppState, session: &SessionState) -> Result<VtopClient, ApiErr
         .map_err(|error| vtop_error(&error))
 }
 
+/// Why a page gave no data: the session ran out (which fails a whole batch), or anything else.
+enum PageError {
+    Expired,
+    Failed(ApiError),
+}
+
+impl From<PageError> for ApiError {
+    fn from(error: PageError) -> Self {
+        match error {
+            PageError::Expired => expired(),
+            PageError::Failed(error) => error,
+        }
+    }
+}
+
+impl From<ApiError> for PageError {
+    fn from(error: ApiError) -> Self {
+        Self::Failed(error)
+    }
+}
+
 /// Page `name` with its `args` checked, within [`FETCH_TIMEOUT`].
 async fn page(
     client: &VtopClient,
     name: &str,
     semester: &str,
     args: &Args,
-) -> Result<Value, ApiError> {
+) -> Result<Value, PageError> {
     let def = pages::find(name).ok_or_else(|| {
         ApiError::new(
             StatusCode::NOT_FOUND,
@@ -146,16 +167,12 @@ async fn page(
         )
     })?;
     if args.len() != def.args.len() || !def.args.iter().all(|name| args.contains_key(*name)) {
-        return Err(bad_arguments(format!(
-            "{} takes: {}.",
-            def.name,
-            def.args.join(", ")
-        )));
+        return Err(bad_arguments(format!("{} takes: {}.", def.name, def.args.join(", "))).into());
     }
     tokio::time::timeout(FETCH_TIMEOUT, (def.call)(client, semester, args))
         .await
         .map_err(|_| timed_out())?
-        .map_err(|error| vtop_error(&error))
+        .map_err(|error| page_error(&error))
 }
 
 fn timed_out() -> ApiError {
@@ -182,14 +199,19 @@ fn expired() -> ApiError {
 /// it sign in again; the rest name what failed. VTOP's own messages carry
 /// no session data.
 pub fn vtop_error(error: &VtopError) -> ApiError {
+    page_error(error).into()
+}
+
+/// [`vtop_error`], an expiry kept apart.
+fn page_error(error: &VtopError) -> PageError {
     let message = error.to_string();
-    match error {
+    PageError::Failed(match error {
         // A borrowed session cannot sign in, so any refusal is an expiry.
         VtopError::SessionExpired
         | VtopError::AuthenticationFailed(_)
         | VtopError::OtpExpired(_)
         | VtopError::InvalidCredentials
-        | VtopError::OTPRequired(..) => expired(),
+        | VtopError::OTPRequired(..) => return PageError::Expired,
         VtopError::NetworkError | VtopError::VtopServerError(_) | VtopError::VtopUnavailable(_) => {
             ApiError::new(StatusCode::BAD_GATEWAY, "vtop_unavailable", message)
         }
@@ -199,7 +221,7 @@ pub fn vtop_error(error: &VtopError) -> ApiError {
         // vtop-core's inputs reject a bad argument this way.
         VtopError::ConfigurationError(_) => bad_arguments(message),
         _ => ApiError::new(StatusCode::BAD_GATEWAY, "vtop_error", message),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -213,12 +235,18 @@ mod tests {
             VtopError::AuthenticationFailed("x".into()),
             VtopError::OTPRequired("x".into(), 1),
         ] {
+            // Kept apart, so a batch fails whole on it.
+            assert!(matches!(page_error(&error), PageError::Expired));
             let api = vtop_error(&error);
             assert_eq!(
                 (api.status, api.code),
                 (StatusCode::UNAUTHORIZED, "session_expired")
             );
         }
+        assert!(matches!(
+            page_error(&VtopError::NetworkError),
+            PageError::Failed(_)
+        ));
     }
 
     #[test]

@@ -36,6 +36,10 @@ pub(crate) enum ServerCode {
     AuthenticationFailed,
     /// The engine's: the OTP ran out before it was sent.
     OtpExpired,
+    /// The engine's: VTOP didn't answer, or answered with an error page.
+    VtopUnavailable,
+    /// The engine's: VTOP took too long.
+    VtopTimeout,
     /// The phone's: a failure with no code (or a server that crashed).
     ServerError,
     /// The phone's: proving who the student is failed.
@@ -47,7 +51,7 @@ pub(crate) enum ServerCode {
 impl ServerCode {
     /// Every code but [`Self::Unknown`], for the contract test.
     #[cfg(test)]
-    pub(crate) const KNOWN: [Self; 23] = [
+    pub(crate) const KNOWN: [Self; 25] = [
         Self::Unauthenticated,
         Self::DeviceRemoved,
         Self::RefreshReused,
@@ -69,6 +73,8 @@ impl ServerCode {
         Self::InvalidCredentials,
         Self::AuthenticationFailed,
         Self::OtpExpired,
+        Self::VtopUnavailable,
+        Self::VtopTimeout,
         Self::ServerError,
         Self::IdentityFailed,
     ];
@@ -96,6 +102,8 @@ impl ServerCode {
             "invalid_credentials" => Self::InvalidCredentials,
             "authentication_failed" => Self::AuthenticationFailed,
             "otp_expired" => Self::OtpExpired,
+            "vtop_unavailable" => Self::VtopUnavailable,
+            "vtop_timeout" => Self::VtopTimeout,
             "server_error" => Self::ServerError,
             "identity_failed" => Self::IdentityFailed,
             other => Self::Unknown(other.to_string()),
@@ -125,6 +133,8 @@ impl ServerCode {
             Self::InvalidCredentials => "invalid_credentials",
             Self::AuthenticationFailed => "authentication_failed",
             Self::OtpExpired => "otp_expired",
+            Self::VtopUnavailable => "vtop_unavailable",
+            Self::VtopTimeout => "vtop_timeout",
             Self::ServerError => "server_error",
             Self::IdentityFailed => "identity_failed",
             Self::Unknown(code) => code,

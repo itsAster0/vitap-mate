@@ -20,6 +20,7 @@ use vtop_wire::client::{self as wire, ClientConfig, WireError};
 
 use crate::remote::backend::Kind;
 use crate::remote::route::unpacked;
+use crate::remote::server_code::ServerCode;
 use crate::transport::TransportError;
 use crate::{Core, unix_now};
 
@@ -36,9 +37,9 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) enum UdpFetchError {
     /// The link worked; VTOP's session ran out and the gateway couldn't renew it.
     SessionExpired,
-    /// The gateway (or the engine behind it) answered `status` with `code` (`unreadable` when
-    /// the body wasn't JSON).
-    Gateway { status: u16, code: String },
+    /// The gateway (or the engine behind it) answered `status` with `code`
+    /// ([`ServerCode::ServerError`] when the body had none or wasn't JSON).
+    Gateway { status: u16, code: ServerCode },
     /// No answer, or none we could use: the route counts it as a failure.
     Transport(String),
 }
@@ -200,17 +201,13 @@ fn page_answer(name: &str, answer: &WirePageResponse) -> Result<Value, UdpFetchE
     let status = answer.status;
     if status != 200 {
         let body = serde_json::from_slice::<Value>(&answer.body).ok();
-        let code = body.as_ref().map_or("unreadable", |body| {
-            body.get("code")
-                .and_then(Value::as_str)
-                .unwrap_or("unknown")
-        });
+        let code = body
+            .as_ref()
+            .and_then(|body| body.get("code")?.as_str())
+            .map_or(ServerCode::ServerError, ServerCode::parse);
         return Err(match code {
-            "session_expired" => UdpFetchError::SessionExpired,
-            code => UdpFetchError::Gateway {
-                status,
-                code: code.to_string(),
-            },
+            ServerCode::SessionExpired => UdpFetchError::SessionExpired,
+            code => UdpFetchError::Gateway { status, code },
         });
     }
     let unreadable = || UdpFetchError::Transport("unreadable page from UDP".to_string());

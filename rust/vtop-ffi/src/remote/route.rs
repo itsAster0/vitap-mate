@@ -427,6 +427,10 @@ impl From<EdgeError> for ServerError {
                 code: ServerCode::SessionExpired,
                 ..
             } => Self::Expired,
+            EdgeError::Status {
+                code: ServerCode::NotFound,
+                ..
+            } => Self::NotFound,
             EdgeError::Offline => Self::Failed("server unreachable".into()),
             EdgeError::Status { code, message } => Self::Failed(format!("{code}: {message}")),
         }

@@ -209,15 +209,16 @@ impl Core {
         let started = Instant::now();
         let proving = std::pin::pin!(self.prove_with(flow, &stats));
         let deadline = std::pin::pin!(vtop_core::sync::sleep(budget));
-        let out = match select(proving, deadline).await {
-            Either::Left((out, _)) => out,
-            Either::Right(_) => Err(failed("the server took too long")),
-        };
-        let outcome = match &out {
-            Ok(_) => "proved",
-            Err(CoreError::Offline) => "offline",
-            Err(CoreError::Other { reason }) if reason.ends_with("too long") => "timed out",
-            Err(_) => "failed",
+        let (out, outcome) = match select(proving, deadline).await {
+            Either::Left((out, _)) => {
+                let outcome = match &out {
+                    Ok(_) => "proved",
+                    Err(CoreError::Offline) => "offline",
+                    Err(_) => "failed",
+                };
+                (out, outcome)
+            }
+            Either::Right(_) => (Err(failed("the server took too long")), "timed out"),
         };
         stats.log(outcome, since(started));
         out

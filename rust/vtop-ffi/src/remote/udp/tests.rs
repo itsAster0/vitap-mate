@@ -382,18 +382,25 @@ fn gateway_answers_parse_once_into_errors() {
         gone,
         Err(UdpFetchError::Gateway {
             status: 404,
-            code: "unreadable".into()
+            code: ServerCode::ServerError
         })
     );
     assert_eq!(
         gone.unwrap_err().to_string(),
-        "the UDP gateway answered 404 unreadable"
+        "the UDP gateway answered 404 server_error"
     );
     assert_eq!(
         page_answer("marks", &answer(502, b"{}")),
         Err(UdpFetchError::Gateway {
             status: 502,
-            code: "unknown".into()
+            code: ServerCode::ServerError
+        })
+    );
+    assert_eq!(
+        page_answer("marks", &answer(503, br#"{"code":"vtop_unavailable"}"#)),
+        Err(UdpFetchError::Gateway {
+            status: 503,
+            code: ServerCode::VtopUnavailable
         })
     );
     assert!(matches!(

@@ -16,6 +16,7 @@ use vtop_shared::wire_page::{BATCH, WirePageRequest, batch_args};
 
 use super::plan::ServerError;
 use super::{Route, page_data};
+use crate::remote::server_code::ServerCode;
 use crate::remote::udp::UdpFetchError;
 use crate::{Core, CoreError, SEMESTERS, SemesterData, traced};
 
@@ -217,7 +218,7 @@ impl Core {
         }
         let body = serde_json::to_value(request).unwrap_or_default();
         let answer = match self.engine_call(flow, "vtop:fetchBatch", body).await {
-            Err(ServerError::Failed(reason)) if reason.starts_with("not_found") => {
+            Err(ServerError::NotFound) => {
                 info!("the server has no batches; page by page");
                 return Ok(None);
             }
@@ -244,10 +245,14 @@ fn page_answer(mut answer: Value) -> Result<Value, CoreError> {
     if let Some(data) = answer.get_mut("data") {
         return Ok(data.take());
     }
-    let text = |key| answer.get(key).and_then(Value::as_str).unwrap_or_default();
-    let reason = text("error").to_string();
-    Err(match text("code") {
-        "vtop_unavailable" | "vtop_timeout" => CoreError::VtopUnavailable { reason },
+    let text = |key| answer.get(key).and_then(Value::as_str);
+    let reason = text("error").unwrap_or_default().to_string();
+    // No code: the engine failed without saying why.
+    let code = text("code").map_or(ServerCode::ServerError, ServerCode::parse);
+    Err(match code {
+        ServerCode::VtopUnavailable | ServerCode::VtopTimeout => {
+            CoreError::VtopUnavailable { reason }
+        }
         code => CoreError::Other {
             reason: format!("{code}: {reason}"),
         },

@@ -98,11 +98,24 @@ impl RoutePlan {
     }
 }
 
-/// The edge's answer as [`ServerError`]: the session ran out, or the server part failed.
+/// The edge's answer as [`ServerError`]: the session ran out, the server has no such function
+/// (it is older than the app), or the server part failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ServerError {
     Expired,
+    NotFound,
     Failed(String),
+}
+
+impl ServerError {
+    /// Why the route is skipped for it.
+    fn reason(self) -> Option<String> {
+        match self {
+            Self::Expired => None,
+            Self::NotFound => Some("the server has no such function".into()),
+            Self::Failed(reason) => Some(reason),
+        }
+    }
 }
 
 /// What a server page does next.
@@ -149,16 +162,14 @@ impl ServerFetch {
                 self.relogged = true;
                 Next::Relogin
             }
-            ServerError::Expired => Next::GiveUp,
-            ServerError::Failed(reason) => Next::Fail(reason),
+            error => error.reason().map_or(Next::GiveUp, Next::Fail),
         }
     }
 
     pub(super) fn relogged(&self, result: Result<(), ServerError>) -> Next {
         match result {
             Ok(()) => Next::Fetch,
-            Err(ServerError::Expired) => Next::GiveUp,
-            Err(ServerError::Failed(reason)) => Next::Fail(reason),
+            Err(error) => error.reason().map_or(Next::GiveUp, Next::Fail),
         }
     }
 }
@@ -336,6 +347,19 @@ mod tests {
         assert_eq!(ServerFetch::start(false, true), Next::Ask);
         assert_eq!(ServerFetch::start(false, false), Next::GiveUp);
         assert_eq!(ServerFetch::start(true, true), Next::GiveUp);
+    }
+
+    #[test]
+    fn a_server_without_the_function_is_skipped() {
+        let mut fetch = ServerFetch::default();
+        assert_eq!(
+            fetch.fetched(ServerError::NotFound),
+            Next::Fail("the server has no such function".into())
+        );
+        assert_eq!(
+            fetch.relogged(Err(ServerError::NotFound)),
+            Next::Fail("the server has no such function".into())
+        );
     }
 
     #[test]
