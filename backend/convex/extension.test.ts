@@ -117,7 +117,18 @@ describe("live queries", () => {
     expect(await ext.query(api.extension.request, { requestId: started.requestId })).toMatchObject({ status: "pending", stage: "server", login: "signing_in" });
     await t.run(async (ctx) => {
       const row = (await ctx.db.query("logins").collect())[0];
-      await ctx.db.patch(row._id, { sealedState: "half", busy: false });
+      await ctx.db.patch(row._id, { phase: { kind: "waiting_otp", sealedState: "half" } });
+    });
+    expect(await ext.query(api.extension.request, { requestId: started.requestId })).toMatchObject({ login: "waiting_otp" });
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("logins").collect())[0];
+      await ctx.db.patch(row._id, { phase: { kind: "checking_otp", sealedState: "half", nextOtp: null } });
+    });
+    expect(await ext.query(api.extension.request, { requestId: started.requestId })).toMatchObject({ login: "checking_otp" });
+    // Pre-phase legacy row also reads cleanly.
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("logins").collect())[0];
+      await ctx.db.patch(row._id, { phase: undefined, sealedState: "half", busy: false, next: null });
     });
     expect(await ext.query(api.extension.request, { requestId: started.requestId })).toMatchObject({ login: "waiting_otp" });
   });

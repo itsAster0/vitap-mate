@@ -10,6 +10,7 @@ import { internalMutation, query, type QueryCtx } from "./_generated/server";
 import { rateLimits } from "./lib/rateLimits";
 import { requestOf, requestRow } from "./lib/requests";
 import { now } from "./lib/util";
+import { phaseOf } from "./logins";
 import { type KeyHolder, keyAccount, keyView } from "./sessions";
 
 /** The key behind the caller's key JWT; null for a phone's JWT, none, or a revoked key. */
@@ -50,8 +51,8 @@ async function loginStep(ctx: QueryCtx, row: Doc<"sessionRequests">) {
       .collect()
   ).find((l) => l.requestId === row.requestId);
   if (!login) return null;
-  if (login.sealedState === null) return "signing_in" as const;
-  return login.busy ? ("checking_otp" as const) : ("waiting_otp" as const);
+  const phase = phaseOf(login);
+  return phase.kind === "starting" ? ("signing_in" as const) : phase.kind;
 }
 
 /** A session request's progress, never its cookies: the extension fetches those once over HTTP

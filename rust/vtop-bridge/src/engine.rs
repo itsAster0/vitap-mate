@@ -233,19 +233,100 @@ pub struct LoginStep {
     otp: Option<String>,
 }
 
-/// How a step ended: done, or waiting for the OTP mail. No `Debug`.
-#[derive(Serialize)]
-#[serde(untagged)]
+/// Parsed [`LoginStep`]: either the first step with a sealed vault, or a resumed step with a
+/// mailed OTP and sealed pending state. No `Debug`.
+enum LoginCommand {
+    Start {
+        account: String,
+        sealed_vault: String,
+        forwarding: bool,
+    },
+    Resume {
+        account: String,
+        sealed_state: String,
+        otp: String,
+    },
+}
+
+impl TryFrom<LoginStep> for LoginCommand {
+    type Error = ApiError;
+
+    fn try_from(step: LoginStep) -> Result<Self, Self::Error> {
+        let account = account_id(&step.account);
+        if account.is_empty() {
+            return Err(bad_request("account is required."));
+        }
+        match (step.sealed_state, step.otp, step.sealed_vault) {
+            (Some(sealed_state), Some(otp), None) => Ok(Self::Resume {
+                account,
+                sealed_state,
+                otp: otp.trim().to_string(),
+            }),
+            (None, None, Some(sealed_vault)) => Ok(Self::Start {
+                account,
+                sealed_vault,
+                forwarding: step.forwarding,
+            }),
+            _ => Err(bad_request(
+                "sealedVault, or sealedState and otp, are required.",
+            )),
+        }
+    }
+}
+
+/// Wire format of `POST /engine/login` (matches `backend/convex/logins.ts`'s `steppedValidator`).
+/// Internally tagged by `status` — never `#[serde(untagged)]`. No `Debug`: `Ok` holds cookies.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
 pub enum LoginStepped {
     #[serde(rename_all = "camelCase")]
+    Ok {
+        cookies: String,
+        sealed_session: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        csrf_token: Option<String>,
+    },
+    InvalidCredentials,
+    VaultUnusable,
+    ForwardingRequired,
+    #[serde(rename_all = "camelCase")]
+    GmailRevoked {
+        sealed_vault: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    Failed {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        reason: String,
+    },
+    #[serde(rename_all = "camelCase")]
     OtpNeeded {
-        status: &'static str,
         /// [`Pending`], sealed to the account.
         sealed_state: String,
         /// Only mail sent from then on (unix seconds) can hold the code.
         since: u64,
     },
-    Done(LoginOutcome),
+}
+
+impl From<LoginOutcome> for LoginStepped {
+    fn from(outcome: LoginOutcome) -> Self {
+        match outcome {
+            LoginOutcome::Ok {
+                cookies,
+                sealed_session,
+                csrf_token,
+            } => Self::Ok {
+                cookies,
+                sealed_session,
+                csrf_token,
+            },
+            LoginOutcome::InvalidCredentials => Self::InvalidCredentials,
+            LoginOutcome::VaultUnusable => Self::VaultUnusable,
+            LoginOutcome::ForwardingRequired => Self::ForwardingRequired,
+            LoginOutcome::GmailRevoked { sealed_vault } => Self::GmailRevoked { sealed_vault },
+            LoginOutcome::Failed { code, reason } => Self::Failed { code, reason },
+        }
+    }
 }
 
 /// A sign-in waiting for its OTP, between two steps. No `Debug`.
@@ -271,15 +352,18 @@ pub async fn login(
 ) -> Result<Response, ApiError> {
     require_secret(&state, &headers)?;
     let Json(step) = body.map_err(|_| bad_request("Invalid JSON body."))?;
-    let account = account_id(&step.account);
-    let stepped = match (step.sealed_state, step.otp, step.sealed_vault) {
-        (Some(pending), Some(otp), _) => resume(&state, &account, &pending, otp.trim()).await,
-        (None, None, Some(vault)) => start(&state, &account, &vault, step.forwarding).await,
-        _ => {
-            return Err(bad_request(
-                "sealedVault, or sealedState and otp, are required.",
-            ));
-        }
+    let command = LoginCommand::try_from(step)?;
+    let stepped = match command {
+        LoginCommand::Start {
+            account,
+            sealed_vault,
+            forwarding,
+        } => start(&state, &account, &sealed_vault, forwarding).await,
+        LoginCommand::Resume {
+            account,
+            sealed_state,
+            otp,
+        } => resume(&state, &account, &sealed_state, &otp).await,
     };
     Ok(Json(stepped).into_response())
 }
@@ -294,16 +378,18 @@ async fn start(
         .accounts_sealer()
         .open_json::<Vault>(&accounts_aad(account), sealed_vault)
     else {
-        return LoginStepped::Done(LoginOutcome::VaultUnusable);
+        return LoginOutcome::VaultUnusable.into();
     };
     // Gmail when the phone picked it; else forwarding first, Gmail only
     // for students without it. Without either VTOP is not asked: it would
     // mail an OTP nobody can read here.
     match vault.gmail.clone().and_then(GmailGrant::usable) {
         Some(grant) if vault.otp == Some(OtpMethod::Gmail) || !forwarding => {
-            return LoginStepped::Done(sign_in_with_gmail(state, account, vault, grant).await);
+            return sign_in_with_gmail(state, account, vault, grant)
+                .await
+                .into();
         }
-        None if !forwarding => return LoginStepped::Done(LoginOutcome::ForwardingRequired),
+        None if !forwarding => return LoginOutcome::ForwardingRequired.into(),
         _ => {}
     }
     match state
@@ -311,9 +397,7 @@ async fn start(
         .start(&vault.username, &vault.password)
         .await
     {
-        Ok(Started::SignedIn(session)) => {
-            LoginStepped::Done(signed_in(state, account, Ok(session)))
-        }
+        Ok(Started::SignedIn(session)) => signed_in(state, account, Ok(session)).into(),
         Ok(Started::OtpNeeded { session, issued_at }) => {
             let pending = Pending {
                 session,
@@ -322,7 +406,7 @@ async fn start(
             };
             otp_needed(state, account, &pending)
         }
-        Err(error) => LoginStepped::Done(signed_in(state, account, Err(error))),
+        Err(error) => signed_in(state, account, Err(error)).into(),
     }
 }
 
@@ -333,9 +417,11 @@ async fn resume(state: &AppState, account: &str, sealed: &str, code: &str) -> Lo
         .accounts_sealer()
         .open_json::<Pending>(&logins_aad(account), sealed)
     else {
-        return LoginStepped::Done(LoginOutcome::Failed {
-            reason: "login_expired: the waiting sign-in does not open".into(),
-        });
+        return LoginOutcome::Failed {
+            code: Some("login_expired".into()),
+            reason: "the waiting sign-in does not open".into(),
+        }
+        .into();
     };
     if pending.tried.iter().any(|tried| tried == code) {
         return otp_needed(state, account, &pending);
@@ -345,13 +431,12 @@ async fn resume(state: &AppState, account: &str, sealed: &str, code: &str) -> Lo
             pending.tried.push(code.to_string());
             otp_needed(state, account, &pending)
         }
-        result => LoginStepped::Done(signed_in(state, account, result)),
+        result => signed_in(state, account, result).into(),
     }
 }
 
 fn otp_needed(state: &AppState, account: &str, pending: &Pending) -> LoginStepped {
     LoginStepped::OtpNeeded {
-        status: "otp_needed",
         sealed_state: state
             .accounts_sealer()
             .seal_json(&logins_aad(account), pending),
@@ -384,7 +469,8 @@ async fn sign_in_with_gmail(
         Err(RefreshError::Unavailable(reason)) => {
             tracing::info!("engine: no Gmail access token for {account} for now: {reason}");
             return LoginOutcome::Failed {
-                reason: "gmail_unavailable: Gmail could not be reached".into(),
+                code: Some("gmail_unavailable".into()),
+                reason: "Gmail could not be reached".into(),
             };
         }
     };
@@ -429,11 +515,19 @@ fn signed_in(
         Err(LoginError::InvalidCredentials) => LoginOutcome::InvalidCredentials,
         // Only a later step sends an OTP of its own; Gmail's are tried in its sign-in.
         Err(LoginError::OtpRejected) => LoginOutcome::Failed {
-            reason: "otp_rejected: VTOP did not take the OTP".into(),
+            code: Some("otp_rejected".into()),
+            reason: "VTOP did not take the OTP".into(),
+        },
+        Err(LoginError::OtpNotFound) => LoginOutcome::Failed {
+            code: Some("otp_not_found".into()),
+            reason: "the OTP mail did not arrive".into(),
         },
         Err(LoginError::Failed(reason)) => {
             tracing::info!("engine: sign-in of {account} failed for now: {reason}");
-            LoginOutcome::Failed { reason }
+            LoginOutcome::Failed {
+                code: Some("login_failed".into()),
+                reason,
+            }
         }
     }
 }

@@ -85,9 +85,7 @@ impl ForwardedLogin for FakeLogin {
                 .await
                 .is_none()
         {
-            return Err(LoginError::Failed(
-                "otp_not_found: the OTP mail did not arrive".into(),
-            ));
+            return Err(LoginError::OtpNotFound);
         }
         self.answer()
     }

@@ -72,7 +72,7 @@ export type LoginOutcome =
   /** Google refused the saved Gmail access; `sealedVault` is the same
    * credentials without it, to keep in place of the old ones. */
   | { status: "gmail_revoked"; sealedVault: string }
-  /** Anything else; the credentials may still be good. */
-  | { status: "failed"; reason: string };
+  /** Anything else; the credentials may still be good. `code` is optional for older engines. */
+  | { status: "failed"; code?: string; reason: string };
 
 

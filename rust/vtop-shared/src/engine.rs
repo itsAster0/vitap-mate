@@ -212,7 +212,13 @@ pub enum LoginOutcome {
     #[serde(rename_all = "camelCase")]
     GmailRevoked { sealed_vault: String },
     /// Anything else; the credentials may still be good.
-    Failed { reason: String },
+    #[serde(rename_all = "camelCase")]
+    Failed {
+        /// Structured `snake_case` error code; absent on older wire payloads.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        reason: String,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -295,9 +301,27 @@ mod tests {
             serde_json::to_value(&ok).unwrap(),
             serde_json::json!({"status": "ok", "cookies": "A=1", "sealedSession": "s", "csrfToken": "t"})
         );
-        let failed: LoginOutcome =
+        let legacy_failed: LoginOutcome =
             serde_json::from_value(serde_json::json!({"status": "failed", "reason": "x"})).unwrap();
-        assert!(failed == LoginOutcome::Failed { reason: "x".into() });
+        assert!(
+            legacy_failed
+                == LoginOutcome::Failed {
+                    code: None,
+                    reason: "x".into()
+                }
+        );
+        let structured_failed = LoginOutcome::Failed {
+            code: Some("otp_not_found".into()),
+            reason: "the OTP mail did not arrive".into(),
+        };
+        let structured_json = serde_json::to_value(&structured_failed).unwrap();
+        assert_eq!(
+            structured_json,
+            serde_json::json!({"status": "failed", "code": "otp_not_found", "reason": "the OTP mail did not arrive"})
+        );
+        assert!(
+            serde_json::from_value::<LoginOutcome>(structured_json).unwrap() == structured_failed
+        );
         assert_eq!(
             serde_json::to_value(LoginOutcome::ForwardingRequired).unwrap(),
             serde_json::json!({"status": "forwarding_required"})

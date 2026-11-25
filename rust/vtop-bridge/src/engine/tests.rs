@@ -252,21 +252,91 @@ async fn a_forwarded_sign_in_stops_at_the_otp_and_resumes_with_the_mail() {
         .open_json(&format!("accounts/{REG}"), &sealed_session)
         .unwrap();
     assert_eq!(opened.cookies, "JSESSIONID=fresh");
-    // The waiting sign-in opens for its own account only.
+    // The waiting sign-in opens for its own account only, and emits a structured error code.
     let theirs =
         json!({"account": "23ABC4567", "sealedState": waiting["sealedState"], "otp": "123456"});
     assert!(matches!(
         done(step(&app, theirs).await),
-        LoginOutcome::Failed { .. }
+        LoginOutcome::Failed {
+            code: Some(code),
+            reason
+        } if code == "login_expired" && !reason.contains("login_expired:")
     ));
-    let (status, _) = post(
-        &app,
-        vtop_shared::engine::LOGIN,
-        RELAY,
+    for bad in [
         json!({"account": REG}),
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
+        json!({"account": "", "sealedVault": vault}),
+        json!({"account": REG, "sealedVault": vault, "sealedState": waiting["sealedState"], "otp": "123456"}),
+    ] {
+        let (status, _) = post(&app, vtop_shared::engine::LOGIN, RELAY, bad).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+}
+
+#[test]
+fn login_stepped_wire_roundtrips_every_variant() {
+    let cases = [
+        (
+            LoginStepped::Ok {
+                cookies: "JSESSIONID=a".into(),
+                sealed_session: "s".into(),
+                csrf_token: Some("c".into()),
+            },
+            json!({"status": "ok", "cookies": "JSESSIONID=a", "sealedSession": "s", "csrfToken": "c"}),
+        ),
+        (
+            LoginStepped::Ok {
+                cookies: "JSESSIONID=a".into(),
+                sealed_session: "s".into(),
+                csrf_token: None,
+            },
+            json!({"status": "ok", "cookies": "JSESSIONID=a", "sealedSession": "s"}),
+        ),
+        (
+            LoginStepped::InvalidCredentials,
+            json!({"status": "invalid_credentials"}),
+        ),
+        (
+            LoginStepped::VaultUnusable,
+            json!({"status": "vault_unusable"}),
+        ),
+        (
+            LoginStepped::ForwardingRequired,
+            json!({"status": "forwarding_required"}),
+        ),
+        (
+            LoginStepped::GmailRevoked {
+                sealed_vault: "v".into(),
+            },
+            json!({"status": "gmail_revoked", "sealedVault": "v"}),
+        ),
+        (
+            LoginStepped::Failed {
+                code: Some("otp_not_found".into()),
+                reason: "the OTP mail did not arrive".into(),
+            },
+            json!({"status": "failed", "code": "otp_not_found", "reason": "the OTP mail did not arrive"}),
+        ),
+        (
+            LoginStepped::Failed {
+                code: None,
+                reason: "legacy".into(),
+            },
+            json!({"status": "failed", "reason": "legacy"}),
+        ),
+        (
+            LoginStepped::OtpNeeded {
+                sealed_state: "st".into(),
+                since: 1234,
+            },
+            json!({"status": "otp_needed", "sealedState": "st", "since": 1234}),
+        ),
+    ];
+    for (variant, expected) in cases {
+        let wire = serde_json::to_value(&variant).unwrap();
+        assert_eq!(wire, expected);
+        let decoded: LoginStepped = serde_json::from_value(wire).unwrap();
+        assert!(decoded == variant);
+    }
 }
 
 #[tokio::test]

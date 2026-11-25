@@ -114,7 +114,37 @@ describe("server sign-ins", () => {
     await t.mutation(internal.sweeps.fiveMinutes, {});
     expect(await t.run((ctx) => ctx.db.query("logins").collect())).toEqual([]);
     const { signIns } = await as.query(api.app.status, { flow: "f" });
-    expect(signIns[0]).toMatchObject({ by: "server", ok: false, reason: "otp_not_found: the OTP mail did not arrive" });
+    expect(signIns[0]).toMatchObject({ by: "server", ok: false, reason: "the OTP mail did not arrive" });
+  });
+
+  it("handles structured and legacy failed outcomes and pre-phase in-flight login rows", async () => {
+    const t = await setup();
+    const { as, account } = await student(t);
+    // Structured engine failure stores code and clean reason on sessionRequests.
+    engine((path) => (path === "/engine/login" ? Response.json({ status: "failed", code: "gmail_unavailable", reason: "Gmail could not be reached" }) : undefined));
+    expect(await codeOf(as.action(api.app.login, { flow: "f" }))).toBe("server_login_failed");
+    const req1 = await t.run(async (ctx) => (await ctx.db.query("sessionRequests").collect()).at(-1)!);
+    expect(req1.errorCode).toBe("gmail_unavailable");
+    expect(req1.error).toBe("Gmail could not be reached");
+    // Legacy engine failure without code still parses snake_case prefix.
+    engine((path) => (path === "/engine/login" ? Response.json({ status: "failed", reason: "otp_rejected: VTOP did not take the OTP" }) : undefined));
+    expect(await codeOf(as.action(api.app.login, { flow: "f" }))).toBe("server_login_failed");
+    const req2 = await t.run(async (ctx) => (await ctx.db.query("sessionRequests").collect()).at(-1)!);
+    expect(req2.errorCode).toBe("otp_rejected");
+    expect(req2.error).toBe("VTOP did not take the OTP");
+    // A pre-phase legacy logins row left in flight during deploy resumes cleanly when OTP arrives.
+    const calls = otpEngine("777777");
+    const started = (await as.action(api.app.login, { flow: "f" })) as { requestId: string };
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("logins").collect())[0];
+      await ctx.db.patch(row._id, { phase: undefined, sealedState: "st", busy: false, next: null });
+    });
+    await mail(t, "777777");
+    await drain(t);
+    expect(calls.filter((c) => c.path === "/engine/login").at(-1)?.body).toEqual({ account: REGNO, sealedState: "st", otp: "777777" });
+    expect(await as.query(api.app.loginResult, { requestId: started.requestId })).toEqual({ status: "ok", session: SESSION });
+    expect(await t.run((ctx) => ctx.db.query("logins").collect())).toEqual([]);
+    expect(account).toBeTruthy();
   });
 
   it("ignore late OTP mail once expired, even before the 5-minute sweep runs", async () => {

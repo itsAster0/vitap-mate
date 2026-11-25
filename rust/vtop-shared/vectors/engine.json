@@ -124,6 +124,15 @@
         "status": "failed",
         "reason": "vtop_unavailable"
       }
+    },
+    {
+      "account": "23ABC4567",
+      "requestId": "request-1",
+      "outcome": {
+        "status": "failed",
+        "code": "otp_not_found",
+        "reason": "the OTP mail did not arrive"
+      }
     }
   ],
   "OtpAwait": [

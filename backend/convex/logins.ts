@@ -6,7 +6,7 @@
 
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { type ActionCtx, type MutationCtx, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { enginePost } from "./lib/engine";
 import { LOGIN, type LoginOutcome } from "./lib/engineApi";
@@ -19,7 +19,23 @@ import { isLoginOutcome, loginDone } from "./sessions";
 export const LOGIN_WAIT_SECS = 300;
 /** Mail dates come from VTOP's clock; allow it to run a little behind. */
 const CLOCK_SLACK_SECS = 120;
-const OTP_NOT_FOUND: LoginOutcome = { status: "failed", reason: "otp_not_found: the OTP mail did not arrive" };
+const OTP_NOT_FOUND: LoginOutcome = { status: "failed", code: "otp_not_found", reason: "the OTP mail did not arrive" };
+
+/** Mutually exclusive phase of a server sign-in row. */
+export type LoginPhase =
+  | { kind: "starting"; nextOtp: string | null }
+  | { kind: "waiting_otp"; sealedState: string }
+  | { kind: "checking_otp"; sealedState: string; nextOtp: string | null };
+
+const CLEAR_LEGACY = { sealedState: undefined, busy: undefined, next: undefined } as const;
+
+/** Reads `row.phase`, or translates a pre-phase row left in flight during deploy. */
+export function phaseOf(row: Doc<"logins">): LoginPhase {
+  if (row.phase) return row.phase;
+  if (row.sealedState == null) return { kind: "starting", nextOtp: row.next ?? null };
+  if (row.busy) return { kind: "checking_otp", sealedState: row.sealedState, nextOtp: row.next ?? null };
+  return { kind: "waiting_otp", sealedState: row.sealedState };
+}
 
 /** How an engine step ended. */
 type Stepped = LoginOutcome | { status: "otp_needed"; sealedState: string; since: number };
@@ -30,7 +46,7 @@ const steppedValidator = v.union(
   v.object({ status: v.literal("vault_unusable") }),
   v.object({ status: v.literal("forwarding_required") }),
   v.object({ status: v.literal("gmail_revoked"), sealedVault: v.string() }),
-  v.object({ status: v.literal("failed"), reason: v.string() }),
+  v.object({ status: v.literal("failed"), code: v.optional(v.string()), reason: v.string() }),
   v.object({ status: v.literal("otp_needed"), sealedState: v.string(), since: v.number() }),
 );
 
@@ -47,7 +63,11 @@ function normalizeOutcome(outcome: LoginOutcome): LoginOutcome {
     case "gmail_revoked":
       return { status: "gmail_revoked", sealedVault: outcome.sealedVault };
     case "failed":
-      return { status: "failed", reason: outcome.reason };
+      return {
+        status: "failed",
+        ...(typeof outcome.code === "string" && outcome.code ? { code: outcome.code } : {}),
+        reason: outcome.reason,
+      };
     case "invalid_credentials":
     case "vault_unusable":
     case "forwarding_required":
@@ -69,7 +89,7 @@ async function step(body: { account: string; sealedVault?: string; forwarding?: 
   } catch (e) {
     logError(trace, "account: engine unreachable for a sign-in", e);
   }
-  return { status: "failed", reason: "server_login_failed: The server could not reach the engine." };
+  return { status: "failed", code: "server_login_failed", reason: "The server could not reach the engine." };
 }
 
 /** Marks the request's server sign-in started and keeps a row that takes OTP mail from now on,
@@ -89,10 +109,8 @@ export const open = internalMutation({
     const loginId = await ctx.db.insert("logins", {
       accountId: row.accountId,
       requestId,
-      sealedState: null,
       since: at - CLOCK_SLACK_SECS,
-      busy: true,
-      next: null,
+      phase: { kind: "starting", nextOtp: null },
       // No longer than its request: a sign-in nobody waits for doesn't take later codes.
       expiresAt: Math.min(at + LOGIN_WAIT_SECS, request.expiresAt),
     });
@@ -127,9 +145,10 @@ export const waiting = internalQuery({
   handler: async (ctx, { loginId }) => {
     const row = await ctx.db.get(loginId);
     const account = row && (await ctx.db.get(row.accountId));
-    return row && account && row.sealedState !== null && row.expiresAt > now()
-      ? { sealedState: row.sealedState, regno: account.regno, requestId: row.requestId }
-      : null;
+    if (!row || !account || row.expiresAt <= now()) return null;
+    const phase = phaseOf(row);
+    if (phase.kind === "starting") return null;
+    return { sealedState: phase.sealedState, regno: account.regno, requestId: row.requestId };
   },
 });
 
@@ -161,8 +180,22 @@ export const stepped = internalMutation({
       await loginDone(ctx, regno, requestId, OTP_NOT_FOUND);
       return;
     }
-    await ctx.db.patch(loginId, { sealedState: answer.sealedState, since: answer.since, busy: row.next !== null, next: null });
-    if (row.next !== null) await ctx.scheduler.runAfter(0, internal.logins.resume, { loginId, otp: row.next });
+    const phase = phaseOf(row);
+    const queued = phase.kind === "waiting_otp" ? null : phase.nextOtp;
+    if (queued !== null) {
+      await ctx.db.patch(loginId, {
+        since: answer.since,
+        phase: { kind: "checking_otp", sealedState: answer.sealedState, nextOtp: null },
+        ...CLEAR_LEGACY,
+      });
+      await ctx.scheduler.runAfter(0, internal.logins.resume, { loginId, otp: queued });
+    } else {
+      await ctx.db.patch(loginId, {
+        since: answer.since,
+        phase: { kind: "waiting_otp", sealedState: answer.sealedState },
+        ...CLEAR_LEGACY,
+      });
+    }
   },
 });
 
@@ -176,12 +209,19 @@ export async function offerCode(ctx: MutationCtx, accountId: Id<"accounts">, otp
     .collect();
   for (const row of rows) {
     if (row.expiresAt <= at || sentAt < row.since) continue;
-    if (row.busy) {
-      await ctx.db.patch(row._id, { next: otp });
-      continue;
+    const phase = phaseOf(row);
+    switch (phase.kind) {
+      case "starting":
+        await ctx.db.patch(row._id, { phase: { kind: "starting", nextOtp: otp }, ...CLEAR_LEGACY });
+        break;
+      case "checking_otp":
+        await ctx.db.patch(row._id, { phase: { kind: "checking_otp", sealedState: phase.sealedState, nextOtp: otp }, ...CLEAR_LEGACY });
+        break;
+      case "waiting_otp":
+        await ctx.db.patch(row._id, { phase: { kind: "checking_otp", sealedState: phase.sealedState, nextOtp: null }, ...CLEAR_LEGACY });
+        await ctx.scheduler.runAfter(0, internal.logins.resume, { loginId: row._id, otp });
+        break;
     }
-    await ctx.db.patch(row._id, { busy: true });
-    await ctx.scheduler.runAfter(0, internal.logins.resume, { loginId: row._id, otp });
   }
 }
 

@@ -481,7 +481,7 @@ export function isLoginOutcome(raw: unknown): raw is LoginOutcome {
     case "ok":
       return typeof outcome.cookies === "string" && typeof outcome.sealedSession === "string";
     case "failed":
-      return typeof outcome.reason === "string";
+      return typeof outcome.reason === "string" && (outcome.code === undefined || typeof outcome.code === "string");
     case "gmail_revoked":
       return typeof outcome.sealedVault === "string";
     case "invalid_credentials":
@@ -537,12 +537,14 @@ export async function loginDone(ctx: MutationCtx, regno: string, requestId: stri
       doc.clearVault();
       fallback = { error: null };
       break;
-    case "failed":
+    case "failed": {
       logWarn({ regno: doc.id }, "account: server sign-in failed for now");
+      const failed: RequestError = outcome.code ? { code: outcome.code, message: outcome.reason } : parseRequestError(outcome.reason);
       signIn = { at, by: "server", ok: false, reason: outcome.reason };
-      // With no phone to ask (`app:login`), the engine's reason is the answer.
-      fallback = { error: request?.phones.length === 0 ? parseRequestError(outcome.reason) : null };
+      // With no phone to ask (`app:login`), the engine's failure is the answer.
+      fallback = { error: request?.phones.length === 0 ? failed : null };
       break;
+    }
   }
   if (fallback && request?.pending(at)) {
     if (!request.phoneAsked) {

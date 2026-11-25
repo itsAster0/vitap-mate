@@ -18,6 +18,15 @@ export const settings = v.object({
   vaultTtlSecs: nullable(v.number()),
 });
 
+export const loginPhase = v.union(
+  /** First engine step is running; an OTP that arrives meanwhile waits in `nextOtp`. */
+  v.object({ kind: v.literal("starting"), nextOtp: nullable(v.string()) }),
+  /** Waiting for VTOP's OTP mail with the engine's sealed half-done state. */
+  v.object({ kind: v.literal("waiting_otp"), sealedState: v.string() }),
+  /** Submitting a mailed OTP on the engine; a newer OTP arriving meanwhile waits in `nextOtp`. */
+  v.object({ kind: v.literal("checking_otp"), sealedState: v.string(), nextOtp: nullable(v.string()) }),
+);
+
 export default defineSchema({
   /** One student, by registration number (one row per `regno`). */
   accounts: defineTable({
@@ -267,13 +276,14 @@ export default defineSchema({
     accountId: v.id("accounts"),
     /** The session request it answers. */
     requestId: v.string(),
-    /** The engine's half-done sign-in; null while its first step runs. */
-    sealedState: nullable(v.string()),
     /** Only mail sent from then on (unix seconds) can hold the code. */
     since: v.number(),
-    /** An engine step runs; a code that comes meanwhile waits in `next`. */
-    busy: v.boolean(),
-    next: nullable(v.string()),
+    /** Discriminated phase; optional while pre-phase in-flight rows drain during deploy. */
+    phase: v.optional(loginPhase),
+    /** Legacy pre-phase fields; kept optional for in-flight rows during rollout and cleared on write. */
+    sealedState: v.optional(nullable(v.string())),
+    busy: v.optional(v.boolean()),
+    next: v.optional(nullable(v.string())),
     expiresAt: v.number(),
   })
     .index("by_account", ["accountId"])

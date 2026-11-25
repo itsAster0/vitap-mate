@@ -49,6 +49,8 @@ pub enum LoginError {
     InvalidCredentials,
     /// VTOP did not take the OTP (an older mail's code); it still waits for one.
     OtpRejected,
+    /// VTOP required an OTP and no usable code arrived in time.
+    OtpNotFound,
     /// Anything else; the credentials may still be good.
     Failed(String),
 }
@@ -62,9 +64,7 @@ fn login_error(error: VtopError) -> LoginError {
     match error {
         VtopError::InvalidCredentials => LoginError::InvalidCredentials,
         // No usable code came, so the sign-in is stuck at the OTP.
-        VtopError::OTPRequired(..) => {
-            LoginError::Failed("otp_not_found: the OTP mail did not arrive".into())
-        }
+        VtopError::OTPRequired(..) => LoginError::OtpNotFound,
         error => LoginError::Failed(error.to_string()),
     }
 }
@@ -146,9 +146,7 @@ mod tests {
         );
         assert_eq!(
             map_outcome(Err(VtopError::OTPRequired("enter OTP".into(), 5))),
-            Err(LoginError::Failed(
-                "otp_not_found: the OTP mail did not arrive".into()
-            ))
+            Err(LoginError::OtpNotFound)
         );
         assert_eq!(
             map_outcome(Err(VtopError::NetworkError)),
