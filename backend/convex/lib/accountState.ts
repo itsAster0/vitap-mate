@@ -211,8 +211,8 @@ export const MAX_KEY_IPS = 2;
 export type RequestAsker = {
   keyLabel: string;
   via: KeyVia;
-  /** The extension's address and whether the key used it before; null for an AI app (its
-   * requests come through our engine, so the address would be ours) or when unknown. */
+  /** The address it asked from (an AI app's as our engine saw it on `/mcp`) and whether the key
+   * used it before; null when unknown. */
   ip: { address: string; seen: boolean } | null;
 };
 

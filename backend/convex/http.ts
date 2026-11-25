@@ -14,7 +14,7 @@ import { randomHex, sha256Hex } from "./lib/crypto";
 import { GUIDE_FILES } from "./lib/guideFiles";
 import { badRequest, empty, error } from "./lib/errors";
 import { engineJson, engineSend } from "./lib/engine";
-import { bearer, clientIp, corsRoutes, holds, jsonBody, notInternal, readBodyCapped, route } from "./lib/httpKit";
+import { addressOf, bearer, clientIp, corsRoutes, headerHolds, holds, jsonBody, notInternal, readBodyCapped, route } from "./lib/httpKit";
 import { signAccessJwt } from "./lib/jwt";
 import { seal } from "./lib/mailSeal";
 import { page, pairingPage } from "./lib/oauthPage";
@@ -73,6 +73,14 @@ function keyVia(req: Request): KeyVia {
   return req.headers.get("x-vtop-client")?.trim().toLowerCase() === "mcp" ? "mcp" : "extension";
 }
 
+/** Where a key call came from. The extension calls us itself; an AI app's call comes through our
+ * engine, which says in `x-vtop-asker-ip` the address its `/mcp` call came from (as `mcp` below
+ * passed it on), believed only with the internal token in `x-vtop-internal`. */
+async function askerIp(req: Request, via: KeyVia): Promise<string | null> {
+  if (via === "extension") return clientIp(req);
+  return (await headerHolds(req, "x-vtop-internal", process.env.INTERNAL_TOKEN)) ? addressOf(req.headers.get("x-vtop-asker-ip")) : null;
+}
+
 for (const spec of [
   ...corsRoutes("GET", { path: "/v1/whoami" }, async (ctx, req) => {
     const keyHash = await keyHashOf(req);
@@ -81,7 +89,8 @@ for (const spec of [
   }),
   ...corsRoutes("POST", { path: "/v1/session" }, async (ctx, req) => {
     const keyHash = await keyHashOf(req);
-    const started = keyHash && (await ctx.runMutation(internal.sessions.start, { keyHash, via: keyVia(req), ip: clientIp(req) }));
+    const via = keyVia(req);
+    const started = keyHash && (await ctx.runMutation(internal.sessions.start, { keyHash, via, ip: await askerIp(req, via) }));
     if (!started) return keyUnknown();
     if (started.limited) return error(429, "rate_limited", "Too many requests for this account.", { headers: { "retry-after": "60" } });
     const cached = await cachedCookies(ctx, started.accountId, started.regno, started.cached);

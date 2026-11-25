@@ -33,8 +33,8 @@ export const loginPhase = v.union(
 export const requestAsker = v.object({
   keyLabel: v.string(),
   via: v.union(v.literal("extension"), v.literal("mcp")),
-  /** The extension's address and whether the key used it before; null for an AI app (its
-   * requests come through our engine) or when unknown. */
+  /** The address it asked from (an AI app's as our engine saw it on `/mcp`) and whether the key
+   * used it before; null when unknown. */
   ip: v.union(v.object({ address: v.string(), seen: v.boolean() }), v.null()),
 });
 
@@ -138,8 +138,9 @@ export default defineSchema({
     outings: v.boolean(),
     /** Its latest uses, newest first, at most 10. */
     uses: v.array(v.object({ at: v.number(), via: v.union(v.literal("extension"), v.literal("mcp")) })),
-    /** The extension's latest addresses, newest first, at most `MAX_KEY_IPS`: a request from one
-     * not listed shows as a new IP on the phone. */
+    /** The key's latest addresses (the extension's, or the AI app's as our engine saw it on
+     * `/mcp`), newest first, at most `MAX_KEY_IPS`: a request from one not listed shows as a new
+     * IP on the phone. */
     ips: v.optional(v.array(v.string())),
   })
     .index("by_keyHash", ["keyHash"])

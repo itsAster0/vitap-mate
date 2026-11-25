@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use async_trait::async_trait;
 use vtop_core::{SessionState, VtopError};
 use vtop_mcp::bridge::{BridgeClient, Identity, SessionSource};
-use vtop_mcp::tools::with_retry;
+use vtop_mcp::tools::{Caller, with_retry};
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -35,7 +35,7 @@ impl SessionSource for FakeSource {
         }))
     }
 
-    async fn session(&self, _key: &str) -> Result<SessionState, String> {
+    async fn session(&self, _key: &str, _ip: Option<&str>) -> Result<SessionState, String> {
         self.sessions.fetch_add(1, Ordering::SeqCst);
         Ok(SessionState {
             cookies: "JSESSIONID=x".into(),
@@ -56,7 +56,7 @@ impl SessionSource for FakeSource {
 async fn retry_expires_and_retries_once() {
     let source = FakeSource::new();
     let calls = AtomicUsize::new(0);
-    let result = with_retry(source.as_ref(), KEY, |_client| {
+    let result = with_retry(source.as_ref(), &caller(), |_client| {
         let call = calls.fetch_add(1, Ordering::SeqCst);
         async move {
             if call == 0 {
@@ -75,7 +75,7 @@ async fn retry_expires_and_retries_once() {
 #[tokio::test]
 async fn retry_gives_up_after_second_expiry() {
     let source = FakeSource::new();
-    let result: Result<(), String> = with_retry(source.as_ref(), KEY, |_client| async {
+    let result: Result<(), String> = with_retry(source.as_ref(), &caller(), |_client| async {
         Err(VtopError::SessionExpired)
     })
     .await;
@@ -88,7 +88,7 @@ async fn http_error_gets_a_fresh_session() {
     // VTOP answers 404 for a session it dropped.
     let source = FakeSource::new();
     let calls = AtomicUsize::new(0);
-    let result = with_retry(source.as_ref(), KEY, |_client| {
+    let result = with_retry(source.as_ref(), &caller(), |_client| {
         let call = calls.fetch_add(1, Ordering::SeqCst);
         async move {
             if call == 0 {
@@ -107,12 +107,19 @@ async fn http_error_gets_a_fresh_session() {
 #[tokio::test]
 async fn other_errors_are_not_retried() {
     let source = FakeSource::new();
-    let result: Result<(), String> = with_retry(source.as_ref(), KEY, |_client| async {
+    let result: Result<(), String> = with_retry(source.as_ref(), &caller(), |_client| async {
         Err(VtopError::NetworkError)
     })
     .await;
     assert_eq!(result, Err("Network connection error".to_string()));
     assert_eq!(source.expires.load(Ordering::SeqCst), 0);
+}
+
+fn caller() -> Caller {
+    Caller {
+        key: KEY.into(),
+        ip: None,
+    }
 }
 
 fn client(server: &MockServer) -> BridgeClient {
@@ -133,7 +140,38 @@ async fn ready_session_uses_the_callers_key() {
         ))
         .mount(&server)
         .await;
-    assert_eq!(client(&server).session(KEY).await.unwrap().cookies, "A=1");
+    assert_eq!(
+        client(&server).session(KEY, None).await.unwrap().cookies,
+        "A=1"
+    );
+}
+
+#[tokio::test]
+async fn a_session_request_states_the_callers_address_with_the_internal_token() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/session"))
+        .and(header("x-vtop-asker-ip", "198.51.100.4"))
+        .and(header("x-vtop-internal", "internal-token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({ "status": "ready", "session": { "cookies": "A=1" }, "cookies": [] }),
+        ))
+        .mount(&server)
+        .await;
+    let stated = client(&server).with_internal_token("internal-token".into());
+    assert_eq!(
+        stated
+            .session(KEY, Some("198.51.100.4"))
+            .await
+            .unwrap()
+            .cookies,
+        "A=1"
+    );
+    // Without the token it states nothing.
+    let plain = client(&server).session(KEY, Some("198.51.100.4")).await;
+    assert!(plain.is_err());
+    let sent = server.received_requests().await.unwrap();
+    assert!(sent[1].headers.get("x-vtop-asker-ip").is_none());
 }
 
 #[tokio::test]
@@ -162,7 +200,7 @@ async fn pending_session_is_polled_until_ready() {
         .mount(&server)
         .await;
     assert_eq!(
-        client(&server).session(KEY).await.unwrap().cookies,
+        client(&server).session(KEY, None).await.unwrap().cookies,
         "A=phone"
     );
 }
@@ -179,7 +217,7 @@ async fn pending_error_surfaces() {
     Mock::given(method("GET")).respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
         "status": "error", "code": "phone_unreachable", "error": "phone_unreachable: Open VITAP Mate → Connected apps → Reconnect this phone."
     }))).mount(&server).await;
-    let error = client(&server).session(KEY).await.unwrap_err();
+    let error = client(&server).session(KEY, None).await.unwrap_err();
     assert!(error.starts_with("phone_unreachable"), "{error}");
 }
 
@@ -199,7 +237,7 @@ async fn expired_request_is_phone_timeout() {
         )
         .mount(&server)
         .await;
-    let error = client(&server).session(KEY).await.unwrap_err();
+    let error = client(&server).session(KEY, None).await.unwrap_err();
     assert_eq!(error, vtop_mcp::bridge::PHONE_TIMEOUT_ERROR);
 }
 
@@ -249,7 +287,10 @@ async fn bridge_client_retries_once_after_a_502() {
         ))
         .mount(&server)
         .await;
-    assert_eq!(client(&server).session(KEY).await.unwrap().cookies, "A=1");
+    assert_eq!(
+        client(&server).session(KEY, None).await.unwrap().cookies,
+        "A=1"
+    );
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
 }
 

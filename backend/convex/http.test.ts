@@ -153,6 +153,31 @@ describe("access keys", () => {
     expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: "nope" }))).toBe("bad_request");
   });
 
+  it("show an AI app's address only when our engine states it with the internal token", async () => {
+    for (const [token, expected] of [
+      [TOKENS.INTERNAL_TOKEN, { address: "198.51.100.4", seen: false }],
+      ["wrong", null],
+    ] as const) {
+      const t = await setup();
+      const { as } = await prove(t, await phone(1));
+      await as.mutation(api.devices.update, { flow: "f", fcmToken: "fcm-tok" });
+      const made = await as.action(api.keys.create, { flow: "f" });
+      const started = await t.fetch("/v1/session", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${made.key}`,
+          "x-vtop-client": "mcp",
+          "x-vtop-internal": token,
+          "x-vtop-asker-ip": "198.51.100.4",
+          "x-forwarded-for": "203.0.113.9",
+        },
+      });
+      expect(started.status).toBe(202);
+      const [listed] = await as.query(api.sessions.pending, { flow: "f" });
+      expect(listed.asker).toEqual({ keyLabel: expect.any(String), via: "mcp", ip: expected });
+    }
+  });
+
   it("ask the phone that made the key for a session, never store sealedSession when off, scrub after 30 s, and discard late answers", async () => {
     const t = await setup();
     const p = await phone(1);

@@ -177,7 +177,7 @@ async fn mcp_evict_route_requires_internal_token_and_drops_cached_sessions() {
                 outings: false,
             }))
         }
-        async fn session(&self, key: &str) -> Result<SessionState, String> {
+        async fn session(&self, key: &str, _ip: Option<&str>) -> Result<SessionState, String> {
             let n = self.sessions.fetch_add(1, Ordering::SeqCst);
             Ok(cookies_session(&format!("{key}-{n}")))
         }
@@ -214,9 +214,9 @@ async fn mcp_evict_route_requires_internal_token_and_drops_cached_sessions() {
     let app = crate::router(state);
 
     // Populate the RAM cache for two keys.
-    let s1 = sessions.session("vtm_key1").await.unwrap();
-    let s2 = sessions.session("vtm_key2").await.unwrap();
-    assert_eq!(sessions.session("vtm_key1").await.unwrap(), s1);
+    let s1 = sessions.session("vtm_key1", None).await.unwrap();
+    let s2 = sessions.session("vtm_key2", None).await.unwrap();
+    assert_eq!(sessions.session("vtm_key1", None).await.unwrap(), s1);
     assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
 
     // Gateway token is rejected.
@@ -240,8 +240,8 @@ async fn mcp_evict_route_requires_internal_token_and_drops_cached_sessions() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["evicted"], 1);
 
-    assert_eq!(sessions.session("vtm_key2").await.unwrap(), s2);
-    assert_ne!(sessions.session("vtm_key1").await.unwrap(), s1);
+    assert_eq!(sessions.session("vtm_key2", None).await.unwrap(), s2);
+    assert_ne!(sessions.session("vtm_key1", None).await.unwrap(), s1);
     assert_eq!(inner.sessions.load(Ordering::SeqCst), 3);
 }
 

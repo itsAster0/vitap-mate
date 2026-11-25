@@ -36,10 +36,10 @@ async fn main() {
     // Sessions are kept a few minutes, so a run of tool calls asks the edge
     // (and VTOP, to check it) once.
     let sessions = Arc::new(vtop_mcp::bridge::CachedSessions::new(
-        Arc::new(vtop_mcp::bridge::BridgeClient::new(
-            https(),
-            config.edge_url.clone(),
-        )),
+        Arc::new(
+            vtop_mcp::bridge::BridgeClient::new(https(), config.edge_url.clone())
+                .with_internal_token(config.internal_token.clone()),
+        ),
         Duration::from_secs(300),
     ));
     let (mcp, mcp_evictor) = vtop_mcp::mcp_router_with_evictor(sessions, Duration::from_secs(300));

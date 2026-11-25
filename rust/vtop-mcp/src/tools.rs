@@ -23,17 +23,22 @@ use vtop_core::{VtopClient, VtopError, VtopResult};
 
 use crate::bridge::SessionSource;
 
-/// The caller's access key, put on the request by the auth layer.
+/// Who calls a tool, put on the request by the auth layer: the access key, and the address its
+/// `/mcp` call came from (Convex's `x-forwarded-for`, which only it can set: the engine is
+/// reachable only from Convex), shown on the phone's approve sheet.
 #[derive(Clone)]
-pub struct Caller(pub String);
+pub struct Caller {
+    pub key: String,
+    pub ip: Option<String>,
+}
 
-/// Runs `call` with a client for `username`'s session. When VTOP says the
+/// Runs `call` with a client for `caller`'s session. When VTOP says the
 /// session expired, or answers with an HTTP error (it gives 404 for a
 /// session it dropped, e.g. after use from another address), drops the
 /// session (here and at the edge) and tries once more with a fresh one.
 pub async fn with_retry<T, F, Fut>(
     source: &dyn SessionSource,
-    username: &str,
+    caller: &Caller,
     call: F,
 ) -> Result<T, String>
 where
@@ -42,14 +47,14 @@ where
 {
     let mut retried = false;
     loop {
-        let session = source.session(username).await?;
+        let session = source.session(&caller.key, caller.ip.as_deref()).await?;
         let client = VtopClient::builder()
             .with_session(&session)
             .map_err(|error| error.to_string())?;
         match call(client).await {
             Err(VtopError::SessionExpired | VtopError::VtopServerError(_)) if !retried => {
                 retried = true;
-                source.expire(username).await?;
+                source.expire(&caller.key).await?;
             }
             result => return result.map_err(|error| error.to_string()),
         }
@@ -308,10 +313,10 @@ impl VtopTools {
         F: Fn(VtopClient) -> Fut,
         Fut: Future<Output = VtopResult<T>>,
     {
-        let Some(Caller(username)) = parts.extensions.get::<Caller>().cloned() else {
+        let Some(caller) = parts.extensions.get::<Caller>().cloned() else {
             return tool_error("no caller on the request");
         };
-        match with_retry(self.source.as_ref(), &username, call).await {
+        match with_retry(self.source.as_ref(), &caller, call).await {
             Ok(value) => match serde_json::to_string(&value) {
                 Ok(json) => CallToolResult::success(vec![ContentBlock::text(json)]),
                 Err(error) => tool_error(format!("could not encode the result: {error}")),
@@ -351,10 +356,10 @@ impl VtopTools {
         F: Fn(VtopClient) -> Fut,
         Fut: Future<Output = VtopResult<CourseFile>>,
     {
-        let Some(Caller(username)) = parts.extensions.get::<Caller>().cloned() else {
+        let Some(caller) = parts.extensions.get::<Caller>().cloned() else {
             return tool_error("no caller on the request");
         };
-        match with_retry(self.source.as_ref(), &username, call).await {
+        match with_retry(self.source.as_ref(), &caller, call).await {
             Ok(file) => file_result(&file.file_name, &file.content_type, &file.bytes, uri),
             Err(message) => tool_error(message),
         }
@@ -372,10 +377,10 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let Some(Caller(key)) = parts.extensions.get::<Caller>().cloned() else {
+        let Some(caller) = parts.extensions.get::<Caller>().cloned() else {
             return tool_error("no caller on the request");
         };
-        let data = match with_retry(self.source.as_ref(), &key, |client| async move {
+        let data = match with_retry(self.source.as_ref(), &caller, |client| async move {
             client.fetch(&spec::SEMESTERS, &Query::NONE).await
         })
         .await
@@ -384,7 +389,7 @@ impl VtopTools {
             Err(message) => return tool_error(message),
         };
         // No VTOP request: the bridge has the app's pick.
-        let picked = match self.source.whoami(&key).await {
+        let picked = match self.source.whoami(&caller.key).await {
             Ok(Some(identity)) => identity.semester_id,
             _ => None,
         };
@@ -861,11 +866,11 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let Some(Caller(key)) = parts.extensions.get::<Caller>().cloned() else {
+        let Some(caller) = parts.extensions.get::<Caller>().cloned() else {
             return tool_error("no caller on the request");
         };
         // The bridge checks the session with VTOP before handing it out.
-        match self.source.session(&key).await {
+        match self.source.session(&caller.key, caller.ip.as_deref()).await {
             Ok(session) => json_result(&browser_session(&session.cookies)),
             Err(message) => tool_error(message),
         }
@@ -880,7 +885,7 @@ impl VtopTools {
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let Some(Caller(key)) = parts.extensions.get::<Caller>().cloned() else {
+        let Some(Caller { key, .. }) = parts.extensions.get::<Caller>().cloned() else {
             return tool_error("no caller on the request");
         };
         match self.source.whoami(&key).await {

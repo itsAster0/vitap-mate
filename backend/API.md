@@ -67,6 +67,8 @@ keys return `401 key_unknown`. `x-vtop-client: mcp` tags MCP key usage.
   - `200 { status: "ready", session: { cookies }, cookies: [Cookie-Editor], source: { from, cached, madeAt }, cacheable }` when `settings.cacheSession` is on and the cached session still validates on VTOP (`cacheable: true`);
   - `202 { status: "pending", stage: "starting" | "phone" | "server", serverDueAt, pushSent, requestId, pollAfterMs, expiresAt }` with `retry-after: 2` when a new or in-flight request is opened/joined;
   - `429 rate_limited` (`retry-after: 60`) past 60 calls/min per account.
+
+  The phone's approve sheet shows the key's name and the address it asked from: the caller's own, or for `x-vtop-client: mcp` the one our engine states in `x-vtop-asker-ip` (where the AI app's `/mcp` call came from), believed only with `x-vtop-internal: $INTERNAL_TOKEN`.
 - **`GET /v1/session/requests/{id}`** (`cache-control: no-store`) →
   - `202 { status: "pending", stage, serverDueAt, pushSent }`,
   - `200 { status: "ready", session, cookies, source, cacheable }` (`cacheable` mirrors `settings.cacheSession`; when `false`, the request's cookies are scrubbed 30 s after completion and later polls return `410 request_expired`),

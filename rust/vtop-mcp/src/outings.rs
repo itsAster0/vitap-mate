@@ -330,11 +330,11 @@ impl VtopTools {
         clippy::result_large_err,
         reason = "an early tool answer, made once per call; big only with serde_json's preserve_order"
     )]
-    fn caller(parts: &Parts) -> Result<String, CallToolResult> {
+    fn caller(parts: &Parts) -> Result<Caller, CallToolResult> {
         parts
             .extensions
             .get::<Caller>()
-            .map(|Caller(key)| key.clone())
+            .cloned()
             .ok_or_else(|| tool_error("no caller on the request"))
     }
 
@@ -344,10 +344,10 @@ impl VtopTools {
         clippy::result_large_err,
         reason = "an early tool answer, made once per call; big only with serde_json's preserve_order"
     )]
-    async fn outing_caller(&self, parts: &Parts) -> Result<String, CallToolResult> {
-        let key = Self::caller(parts)?;
-        match self.source.whoami(&key).await {
-            Ok(Some(identity)) if identity.outings => Ok(key),
+    async fn outing_caller(&self, parts: &Parts) -> Result<Caller, CallToolResult> {
+        let caller = Self::caller(parts)?;
+        match self.source.whoami(&caller.key).await {
+            Ok(Some(identity)) if identity.outings => Ok(caller),
             Ok(Some(_)) => Err(tool_error(OUTINGS_OFF)),
             Ok(None) => Err(tool_error("key_unknown: Unknown or revoked access key.")),
             Err(message) => Err(tool_error(message)),
@@ -370,8 +370,8 @@ impl VtopTools {
         Parameters(args): Parameters<GeneralOutingArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let key = match self.outing_caller(&parts).await {
-            Ok(key) => key,
+        let caller = match self.outing_caller(&parts).await {
+            Ok(caller) => caller,
             Err(error) => return error,
         };
         let parsed = (|| {
@@ -400,7 +400,7 @@ impl VtopTools {
         let action = "apply_general_outing";
 
         let Some(code) = args.confirmation else {
-            let form = match with_retry(self.source.as_ref(), &key, |client| async move {
+            let form = match with_retry(self.source.as_ref(), &caller, |client| async move {
                 client.fetch(&spec::GENERAL_OUTING, &Query::NONE).await
             })
             .await
@@ -427,16 +427,16 @@ impl VtopTools {
                     "returning": format!("{} {}, {in_time}", weekday(back), application.in_date.as_str()),
                 },
                 "for": student_json(student),
-                "confirmation": new_confirmation(&key, action, &fields),
+                "confirmation": new_confirmation(&caller.key, action, &fields),
                 "next": "Show the student this request and ask them to confirm. Only if they say yes, call apply_general_outing again with the same arguments and this confirmation.",
             }));
         };
 
-        if let Err(message) = check_confirmation(&code, &key, action, &fields) {
+        if let Err(message) = check_confirmation(&code, &caller.key, action, &fields) {
             return tool_error(message);
         }
         let out_iso = iso_date(application.out_date.day_number());
-        let result = with_retry(self.source.as_ref(), &key, |client| {
+        let result = with_retry(self.source.as_ref(), &caller, |client| {
             let (application, out_iso) = (application.clone(), out_iso.clone());
             async move {
                 // A second send of the same code (or a retry after VTOP
@@ -473,8 +473,8 @@ impl VtopTools {
         Parameters(args): Parameters<WeekendOutingArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let key = match self.outing_caller(&parts).await {
-            Ok(key) => key,
+        let caller = match self.outing_caller(&parts).await {
+            Ok(caller) => caller,
             Err(error) => return error,
         };
         let parsed = (|| {
@@ -500,7 +500,7 @@ impl VtopTools {
         let action = "apply_weekend_outing";
 
         let Some(code) = args.confirmation else {
-            let form = match with_retry(self.source.as_ref(), &key, |client| async move {
+            let form = match with_retry(self.source.as_ref(), &caller, |client| async move {
                 client.fetch(&spec::WEEKEND_OUTING, &Query::NONE).await
             })
             .await
@@ -535,16 +535,16 @@ impl VtopTools {
                     "contact_number": application.contact_number.as_str(),
                 },
                 "for": student_json(student),
-                "confirmation": new_confirmation(&key, action, &fields),
+                "confirmation": new_confirmation(&caller.key, action, &fields),
                 "next": "Show the student this request and ask them to confirm. Only if they say yes, call apply_weekend_outing again with the same arguments and this confirmation.",
             }));
         };
 
-        if let Err(message) = check_confirmation(&code, &key, action, &fields) {
+        if let Err(message) = check_confirmation(&code, &caller.key, action, &fields) {
             return tool_error(message);
         }
         let date_iso = iso_date(application.date.day_number());
-        let result = with_retry(self.source.as_ref(), &key, |client| {
+        let result = with_retry(self.source.as_ref(), &caller, |client| {
             let (application, date_iso) = (application.clone(), date_iso.clone());
             async move {
                 let form = client.fetch(&spec::WEEKEND_OUTING, &Query::NONE).await?;
@@ -576,8 +576,8 @@ impl VtopTools {
         Parameters(args): Parameters<CancelOutingArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let key = match self.outing_caller(&parts).await {
-            Ok(key) => key,
+        let caller = match self.outing_caller(&parts).await {
+            Ok(caller) => caller,
             Err(error) => return error,
         };
         let parsed = (|| {
@@ -598,7 +598,7 @@ impl VtopTools {
         let action = "cancel_outing";
 
         let Some(code) = args.confirmation else {
-            let found = with_retry(self.source.as_ref(), &key, |client| {
+            let found = with_retry(self.source.as_ref(), &caller, |client| {
                 let id = id.clone();
                 async move {
                     Ok(match kind {
@@ -624,7 +624,7 @@ impl VtopTools {
                 Ok(Some(record)) => json_result(&serde_json::json!({
                     "cancelled": false,
                     "request": record,
-                    "confirmation": new_confirmation(&key, action, &fields),
+                    "confirmation": new_confirmation(&caller.key, action, &fields),
                     "next": "Show the student this request and ask them to confirm cancelling it. Only if they say yes, call cancel_outing again with the same arguments and this confirmation.",
                 })),
                 Ok(None) => tool_error(
@@ -634,11 +634,11 @@ impl VtopTools {
             };
         };
 
-        if let Err(message) = check_confirmation(&code, &key, action, &fields) {
+        if let Err(message) = check_confirmation(&code, &caller.key, action, &fields) {
             return tool_error(message);
         }
         // vtop-core checks a fresh copy of the page before cancelling.
-        let result = with_retry(self.source.as_ref(), &key, |client| {
+        let result = with_retry(self.source.as_ref(), &caller, |client| {
             let id = id.clone();
             async move {
                 match kind {
@@ -663,8 +663,8 @@ impl VtopTools {
         Parameters(args): Parameters<OutingPassArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        let key = match Self::caller(&parts) {
-            Ok(key) => key,
+        let caller = match Self::caller(&parts) {
+            Ok(caller) => caller,
             Err(error) => return error,
         };
         let parsed = (|| {
@@ -677,7 +677,7 @@ impl VtopTools {
             Ok(value) => value,
             Err(error) => return error,
         };
-        let result = with_retry(self.source.as_ref(), &key, |client| {
+        let result = with_retry(self.source.as_ref(), &caller, |client| {
             let id = id.clone();
             async move { client.outing_pass(kind, &id).await }
         })

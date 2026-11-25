@@ -24,7 +24,9 @@ pub struct Identity {
 pub trait SessionSource: Send + Sync {
     /// Who `key` belongs to, or `None` for an unknown or revoked key.
     async fn whoami(&self, key: &str) -> Result<Option<Identity>, String>;
-    async fn session(&self, key: &str) -> Result<SessionState, String>;
+    /// A session for `key`; `ip` is where the caller's `/mcp` call came from, for the phone's
+    /// approve sheet.
+    async fn session(&self, key: &str, ip: Option<&str>) -> Result<SessionState, String>;
     async fn expire(&self, key: &str) -> Result<(), String>;
 }
 
@@ -38,6 +40,8 @@ pub struct BridgeClient {
     http: reqwest::Client,
     base_url: String,
     pending_wait: Duration,
+    /// `INTERNAL_TOKEN`, so Convex believes the caller's address this states.
+    internal_token: Option<String>,
 }
 
 fn error_text(body: &Value, fallback: &str) -> String {
@@ -69,7 +73,14 @@ impl BridgeClient {
             http,
             base_url: base_url.trim_end_matches('/').to_string(),
             pending_wait: PENDING_WAIT,
+            internal_token: None,
         }
+    }
+
+    /// States the caller's address on session requests, proved with `token` (`INTERNAL_TOKEN`).
+    pub fn with_internal_token(mut self, token: String) -> Self {
+        self.internal_token = Some(token);
+        self
     }
 
     pub fn with_pending_wait(mut self, pending_wait: Duration) -> Self {
@@ -86,7 +97,7 @@ impl BridgeClient {
         path: &str,
         key: &str,
     ) -> Result<(StatusCode, Value), String> {
-        self.call_with_timeout(method, path, key, CALL_TIMEOUT)
+        self.call_with_timeout(method, path, key, &[], CALL_TIMEOUT)
             .await
     }
 
@@ -95,20 +106,23 @@ impl BridgeClient {
         method: reqwest::Method,
         path: &str,
         key: &str,
+        headers: &[(&str, &str)],
         timeout: Duration,
     ) -> Result<(StatusCode, Value), String> {
         let mut attempt = 0;
         loop {
             attempt += 1;
-            let sent = self
+            let mut request = self
                 .http
                 .request(method.clone(), format!("{}{path}", self.base_url))
                 .bearer_auth(key)
                 // So the account shows this key was used by an AI agent.
                 .header("x-vtop-client", "mcp")
-                .timeout(timeout)
-                .send()
-                .await;
+                .timeout(timeout);
+            for (name, value) in headers {
+                request = request.header(*name, *value);
+            }
+            let sent = request.send().await;
             let response = match sent {
                 Ok(response) => response,
                 Err(_) if attempt == 1 => continue,
@@ -150,9 +164,23 @@ impl SessionSource for BridgeClient {
         }
     }
 
-    async fn session(&self, key: &str) -> Result<SessionState, String> {
+    async fn session(&self, key: &str, ip: Option<&str>) -> Result<SessionState, String> {
         let deadline = Instant::now() + self.pending_wait;
-        let (status, body) = self.call(reqwest::Method::POST, "/v1/session", key).await?;
+        let asker = match (ip, &self.internal_token) {
+            (Some(ip), Some(token)) => {
+                vec![("x-vtop-asker-ip", ip), ("x-vtop-internal", token.as_str())]
+            }
+            _ => Vec::new(),
+        };
+        let (status, body) = self
+            .call_with_timeout(
+                reqwest::Method::POST,
+                "/v1/session",
+                key,
+                &asker,
+                CALL_TIMEOUT,
+            )
+            .await?;
         match status {
             StatusCode::OK => return session_of(&body),
             StatusCode::ACCEPTED => {}
@@ -185,6 +213,7 @@ impl SessionSource for BridgeClient {
                     reqwest::Method::GET,
                     &path,
                     key,
+                    &[],
                     remaining.min(CALL_TIMEOUT),
                 )
                 .await
@@ -261,7 +290,7 @@ impl SessionSource for CachedSessions {
         self.inner.whoami(key).await
     }
 
-    async fn session(&self, key: &str) -> Result<SessionState, String> {
+    async fn session(&self, key: &str, ip: Option<&str>) -> Result<SessionState, String> {
         let hash = crate::hex_sha256(key);
         {
             let mut kept = self.kept.lock().await;
@@ -270,7 +299,7 @@ impl SessionSource for CachedSessions {
                 return Ok(session.clone());
             }
         }
-        let session = self.inner.session(key).await?;
+        let session = self.inner.session(key, ip).await?;
         // Only a signed-in session is worth reusing, not one waiting on an OTP.
         if session.otp_issued_at.is_none() {
             self.kept
@@ -305,7 +334,7 @@ mod tests {
         async fn whoami(&self, _key: &str) -> Result<Option<Identity>, String> {
             Ok(None)
         }
-        async fn session(&self, key: &str) -> Result<SessionState, String> {
+        async fn session(&self, key: &str, _ip: Option<&str>) -> Result<SessionState, String> {
             let n = self.sessions.fetch_add(1, Ordering::SeqCst);
             Ok(SessionState {
                 cookies: format!("{key}-{n}"),
@@ -325,14 +354,14 @@ mod tests {
     async fn keeps_a_session_until_expired() {
         let inner = Arc::new(Counting::default());
         let cached = CachedSessions::new(inner.clone(), Duration::from_secs(60));
-        let first = cached.session("a").await.unwrap();
-        assert_eq!(cached.session("a").await.unwrap(), first);
+        let first = cached.session("a", None).await.unwrap();
+        assert_eq!(cached.session("a", None).await.unwrap(), first);
         assert_eq!(inner.sessions.load(Ordering::SeqCst), 1);
         // Another key gets its own.
-        assert_ne!(cached.session("b").await.unwrap(), first);
+        assert_ne!(cached.session("b", None).await.unwrap(), first);
         cached.expire("a").await.unwrap();
         assert_eq!(inner.expires.load(Ordering::SeqCst), 1);
-        assert_ne!(cached.session("a").await.unwrap(), first);
+        assert_ne!(cached.session("a", None).await.unwrap(), first);
         assert_eq!(inner.sessions.load(Ordering::SeqCst), 3);
     }
 
@@ -340,8 +369,8 @@ mod tests {
     async fn fetches_again_after_the_ttl() {
         let inner = Arc::new(Counting::default());
         let cached = CachedSessions::new(inner.clone(), Duration::ZERO);
-        cached.session("a").await.unwrap();
-        cached.session("a").await.unwrap();
+        cached.session("a", None).await.unwrap();
+        cached.session("a", None).await.unwrap();
         assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
     }
 
@@ -349,15 +378,15 @@ mod tests {
     async fn evicts_by_key_hash_without_touching_other_keys() {
         let inner = Arc::new(Counting::default());
         let cached = CachedSessions::new(inner.clone(), Duration::from_secs(300));
-        let a1 = cached.session("vtm_a").await.unwrap();
-        let b1 = cached.session("vtm_b").await.unwrap();
-        assert_eq!(cached.session("vtm_a").await.unwrap(), a1);
+        let a1 = cached.session("vtm_a", None).await.unwrap();
+        let b1 = cached.session("vtm_b", None).await.unwrap();
+        assert_eq!(cached.session("vtm_a", None).await.unwrap(), a1);
         assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
 
         let removed = cached.evict_hashes(&[crate::hex_sha256("vtm_a")]).await;
         assert_eq!(removed, 1);
-        assert_eq!(cached.session("vtm_b").await.unwrap(), b1);
-        assert_ne!(cached.session("vtm_a").await.unwrap(), a1);
+        assert_eq!(cached.session("vtm_b", None).await.unwrap(), b1);
+        assert_ne!(cached.session("vtm_a", None).await.unwrap(), a1);
         assert_eq!(inner.sessions.load(Ordering::SeqCst), 3);
     }
 
@@ -385,7 +414,7 @@ mod tests {
         let http = vtop_core::client::https_client(&[]).build().unwrap();
         let client =
             BridgeClient::new(http, server.uri()).with_pending_wait(Duration::from_millis(35));
-        let err = client.session("vtm_k").await.unwrap_err();
+        let err = client.session("vtm_k", None).await.unwrap_err();
         assert_eq!(err, PHONE_TIMEOUT_ERROR);
     }
 
@@ -411,7 +440,7 @@ mod tests {
 
         let http = vtop_core::client::https_client(&[]).build().unwrap();
         let client = BridgeClient::new(http, server.uri());
-        let err = client.session("vtm_k").await.unwrap_err();
+        let err = client.session("vtm_k", None).await.unwrap_err();
         assert_eq!(err, PHONE_TIMEOUT_ERROR);
     }
 }

@@ -34,7 +34,7 @@ impl SessionSource for RecordingSource {
         )
     }
 
-    async fn session(&self, key: &str) -> Result<SessionState, String> {
+    async fn session(&self, key: &str, _ip: Option<&str>) -> Result<SessionState, String> {
         self.usernames.lock().unwrap().push(key.to_string());
         Err("phone_unreachable: Open VITAP Mate → Connected apps → Reconnect this phone.".into())
     }

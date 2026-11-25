@@ -16740,8 +16740,8 @@ data class HandoverAsker (
     val `via`: KeyKind
     , 
     /**
-     * The extension's address; None for an AI app (its requests come through our engine) or
-     * when the server didn't see one.
+     * The address it asked from (an AI app's as our engine saw it on `/mcp`); None when the
+     * server didn't see one.
      */
     val `ip`: AskerIp?
     

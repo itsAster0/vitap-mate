@@ -40,6 +40,17 @@ export async function holds(req: Request, token: string | undefined): Promise<bo
   return !!token && hashesEqual(await sha256Hex(token), await sha256Hex(bearer(req)));
 }
 
+/** Whether header `name` holds `token` (compared as hashes, like [holds]). */
+export async function headerHolds(req: Request, name: string, token: string | undefined): Promise<boolean> {
+  return !!token && hashesEqual(await sha256Hex(token), await sha256Hex(req.headers.get(name) ?? ""));
+}
+
+/** An address as a caller may state it: IPv4 or IPv6 characters only, at most 45 of them. */
+export function addressOf(value: string | null): string | null {
+  const address = value?.trim() ?? "";
+  return /^[0-9A-Fa-f:.]{2,45}$/.test(address) ? address : null;
+}
+
 export const notInternal = () => error(401, "unauthorized", "The internal token is required.");
 
 export async function jsonBody(req: Request): Promise<Record<string, unknown> | null> {

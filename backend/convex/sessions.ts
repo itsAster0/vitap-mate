@@ -123,8 +123,9 @@ export const keyHolder = internalQuery({
   handler: async (ctx, { keyHash }) => (await keyAccount(ctx, keyHash))?.account._id ?? null,
 });
 
-/** Counts a session call (`limited` past `sessionCall`) and records the key's use (and the
- * extension's address, `ip`), then says what the cache holds and who asked. Null for no such key. */
+/** Counts a session call (`limited` past `sessionCall`) and records the key's use and the address
+ * it came from (`ip`, null when unknown), then says what the cache holds and who asked. Null for
+ * no such key. */
 export const start = internalMutation({
   args: { keyHash: v.string(), via: v.union(v.literal("extension"), v.literal("mcp")), ip: v.union(v.string(), v.null()) },
   handler: async (ctx, { keyHash, via, ip }) => {
@@ -135,11 +136,9 @@ export const start = internalMutation({
     const doc = await recordOf(ctx, account);
     const at = now();
     const use = keyUse(keyOf(key), at, via as KeyVia);
-    // An AI app's calls come through our engine, so only the extension's address is its own.
-    const address = via === "extension" ? ip : null;
-    const known = address === null ? null : keyIp(key.ips ?? [], address);
+    const known = ip === null ? null : keyIp(key.ips ?? [], ip);
     if (use || known?.ips) await ctx.db.patch(key._id, { ...use, ...(known?.ips ? { ips: known.ips } : {}) });
-    const asker: RequestAsker = { keyLabel: key.label, via, ip: address === null || known === null ? null : { address, seen: known.seen } };
+    const asker: RequestAsker = { keyLabel: key.label, via, ip: ip === null || known === null ? null : { address: ip, seen: known.seen } };
     return { limited: false as const, accountId: account._id, regno: doc.id, cached: doc.cachedSession(at), source: doc.cachedSource(), asker };
   },
 });

@@ -140,7 +140,16 @@ async fn require_bearer(
                 .into_response();
         }
     }
-    request.extensions_mut().insert(Caller(presented));
+    // Convex sets `x-forwarded-for` to the one address the `/mcp` call came from.
+    let ip = (request.headers().get("x-forwarded-for"))
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(',').next())
+        .map(str::trim)
+        .filter(|ip| !ip.is_empty())
+        .map(String::from);
+    request
+        .extensions_mut()
+        .insert(Caller { key: presented, ip });
     next.run(request).await
 }
 
