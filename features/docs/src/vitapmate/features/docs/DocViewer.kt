@@ -62,12 +62,12 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.X
 import java.io.File
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.data.Doc
 import vitapmate.data.DocKind
 import vitapmate.data.Docs
+import vitapmate.data.attempt
 import vitapmate.data.readSpreadsheet
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -98,10 +98,8 @@ internal fun DocViewer(id: String) {
 internal fun DocContent(doc: Doc, embedded: Boolean, inTab: Boolean = false) {
     var failed by remember(doc.uri) { mutableStateOf<Throwable?>(null) }
     val fail: (Throwable) -> Unit = { e ->
-        if (e !is CancellationException) {
-            Log.warn(SRC, "unreadable: ${e::class.simpleName}", fields = mapOf("kind" to doc.kind.name))
-            failed = e
-        }
+        Log.warn(SRC, "unreadable: ${e::class.simpleName}", fields = mapOf("kind" to doc.kind.name))
+        failed = e
     }
     // The file lives in the download folder, where a file manager can delete it.
     val there by produceState<Boolean?>(null, doc.uri) { value = withContext(Dispatchers.IO) { Docs.exists(doc) } }
@@ -127,7 +125,7 @@ internal fun DocContent(doc: Doc, embedded: Boolean, inTab: Boolean = false) {
 @Composable
 private fun ImageView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
     val bitmap by produceState<android.graphics.Bitmap?>(null, doc.uri) {
-        value = runCatching { withContext(Dispatchers.IO) { decodeImage(Docs.readBytes(doc)) } }.onFailure(onFailed).getOrNull()
+        value = attempt { withContext(Dispatchers.IO) { decodeImage(Docs.readBytes(doc)) } }.onFailure(onFailed).getOrNull()
     }
     val zoom = rememberZoom()
     Box(Modifier.fillMaxSize().zoomGestures(zoom, list = false).testTag("docs.viewer.image"), Alignment.Center) {
@@ -148,7 +146,7 @@ private fun decodeImage(bytes: ByteArray): android.graphics.Bitmap {
 @Composable
 private fun TextView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
     val text by produceState<String?>(null, doc.uri) {
-        value = runCatching { withContext(Dispatchers.IO) { Docs.readBytes(doc).decodeToString().take(1_000_000) } }.onFailure(onFailed).getOrNull()
+        value = attempt { withContext(Dispatchers.IO) { Docs.readBytes(doc).decodeToString().take(1_000_000) } }.onFailure(onFailed).getOrNull()
     }
     var query by rememberSaveable { mutableStateOf("") }
     val body = text ?: return Loading()
@@ -184,7 +182,7 @@ private fun marked(text: String, needle: String, color: Color): AnnotatedString 
 @Composable
 private fun SheetView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
     val tables by produceState<Map<String, List<List<String>>>?>(null, doc.uri) {
-        value = runCatching { withContext(Dispatchers.IO) { Docs.withFile(doc, ::readSpreadsheet) } }.onFailure(onFailed).getOrNull()
+        value = attempt { withContext(Dispatchers.IO) { Docs.withFile(doc, ::readSpreadsheet) } }.onFailure(onFailed).getOrNull()
     }
     var sheet by rememberSaveable { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }

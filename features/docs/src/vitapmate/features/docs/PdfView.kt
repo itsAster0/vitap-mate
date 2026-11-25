@@ -41,6 +41,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.withContext
 import vitapmate.data.Doc
 import vitapmate.data.Docs
+import vitapmate.data.attempt
+import vitapmate.data.orNull
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 
@@ -77,7 +79,7 @@ private class Pdf(fd: ParcelFileDescriptor) : AutoCloseable {
 @Composable
 internal fun PdfView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
     val pdf by produceState<Pdf?>(null, doc.uri) {
-        value = runCatching { withContext(Dispatchers.IO) { Pdf(Docs.open(doc)) } }.onFailure(onFailed).getOrNull()
+        value = attempt { withContext(Dispatchers.IO) { Pdf(Docs.open(doc)) } }.onFailure(onFailed).getOrNull()
     }
     val open = pdf ?: return Box(Modifier.fillMaxSize())
     DisposableEffect(open) { onDispose { open.close() } }
@@ -98,7 +100,7 @@ internal fun PdfView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit)
             verticalArrangement = Arrangement.spacedBy(Space.sm),
         ) {
             itemsIndexed(open.ratios) { i, ratio ->
-                val bitmap by produceState<Bitmap?>(null, i, px) { value = runCatching { open.page(i, px) }.getOrNull() }
+                val bitmap by produceState<Bitmap?>(null, i, px) { value = orNull { open.page(i, px) } }
                 Box(
                     Modifier.fillMaxWidth().aspectRatio(ratio).clip(RoundedCornerShape(4.dp)).background(AppTheme.colors.card).testTag("docs.viewer.page.$i"),
                 ) {

@@ -18,6 +18,8 @@ import org.json.JSONObject
 import vitapmate.data.Guides
 import vitapmate.data.Problem
 import vitapmate.data.ProblemKind
+import vitapmate.data.attempt
+import vitapmate.data.orNull
 import vitapmate.observability.flow
 
 /** A guide from the edge: its [value] once read (the kept copy first), or why it couldn't be, and [retry]. */
@@ -32,8 +34,8 @@ fun <T> rememberGuide(path: String, parse: (JSONObject) -> T): LoadedGuide<T> {
     val context = LocalContext.current.applicationContext
     var value by remember(path) { mutableStateOf<T?>(null) }
     var problem by remember(path) { mutableStateOf<Problem?>(null) }
-    var attempt by remember(path) { mutableIntStateOf(0) }
-    LaunchedEffect(path, attempt) {
+    var round by remember(path) { mutableIntStateOf(0) }
+    LaunchedEffect(path, round) {
         problem = null
         flow("guide.open") { f ->
             fun read(file: File): T {
@@ -42,7 +44,7 @@ fun <T> rememberGuide(path: String, parse: (JSONObject) -> T): LoadedGuide<T> {
                 return parse(json)
             }
             withContext(Dispatchers.IO) { Guides.cached(context, path)?.let { runCatching { read(it) }.getOrNull() } }?.let { value = it }
-            runCatching { withContext(Dispatchers.IO) { read(Guides.refresh(context, path, f)) } }
+            attempt { withContext(Dispatchers.IO) { read(Guides.refresh(context, path, f)) } }
                 .onSuccess { value = it }
                 .onFailure { e ->
                     if (value != null) return@onFailure
@@ -51,7 +53,7 @@ fun <T> rememberGuide(path: String, parse: (JSONObject) -> T): LoadedGuide<T> {
                 }
         }
     }
-    return LoadedGuide(value, problem) { attempt++ }
+    return LoadedGuide(value, problem) { round++ }
 }
 
 /** The image at [path] next to a guide, once it's kept (fetched the first time); null until then or when offline. */
@@ -63,7 +65,7 @@ fun rememberGuideImage(path: String): ImageBitmap? {
         fun decode(file: File) = BitmapFactory.decodeFile(file.path)?.asImageBitmap()
         image = withContext(Dispatchers.IO) { Guides.cached(context, path)?.let(::decode) }
         flow("guide.image") { f ->
-            runCatching { withContext(Dispatchers.IO) { decode(Guides.refresh(context, path, f)) } }.getOrNull()?.let { image = it }
+            orNull { withContext(Dispatchers.IO) { decode(Guides.refresh(context, path, f)) } }?.let { image = it }
         }
     }
     return image

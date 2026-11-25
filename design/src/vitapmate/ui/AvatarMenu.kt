@@ -17,7 +17,6 @@ import com.composables.icons.lucide.IdCard
 import com.composables.icons.lucide.ImagePlus
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Trash2
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 import vitapmate.data.Settings
 import vitapmate.observability.Log
@@ -60,12 +59,12 @@ fun AvatarMenu(expanded: Boolean, onDismiss: () -> Unit, vtopPhoto: String? = nu
                 onClick = {
                     onDismiss()
                     scope.launch {
-                        runCatching {
+                        attempt {
                             flow("profile.photo.vtop") { id ->
                                 AvatarPhoto.use(context, Base64.decode(vtopPhoto, Base64.DEFAULT))
                                 Log.info("ui.profile", "photo set from VTOP", id)
                             }
-                        }.onFailure { if (it is CancellationException) throw it else showToast("Couldn't use the VTOP photo", "Choose one instead.", tone = ToastTone.Error) }
+                        }.onFailure { showToast("Couldn't use the VTOP photo", "Choose one instead.", tone = ToastTone.Error) }
                     }
                 },
                 leadingIcon = { Icon(Lucide.IdCard, null) },

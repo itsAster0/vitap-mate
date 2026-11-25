@@ -133,7 +133,7 @@ object SemesterChoice {
     private fun sendToServer() {
         AppScope.launch {
             flow("semesters.server") { f ->
-                runCatching { withContext(Dispatchers.IO) { AppCore.await().sendServerSemester(f) } }
+                attempt { withContext(Dispatchers.IO) { AppCore.await().sendServerSemester(f) } }
                     .onFailure { Log.info("ui.semesters", "not sent to the server: ${it::class.simpleName}", f) }
             }
         }

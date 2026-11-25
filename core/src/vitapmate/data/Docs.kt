@@ -413,7 +413,7 @@ object Docs {
         scope.launch {
             flow("docs.download") { f ->
                 val manager = context.getSystemService(DownloadManager::class.java)
-                runCatching {
+                attempt {
                     val done = finished(context, manager, downloadId)
                     val file = manager.getUriForDownloadedFile(downloadId) ?: error("no file")
                     add(name, null, source, "$source:$name", f, done.size) { context.contentResolver.openInputStream(file) ?: error("can't read the file") }
@@ -537,7 +537,7 @@ object Docs {
                 val copy = byName[fileName]?.let(Uri::parse)?.takeIf { Downloads.exists(it) }
                 val uri = when {
                     copy != null -> copy.also { linked++ }
-                    file.exists() -> runCatching { Downloads.saveQuietly(fileName, mimeOf(fileName, null), file.readBytes()) }
+                    file.exists() -> attempt { Downloads.saveQuietly(fileName, mimeOf(fileName, null), file.readBytes()) }
                         .onFailure { Log.warn("docs", "move failed: ${it::class.simpleName}", f) }.getOrNull()?.also { written++ }
                     else -> null
                 }

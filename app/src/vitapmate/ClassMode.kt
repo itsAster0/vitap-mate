@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 import vitapmate.data.AppCore
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
+import vitapmate.data.attempt
 import vitapmate.data.istDay
 import vitapmate.data.istMinute
 import vitapmate.data.istSecond
@@ -74,7 +75,7 @@ object ClassMode {
             val today = istDay(ms)
             val now = istMinute(ms)
             // The classes and exams of the next 8 days, by day and start.
-            val quiet = runCatching {
+            val quiet = attempt {
                 withContext(Dispatchers.IO) {
                     val c = AppCore.await()
                     val classes = c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).flatMap { d -> meeting(d).map { Quiet(d.day, it.slot.start, it.slot.end, it.slot.name) } } }.orEmpty()

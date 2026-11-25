@@ -80,6 +80,7 @@ import vitapmate.data.MessItem
 import vitapmate.data.MessMenu
 import vitapmate.data.MessSheet
 import vitapmate.data.MessTimings
+import vitapmate.data.attempt
 import vitapmate.data.currentOrNextMeal
 import vitapmate.data.epochDayOf
 import vitapmate.data.messMenuYear
@@ -119,7 +120,7 @@ private const val SHEET_KEY = "mess_menu_sheet"
  */
 @Composable
 internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> Unit, inTab: Boolean = false) {
-    val menu by produceState<MessMenu?>(null, doc.uri) { value = runCatching { loadMessMenu(doc) }.onFailure(onFailed).getOrNull() }
+    val menu by produceState<MessMenu?>(null, doc.uri) { value = attempt { loadMessMenu(doc) }.onFailure(onFailed).getOrNull() }
     val data = menu ?: return Loading()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }

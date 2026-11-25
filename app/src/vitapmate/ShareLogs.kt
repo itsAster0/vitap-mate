@@ -6,12 +6,13 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import vitapmate.data.attempt
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
 
 /** Shares the log file through the system share sheet (the `.logs` FileProvider in the manifest). */
 suspend fun shareLogs(context: Context) {
-    val file = runCatching { withContext(Dispatchers.IO) { Inspector.exportFile() } }.getOrElse {
+    val file = attempt { withContext(Dispatchers.IO) { Inspector.exportFile() } }.getOrElse {
         Log.error("ui.inspector", "export failed: $it")
         return
     }

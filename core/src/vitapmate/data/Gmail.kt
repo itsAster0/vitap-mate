@@ -314,7 +314,7 @@ object Gmail {
     /** Trashes the OTP mail, or marks it read; best effort. */
     suspend fun tidyUp(otp: Otp, flow: String) = withContext(Dispatchers.IO) {
         val a = account ?: return@withContext
-        runCatching {
+        attempt {
             val token = token(flow, force = false)
             val (path, body) = if (a.deleteAfterReading) "/messages/${otp.messageId}/trash" to "" else
                 "/messages/${otp.messageId}/modify" to """{"removeLabelIds":["UNREAD"]}"""
