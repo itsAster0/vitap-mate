@@ -6,12 +6,12 @@
 //! Keystore that fails for a moment is not that: the password stays on disk and is opened again
 //! on the next use. Neither the password nor the sealed text is ever logged.
 
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use crate::{ACCOUNT, Account, Core, demo, traced_sync};
+use crate::{ACCOUNT, Account, Core, Slot, demo, traced_sync};
 
 /// [`PasswordCipher::seal`]'s answer.
 #[derive(uniffi::Enum)]
@@ -143,6 +143,12 @@ impl Saved {
     }
 }
 
+/// The account lock, held. `account.json` is written only under it, and a sign-out forgets it
+/// under it too, so a write that checked the session is still signed in can't land after.
+pub(crate) struct AccountFile<'a> {
+    _held: MutexGuard<'a, ()>,
+}
+
 /// The last password sealed or opened and its sealed text, so writing the same password again
 /// needs no Keystore (and can't lose it when the Keystore fails), and reads open it once.
 #[derive(Default)]
@@ -216,12 +222,7 @@ impl Core {
         let Some(cipher) = &self.shared.cipher else {
             return;
         };
-        let _file = self
-            .shared
-            .locks
-            .account
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let _file = self.lock_account();
         let Some(mut stored) = self.read::<Stored>(ACCOUNT) else {
             return;
         };
@@ -246,46 +247,71 @@ impl Core {
         }
     }
 
+    pub(crate) fn lock_account(&self) -> AccountFile<'_> {
+        AccountFile {
+            _held: self
+                .shared
+                .locks
+                .account
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+        }
+    }
+
     /// Writes `account`, `rejected` when VTOP turned its password down. The same student's
     /// registration number (when `account` has none: it is only known once signed in) and the
     /// server's rejection stay.
     pub(crate) fn write_account(&self, account: &Account, rejected: bool) {
         {
-            let _file = self
-                .shared
-                .locks
-                .account
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner);
-            let same = self
-                .read::<Stored>(ACCOUNT)
-                .filter(|saved| saved.username == account.username);
-            let mut account = account.clone();
-            if account.registration_number.is_none() {
-                account.registration_number = same
-                    .as_ref()
-                    .and_then(|saved| saved.registration_number.clone());
-            }
-            let server_rejected = same.as_ref().is_some_and(|saved| saved.server_rejected);
-            // A plain-text password from an older version, not sealed yet: kept as it is if
-            // the Keystore can't seal it now either.
-            let plain = same
-                .and_then(|saved| saved.password)
-                .filter(|plain| *plain == account.password);
-            self.write_stored(&account, rejected, server_rejected, plain);
+            let file = self.lock_account();
+            self.write_account_held(&file, account, rejected);
         }
         self.account_changed();
+    }
+
+    /// [`Core::write_account`] for `slot`'s sign-in, unless it was signed out or replaced
+    /// meanwhile; checked under the lock, so a sign-out can't land between.
+    pub(crate) fn write_account_of(&self, slot: &Arc<Slot>, account: &Account, rejected: bool) {
+        {
+            let file = self.lock_account();
+            if !self.is_current(slot) {
+                return;
+            }
+            self.write_account_held(&file, account, rejected);
+        }
+        self.account_changed();
+    }
+
+    /// [`Core::write_account`] with the lock held and nothing announced: the caller says so
+    /// ([`Core::account_changed`]) once it let go of the lock.
+    pub(crate) fn write_account_held(
+        &self,
+        _file: &AccountFile<'_>,
+        account: &Account,
+        rejected: bool,
+    ) {
+        let same = self
+            .read::<Stored>(ACCOUNT)
+            .filter(|saved| saved.username == account.username);
+        let mut account = account.clone();
+        if account.registration_number.is_none() {
+            account.registration_number = same
+                .as_ref()
+                .and_then(|saved| saved.registration_number.clone());
+        }
+        let server_rejected = same.as_ref().is_some_and(|saved| saved.server_rejected);
+        // A plain-text password from an older version, not sealed yet: kept as it is if the
+        // Keystore can't seal it now either.
+        let plain = same
+            .and_then(|saved| saved.password)
+            .filter(|plain| *plain == account.password);
+        self.write_stored(&account, rejected, server_rejected, plain);
     }
 
     /// Flags (or clears) the server's rejection of the saved account's password.
     pub(crate) fn set_server_rejected(&self, rejected: bool) {
         {
-            let _file = self
-                .shared
-                .locks
-                .account
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner);
+            let _file = self.lock_account();
             let Some(mut stored) = self.read::<Stored>(ACCOUNT) else {
                 return;
             };
@@ -589,6 +615,80 @@ mod tests {
         assert_eq!(core.account_status(), AccountStatus::SignedIn);
         core.sign_out_here("f");
         assert_eq!(core.account_status(), AccountStatus::SignedOut);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Signs `core` out on another thread when asked to seal, as a sign-out landing in the
+    /// middle of a save does; seals like [`Fake`].
+    struct SignOutWhileSealing {
+        core: Mutex<Option<std::sync::Weak<Core>>>,
+        signing_out: Mutex<Option<std::thread::JoinHandle<()>>>,
+        past_install: Mutex<Option<std::sync::mpsc::Receiver<()>>>,
+    }
+
+    impl PasswordCipher for SignOutWhileSealing {
+        fn seal(&self, plain: String) -> Sealing {
+            if let Some(core) = self
+                .core
+                .lock()
+                .unwrap()
+                .take()
+                .and_then(|core| core.upgrade())
+            {
+                *self.signing_out.lock().unwrap() =
+                    Some(std::thread::spawn(move || core.sign_out_here("sign_out")));
+                // The sign-out has dropped the session (its status heard) before the save goes
+                // on to write.
+                if let Some(past) = self.past_install.lock().unwrap().take() {
+                    past.recv().unwrap();
+                }
+            }
+            Sealing::Sealed { sealed: plain }
+        }
+        fn open(&self, sealed: String) -> Opening {
+            Opening::Opened { plain: sealed }
+        }
+    }
+
+    /// Tells `to` once it hears the student signed out.
+    struct HearsSignOut(Mutex<std::sync::mpsc::Sender<()>>);
+
+    impl AccountListener for HearsSignOut {
+        fn changed(&self, status: AccountStatus) {
+            if status == AccountStatus::SignedOut {
+                // The test may have stopped listening; nothing else waits on it.
+                let _ = self.0.lock().unwrap().send(());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_sign_out_during_a_save_still_ends_signed_out_on_disk() {
+        let dir = dir("save-race");
+        let (told, past) = std::sync::mpsc::channel();
+        let cipher = Arc::new(SignOutWhileSealing {
+            core: Mutex::new(None),
+            signing_out: Mutex::new(None),
+            past_install: Mutex::new(Some(past)),
+        });
+        let core = Arc::new(Core::for_test_on(
+            &dir,
+            Shared {
+                cipher: Some(cipher.clone() as Arc<dyn PasswordCipher>),
+                ..Shared::default()
+            },
+        ));
+        let session = crate::Session::new(account("pw-1"), &core.shared).unwrap();
+        let slot = Arc::new(vtop_core::sync::RwLock::new(session));
+        core.install(Some(slot.clone()));
+        core.watch_account("f".into(), Arc::new(HearsSignOut(Mutex::new(told))));
+        *cipher.core.lock().unwrap() = Some(Arc::downgrade(&core));
+
+        core.save(&slot, &*slot.read().await);
+        let signing_out = cipher.signing_out.lock().unwrap().take().unwrap();
+        signing_out.join().unwrap();
+        assert!(!core.at(ACCOUNT).exists(), "the account came back");
+        assert!(!core.at(crate::SESSION).exists(), "the session came back");
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -17,6 +17,7 @@ use vtop_core::sync::RwLock;
 use crate::device::Device;
 use crate::pages::changes;
 use crate::remote::{consent, regno, udp};
+use crate::store::account::AccountFile;
 use crate::{Core, PAGES, SELECTED, SEMESTERS};
 
 pub(crate) mod account;
@@ -48,6 +49,12 @@ impl Core {
     /// Removes `files` and every cached page: the student's data, at a sign-out or another
     /// student. One file alone goes with [`Core::remove_file`].
     pub(crate) fn forget(&self, files: &[&str]) {
+        let account = self.lock_account();
+        self.forget_held(&account, files);
+    }
+
+    /// [`Core::forget`] with the account lock held (a save that found another student).
+    pub(crate) fn forget_held(&self, _account: &AccountFile<'_>, files: &[&str]) {
         // Not while a pull records mail into forwarding.json (it would write it back).
         let _forwarding = self
             .shared

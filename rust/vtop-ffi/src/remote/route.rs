@@ -600,11 +600,8 @@ impl Core {
                 ..
             }) => {
                 // As on the phone: clear cookies and stop signing in with it.
-                warn!("VTOP rejected the saved password on the server; no more sign-ins with it");
-                session.mark_password_rejected();
-                if self.is_current(slot) {
-                    self.write_account(&session.account, true);
-                }
+                info!("rejected on the server");
+                self.reject_password(slot, &mut session);
                 return Err(ServerError::Expired);
             }
             answer => answer?,

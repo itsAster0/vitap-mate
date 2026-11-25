@@ -9,7 +9,7 @@ use vtop_core::sync::RwLock;
 use vtop_core::types::PersistedVtopSession;
 
 use crate::remote::route;
-use crate::store::account::SavedPassword;
+use crate::store::account::{AccountFile, SavedPassword};
 use crate::{
     ACCOUNT, Account, Core, CoreError, OtpRejection, OtpVia, SESSION, STUDENT_FILES, SavedAccount,
     Session, SignIn, Slot, demo, obs, traced, traced_sync, unix_now,
@@ -267,7 +267,8 @@ impl Core {
     /// The client has no OTP challenge left to take a code for (the app restarted, or a call
     /// dropped it): signs in afresh. Ok when VTOP lets it in without a code; when VTOP mails a
     /// new one, `OtpRejected` saying so, so the prompt stays open and auto-fill takes the new
-    /// code instead of failing on a challenge that is gone.
+    /// code instead of failing on a challenge that is gone. A rejected password asks VTOP
+    /// nothing.
     pub(crate) async fn fresh_challenge(
         &self,
         slot: &Arc<Slot>,
@@ -275,22 +276,13 @@ impl Core {
     ) -> Result<(), CoreError> {
         warn!("no otp challenge left to answer; signing in again");
         session.restart(&self.shared)?;
-        match session.client.login().await {
-            Ok(()) => {
-                session.mark_signed_in();
-                obs::set_regno(session.client.registration_number().ok());
-                self.save(slot, session);
-                Ok(())
-            }
-            Err(VtopError::OTPRequired(message, _)) => {
-                session.begin_otp(OtpVia::Phone, message);
-                Err(CoreError::OtpRejected {
-                    kind: OtpRejection::SignInEnded,
-                    reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
-                        .into(),
-                })
-            }
-            Err(error) => Err(error.into()),
+        match self.log_in(slot, session).await {
+            Err(CoreError::OtpRequired { .. }) => Err(CoreError::OtpRejected {
+                kind: OtpRejection::SignInEnded,
+                reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
+                    .into(),
+            }),
+            result => result,
         }
     }
 
@@ -344,36 +336,54 @@ impl Core {
                 issued_at: session.client.otp_issued_at(),
             });
         }
+        self.log_in(slot, session).await
+    }
+
+    /// One sign-in with the saved password, shared by [`Core::sign_in_again`] and
+    /// [`Core::fresh_challenge`]: none for a rejected password or a session signed out
+    /// meanwhile; VTOP's OTP opens the prompt (`OtpRequired`), and its no marks the password
+    /// rejected ([`Core::reject_password`]).
+    async fn log_in(&self, slot: &Arc<Slot>, session: &mut Session) -> Result<(), CoreError> {
+        if !self.is_current(slot) {
+            return Err(CoreError::NotSignedIn);
+        }
         if session.is_password_rejected() {
             info!("the saved password was rejected, not signing in again");
             return Err(CoreError::InvalidCredentials);
         }
         info!("signing in again");
-        if let Err(error) = session.client.login().await {
-            match &error {
-                VtopError::OTPRequired(message, _) => {
-                    session.begin_otp(OtpVia::Phone, message.clone());
-                }
-                VtopError::InvalidCredentials => {
-                    warn!("VTOP rejected the saved password; no more sign-ins with it");
-                    session.mark_password_rejected();
-                    if self.is_current(slot) {
-                        self.write_account(&session.account, true);
-                    }
-                }
-                _ => {}
+        match session.client.login().await {
+            Ok(()) => {}
+            Err(VtopError::OTPRequired(message, issued_at)) => {
+                session.begin_otp(OtpVia::Phone, message.clone());
+                return Err(VtopError::OTPRequired(message, issued_at).into());
             }
-            return Err(error.into());
+            Err(VtopError::InvalidCredentials) => {
+                self.reject_password(slot, session);
+                return Err(CoreError::InvalidCredentials);
+            }
+            Err(error) => return Err(error.into()),
         }
         session.mark_signed_in();
+        obs::set_regno(session.client.registration_number().ok());
         self.save(slot, session);
         Ok(())
     }
 
     pub(crate) fn save(&self, slot: &Arc<Slot>, session: &Session) {
-        if !self.is_current(slot) {
-            return;
+        {
+            // Held to the end: a sign-out after this check waits for the writes below and
+            // forgets them; one before it leaves nothing to write.
+            let file = self.lock_account();
+            if !self.is_current(slot) {
+                return;
+            }
+            self.save_held(&file, session);
         }
+        self.account_changed();
+    }
+
+    fn save_held(&self, file: &AccountFile<'_>, session: &Session) {
         // Another student signed in over the saved one ("Sign in again"): the last one's
         // semesters, pick and pages are not theirs.
         if self.read_account().is_some_and(|saved| {
@@ -383,7 +393,7 @@ impl Core {
         }) {
             info!("another account signed in: cached pages and forwarding address dropped");
             self.queue_leave();
-            self.forget(&STUDENT_FILES);
+            self.forget_held(file, &STUDENT_FILES);
             // The JWT names the last student: set aside to sign out of their account, while the
             // next server call proves this one.
             self.set_aside_identity();
@@ -395,7 +405,7 @@ impl Core {
         if let Ok(regno) = session.client.registration_number() {
             account.registration_number = Some(regno);
         }
-        self.write_account(&account, session.is_password_rejected());
+        self.write_account_held(file, &account, session.is_password_rejected());
         #[expect(
             clippy::disallowed_methods,
             reason = "saved to session.json on the phone; nothing leaves it"
@@ -439,12 +449,29 @@ impl Core {
     /// Saves `account`'s password over the saved account's when it's the same username
     /// (another username is another account, saved only once signed in).
     pub(crate) fn keep_accepted_password(&self, account: &Account) {
-        if let Some(saved) = self.read_account()
-            && saved.username == account.username
-            && (saved.password() != Some(account.password.as_str()) || saved.rejected)
         {
+            // Read and written under the lock: a sign-out meanwhile leaves nothing to save over.
+            let file = self.lock_account();
+            let Some(saved) = self.read_account() else {
+                return;
+            };
+            if saved.username != account.username
+                || (saved.password() == Some(account.password.as_str()) && !saved.rejected)
+            {
+                return;
+            }
             info!("password accepted before the otp: saved");
-            self.write_account(account, false);
+            self.write_account_held(&file, account, false);
         }
+        self.account_changed();
+    }
+
+    /// VTOP rejected `session`'s saved password: its cookies go, no sign-in is tried with it
+    /// again, its prompt closes (the calls waiting on it end) and, unless it was signed out or
+    /// replaced meanwhile, the saved account says so.
+    pub(crate) fn reject_password(&self, slot: &Arc<Slot>, session: &mut Session) {
+        warn!("VTOP rejected the saved password; no more sign-ins with it");
+        session.mark_password_rejected();
+        self.write_account_of(slot, &session.account, true);
     }
 }

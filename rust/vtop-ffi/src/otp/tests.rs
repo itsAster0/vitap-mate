@@ -155,6 +155,31 @@ async fn sign_out_or_a_rejected_password_ends_the_wait() {
 }
 
 #[tokio::test]
+async fn a_rejected_password_never_signs_in_afresh_for_a_code() {
+    let dir = std::env::temp_dir().join(format!(
+        "vtop-ffi-otp-rejected-fresh-{}",
+        std::process::id()
+    ));
+    let core = Core::for_test(dir);
+    let account = Account {
+        username: "21BCE0001".into(),
+        password: "pw".into(),
+        registration_number: None,
+    };
+    let session = Session::new(account, &core.shared).unwrap().rejected(true);
+    core.install(Some(Arc::new(RwLock::new(session))));
+    // No challenge left to answer: a fresh sign-in would try the rejected password on VTOP.
+    assert_eq!(
+        core.submit_otp("f".into(), "123456".into()).await,
+        Err(CoreError::InvalidCredentials)
+    );
+    assert_eq!(
+        core.resend_otp("f".into()).await,
+        Err(CoreError::InvalidCredentials)
+    );
+}
+
+#[tokio::test]
 async fn a_wait_past_its_deadline_gives_up_but_the_prompt_stays() {
     let (core, slot, told) = awaiting("deadline", true);
     let (over, deadline) = futures::channel::oneshot::channel::<()>();
