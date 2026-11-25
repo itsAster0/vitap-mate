@@ -7,7 +7,8 @@ METADATA = 'fastlane/metadata/android'.freeze
 DEFAULT_UPDATE_PRIORITY = 2
 UPDATE_PRIORITIES = {
   # 3001000 => 5,
-  3_002_000 => 5 # the new server: older versions stop syncing
+  3_002_000 => 5, # the new server: older versions stop syncing
+  3_002_100 => 3 # hung OTP sign-ins, Keystore password, no stored session: ask once on start
 }.freeze
 
 # The versionCode the AAB is built with, from app/module.yaml.
