@@ -113,10 +113,15 @@ private fun TimetableContent(tt: Timetable) {
     // One state for the screen's life (not keyed on the semester: a recreated state leaves
     // callbacks held by the pager writing to the old one); a semester switch goes back to today.
     var selectedDay by rememberSaveable { mutableIntStateOf(isoWeekday(today)) }
+    // Weeks from this week's Monday (the strip swipes between them).
+    var selectedWeek by rememberSaveable { mutableIntStateOf(0) }
     var daySemester by rememberSaveable { mutableStateOf(semester) }
     LaunchedEffect(semester) {
         if (semester != daySemester) {
-            if (daySemester != null) selectedDay = isoWeekday(today)
+            if (daySemester != null) {
+                selectedDay = isoWeekday(today)
+                selectedWeek = 0
+            }
             daySemester = semester
         }
     }
@@ -124,12 +129,13 @@ private fun TimetableContent(tt: Timetable) {
     val scope = rememberCoroutineScope()
     val ext = extra ?: return TimetableSkeleton()
 
-    LaunchedEffect(mode, selectedDay, ext) {
+    LaunchedEffect(mode, selectedDay, selectedWeek, ext) {
         StateRegistry.report(
             "timetable",
             mapOf(
                 "view" to mode.name.lowercase(),
                 "selectedDay" to selectedDay,
+                "selectedWeek" to selectedWeek,
                 "semester" to tt.semesterId,
                 "slots" to tt.slots.size,
                 "attendanceCourses" to ext.attendance.size,
@@ -140,9 +146,10 @@ private fun TimetableContent(tt: Timetable) {
     }
     DisposableEffect(Unit) { onDispose { StateRegistry.remove("timetable") } }
 
-    fun select(day: Int, how: String) {
+    fun select(week: Int, day: Int, how: String) {
+        selectedWeek = week
         selectedDay = day
-        scope.logAction("timetable.day", "ui.timetable", "day $day", mapOf("day" to "$day", "how" to how))
+        scope.logAction("timetable.day", "ui.timetable", "week $week day $day", mapOf("week" to "$week", "day" to "$day", "how" to how))
     }
     fun open(c: DayClass, from: String) {
         sheet = c
@@ -156,7 +163,7 @@ private fun TimetableContent(tt: Timetable) {
     Column(Modifier.fillMaxSize()) {
         Crossfade(mode, Modifier.weight(1f), label = "timetable-view") { m ->
             if (m == TimetableViewMode.Agenda) {
-                AgendaView(ext.days, ext.attendance, selectedDay, ::select, ::open, now, h24, Modifier.testTag("timetable.agenda"))
+                AgendaView(ext.days, ext.attendance, selectedWeek, selectedDay, ::select, ::open, now, h24, Modifier.testTag("timetable.agenda"))
             } else {
                 val classDays = remember(tt.slots) { tt.slots.map { it.day + 1 }.distinct().sorted() }
                 WeeklyGrid(

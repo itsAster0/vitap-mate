@@ -49,15 +49,18 @@ import vitapmate.ui.isoWeekday
  * The day view: the week strip, the selected day's heading and shape, its focus card (now / next,
  * the end-of-day summary, or why it's free), then its classes with the free time between them; a
  * day your timetable has nothing on looks at the week ahead and the courses to watch. Days are
- * pages: swipe sideways for the next or previous day. [days] start on this week's Monday (India time).
+ * pages: swipe sideways for the next or previous day, or swipe the week strip for the next or
+ * previous week. [days] start on this week's Monday (India time), whole weeks; [selectedWeek]
+ * counts weeks from it.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AgendaView(
     days: List<TimetableDay>,
     attendance: List<AttendanceCourse>,
+    selectedWeek: Int,
     selectedDay: Int,
-    onSelectDay: (day: Int, how: String) -> Unit,
+    onSelect: (week: Int, day: Int, how: String) -> Unit,
     onOpen: (DayClass, from: String) -> Unit,
     now: State<Long>,
     h24: Boolean,
@@ -67,34 +70,53 @@ fun AgendaView(
     val today = istDay(ms)
     val minuteNow = istMinute(ms)
     val first = days.first().day
-    val week = days.subList(0, 7)
+    val weeks = days.size / 7
+    val shown = selectedWeek.coerceIn(0, weeks - 1)
+    fun weekOf(w: Int) = days.subList(w * 7, w * 7 + 7)
+    val week = weekOf(shown)
     fun at(d: Int) = days.getOrNull(d - first)
+    /** Selects epoch day [date] when it is in the days read, else nothing to open. */
+    fun goTo(date: Int, how: String): (() -> Unit)? =
+        if (date - first in 0 until weeks * 7) ({ onSelect((date - first) / 7, isoWeekday(date), how) }) else null
 
     // One page per weekday: swiping follows the finger and settles on a spring; the strip and
-    // the pager move together.
+    // the pager move together. The strip is a pager of weeks: swiping it moves a week, keeping
+    // the weekday.
     val pager = rememberPagerState(initialPage = selectedDay - 1) { 7 }
-    // The collector outlives recompositions: read the latest day and callback, never the first ones
-    // (the screen's state is recreated once the semester is known, so a captured callback goes stale).
-    val latest by rememberUpdatedState(selectedDay)
-    val select by rememberUpdatedState(onSelectDay)
+    val weekPager = rememberPagerState(initialPage = shown) { weeks }
+    // The collectors outlive recompositions: read the latest day, week and callback, never the
+    // first ones (the screen's state is recreated once the semester is known, so a captured
+    // callback goes stale).
+    val latestDay by rememberUpdatedState(selectedDay)
+    val latestWeek by rememberUpdatedState(shown)
+    val select by rememberUpdatedState(onSelect)
     LaunchedEffect(selectedDay) {
         if (pager.targetPage != selectedDay - 1) pager.animateScrollToPage(selectedDay - 1, animationSpec = MotionSpring)
     }
+    LaunchedEffect(shown) {
+        if (weekPager.targetPage != shown) weekPager.animateScrollToPage(shown, animationSpec = MotionSpring)
+    }
     LaunchedEffect(pager) {
-        snapshotFlow { pager.settledPage }.collect { p -> if (p + 1 != latest) select(p + 1, "swipe") }
+        snapshotFlow { pager.settledPage }.collect { p -> if (p + 1 != latestDay) select(latestWeek, p + 1, "swipe") }
+    }
+    LaunchedEffect(weekPager) {
+        snapshotFlow { weekPager.settledPage }.collect { w -> if (w != latestWeek) select(w, latestDay, "week_swipe") }
     }
     Column(modifier.fillMaxSize()) {
-        WeekStrip(
-            dates = week.map { it.day },
-            today = if (today - first in 0..6) isoWeekday(today) else 0,
-            selectedDay = selectedDay,
-            onSelect = { onSelectDay(it, "tap") },
-            classCounts = week.map { meeting(it).size },
-            examDays = week.mapIndexedNotNull { i, d -> if (d.papers.isNotEmpty()) i + 1 else null }.toSet(),
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
+        HorizontalPager(weekPager, Modifier.fillMaxWidth().testTag("timetable.weeks"), key = { it }) { w ->
+            val shownWeek = weekOf(w)
+            WeekStrip(
+                dates = shownWeek.map { it.day },
+                today = if (today - shownWeek.first().day in 0..6) isoWeekday(today) else 0,
+                selectedDay = selectedDay,
+                onSelect = { onSelect(w, it, "tap") },
+                classCounts = shownWeek.map { meeting(it).size },
+                examDays = shownWeek.mapIndexedNotNull { i, d -> if (d.papers.isNotEmpty()) i + 1 else null }.toSet(),
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+        }
         Spacer(Modifier.height(12.dp))
-        HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f), pageSpacing = 16.dp, beyondViewportPageCount = 1, key = { it }) { page ->
+        HorizontalPager(pager, Modifier.fillMaxWidth().weight(1f), pageSpacing = 16.dp, beyondViewportPageCount = 1, key = { shown * 7 + it }) { page ->
             val weekday = page + 1
             val scroll = rememberScrollState()
             if (page == pager.currentPage) ScrollToTopOnReselect(scroll)
@@ -108,16 +130,14 @@ fun AgendaView(
                     .testTag("timetable.agenda.day.$weekday"),
             ) {
                 Column(Modifier.padding(horizontal = 4.dp)) {
-                    DayHeading(d.day.day, d.isToday, d.slots, d.note, onToday = { onSelectDay(isoWeekday(today), "today") }, h24 = h24)
+                    DayHeading(d.day.day, d.isToday, d.slots, d.note, onToday = { goTo(today, "today")?.invoke() }, h24 = h24)
                     if (d.slots.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
                         DayBar(d.slots.map { it.slot }, minuteNow = if (d.isToday) minuteNow else null)
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                DayContent(d, ::at, attendance, today, h24, onOpen = { onOpen(it, "agenda") }, onGo = { date ->
-                    if (date - first in 0..6) ({ onSelectDay(isoWeekday(date), "next_class_day") }) else null
-                })
+                DayContent(d, ::at, attendance, today, h24, onOpen = { onOpen(it, "agenda") }, onGo = { date -> goTo(date, "next_class_day") })
                 zoneNote(ms)?.let {
                     Spacer(Modifier.height(20.dp))
                     Text(
