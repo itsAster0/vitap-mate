@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -38,7 +37,7 @@ import vitapmate.data.orNull
 import vitapmate.ui.AppDialog
 import vitapmate.ui.DialogRows
 import vitapmate.ui.Space
-import vitapmate.ui.showToast
+import vitapmate.ui.rememberHaptics
 
 /**
  * The first of [CookieConsent.pending] as the "Send your VTOP cookie?" dialog; dismissing it is
@@ -91,33 +90,41 @@ fun CookieConsentDialog() {
     }
 }
 
-/** Settings → Connections: the kinds sent without asking, and a reset; hidden while there are none. */
+/**
+ * "Ask before …" for one [kind] (Connection's routes, Connected apps' handover): on while its
+ * "Don't ask again" isn't ticked; turning it off ticks it, as the dialog's tick would.
+ */
 @Composable
-fun CookieConsentSetting() {
+fun CookieAskSetting(kind: CookieKind, title: String, tag: String) {
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
     var version by remember { mutableIntStateOf(0) }
     val pending by CookieConsent.pending.collectAsState()
-    // Read again after each dialog (a tick may have added a kind) and after a reset.
-    val remembered by produceState(emptyList(), version, pending.size) {
-        // The saved password's consent sends no cookie, so this row isn't about it.
-        value = orNull { coreFlow("settings.cookie_consent") { c, f -> c.cookieConsentRemembered(f) } }.orEmpty().filter { it != CookieKind.ACCOUNT }
+    // Read again after each dialog (a tick may have added the kind) and after a change here.
+    val remembered by produceState<Boolean?>(null, version, pending.size) {
+        value = orNull { coreFlow("consent.read") { c, f -> c.cookieConsentRemembered(f) } }?.contains(kind)
     }
-    if (remembered.isEmpty()) return
-    GroupItem(
-        "Ask before sending your VTOP cookie",
-        "settings.cookie_consent",
-        Lucide.Cookie,
-        "Not for: ${remembered.joinToString { it.label }}",
-        trailing = {
-            TextButton({
-                scope.launch {
-                    orNull { coreFlow("settings.cookie_reset") { c, f -> c.resetCookieConsent(f) } }?.let {
-                        version++
-                        showToast("Cookie", "You'll be asked every time")
-                    }
+    val asks = remembered?.not() ?: return
+    val set = { ask: Boolean ->
+        haptics.toggle(ask)
+        scope.launch {
+            orNull {
+                coreFlow(if (ask) "consent.ask" else "consent.skip") { c, f ->
+                    if (ask) c.forgetCookieConsent(f, kind) else c.rememberCookieConsent(f, kind)
                 }
-            }, Modifier.testTag("settings.cookie_reset")) { Text("Ask every time again") }
-        },
+            }
+            version++
+        }
+        Unit
+    }
+    GroupItem(
+        title,
+        tag,
+        Lucide.Cookie,
+        if (asks) "Each time, saying where it goes" else "Sent without asking for ${kind.label}",
+        onClick = { set(!asks) },
+        trailing = { ItemSwitch(asks, { set(it) }) },
+        on = asks,
     )
 }
 

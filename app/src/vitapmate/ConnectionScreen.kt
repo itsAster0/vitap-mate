@@ -92,7 +92,8 @@ fun VtopRoute.title() = CHOICES.first { it.route == this }.title
  * How the app reaches VTOP (Rust's `route.rs`): the chosen route, which one the last answer came
  * by and the routes skipped after failing. Any route falls back to the next and finally to Direct,
  * so data still comes when the server is down. Server fetch asks first: the server signs in with
- * the saved password (sent each time, not kept). Flows `connection.*`.
+ * the saved password (sent each time, not kept). Privacy has the route's cookie question
+ * ([CookieAskSetting]). Flows `connection.*`.
  */
 @Composable
 fun ConnectionScreen() {
@@ -169,6 +170,11 @@ fun ConnectionScreen() {
                     }
                 }
             }
+            item {
+                ListGroup("Privacy", footer = "Proxy, Server fetch and UDP send your VTOP cookie through the vitapmate server. With this off, they send it without asking, also from background sync.") {
+                    CookieAskSetting(CookieKind.ROUTE, "Ask before sending your VTOP cookie", "connection.ask_cookie")
+                }
+            }
         }
     }
 
@@ -176,7 +182,7 @@ fun ConnectionScreen() {
         AppDialog({ asking = null }, "Let the server sign in?", "Use ${route.title()}", { asking = null; choose(route, consented = true) }, icon = Lucide.Server) {
             Text(
                 "With ${route.title()}, the vitapmate server signs in to VTOP for you when your session runs out. " +
-                    "Your username and password are sent to the server each time it signs in; it keeps them only if you choose to save them in Settings → Server. " +
+                    "Your username and password are sent to the server each time it signs in, and aren't kept for this. " +
                     "Your VTOP sign-in cookie goes to the server with each fetch too, and isn't kept. " +
                     "Changing what VTOP holds (outings) and downloads still happen on your phone.",
             )
