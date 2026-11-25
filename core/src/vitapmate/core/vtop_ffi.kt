@@ -1060,6 +1060,14 @@ internal object IntegrityCheckingUniffiLib {
     }
 
     internal fun ensureInitialized() = Unit
+    external fun uniffi_vtop_ffi_checksum_func_decode_doc_index(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_decode_saved_files(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_encode_doc_index(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_encode_saved_files(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_func_log_event(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_obs_init(
@@ -1826,6 +1834,14 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_httptransport_send(`ptr`: Long,`request`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_func_decode_doc_index(`raw`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_decode_saved_files(`raw`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_encode_doc_index(`index`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_encode_saved_files(`files`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_log_event(`level`: RustBuffer.ByValue,`src`: RustBuffer.ByValue,`flow`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,`fields`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_obs_init(`dataDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1975,6 +1991,18 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_decode_doc_index() and 0xFFFF) != 60803) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_decode_saved_files() and 0xFFFF) != 41411) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_encode_doc_index() and 0xFFFF) != 25683) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_encode_saved_files() and 0xFFFF) != 9384) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_func_log_event() and 0xFFFF) != 39318) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -18600,6 +18628,199 @@ public object FfiConverterTypeSkippedRoute: FfiConverterRustBuffer<SkippedRoute>
 
 
 
+/**
+ * One saved document.
+ */
+data class StoredDoc (
+    val `id`: kotlin.String
+    , 
+    val `name`: kotlin.String
+    , 
+    /**
+     * Its file name in the download folder (the kind and type come from it).
+     */
+    val `file`: kotlin.String
+    , 
+    /**
+     * Empty only for a document still in app storage from before.
+     */
+    val `uri`: kotlin.String
+    , 
+    /**
+     * The Kotlin `DocKind` name; empty or unknown, the app takes it from [`StoredDoc::file`].
+     */
+    val `kind`: kotlin.String
+    , 
+    val `size`: kotlin.Long
+    , 
+    val `source`: kotlin.String
+    , 
+    val `addedAt`: kotlin.Long
+    , 
+    val `lastOpenedAt`: kotlin.Long?
+    , 
+    val `asMessMenu`: kotlin.Boolean
+    , 
+    val `page`: kotlin.Int
+    , 
+    val `zoom`: kotlin.Double
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStoredDoc: FfiConverterRustBuffer<StoredDoc> {
+    override fun read(buf: ByteBuffer): StoredDoc {
+        return StoredDoc(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterDouble.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StoredDoc) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`file`) +
+            FfiConverterString.allocationSize(value.`uri`) +
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterLong.allocationSize(value.`size`) +
+            FfiConverterString.allocationSize(value.`source`) +
+            FfiConverterLong.allocationSize(value.`addedAt`) +
+            FfiConverterOptionalLong.allocationSize(value.`lastOpenedAt`) +
+            FfiConverterBoolean.allocationSize(value.`asMessMenu`) +
+            FfiConverterInt.allocationSize(value.`page`) +
+            FfiConverterDouble.allocationSize(value.`zoom`)
+    )
+
+    override fun write(value: StoredDoc, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`file`, buf)
+            FfiConverterString.write(value.`uri`, buf)
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterLong.write(value.`size`, buf)
+            FfiConverterString.write(value.`source`, buf)
+            FfiConverterLong.write(value.`addedAt`, buf)
+            FfiConverterOptionalLong.write(value.`lastOpenedAt`, buf)
+            FfiConverterBoolean.write(value.`asMessMenu`, buf)
+            FfiConverterInt.write(value.`page`, buf)
+            FfiConverterDouble.write(value.`zoom`, buf)
+    }
+}
+
+
+
+/**
+ * The Docs index: the library's sort and every document, newest last.
+ */
+data class StoredDocIndex (
+    /**
+     * The Kotlin `DocSort` name; empty when unknown, and the app uses its default.
+     */
+    val `sort`: kotlin.String
+    , 
+    /**
+     * Read one by one: a document that doesn't read is dropped, not the index.
+     */
+    val `docs`: List<StoredDoc>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStoredDocIndex: FfiConverterRustBuffer<StoredDocIndex> {
+    override fun read(buf: ByteBuffer): StoredDocIndex {
+        return StoredDocIndex(
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeStoredDoc.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StoredDocIndex) = (
+            FfiConverterString.allocationSize(value.`sort`) +
+            FfiConverterSequenceTypeStoredDoc.allocationSize(value.`docs`)
+    )
+
+    override fun write(value: StoredDocIndex, buf: ByteBuffer) {
+            FfiConverterString.write(value.`sort`, buf)
+            FfiConverterSequenceTypeStoredDoc.write(value.`docs`, buf)
+    }
+}
+
+
+
+/**
+ * A file the app saved in the download folder, so a folder change moves it (and only it).
+ */
+data class StoredSavedFile (
+    val `uri`: kotlin.String
+    , 
+    val `name`: kotlin.String
+    , 
+    val `mime`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStoredSavedFile: FfiConverterRustBuffer<StoredSavedFile> {
+    override fun read(buf: ByteBuffer): StoredSavedFile {
+        return StoredSavedFile(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StoredSavedFile) = (
+            FfiConverterString.allocationSize(value.`uri`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`mime`)
+    )
+
+    override fun write(value: StoredSavedFile, buf: ByteBuffer) {
+            FfiConverterString.write(value.`uri`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`mime`, buf)
+    }
+}
+
+
+
 data class Timetable (
     val `semesterId`: kotlin.String
     , 
@@ -24142,6 +24363,38 @@ public object FfiConverterOptionalTypeServerMailbox: FfiConverterRustBuffer<Serv
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeStoredDocIndex: FfiConverterRustBuffer<StoredDocIndex?> {
+    override fun read(buf: ByteBuffer): StoredDocIndex? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeStoredDocIndex.read(buf)
+    }
+
+    override fun allocationSize(value: StoredDocIndex?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeStoredDocIndex.allocationSize(value)
+        }
+    }
+
+    override fun write(value: StoredDocIndex?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeStoredDocIndex.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeTimetable: FfiConverterRustBuffer<Timetable?> {
     override fun read(buf: ByteBuffer): Timetable? {
         if (buf.get().toInt() == 0) {
@@ -26874,6 +27127,62 @@ public object FfiConverterSequenceTypeSkippedRoute: FfiConverterRustBuffer<List<
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeStoredDoc: FfiConverterRustBuffer<List<StoredDoc>> {
+    override fun read(buf: ByteBuffer): List<StoredDoc> {
+        val len = buf.getInt()
+        return List<StoredDoc>(len) {
+            FfiConverterTypeStoredDoc.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<StoredDoc>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeStoredDoc.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<StoredDoc>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeStoredDoc.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeStoredSavedFile: FfiConverterRustBuffer<List<StoredSavedFile>> {
+    override fun read(buf: ByteBuffer): List<StoredSavedFile> {
+        val len = buf.getInt()
+        return List<StoredSavedFile>(len) {
+            FfiConverterTypeStoredSavedFile.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<StoredSavedFile>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeStoredSavedFile.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<StoredSavedFile>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeStoredSavedFile.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeTimetableDay: FfiConverterRustBuffer<List<TimetableDay>> {
     override fun read(buf: ByteBuffer): List<TimetableDay> {
         val len = buf.getInt()
@@ -27081,6 +27390,56 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 
 
 
+
+        /**
+         * The Docs index in `raw`; None when it doesn't read at all.
+         */ fun `decodeDocIndex`(`raw`: kotlin.String): StoredDocIndex? {
+            return FfiConverterOptionalTypeStoredDocIndex.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_decode_doc_index(
+    
+        
+        FfiConverterString.lower(`raw`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * The saved files in `raw`; empty when it doesn't read (older apps did the same).
+         */ fun `decodeSavedFiles`(`raw`: kotlin.String): List<StoredSavedFile> {
+            return FfiConverterSequenceTypeStoredSavedFile.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_decode_saved_files(
+    
+        
+        FfiConverterString.lower(`raw`),_status)
+}
+    )
+    }
+    
+ fun `encodeDocIndex`(`index`: StoredDocIndex): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_encode_doc_index(
+    
+        
+        FfiConverterTypeStoredDocIndex.lower(`index`),_status)
+}
+    )
+    }
+    
+ fun `encodeSavedFiles`(`files`: List<StoredSavedFile>): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_encode_saved_files(
+    
+        
+        FfiConverterSequenceTypeStoredSavedFile.lower(`files`),_status)
+}
+    )
+    }
+    
 
         /**
          * Writes one line from Kotlin into the same file and logcat, in order.

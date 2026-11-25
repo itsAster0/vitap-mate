@@ -26,9 +26,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONArray
-import org.json.JSONObject
 import vitapmate.core.FileLink
+import vitapmate.core.StoredDoc
+import vitapmate.core.StoredDocIndex
+import vitapmate.core.decodeDocIndex
+import vitapmate.core.encodeDocIndex
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -97,35 +99,26 @@ fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = "", kind: DocKind?
 /** The newest of these documents read as the mess menu. */
 fun List<Doc>.newestMessMenu(): Doc? = filter { it.asMessMenu }.maxByOrNull { it.addedAt }
 
-/** The index file: the sort and every document, newest last. */
+/** The index file, in Rust's [StoredDocIndex] shape: the sort and every document, newest last. */
 internal object DocIndex {
-    fun encode(sort: DocSort, docs: List<Doc>): String = JSONObject()
-        .put("sort", sort.name)
-        .put("docs", JSONArray(docs.map { d ->
-            JSONObject().put("id", d.id).put("name", d.name).put("file", d.file).put("uri", d.uri).put("kind", d.kind.name).put("size", d.size)
-                .put("source", d.source).put("addedAt", d.addedAt).put("lastOpenedAt", d.lastOpenedAt ?: JSONObject.NULL)
-                .put("asMessMenu", d.asMessMenu).put("page", d.page).put("zoom", d.zoom.toDouble())
-        }))
-        .toString()
+    fun stored(sort: DocSort, docs: List<Doc>) = StoredDocIndex(
+        sort.name,
+        docs.map { d -> StoredDoc(d.id, d.name, d.file, d.uri, d.kind.name, d.size, d.source, d.addedAt, d.lastOpenedAt, d.asMessMenu, d.page, d.zoom.toDouble()) },
+    )
 
-    fun decode(raw: String): Pair<DocSort, List<Doc>> {
-        val json = JSONObject(raw)
-        val sort = DocSort.entries.firstOrNull { it.name == json.optString("sort") } ?: DocSort.RecentlyOpened
-        val list = json.optJSONArray("docs") ?: JSONArray()
-        val docs = (0 until list.length()).mapNotNull { i ->
-            val o = list.optJSONObject(i) ?: return@mapNotNull null
-            runCatching {
-                Doc(
-                    o.getString("id"), o.getString("name"), o.getString("file"), o.optString("uri"),
-                    DocKind.entries.firstOrNull { it.name == o.optString("kind") } ?: DocKind.of(o.getString("file")),
-                    o.optLong("size"), o.optString("source", "import"), o.optLong("addedAt"),
-                    if (o.isNull("lastOpenedAt")) null else o.optLong("lastOpenedAt"),
-                    o.optBoolean("asMessMenu"), o.optInt("page"), o.optDouble("zoom", 1.0).toFloat(),
-                )
-            }.getOrNull()
+    /** An unknown sort is the default; an unknown kind comes from the file name. */
+    fun of(index: StoredDocIndex): Pair<DocSort, List<Doc>> =
+        (DocSort.entries.firstOrNull { it.name == index.sort } ?: DocSort.RecentlyOpened) to index.docs.map { o ->
+            Doc(
+                o.id, o.name, o.file, o.uri, DocKind.entries.firstOrNull { it.name == o.kind } ?: DocKind.of(o.file),
+                o.size, o.source, o.addedAt, o.lastOpenedAt, o.asMessMenu, o.page, o.zoom.toFloat(),
+            )
         }
-        return sort to docs
-    }
+
+    fun encode(sort: DocSort, docs: List<Doc>): String = encodeDocIndex(stored(sort, docs))
+
+    /** Null when the file doesn't read (logged by Rust). */
+    fun decode(raw: String): Pair<DocSort, List<Doc>>? = decodeDocIndex(raw)?.let(::of)
 }
 
 /**
@@ -203,7 +196,7 @@ object Docs {
                 lock.withLock {
                     d.mkdirs()
                     val index = File(d, "index.json")
-                    if (index.exists()) runCatching { DocIndex.decode(index.readText()) }
+                    if (index.exists()) attempt { DocIndex.decode(index.readText()) ?: error("unreadable") }
                         .onSuccess { (s, list) ->
                             sortState.value = s
                             state.value = list

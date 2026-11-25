@@ -22,8 +22,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import vitapmate.core.StoredSavedFile
+import vitapmate.core.decodeSavedFiles
+import vitapmate.core.encodeSavedFiles
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -94,7 +95,7 @@ object Downloads {
         }
         val uri = found ?: fallback ?: error("can't find the file")
         record(uri, name, mime)
-        Log.info("downloads", "adopted", null, mapOf("media_store" to "${found != null}", "count" to "${saved().length()}"))
+        Log.info("downloads", "adopted", null, mapOf("media_store" to "${found != null}", "count" to "${saved().size}"))
         uri
     }
 
@@ -110,7 +111,7 @@ object Downloads {
         return lock.withLock {
             val uri = withContext(Dispatchers.IO) { write(folder, name, mime, open) }
             record(uri, name, mime)
-            Log.info("downloads", "saved", flow, mapOf("bytes" to "$size", "chosen" to "${folder != null}", "count" to "${saved().length()}"))
+            Log.info("downloads", "saved", flow, mapOf("bytes" to "$size", "chosen" to "${folder != null}", "count" to "${saved().size}"))
             uri
         }
     }
@@ -124,10 +125,7 @@ object Downloads {
     suspend fun delete(uri: Uri) = lock.withLock {
         val context = app ?: return@withLock
         withContext(Dispatchers.IO) { delete(context, uri) }
-        val list = saved()
-        val kept = JSONArray()
-        for (i in 0 until list.length()) list.getJSONObject(i).takeIf { it.optString("uri") != uri.toString() }?.let(kept::put)
-        prefs.edit().putString("saved", kept.toString()).apply()
+        keep(saved().filter { it.uri != uri.toString() })
     }
 
     /** Whether [uri] still opens (the student may have deleted the file in their file manager). */
@@ -168,8 +166,7 @@ object Downloads {
 
     /** What the app saved, by file name: its URI (the newest when a name repeats). */
     fun savedByName(): Map<String, String> {
-        val list = saved()
-        return (0 until list.length()).associate { i -> list.getJSONObject(i).let { it.optString("name") to it.optString("uri") } }
+        return saved().associate { it.name to it.uri }
     }
 
     /**
@@ -199,33 +196,31 @@ object Downloads {
 
     private fun move(context: Context, to: Uri?, flow: String): Int {
         val resolver = context.contentResolver
-        val list = saved()
-        val kept = JSONArray()
+        val kept = mutableListOf<StoredSavedFile>()
         val moves = mutableMapOf<String, String>()
         var moved = 0
         var gone = 0
         var failed = 0
-        for (i in 0 until list.length()) {
-            val item = list.getJSONObject(i)
-            val from = Uri.parse(item.getString("uri"))
+        for (item in saved()) {
+            val from = Uri.parse(item.uri)
             val bytes = runCatching { resolver.openInputStream(from)?.use { it.readBytes() } }.getOrNull()
             if (bytes == null) {
                 gone++
                 continue
             }
-            runCatching { write(to, item.getString("name"), item.getString("mime")) { bytes.inputStream() } }
+            runCatching { write(to, item.name, item.mime) { bytes.inputStream() } }
                 .onSuccess { uri ->
                     delete(context, from)
                     moves[from.toString()] = uri.toString()
-                    kept.put(JSONObject(item.toString()).put("uri", uri.toString()))
+                    kept += item.copy(uri = uri.toString())
                     moved++
                 }
                 .onFailure {
-                    kept.put(item)
+                    kept += item
                     failed++
                 }
         }
-        prefs.edit().putString("saved", kept.toString()).apply()
+        keep(kept)
         if (moves.isNotEmpty()) onMoved?.invoke(moves)
         Log.info("downloads", "moved", flow, mapOf("moved" to "$moved", "gone" to "$gone", "failed" to "$failed", "chosen" to "${to != null}"))
         return failed
@@ -275,9 +270,10 @@ object Downloads {
         }
     }
 
-    private fun saved(): JSONArray = runCatching { JSONArray(prefs.getString("saved", "[]")) }.getOrElse { JSONArray() }
+    /** What the app saved here, in Rust's [StoredSavedFile] shape; empty when it doesn't read. */
+    private fun saved(): List<StoredSavedFile> = decodeSavedFiles(prefs.getString("saved", null) ?: "[]")
 
-    private fun record(uri: Uri, name: String, mime: String) {
-        prefs.edit().putString("saved", saved().put(JSONObject().put("uri", uri.toString()).put("name", name).put("mime", mime)).toString()).apply()
-    }
+    private fun keep(files: List<StoredSavedFile>) = prefs.edit().putString("saved", encodeSavedFiles(files)).apply()
+
+    private fun record(uri: Uri, name: String, mime: String) = keep(saved() + StoredSavedFile(uri.toString(), name, mime))
 }

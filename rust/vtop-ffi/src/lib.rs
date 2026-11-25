@@ -25,6 +25,7 @@
 #[macro_use]
 mod macros;
 
+mod app_files;
 mod convex;
 mod demo;
 mod dev;
