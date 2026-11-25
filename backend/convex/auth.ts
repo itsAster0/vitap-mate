@@ -191,8 +191,10 @@ export const token = action({
       newHash: await sha256Hex(refreshToken),
       chainId: randomHex(16),
     });
-    // Refusals that delete a chain come back as values: a throw would roll the delete back.
+    // Refusals that mutate state (revoking a chain, consuming a failed ticket) come back as values:
+    // throwing inside the mutation would roll those deletes back.
     if ("refused" in granted) return fail(granted.refused, REFUSALS[granted.refused]);
+    if ("proofFailed" in granted) return fail(granted.proofFailed, "VTOP's page did not prove who you are.");
     const { jwt, expiresAt } = await signAccessJwt(
       { sub: call.deviceId, regno: granted.regno, acct: granted.account, ...(granted.demo ? { demo: true as const } : {}) },
       at,
@@ -232,7 +234,7 @@ const REFUSALS = {
   device_removed: "This phone was removed from the account; sign in again.",
 } as const;
 
-type Granted = { regno: string; account: string; demo: boolean } | { refused: keyof typeof REFUSALS };
+type Granted = { regno: string; account: string; demo: boolean } | { refused: keyof typeof REFUSALS } | { proofFailed: string };
 
 const deviceFieldsValidator = v.object({
   sealKey: v.string(),
@@ -337,7 +339,7 @@ export const grant = internalMutation({
         if (row.status === "open" || row.status === "taken") fail("proof_pending", "The proof has not finished yet.");
         await ctx.db.delete(row._id);
         if (row.status === "failed" || !row.regno) {
-          return fail(row.code ?? "proof_failed", "VTOP's page did not prove who you are.");
+          return { proofFailed: row.code ?? "proof_failed" };
         }
         const device = await upsertDevice(ctx, deviceId, args.signKey, grant.device);
         const account = await ensureAccount(ctx, row.regno, row.ownerHash ?? null);

@@ -68,7 +68,7 @@ describe("the proof ticket", () => {
     expect(await t.mutation(internal.auth.takeTicket, { ticket: lateTicket })).toBeNull();
   });
 
-  it("hands on the engine's failure", async () => {
+  it("hands on the engine's failure and consumes the failed ticket", async () => {
     const t = await setup();
     const p = await phone(1);
     const { ticket } = await t.mutation(api.auth.proveStart, await p.signed("auth:proveStart", {}));
@@ -76,6 +76,8 @@ describe("the proof ticket", () => {
     await t.mutation(internal.auth.takeTicket, { ticket });
     await t.mutation(internal.auth.proofDone, { ticket, code: "proof_failed" });
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device })))).toBe("proof_failed");
+    expect(await t.run((ctx) => ctx.db.query("proofTickets").collect())).toEqual([]);
+    expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device })))).toBe("challenge_invalid");
   });
 });
 
