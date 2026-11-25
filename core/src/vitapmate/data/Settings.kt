@@ -46,6 +46,12 @@ object Settings {
     var showSkipAdvice by flag("settings_show_skip_advice", false)
 
     /**
+     * Whether Connected apps' note "storage stayed on because you saved your password" was read
+     * (or the student chose storage there): it shows once.
+     */
+    var storageNoteSeen by flag("settings_storage_note_seen", false)
+
+    /**
      * Which one fills in VTOP's OTP: one at a time. Set when one is set up or connected, or chosen
      * with "Use this for OTPs"; null before either is. The other stays set up, on standby.
      */
@@ -196,6 +202,7 @@ object Settings {
         syncCourse = null
         wrappedSeen = emptySet()
         wrappedHideGrades = emptySet()
+        storageNoteSeen = false
         student = null
     }
 

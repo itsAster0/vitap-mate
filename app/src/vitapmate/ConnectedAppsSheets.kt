@@ -34,11 +34,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +57,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import com.composables.icons.lucide.Copy
+import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Trash2
@@ -62,8 +65,12 @@ import com.composables.icons.lucide.TriangleAlert
 import kotlinx.coroutines.launch
 import vitapmate.core.AccessKey
 import vitapmate.core.KeyKind
+import vitapmate.core.LiveTopic
 import vitapmate.core.NewKey
+import vitapmate.core.ServerSignIn
+import vitapmate.core.SignInOutcome
 import vitapmate.core.pairCode
+import vitapmate.data.rememberLive
 import vitapmate.features.login.ago
 import vitapmate.observability.Log
 import vitapmate.ui.AppDialog
@@ -71,6 +78,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
 import vitapmate.ui.OpenHaptic
+import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
 import vitapmate.ui.proofStage
 import vitapmate.ui.rememberHaptics
@@ -340,5 +348,76 @@ internal fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Un
             danger = true,
             confirmTag = "connected_apps.revoke.confirm",
         ) { Text("It stops working at once. To use it again, pair the browser or make a new key.") }
+    }
+}
+
+/** The account's last VTOP sign-ins (phones and the server), live, with Clear history (asks first). */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun SignInsSheet(onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
+    var phase by remember { mutableStateOf<ServerLoad<List<ServerSignIn>>>(ServerLoad.Loading) }
+    var confirmClear by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    fun load() {
+        scope.launch { phase = phase.after(appsCall("sign_ins") { c, f -> c.serverSignIns(f) }) }
+    }
+    val change by rememberLive(LiveTopic.SIGN_INS, phase is ServerLoad.Ready)
+    LaunchedEffect(change) { if (change > 0) load() }
+
+    Sheet("connected_apps.sign_ins_sheet", onDismiss, full = true) {
+        Text("Recent sign-ins", style = MaterialTheme.typography.titleLarge)
+        Note("Each time a phone or the server signed in to VTOP for a connected app.")
+        when (val p = phase) {
+            ServerLoad.Loading -> LoadingIndicator(Modifier.testTag("connected_apps.sign_ins.loading"))
+            is ServerLoad.Failed -> ProblemView(p.problem, onRetry = { phase = ServerLoad.Loading; load() }, Modifier.fillMaxWidth())
+            is ServerLoad.Ready -> if (p.value.isEmpty()) Note("No sign-ins yet.") else {
+                Column(Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(vertical = 4.dp)) {
+                    p.value.forEachIndexed { i, signIn ->
+                        val failed = signIn.outcome as? SignInOutcome.Failed
+                        TimelineItem(
+                            "${if (failed == null) "Signed in" else "Failed"} on ${if (signIn.byServer) "the server" else "a phone"}",
+                            "connected_apps.sign_in.$i",
+                            ago(signIn.at),
+                            failed?.reason,
+                            failed = failed != null,
+                        )
+                    }
+                }
+                OutlinedButton({ confirmClear = true }, Modifier.fillMaxWidth().testTag("connected_apps.sign_ins.clear"), enabled = !busy) {
+                    Icon(Lucide.History, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Clear history")
+                }
+            }
+        }
+    }
+
+    if (confirmClear) {
+        AppDialog(
+            { confirmClear = false },
+            "Clear the sign-in history?",
+            "Clear",
+            {
+                confirmClear = false
+                scope.launch {
+                    busy = true
+                    appsCall("clear_sign_ins") { c, f -> c.clearServerSignIns(f) }.onSuccess { done ->
+                        if (done) {
+                            haptics.confirm()
+                            showToast("Sign-ins", "The history is cleared.")
+                            load()
+                        } else {
+                            showToast("Sign-ins", "The server doesn't offer this yet.")
+                        }
+                    }.onFailure { haptics.reject() }
+                    busy = false
+                }
+            },
+            icon = Lucide.History,
+            danger = true,
+            confirmTag = "connected_apps.sign_ins.clear.confirm",
+        ) { Text("The server forgets these sign-ins. New ones are recorded again.") }
     }
 }

@@ -1,5 +1,6 @@
 package vitapmate
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -12,6 +13,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.toShape
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -40,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.composables.icons.lucide.BellOff
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.KeyRound
@@ -58,11 +62,14 @@ import vitapmate.core.ConnectedApps
 import vitapmate.core.Core
 import vitapmate.core.KeyKind
 import vitapmate.core.LiveTopic
+import vitapmate.core.ServerPush
 import vitapmate.core.defaultServer
+import vitapmate.data.Foreground
+import vitapmate.data.Settings
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
-import vitapmate.data.ServerFailure
 import vitapmate.data.rememberLive
+import vitapmate.observability.Log
 import vitapmate.features.login.ago
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
@@ -72,7 +79,6 @@ import vitapmate.ui.ProblemView
 import vitapmate.ui.ProofProgress
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
-import vitapmate.data.Problem
 
 /** Route id of Settings → Account → Connected apps. */
 const val CONNECTED_APPS = "connected_apps"
@@ -95,7 +101,9 @@ internal val String.host get() = substringAfter("://").substringBefore('/')
  * Connected apps (Rust's `keys.rs`): the access keys of the browser extension and AI apps (MCP),
  * each with its last uses, outings switch and revoke; "Pair a browser" (scan the extension's or
  * the AI app's QR code or type its code), "Copy MCP link" and "Make a key by hand" (shown once).
- * Making a key asks for the screen lock and links this phone to the server account the first time. Flows `connected_apps.*`, lines
+ * Making a key asks for the screen lock and links this phone to the server account the first time.
+ * Below the keys: "Session handover" ([SessionHandover]: the cookie question and what the server
+ * stores, off by default) and the semester and recent sign-ins. Flows `connected_apps.*`, lines
  * `ui.connected_apps`; keys, codes and cookies are never logged.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -105,27 +113,21 @@ fun ConnectedAppsScreen() {
     val uri = LocalUriHandler.current
     val context = LocalContext.current
     val mcpUrl = rememberServer() + "/mcp"
-    var apps by remember { mutableStateOf<ConnectedApps?>(null) }
-    var problem by remember { mutableStateOf<Problem?>(null) }
-    var loading by remember { mutableStateOf(false) }
+    var phase by remember { mutableStateOf<ServerLoad<ConnectedApps>>(ServerLoad.Loading) }
     var pairing by remember { mutableStateOf(false) }
     var newMcp by remember { mutableStateOf(false) }
+    var signIns by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf<AccessKey?>(null) }
     val deviceAuth = rememberDeviceAuth()
     val haptics = rememberHaptics()
     var busy by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf<KeyPhone?>(null) }
+    val actions = rememberServerActions(appsCall)
 
     fun load() {
-        scope.launch {
-            loading = true
-            appsCall("load") { c, f -> c.connectedApps(f) }
-                .onSuccess { apps = it; problem = null }
-                .onFailure { e -> if (apps == null) problem = (e as ServerFailure).problem }
-            loading = false
-        }
+        scope.launch { phase = phase.after(appsCall("load") { c, f -> c.connectedApps(f) }) }
     }
-    val change by rememberLive(LiveTopic.ACCOUNT, apps != null)
+    val change by rememberLive(LiveTopic.ACCOUNT, phase is ServerLoad.Ready)
     LaunchedEffect(change) { if (change > 0) load() }
     /** A change to the account's phones behind the screen lock ([title]), then the keys again. */
     fun change(title: String, name: String, done: String, call: suspend (Core, String) -> Unit) {
@@ -140,7 +142,7 @@ fun ConnectedAppsScreen() {
 
     Page("Connected apps", CONNECTED_APPS) { padding ->
         LazyColumn(contentPadding = padding) {
-            if (apps != null) item { LiveProblemBanner(LiveTopic.ACCOUNT, ::load) }
+            if (phase is ServerLoad.Ready) item { LiveProblemBanner(LiveTopic.ACCOUNT, ::load) }
             item {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
@@ -151,9 +153,9 @@ fun ConnectedAppsScreen() {
                     GroupItem("Get the extension", "connected_apps.get_extension", Lucide.Download, "Chrome zip and Firefox add-on, from GitHub", onClick = { uri.openUri(EXTENSION_URL) }, trailing = { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
             }
-            val current = apps
-            when {
-                current != null -> item {
+            when (val p = phase) {
+                is ServerLoad.Ready -> item {
+                    val current = p.value
                     ListGroup("Keys", footer = "Up to 10 keys. Revoke one you no longer use; it stops working at once.", titleEnd = if (current.linked) "${current.keys.size} of 10" else null, belowTitle = if (current.linked) ({ Pips(current.keys.size, 10) }) else null) {
                         // After a reinstall: the server lists the account's keys only to a linked phone.
                         if (!current.linked) GroupItem(
@@ -165,6 +167,7 @@ fun ConnectedAppsScreen() {
                             onClick = { change("Link this phone", "link", "Phone linked") { c, f -> c.linkPhone(f) } },
                             trailing = { Chevron() },
                         ) else if (current.keys.isEmpty()) GroupItem("No keys yet", "connected_apps.empty", Lucide.KeyRound, "Pair a browser or an AI app above")
+                        if (current.keys.isNotEmpty()) PushWarning(current.push)
                         current.keys.forEach { key ->
                             GroupItem(key.label, "connected_apps.key.${key.id}", key.kind.icon, onClick = { opened = key }, trailing = { Chevron() }, iconShape = key.kind.shape, below = { KeyTags(key) })
                         }
@@ -194,8 +197,12 @@ fun ConnectedAppsScreen() {
                         }
                     }
                 }
-                problem != null -> item { problem?.let { ProblemView(it, onRetry = ::load, Modifier.fillMaxWidth(), busy = loading) } }
-                else -> item { ProofProgress(Modifier.testTag("connected_apps.loading")) }
+                is ServerLoad.Failed -> item { ProblemView(p.problem, onRetry = { phase = ServerLoad.Loading; load() }, Modifier.fillMaxWidth()) }
+                ServerLoad.Loading -> item { ProofProgress(Modifier.testTag("connected_apps.loading")) }
+            }
+            phase.ready?.let { current ->
+                item { SessionHandover(current, actions, ::load) }
+                item { HandoverDetails(current) { signIns = true } }
             }
         }
     }
@@ -219,9 +226,46 @@ fun ConnectedAppsScreen() {
             Text("This phone will answer for ${if (phone.keys == 1u) "it" else "them"}.$unlinks")
         }
     }
+    actions.Dialog { done ->
+        // Choosing storage here answers the one-time note about it.
+        if (done.name.startsWith("storage")) Settings.storageNoteSeen = true
+        load()
+    }
+    if (signIns) SignInsSheet { signIns = false }
     if (pairing) PairSheet(onDone = { pairing = false; load() }, onDismiss = { pairing = false })
     if (newMcp) NewMcpSheet(onDone = { load() }, onDismiss = { newMcp = false })
     opened?.let { key -> KeySheet(key, onChanged = { opened = null; load() }, onDismiss = { opened = null }) }
+}
+
+/**
+ * Keys that can't reach this phone while the app is closed: notifications not allowed (tap asks)
+ * or no push token on the server ([ServerPush.NO_TOKEN]). Read again on each return to the app.
+ */
+@Composable
+private fun PushWarning(push: ServerPush) {
+    val context = LocalContext.current
+    val resumes = Foreground.resumes
+    val canNotify = remember(resumes) { Push.canNotify(context) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        Log.info("ui.connected_apps", "notifications", fields = mapOf("granted" to "$granted"))
+    }
+    when {
+        !canNotify -> GroupItem(
+            "Allow notifications",
+            "connected_apps.push_warning",
+            Lucide.BellOff,
+            "Your apps' session requests reach this phone only as a notification while the app is closed",
+            onClick = { ask.launch(Manifest.permission.POST_NOTIFICATIONS) },
+            tone = AppTheme.tones.warning,
+        )
+        push == ServerPush.NO_TOKEN -> GroupItem(
+            "The server can't wake this phone",
+            "connected_apps.push_warning",
+            Lucide.BellOff,
+            "It has no push token for it (Google Play services may be missing). Keep the app open when an app needs your session.",
+            tone = AppTheme.tones.warning,
+        )
+    }
 }
 
 private fun keys(phone: KeyPhone) = if (phone.keys == 1u) "1 key" else "${phone.keys} keys"
