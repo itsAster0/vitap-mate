@@ -422,7 +422,7 @@ describe("sweeps", () => {
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
   });
 
-  it("sweeps legacy otpInbox rows without expiresAt via the by_receivedAt fallback", async () => {
+  it("sweeps legacy otpInbox rows without expiresAt via by_expiresAt even behind 500 live gmail_confirm rows", async () => {
     const t = await setup();
     const p = await phone(1);
     const { as, account } = await prove(t, p);
@@ -431,6 +431,17 @@ describe("sweeps", () => {
     const t0 = Math.floor(Date.now() / 1000);
     await t.run(async (ctx) => {
       const accountId = ctx.db.normalizeId("accounts", account)!;
+      for (let i = 0; i < 500; i++) {
+        await ctx.db.insert("otpInbox", {
+          addressId: box.id,
+          deviceId: `dev-${i}`,
+          kind: "gmail_confirm",
+          sealed: "live-confirm",
+          receivedAt: t0 - 10,
+          expiresAt: t0 - 10 + CONFIRMATION_TTL_SECS,
+          accountId,
+        });
+      }
       await ctx.db.insert("otpInbox", {
         addressId: box.id,
         deviceId: p.deviceId,
@@ -451,8 +462,13 @@ describe("sweeps", () => {
     vi.advanceTimersByTime((SEALED_TTL_SECS + 1) * 1000);
     await t.mutation(internal.sweeps.quarter, {});
     const afterOtp = await t.run((ctx) => ctx.db.query("otpInbox").collect());
-    expect(afterOtp.map((r) => r.kind)).toEqual(["gmail_confirm"]);
+    expect(afterOtp.filter((r) => r.kind === "otp")).toHaveLength(0);
+    // Live legacy gmail_confirm was stamped with expiresAt so it left the undefined bucket.
+    const stamped = afterOtp.find((r) => r.deviceId === p.deviceId && r.kind === "gmail_confirm");
+    expect(stamped?.expiresAt).toBe(t0 + CONFIRMATION_TTL_SECS);
     vi.advanceTimersByTime(CONFIRMATION_TTL_SECS * 1000);
+    // 501 confirmations expired (> BATCH=500), so two sweep runs clear them all.
+    await t.mutation(internal.sweeps.quarter, {});
     await t.mutation(internal.sweeps.quarter, {});
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
   });

@@ -45,14 +45,16 @@ export const quarter = internalMutation({
       .withIndex("by_expiresAt", (q) => q.gte("expiresAt", 0).lte("expiresAt", at))
       .take(BATCH);
     for (const row of expired) await ctx.db.delete(row._id);
-    // Fallback for rows written before `expiresAt` existed; bounded and empty once those expire (24 h).
+    // Legacy rows written before `expiresAt` existed sit at `expiresAt === undefined` in
+    // `by_expiresAt`; delete expired ones and stamp live ones so they leave this bucket immediately.
     const legacy = await ctx.db
       .query("otpInbox")
-      .withIndex("by_receivedAt", (q) => q.lte("receivedAt", at - SEALED_TTL_SECS))
+      .withIndex("by_expiresAt", (q) => q.eq("expiresAt", undefined))
       .take(BATCH);
     for (const row of legacy) {
-      if (row.expiresAt !== undefined) continue;
-      if (row.kind === "otp" || at - row.receivedAt >= CONFIRMATION_TTL_SECS) await ctx.db.delete(row._id);
+      const expiresAt = row.receivedAt + (row.kind === "otp" ? SEALED_TTL_SECS : CONFIRMATION_TTL_SECS);
+      if (expiresAt <= at) await ctx.db.delete(row._id);
+      else await ctx.db.patch(row._id, { expiresAt });
     }
     const confirmations = await ctx.db
       .query("mailboxes")
