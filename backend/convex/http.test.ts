@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REGNO, TOKENS, advance, codeOf, engine, phone, prove, setup, type T } from "../test/kit";
 import { api, internal } from "./_generated/api";
+import { clientIp, proxyHops } from "./lib/httpKit";
 import { pairCode } from "./lib/pairing";
 import { MAX_CLIENTS, redirectMatches, redirectUriOk, s256 } from "./oauth";
 
@@ -320,10 +321,30 @@ describe("OAuth for MCP clients", () => {
     expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toEqual([]);
   });
 
+  it("resolves client IP from X-Forwarded-For using PROXY_HOPS from the end and ignores cf-connecting-ip", async () => {
+    const req = (headers: Record<string, string>) => new Request("https://vmate.test/x", { headers });
+    expect(clientIp(req({ "cf-connecting-ip": "9.9.9.9" }), 1)).toBeNull();
+    expect(clientIp(req({ "cf-connecting-ip": "9.9.9.9", "x-forwarded-for": "1.2.3.4, 10.0.0.1" }), 1)).toBe("10.0.0.1");
+    expect(clientIp(req({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }), 2)).toBe("1.2.3.4");
+    expect(clientIp(req({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }), 3)).toBe("1.2.3.4");
+    expect(clientIp(req({ "x-forwarded-for": " , " }), 1)).toBeNull();
+
+    vi.stubEnv("PROXY_HOPS", "1");
+    expect(proxyHops()).toBe(1);
+    vi.stubEnv("PROXY_HOPS", "2");
+    expect(proxyHops()).toBe(2);
+    for (const bad of ["", "0", "-1", "1.5", "abc"]) {
+      vi.stubEnv("PROXY_HOPS", bad);
+      expect(() => proxyHops()).toThrow();
+    }
+  });
+
   it("rate limits /register, /authorize, /authorize/poll, /token and /v1/pair per IP", async () => {
     const t = await setup();
-    const ip1 = { "cf-connecting-ip": "203.0.113.1" };
-    const ip2 = { "cf-connecting-ip": "203.0.113.2" };
+    // Spoofed cf-connecting-ip and leftmost XFF entries do not bypass the limit (PROXY_HOPS=1).
+    const ip1 = { "cf-connecting-ip": "198.51.100.1", "x-forwarded-for": "198.51.100.9, 203.0.113.1" };
+    const ip1Spoofed = { "cf-connecting-ip": "198.51.100.2", "x-forwarded-for": "198.51.100.88, 203.0.113.1" };
+    const ip2 = { "x-forwarded-for": "203.0.113.2" };
     // /register: per-IP limit blocks ip1 while ip2 still registers.
     let clientId = "";
     for (let i = 0; i < 10; i++) {
@@ -331,7 +352,7 @@ describe("OAuth for MCP clients", () => {
       expect(r.status).toBe(201);
       clientId = ((await r.json()) as { client_id: string }).client_id;
     }
-    expect((await post(t, "/register", { redirect_uris: ["https://a.test/cb"] }, ip1)).status).toBe(429);
+    expect((await post(t, "/register", { redirect_uris: ["https://a.test/cb"] }, ip1Spoofed)).status).toBe(429);
     expect((await post(t, "/register", { redirect_uris: ["https://a.test/cb"] }, ip2)).status).toBe(201);
     // /authorize: per-IP limit.
     const authUrl = `/authorize?${new URLSearchParams({
@@ -418,7 +439,11 @@ describe("/mcp", () => {
     expect(none.status).toBe(401);
     expect(none.headers.get("www-authenticate")).toContain("/.well-known/oauth-protected-resource/mcp");
     expect((await t.fetch("/mcp", { method: "POST", body: "{}", headers: { authorization: "Bearer vtm_unknown" } })).status).toBe(401);
-    const ok = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "{}", headers: { "cf-connecting-ip": "1.2.3.4" } });
+    const ok = await t.fetch(`/mcp/${made.key}`, {
+      method: "POST",
+      body: "{}",
+      headers: { "cf-connecting-ip": "9.9.9.9", "x-forwarded-for": "8.8.8.8, 1.2.3.4" },
+    });
     expect(ok.status).toBe(200);
     expect(calls.at(-1)?.path).toBe(`/mcp/${made.key}`);
     expect(calls.at(-1)?.headers.get("x-forwarded-for")).toBe("1.2.3.4");

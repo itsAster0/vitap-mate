@@ -14,7 +14,7 @@ import { randomHex, sha256Hex } from "./lib/crypto";
 import { GUIDE_FILES } from "./lib/guideFiles";
 import { badRequest, empty, error } from "./lib/errors";
 import { engineJson, engineSend } from "./lib/engine";
-import { bearer, corsRoutes, holds, jsonBody, notInternal, readBodyCapped, route } from "./lib/httpKit";
+import { bearer, clientIp, corsRoutes, holds, jsonBody, notInternal, readBodyCapped, route } from "./lib/httpKit";
 import { signAccessJwt } from "./lib/jwt";
 import { seal } from "./lib/mailSeal";
 import { page, pairingPage } from "./lib/oauthPage";
@@ -35,11 +35,6 @@ const post = (path: string, handler: (ctx: ActionCtx, req: Request) => Promise<R
 const MAX_MCP_BODY_BYTES = 64 * 1024;
 const MCP_TIMEOUT_MS = 32_000;
 
-/** Best-effort client IP from Cloudflare or reverse-proxy headers. */
-function clientIp(req: Request): string {
-  return req.headers.get("cf-connecting-ip")?.trim() || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-}
-
 function decodeSegment(raw: string): string {
   try {
     return decodeURIComponent(raw);
@@ -55,7 +50,7 @@ async function rateLimited(
   ipLimit: "oauthRegisterIp" | "oauthAuthorizeIp" | "oauthPollIp" | "oauthTokenIp" | "pairIp",
   globalLimit: "oauthRegister" | "oauthAuthorize" | "oauthPoll" | "oauthToken" | "pairGlobal",
 ): Promise<boolean> {
-  if (!(await rateLimits.limit(ctx, ipLimit, { key: clientIp(req) })).ok) return true;
+  if (!(await rateLimits.limit(ctx, ipLimit, { key: clientIp(req) ?? "unknown" })).ok) return true;
   return !(await rateLimits.limit(ctx, globalLimit)).ok;
 }
 
@@ -346,7 +341,7 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   for (const [name, value] of req.headers) {
     if (!["host", "x-forwarded-for", "x-real-ip", "content-length"].includes(name) && !name.startsWith("cf-")) headers.append(name, value);
   }
-  const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const ip = clientIp(req);
   if (ip) headers.set("x-forwarded-for", ip);
   const init: RequestInit = { method: req.method, headers, signal: AbortSignal.timeout(MCP_TIMEOUT_MS) };
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {

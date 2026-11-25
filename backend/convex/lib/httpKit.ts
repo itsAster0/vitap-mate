@@ -5,7 +5,30 @@ import type { RouteSpec } from "convex/server";
 import { type ActionCtx, httpAction } from "../_generated/server";
 import { hashesEqual, sha256Hex } from "./crypto";
 import { empty, error, errorData } from "./errors";
-import { logError, parseObject } from "./util";
+import { env, logError, parseObject } from "./util";
+
+/** Number of trusted reverse proxies in front of Convex (`PROXY_HOPS`, required, >= 1). */
+export function proxyHops(): number {
+  const raw = env("PROXY_HOPS");
+  if (!/^[1-9][0-9]*$/.test(raw)) throw new Error("PROXY_HOPS must be a positive integer");
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < 1) throw new Error("PROXY_HOPS must be a positive integer");
+  return n;
+}
+
+/** Client address from `X-Forwarded-For`, taking the entry `hops` from the end (written by our
+ * outermost proxy; earlier entries came from the caller and can say anything). Fewer entries:
+ * the first there is. Null when the header is missing or empty. */
+export function clientIp(req: Request, hops = proxyHops()): string | null {
+  const raw = req.headers.get("x-forwarded-for");
+  if (!raw) return null;
+  const entries = raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (entries.length === 0) return null;
+  return entries[Math.max(0, entries.length - hops)] ?? null;
+}
 
 export function bearer(req: Request): string {
   const value = req.headers.get("authorization") ?? "";

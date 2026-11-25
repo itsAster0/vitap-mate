@@ -37,6 +37,7 @@ export async function setup(): Promise<T> {
     ENGINE_URL: "https://engine.test",
     PUBLIC_URL: "https://vmate.test",
     MAIL_DOMAIN: "vmate.test",
+    PROXY_HOPS: "1",
     FIREBASE_CREDENTIALS_JSON: "",
   })) {
     vi.stubEnv(k, v);
