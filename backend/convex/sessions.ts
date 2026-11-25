@@ -31,7 +31,7 @@ import { type Credentials, credentialsOf, credentialsValidator, usableText } fro
 import { engineJson } from "./lib/engine";
 import { type LoginOutcome, SEAL, SESSION, type SealVault, type SealedVault, type SessionCheck, type SessionChecked } from "./lib/engineApi";
 import { fail } from "./lib/errors";
-import { actionCaller, caller, mailboxOfAccount, recordOf } from "./lib/identity";
+import { actionCaller, caller, deviceFcmToken, mailboxOfAccount, recordOf } from "./lib/identity";
 import { notify } from "./lib/notify";
 import { askPhone, insertRequest, pendingRequest, putRequest, requestOf, requestRow } from "./lib/requests";
 import { accountId, log, logError, logWarn, now } from "./lib/util";
@@ -84,7 +84,7 @@ export async function keyView(ctx: QueryCtx, { key, account }: KeyHolder) {
     semesterId: doc.semesterId,
     settings: doc.settings,
     phoneLinked: linked,
-    phone: linked ? { label: device.label, notifications: device.fcmToken !== "" } : null,
+    phone: linked ? { label: device.label, notifications: deviceFcmToken(device) !== null } : null,
     savedCredentials: vault !== null,
     vaultSavedAt: vault !== null ? doc.vaultSavedAt : null,
     credentialsRejectedAt: doc.credentialsRejectedAt,

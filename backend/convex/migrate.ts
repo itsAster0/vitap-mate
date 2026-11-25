@@ -208,13 +208,14 @@ async function importDevice(
     return count(tally, "devices.bad_key");
   if (await deviceByDeviceId(ctx, deviceId))
     return count(tally, "devices.exists");
+  const fcm = text(row, "fcm_token")?.trim();
   await ctx.db.insert("devices", {
     deviceId,
     signKey,
     sealKey,
     platform,
     label: text(row, "label"),
-    fcmToken: text(row, "fcm_token") ?? "",
+    ...(fcm ? { fcmToken: fcm } : {}),
     createdAt: int(row, "created_at") ?? 0,
   });
   count(tally, "devices.inserted");

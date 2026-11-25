@@ -30,12 +30,12 @@ const item = (kind: Item["kind"], tables: Record<string, Row[]>, extra: Partial<
   ...extra,
 });
 
-async function deviceExport(n: number) {
+async function deviceExport(n: number, fcmToken: string | null = "fcm-1") {
   const p = await phone(n);
   return {
     p,
     item: item("device", {
-      device: [{ id: p.deviceId, sign_key: p.signKey, seal_key: p.sealKey, label: `Phone ${n}`, platform: "android", fcm_token: "fcm-1", seq: 3, created_at: OLD }],
+      device: [{ id: p.deviceId, sign_key: p.signKey, seal_key: p.sealKey, label: `Phone ${n}`, platform: "android", fcm_token: fcmToken, seq: 3, created_at: OLD }],
     }),
   };
 }
@@ -117,7 +117,7 @@ describe("the backfill", () => {
   it("maps every kind into the v3 model under the old ids", async () => {
     const t = await setup();
     const one = await deviceExport(1);
-    const two = await deviceExport(2);
+    const two = await deviceExport(2, null);
     const tally = await run(t, [one.item, two.item, await accountExport([one.p.deviceId, two.p.deviceId]), mailboxExport([one.p.deviceId]), oauthExport()]);
     expect(tally).toEqual({
       "devices.inserted": 2,
@@ -148,7 +148,7 @@ describe("the backfill", () => {
     });
     expect(r.devices.map((d) => ({ id: d.deviceId, accountId: d.accountId, linkedAt: d.linkedAt, seenAt: d.seenAt, fcm: d.fcmToken }))).toEqual([
       { id: one.p.deviceId, accountId: account._id, linkedAt: OLD, seenAt: OLD + 100, fcm: "fcm-1" },
-      { id: two.p.deviceId, accountId: account._id, linkedAt: OLD + 1, seenAt: OLD + 101, fcm: "fcm-1" },
+      { id: two.p.deviceId, accountId: account._id, linkedAt: OLD + 1, seenAt: OLD + 101, fcm: undefined },
     ]);
     expect(r.keys).toEqual([
       expect.objectContaining({

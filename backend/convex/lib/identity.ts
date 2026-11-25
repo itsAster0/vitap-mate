@@ -42,6 +42,11 @@ export async function deviceRow(ctx: QueryCtx, deviceId: string): Promise<Doc<"d
     .unique();
 }
 
+/** A device's FCM token, treating both `undefined` and legacy `""` rows as absent. */
+export function deviceFcmToken(device: Pick<Doc<"devices">, "fcmToken"> | null | undefined): string | null {
+  return device?.fcmToken ? device.fcmToken : null;
+}
+
 export async function callerOf(ctx: QueryCtx, claims: Claims): Promise<Caller> {
   const device = await deviceRow(ctx, claims.deviceId);
   if (!device) return removed();

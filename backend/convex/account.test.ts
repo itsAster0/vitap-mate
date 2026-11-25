@@ -175,6 +175,15 @@ describe("the install", () => {
     const t = await setup();
     const p = await phone(1);
     const { as } = await prove(t, p);
+    const made = await as.action(api.keys.create, { flow: "f" });
+    const ext = t.withIdentity({ subject: await sha256Hex(made.key), kind: "key" });
+    // Registered without an FCM token: field is absent (not "") and reads as off everywhere.
+    expect((await t.run((ctx) => ctx.db.query("devices").first()))?.fcmToken).toBeUndefined();
+    expect((await as.query(api.devices.info, { flow: "f" })).pushToken).toBe(false);
+    expect((await as.query(api.screen.view, {})).device.pushToken).toBe(false);
+    expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(false);
+    expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBeNull();
+
     expect(await codeOf(as.mutation(api.devices.update, { flow: "f" }))).toBe("bad_request");
     expect(await codeOf(as.mutation(api.devices.update, { flow: "f", sealKey: "x" }))).toBe("bad_request");
     await as.mutation(api.devices.update, { flow: "f", fcmToken: "fcm", label: " Pixel 9 " });
@@ -185,6 +194,27 @@ describe("the install", () => {
       pushToken: true,
       createdAt: Math.floor(Date.now() / 1000),
     });
+    expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(true);
+    expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBe("fcm");
+
+    // Clearing a dead token unsets the optional field instead of writing "".
+    await t.mutation(internal.push.clearToken, { deviceId: p.deviceId, token: "other" });
+    expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBe("fcm");
+    await t.mutation(internal.push.clearToken, { deviceId: p.deviceId, token: "fcm" });
+    expect((await t.run((ctx) => ctx.db.query("devices").first()))?.fcmToken).toBeUndefined();
+    expect((await as.query(api.devices.info, { flow: "f" })).pushToken).toBe(false);
+    expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(false);
+    expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBeNull();
+
+    // Legacy row with fcmToken: "" still reads as absent at the boundary.
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("devices").first())!;
+      await ctx.db.patch(row._id, { fcmToken: "" });
+    });
+    expect((await as.query(api.devices.info, { flow: "f" })).pushToken).toBe(false);
+    expect((await as.query(api.screen.view, {})).device.pushToken).toBe(false);
+    expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(false);
+    expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBeNull();
   });
 
   it("drops mailbox memberships and otpInbox rows when removed", async () => {

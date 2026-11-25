@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { toBase64Url } from "./lib/base64";
+import { deviceFcmToken, deviceRow } from "./lib/identity";
 import { logError, logWarn, now } from "./lib/util";
 
 /** An OAuth scope name, not an address. */
@@ -125,13 +126,7 @@ export const send = internalAction({
 
 export const tokenOf = internalQuery({
   args: { deviceId: v.string() },
-  handler: async (ctx, { deviceId }) =>
-    (
-      await ctx.db
-        .query("devices")
-        .withIndex("by_deviceId", (q) => q.eq("deviceId", deviceId))
-        .unique()
-    )?.fcmToken ?? null,
+  handler: async (ctx, { deviceId }) => deviceFcmToken(await deviceRow(ctx, deviceId)),
 });
 
 /** Google says the token is dead: stop sending to it until the app sends a new one (unless it
@@ -139,10 +134,7 @@ export const tokenOf = internalQuery({
 export const clearToken = internalMutation({
   args: { deviceId: v.string(), token: v.string() },
   handler: async (ctx, { deviceId, token }) => {
-    const device = await ctx.db
-      .query("devices")
-      .withIndex("by_deviceId", (q) => q.eq("deviceId", deviceId))
-      .unique();
-    if (device?.fcmToken === token) await ctx.db.patch(device._id, { fcmToken: "" });
+    const device = await deviceRow(ctx, deviceId);
+    if (device && deviceFcmToken(device) === token) await ctx.db.patch(device._id, { fcmToken: undefined });
   },
 });

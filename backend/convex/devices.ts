@@ -6,7 +6,7 @@ import { mutation, query } from "./_generated/server";
 import { dropMail, revokeDevice } from "./lib/accounts";
 import { fcmToken, memberLabel, sealKey } from "./lib/checks";
 import { badRequest } from "./lib/errors";
-import { caller } from "./lib/identity";
+import { caller, deviceFcmToken } from "./lib/identity";
 import { leaveMailbox } from "./lib/mailboxes";
 import { log } from "./lib/util";
 
@@ -39,7 +39,7 @@ export const info = query({
       deviceId: device.deviceId,
       label: device.label,
       platform: device.platform,
-      pushToken: Boolean(device.fcmToken),
+      pushToken: deviceFcmToken(device) !== null,
       createdAt: device.createdAt,
     };
   },

@@ -133,7 +133,13 @@ async function upsertDevice(ctx: MutationCtx, deviceId: string, signKey: string,
     await ctx.db.patch(found._id, { ...fields, ...(device.fcmToken !== null ? { fcmToken: device.fcmToken } : {}) });
     return (await ctx.db.get(found._id))!;
   }
-  const id = await ctx.db.insert("devices", { deviceId, signKey, ...fields, fcmToken: device.fcmToken ?? "", createdAt: now() });
+  const id = await ctx.db.insert("devices", {
+    deviceId,
+    signKey,
+    ...fields,
+    ...(device.fcmToken !== null ? { fcmToken: device.fcmToken } : {}),
+    createdAt: now(),
+  });
   return (await ctx.db.get(id))!;
 }
 

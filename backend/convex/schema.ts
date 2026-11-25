@@ -60,8 +60,8 @@ export default defineSchema({
     sealKey: v.string(),
     platform: v.string(),
     label: nullable(v.string()),
-    /** Empty when there is none, or Google said it is gone. */
-    fcmToken: v.string(),
+    /** Unset when there is none, or Google said it is gone (legacy rows may hold `""`). */
+    fcmToken: v.optional(v.string()),
     createdAt: v.number(),
     accountId: v.optional(v.id("accounts")),
     linkedAt: v.optional(v.number()),

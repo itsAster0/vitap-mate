@@ -7,7 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 import { keysOf, phoneOf, phonesOf, signInsOf } from "./lib/accounts";
 import { AccountRecord } from "./lib/accountState";
-import { caller, recordOf } from "./lib/identity";
+import { caller, deviceFcmToken, recordOf } from "./lib/identity";
 import { address, mailboxRow, membersOf } from "./lib/mailboxes";
 import { now } from "./lib/util";
 
@@ -37,7 +37,7 @@ export const view = query({
       deviceId: me.device.deviceId,
       label: me.device.label,
       platform: me.device.platform,
-      pushToken: Boolean(me.device.fcmToken),
+      pushToken: deviceFcmToken(me.device) !== null,
       createdAt: me.device.createdAt,
     };
     if (!me.account) {
