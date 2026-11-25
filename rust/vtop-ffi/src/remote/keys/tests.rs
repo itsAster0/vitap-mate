@@ -153,6 +153,29 @@ async fn keys_are_made_as_the_student() {
     );
 }
 
+#[test]
+fn replies_parse_once_into_their_types() {
+    let info = |body: Value| serde_json::from_value::<PairInfo>(body).ok();
+    assert_eq!(
+        info(json!({ "kind": "mcp", "name": "Claude", "host": "claude.ai" })),
+        Some(PairInfo::Mcp {
+            name: "Claude".into(),
+            host: "claude.ai".into()
+        })
+    );
+    assert_eq!(info(json!({ "kind": "browser" })), Some(PairInfo::Browser));
+    assert_eq!(info(json!({ "kind": "watch" })), Some(PairInfo::Other));
+    // An MCP client without its name is a broken answer, not the extension.
+    assert_eq!(info(json!({ "kind": "mcp" })), None);
+    let moved: Moved = serde_json::from_value(json!({ "moved": 3 })).unwrap();
+    assert_eq!(moved.moved, 3);
+    assert!(serde_json::from_value::<Moved>(json!({})).is_err());
+    let made = json!({ "id": "k1", "key": "vk_x", "mcpUrl": "https://s/mcp", "app": null });
+    let key: NewKey = serde_json::from_value(made).unwrap();
+    assert_eq!(key.mcp_url, "https://s/mcp");
+    assert!(serde_json::from_value::<NewKey>(json!({ "id": "k1", "key": "vk_x" })).is_err());
+}
+
 #[tokio::test]
 async fn pair_codes_name_their_mcp_client() {
     let edge = Arc::new(Mutex::new(Edge::default()));

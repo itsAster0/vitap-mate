@@ -156,8 +156,29 @@ pub struct PairApp {
     pub host: String,
 }
 
-/// A key just made: [`NewKey::key`] is shown once.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+/// `pair:info`'s answer: an MCP client's sign-in page, or the extension's code.
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum PairInfo {
+    Mcp {
+        name: String,
+        host: String,
+    },
+    Browser,
+    /// A kind from a newer server: no client to name.
+    #[serde(other)]
+    Other,
+}
+
+/// `keys:move`'s answer.
+#[derive(Deserialize)]
+struct Moved {
+    moved: u32,
+}
+
+/// A key just made (`keys:create`'s answer): [`NewKey::key`] is shown once.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, uniffi::Record)]
+#[serde(rename_all = "camelCase")]
 pub struct NewKey {
     pub id: String,
     pub key: String,
@@ -360,7 +381,7 @@ impl Core {
                 .account_call(&flow, Kind::Mutation, path, action, true, body)
                 .await?
                 .map_err(refused)?;
-            let moved = answer.get("moved").and_then(Value::as_u64).unwrap_or(0) as u32;
+            let Moved { moved } = serde_json::from_value(answer).map_err(unexpected)?;
             info!(moved, "keys moved");
             Ok(moved)
         })
@@ -442,14 +463,9 @@ impl Core {
             .device_call(flow, Kind::Query, "pair:info", json!({ "code": code }))
             .await
             .map_err(refused)?;
-        let text = |key: &str| answer.get(key)?.as_str().map(str::to_string);
-        let app = match (
-            answer.get("kind").and_then(Value::as_str),
-            text("name"),
-            text("host"),
-        ) {
-            (Some("mcp"), Some(name), Some(host)) => Some(PairApp { name, host }),
-            _ => None,
+        let app = match serde_json::from_value(answer).map_err(unexpected)? {
+            PairInfo::Mcp { name, host } => Some(PairApp { name, host }),
+            PairInfo::Browser | PairInfo::Other => None,
         };
         info!(mcp = app.is_some(), "pair code checked");
         Ok(app)
@@ -485,20 +501,7 @@ impl Core {
             .account_call(flow, Kind::Action, "keys:create", action, true, body)
             .await?
             .map_err(refused)?;
-        let text = |key: &str| {
-            answer
-                .get(key)
-                .and_then(Value::as_str)
-                .map(str::to_string)
-                .ok_or_else(|| CoreError::Other {
-                    reason: "The server sent an unexpected answer.".into(),
-                })
-        };
-        let key = NewKey {
-            id: text("id")?,
-            key: text("key")?,
-            mcp_url: text("mcpUrl")?,
-        };
+        let key: NewKey = serde_json::from_value(answer).map_err(unexpected)?;
         info!(paired, outings, "key made");
         Ok(key)
     }
