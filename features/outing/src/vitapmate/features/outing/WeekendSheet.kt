@@ -58,9 +58,7 @@ internal fun WeekendSheet(form: WeekendOuting, onDismiss: () -> Unit, onMaybeSen
     var purpose by rememberSaveable { mutableStateOf("") }
     var contact by rememberSaveable { mutableStateOf(prefs(context).getString(CONTACT, null).orEmpty()) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
-    var failure by rememberSaveable { mutableStateOf<String?>(null) }
-    var sending by remember { mutableStateOf(false) }
-    var confirming by remember { mutableStateOf(false) }
+    var phase by rememberSaveable(stateSaver = ApplyPhase.Saver) { mutableStateOf<ApplyPhase>(ApplyPhase.Editing()) }
     val now by rememberNow()
     val check = remember(form.rules, purpose, day, contact, now) { checkWeekendOuting(form.rules, purpose, day, contact) }
     fun shown(error: String?) = error.takeIf { showErrors }
@@ -68,16 +66,14 @@ internal fun WeekendSheet(form: WeekendOuting, onDismiss: () -> Unit, onMaybeSen
     ApplySheet(
         "Weekend outing",
         form.hostel,
-        failure,
-        sending,
+        phase,
         "outing.sheet.weekend",
         onReview = {
             if (listOf(check.purpose, check.day, check.contact).any { it != null } || slot == null || place == null) {
                 showErrors = true
-                failure = "Check the fields marked in red."
+                phase = ApplyPhase.Editing("Check the fields marked in red.")
             } else {
-                failure = null
-                confirming = true
+                phase = ApplyPhase.Confirming
             }
         },
         onDismiss = onDismiss,
@@ -125,12 +121,12 @@ internal fun WeekendSheet(form: WeekendOuting, onDismiss: () -> Unit, onMaybeSen
         }
     }
 
-    if (confirming) {
+    if (phase == ApplyPhase.Confirming) {
         val d = day
         val s = slot
         val p = place
         if (d == null || s == null || p == null) {
-            confirming = false
+            phase = ApplyPhase.Editing()
             return
         }
         ConfirmDialog(
@@ -143,9 +139,7 @@ internal fun WeekendSheet(form: WeekendOuting, onDismiss: () -> Unit, onMaybeSen
                 "Contact" to contact.trim(),
             ),
             onApply = {
-                confirming = false
-                sending = true
-                failure = null
+                phase = ApplyPhase.Sending
                 val application = WeekendOutingForm(p, tidy(purpose), d, s, contact.trim())
                 sendApplication(
                     "weekend",
@@ -155,16 +149,17 @@ internal fun WeekendSheet(form: WeekendOuting, onDismiss: () -> Unit, onMaybeSen
                             haptics.confirm()
                             prefs(context).edit().putString(CONTACT, application.contact).apply()
                             onSent(result)
-                        } else failure = result.message
+                        } else phase = ApplyPhase.Editing(result.message)
                     },
                     onError = { message ->
-                        failure = message
+                        phase = ApplyPhase.Editing(message)
                         onMaybeSent()
                     },
-                    onDone = { sending = false },
+                    // Sent but no answer to show (the OTP prompt took over, or it stopped).
+                    onDone = { if (phase == ApplyPhase.Sending) phase = ApplyPhase.Editing() },
                 )
             },
-            onEdit = { confirming = false },
+            onEdit = { phase = ApplyPhase.Editing() },
         )
     }
 }

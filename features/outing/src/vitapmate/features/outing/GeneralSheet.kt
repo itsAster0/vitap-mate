@@ -77,9 +77,7 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
     var backDay by rememberSaveable { mutableIntStateOf(start.returning.day) }
     var backMinute by rememberSaveable { mutableIntStateOf(start.returning.minute) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
-    var failure by rememberSaveable { mutableStateOf<String?>(null) }
-    var sending by remember { mutableStateOf(false) }
-    var confirming by remember { mutableStateOf(false) }
+    var phase by rememberSaveable(stateSaver = ApplyPhase.Saver) { mutableStateOf<ApplyPhase>(ApplyPhase.Editing()) }
     var picking by remember { mutableStateOf<Picking?>(null) }
     val now by rememberNow()
     val leaving = OutingMoment(leaveDay, leaveMinute)
@@ -91,16 +89,14 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
     ApplySheet(
         "General outing",
         form.hostel,
-        failure,
-        sending,
+        phase,
         "outing.sheet.general",
         onReview = {
             if (listOf(check.place, check.purpose, check.leaving, check.returning).any { it != null }) {
                 showErrors = true
-                failure = "Check the fields marked in red."
+                phase = ApplyPhase.Editing("Check the fields marked in red.")
             } else {
-                failure = null
-                confirming = true
+                phase = ApplyPhase.Confirming
             }
         },
         onDismiss = onDismiss,
@@ -177,7 +173,7 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
         null -> {}
     }
 
-    if (confirming) {
+    if (phase == ApplyPhase.Confirming) {
         ConfirmDialog(
             "Apply for general outing?",
             listOfNotNull(
@@ -188,22 +184,21 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
                 form.hostel?.let { "Room" to it },
             ),
             onApply = {
-                confirming = false
-                sending = true
-                failure = null
+                phase = ApplyPhase.Sending
                 val application = GeneralOutingForm(tidy(place), tidy(purpose), leaving, returning)
                 sendApplication(
                     "general",
                     { id, core -> core.applyGeneralOuting(id, application) },
-                    onResult = { result -> if (result.done) { haptics.confirm(); onSent(result) } else { haptics.reject(); failure = result.message } },
+                    onResult = { result -> if (result.done) { haptics.confirm(); onSent(result) } else { haptics.reject(); phase = ApplyPhase.Editing(result.message) } },
                     onError = { message ->
-                        failure = message
+                        phase = ApplyPhase.Editing(message)
                         onMaybeSent()
                     },
-                    onDone = { sending = false },
+                    // Sent but no answer to show (the OTP prompt took over, or it stopped).
+                    onDone = { if (phase == ApplyPhase.Sending) phase = ApplyPhase.Editing() },
                 )
             },
-            onEdit = { confirming = false },
+            onEdit = { phase = ApplyPhase.Editing() },
         )
     }
 }

@@ -41,22 +41,23 @@ import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Space
 
 /**
- * An apply sheet: title and the room, the fields scrolling, VTOP's refusal ([failure]) and the
- * Review button (progress while [sending]). While sending it stays open: the request is on its
- * way and its answer shows here.
+ * An apply sheet: title and the room, the fields scrolling, VTOP's refusal (the [phase]'s
+ * failure) and the Review button (progress while sending). While sending it stays open: the
+ * request is on its way and its answer shows here.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalComposeUiApi::class)
 @Composable
 internal fun ApplySheet(
     title: String,
     subtitle: String?,
-    failure: String?,
-    sending: Boolean,
+    phase: ApplyPhase,
     tag: String,
     onReview: () -> Unit,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val sending = phase == ApplyPhase.Sending
+    val failure = (phase as? ApplyPhase.Editing)?.failure
     val busy by rememberUpdatedState(sending)
     val sheet = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
