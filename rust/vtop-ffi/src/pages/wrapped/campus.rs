@@ -23,7 +23,7 @@ pub(super) fn outings(
     on_campus: impl Fn(i32) -> bool,
 ) -> Option<WrappedOutings> {
     let window = first..=end;
-    let approved = |status: &str| outing::standing(status) == OutingStanding::Approved;
+    let approved = |status: &str| outing::view::standing(status) == OutingStanding::Approved;
     let leaves: Vec<(Option<(i32, i32)>, &str)> = general
         .iter()
         .flat_map(|data| &data.records)

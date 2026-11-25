@@ -11,7 +11,8 @@ use vtop_core::types::{
 use super::{ChangeKind, Context, Draft, EXAMS, PLANS, draft};
 use crate::pages::grades::GRADES;
 use crate::pages::marks::MARKS;
-use crate::pages::outing::{GENERAL, WEEKEND, format_day};
+use crate::pages::outing::time::format_day;
+use crate::pages::outing::{GENERAL, WEEKEND};
 use crate::pages::records::{Attendance, AttendanceCourse, ClassKind, epoch_day};
 use crate::{ATTENDANCE, ATTENDANCE_DETAIL, CALENDAR, TIMETABLE};
 

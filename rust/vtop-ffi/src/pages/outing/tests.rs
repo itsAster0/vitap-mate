@@ -4,8 +4,13 @@ use std::sync::{Arc, Mutex};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use vtop_core::outing::offered;
+use vtop_core::types::{GeneralOutingRecord, OutingStudent, WeekendOutingRecord};
 use vtop_core::{SessionState, VtopClient, VtopConfig};
 
+use super::form::{trip_length, weekend_dates};
+use super::time::{clock, list_days, short_clock, short_date, slot_label, time_slot};
+use super::view::{general_request, upcoming};
 use super::*;
 use crate::{Account, Session};
 
