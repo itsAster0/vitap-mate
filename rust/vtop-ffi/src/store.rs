@@ -68,7 +68,7 @@ impl Core {
             }
             _ => {}
         }
-        decoded::forget(&self.dir);
+        self.shared.decoded.forget(&self.dir);
         self.shared
             .locks
             .attendance_details
@@ -86,7 +86,7 @@ impl Core {
             }
             _ => {}
         }
-        decoded::forget(&path);
+        self.shared.decoded.forget(&path);
     }
 
     /// Where `file` lives: the change inbox in the cache folder, everything
@@ -111,7 +111,9 @@ impl Core {
         file: &str,
     ) -> Option<T> {
         if file.starts_with(&format!("{PAGES}/")) || file == SEMESTERS || file == SELECTED {
-            decoded::read(&self.at(file), |bytes| decode(file, bytes))
+            self.shared
+                .decoded
+                .read(&self.at(file), |bytes| decode(file, bytes))
         } else {
             self.read(file)
         }
@@ -141,7 +143,7 @@ impl Core {
     pub(crate) fn write_bytes(&self, file: &str, bytes: &[u8]) {
         let path = self.at(file);
         let result = write_atomic(&path, bytes);
-        decoded::forget(&path);
+        self.shared.decoded.forget(&path);
         if let Err(error) = result {
             warn!(file, %error, "not saved");
         }

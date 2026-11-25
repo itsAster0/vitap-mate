@@ -4,14 +4,15 @@
 //! modified time and inode as they were before it was read, so a file replaced any other way
 //! (a test, an older build) is read again. [`crate::Core::write_bytes`] drops the path,
 //! [`crate::Core::forget`] (sign-out, another student, cleared pages) everything in the core's
-//! folder, and Developer's removals what they remove. Process-wide, keyed by full path, so two
-//! cores on one folder share it.
+//! folder, and Developer's removals what they remove. Each core keeps its own ([`crate::Shared`]):
+//! its budget is its own, and the copies go with it. Two cores on one folder (tests) each catch
+//! the other's writes by the stamp.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::SystemTime;
 
 /// What the decoded copies may add up to, in the JSON bytes they came from; the least recently
@@ -66,112 +67,121 @@ struct Reading {
 }
 
 /// A read's token, given back however the read ends.
-struct Token(Option<u64>);
+struct Token<'a>(&'a Decoded, Option<u64>);
 
-impl Drop for Token {
+impl Drop for Token<'_> {
     fn drop(&mut self) {
-        if let Some(token) = self.0 {
-            cache().reads.remove(&token);
+        if let Some(token) = self.1 {
+            self.0.cache().reads.remove(&token);
         }
     }
 }
 
-static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(Mutex::default);
+/// One core's decoded copies.
+#[derive(Default)]
+pub(crate) struct Decoded(Mutex<Cache>);
 
-fn cache() -> MutexGuard<'static, Cache> {
-    CACHE.lock().unwrap_or_else(PoisonError::into_inner)
-}
+impl Decoded {
+    fn cache(&self) -> MutexGuard<'_, Cache> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
 
-/// `path` decoded as `T`: the kept copy while the file is unchanged, else `load(bytes)`, kept.
-pub(crate) fn read<T: Clone + Send + Sync + 'static>(
-    path: &Path,
-    load: impl FnOnce(&[u8]) -> Option<T>,
-) -> Option<T> {
-    let key = (path.to_path_buf(), TypeId::of::<T>());
-    let Some(stamp) = Stamp::of(path) else {
-        forget(path);
-        return None;
-    };
-    let mut token = {
-        let mut cache = cache();
-        cache.clock += 1;
-        let clock = cache.clock;
-        if let Some(entry) = cache.entries.get_mut(&key)
-            && entry.stamp == stamp
-            && let Some(value) = entry.value.downcast_ref::<T>()
-        {
-            entry.used = clock;
-            return Some(value.clone());
-        }
-        let token = cache.next_read;
-        cache.next_read += 1;
-        let reading = Reading {
-            path: path.to_path_buf(),
-            spoiled: false,
+    /// `path` decoded as `T`: the kept copy while the file is unchanged, else `load(bytes)`, kept.
+    pub(crate) fn read<T: Clone + Send + Sync + 'static>(
+        &self,
+        path: &Path,
+        load: impl FnOnce(&[u8]) -> Option<T>,
+    ) -> Option<T> {
+        let key = (path.to_path_buf(), TypeId::of::<T>());
+        let Some(stamp) = Stamp::of(path) else {
+            self.forget(path);
+            return None;
         };
-        cache.reads.insert(token, reading);
-        Token(Some(token))
-    };
-    let bytes = fs::read(path).ok()?;
-    let value = load(&bytes)?;
-    let mut cache = cache();
-    let fresh = token
-        .0
-        .take()
-        .and_then(|token| cache.reads.remove(&token))
-        .is_some_and(|reading| !reading.spoiled);
-    if fresh && stamp.len <= LARGEST {
-        let used = cache.clock;
-        let entry = Entry {
-            stamp,
-            value: Arc::new(value.clone()),
-            used,
-        };
-        if let Some(old) = cache.entries.insert(key, entry) {
-            cache.bytes -= old.stamp.len;
-        }
-        cache.bytes += stamp.len;
-        while cache.bytes > BUDGET {
-            let Some(oldest) = cache
-                .entries
-                .iter()
-                .min_by_key(|(_, entry)| entry.used)
-                .map(|(key, _)| key.clone())
-            else {
-                break;
+        let mut token = {
+            let mut cache = self.cache();
+            cache.clock += 1;
+            let clock = cache.clock;
+            if let Some(entry) = cache.entries.get_mut(&key)
+                && entry.stamp == stamp
+                && let Some(value) = entry.value.downcast_ref::<T>()
+            {
+                entry.used = clock;
+                return Some(value.clone());
+            }
+            let token = cache.next_read;
+            cache.next_read += 1;
+            let reading = Reading {
+                path: path.to_path_buf(),
+                spoiled: false,
             };
-            if let Some(gone) = cache.entries.remove(&oldest) {
-                cache.bytes -= gone.stamp.len;
+            cache.reads.insert(token, reading);
+            Token(self, Some(token))
+        };
+        let bytes = fs::read(path).ok()?;
+        let value = load(&bytes)?;
+        let mut cache = self.cache();
+        let fresh = token
+            .1
+            .take()
+            .and_then(|token| cache.reads.remove(&token))
+            .is_some_and(|reading| !reading.spoiled);
+        if fresh && stamp.len <= LARGEST {
+            let used = cache.clock;
+            let entry = Entry {
+                stamp,
+                value: Arc::new(value.clone()),
+                used,
+            };
+            if let Some(old) = cache.entries.insert(key, entry) {
+                cache.bytes -= old.stamp.len;
+            }
+            cache.bytes += stamp.len;
+            while cache.bytes > BUDGET {
+                let Some(oldest) = cache
+                    .entries
+                    .iter()
+                    .min_by_key(|(_, entry)| entry.used)
+                    .map(|(key, _)| key.clone())
+                else {
+                    break;
+                };
+                if let Some(gone) = cache.entries.remove(&oldest) {
+                    cache.bytes -= gone.stamp.len;
+                }
+            }
+        }
+        Some(value)
+    }
+
+    /// Drops the copies of `path` and of every file under it (written, removed, or a folder
+    /// removed).
+    pub(crate) fn forget(&self, path: &Path) {
+        let mut cache = self.cache();
+        let mut freed = 0;
+        cache.entries.retain(|(at, _), entry| {
+            let keep = !at.starts_with(path);
+            if !keep {
+                freed += entry.stamp.len;
+            }
+            keep
+        });
+        cache.bytes -= freed;
+        for reading in cache.reads.values_mut() {
+            if reading.path.starts_with(path) {
+                reading.spoiled = true;
             }
         }
     }
-    Some(value)
-}
 
-/// Drops the copies of `path` and of every file under it (written, removed, or a folder
-/// removed).
-pub(crate) fn forget(path: &Path) {
-    let mut cache = cache();
-    let mut freed = 0;
-    cache.entries.retain(|(at, _), entry| {
-        let keep = !at.starts_with(path);
-        if !keep {
-            freed += entry.stamp.len;
-        }
-        keep
-    });
-    cache.bytes -= freed;
-    for reading in cache.reads.values_mut() {
-        if reading.path.starts_with(path) {
-            reading.spoiled = true;
-        }
+    /// How many copies are kept, for tests.
+    #[cfg(test)]
+    pub(crate) fn kept(&self, path: &Path) -> usize {
+        self.cache()
+            .entries
+            .keys()
+            .filter(|(at, _)| at == path)
+            .count()
     }
-}
-
-/// How many copies are kept, for tests.
-#[cfg(test)]
-pub(crate) fn kept(path: &Path) -> usize {
-    cache().entries.keys().filter(|(at, _)| at == path).count()
 }
 
 #[cfg(test)]
@@ -184,20 +194,17 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("page.json");
         fs::write(&path, "1").unwrap();
-        let read = read(&path, |bytes| {
+        let decoded = Decoded::default();
+        let read = decoded.read(&path, |bytes| {
             // A write lands while this read parses, outside the lock.
-            forget(&path);
+            decoded.forget(&path);
             Some(bytes.to_vec())
         });
         assert_eq!(read.as_deref(), Some(&b"1"[..]));
-        assert_eq!(kept(&path), 0);
+        assert_eq!(decoded.kept(&path), 0);
         // Undisturbed, the next read is kept.
-        read_bytes(&path);
-        assert_eq!(kept(&path), 1);
+        decoded.read(&path, |bytes| Some(bytes.to_vec()));
+        assert_eq!(decoded.kept(&path), 1);
         fs::remove_dir_all(&dir).unwrap();
-    }
-
-    fn read_bytes(path: &Path) -> Option<Vec<u8>> {
-        read(path, |bytes| Some(bytes.to_vec()))
     }
 }

@@ -11,7 +11,7 @@ use vtop_core::types::AttendanceData;
 use super::*;
 use crate::pages::{changes, records};
 use crate::remote::{account_token, consent, edge, forwarding, route};
-use crate::store::{cookies, decoded};
+use crate::store::cookies;
 
 /// The cache folder of every test that opens a real [`Core::new`]. The log pipeline is
 /// process-wide ([`obs::obs_init`]): the first core's cache folder gets the one log file, so
@@ -866,12 +866,16 @@ fn kept_pages_follow_writes() {
     let (core, dir) = kept_fixture("kept-write", 1);
     let page = dir.join(PAGES).join("AP1").join(ATTENDANCE);
     assert_eq!(first_course(&core), Some(("AP1-0".into(), 30)));
-    assert_eq!(decoded::kept(&page), 1, "kept after the first read");
+    assert_eq!(
+        core.shared.decoded.kept(&page),
+        1,
+        "kept after the first read"
+    );
     assert_eq!(first_course(&core), Some(("AP1-0".into(), 30)));
 
     let mut data: AttendanceData = serde_json::from_str(&attendance_json("AP1", 1, "31")).unwrap();
     core.write(&format!("{PAGES}/AP1/{ATTENDANCE}"), &data);
-    assert_eq!(decoded::kept(&page), 0, "a write drops it");
+    assert_eq!(core.shared.decoded.kept(&page), 0, "a write drops it");
     assert_eq!(first_course(&core), Some(("AP1-0".into(), 31)));
 
     // Replaced on disk without `write` (same length): the stamp catches it.
@@ -880,7 +884,7 @@ fn kept_pages_follow_writes() {
     // Gone from disk: gone here too.
     fs::remove_file(&page).unwrap();
     assert_eq!(first_course(&core), None);
-    assert_eq!(decoded::kept(&page), 0);
+    assert_eq!(core.shared.decoded.kept(&page), 0);
 
     // Written with another type at the same path: each type is kept apart.
     data.records.clear();
@@ -893,7 +897,7 @@ fn kept_pages_follow_writes() {
     );
     let raw = core.read_kept::<Value>(&format!("{PAGES}/AP1/{ATTENDANCE}"));
     assert_eq!(raw.unwrap()["records"], serde_json::json!([]));
-    assert_eq!(decoded::kept(&page), 2);
+    assert_eq!(core.shared.decoded.kept(&page), 2);
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -931,7 +935,7 @@ fn kept_pages_follow_the_semester() {
     assert_eq!(first_course(&core).unwrap().0, "AP1-0");
     core.dev_reset_semester("f".into()).unwrap();
     assert_eq!(first_course(&core), None);
-    assert_eq!(decoded::kept(&dir.join(SELECTED)), 0);
+    assert_eq!(core.shared.decoded.kept(&dir.join(SELECTED)), 0);
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -942,14 +946,20 @@ fn kept_pages_go_with_clears_and_sign_out() {
     assert!(first_course(&core).is_some());
     core.dev_clear_cache("f".into(), dev::CacheScope::Semester)
         .unwrap();
-    assert_eq!((first_course(&core), decoded::kept(&page)), (None, 0));
+    assert_eq!(
+        (first_course(&core), core.shared.decoded.kept(&page)),
+        (None, 0)
+    );
 
     fs::create_dir_all(page.parent().unwrap()).unwrap();
     fs::write(&page, attendance_json("AP1", 1, "30")).unwrap();
     assert!(first_course(&core).is_some());
     core.dev_clear_cache("f".into(), dev::CacheScope::All)
         .unwrap();
-    assert_eq!((first_course(&core), decoded::kept(&page)), (None, 0));
+    assert_eq!(
+        (first_course(&core), core.shared.decoded.kept(&page)),
+        (None, 0)
+    );
 
     fs::create_dir_all(page.parent().unwrap()).unwrap();
     fs::write(&page, attendance_json("AP1", 1, "30")).unwrap();
@@ -959,7 +969,7 @@ fn kept_pages_go_with_clears_and_sign_out() {
     assert_eq!(first_course(&core), None);
     assert!(core.cached_semesters("f".into()).is_none());
     assert_eq!(
-        decoded::kept(&page) + decoded::kept(&dir.join(SEMESTERS)),
+        core.shared.decoded.kept(&page) + core.shared.decoded.kept(&dir.join(SEMESTERS)),
         0
     );
     let _ = fs::remove_dir_all(&dir);
@@ -976,11 +986,11 @@ fn kept_pages_are_bounded() {
         assert!(core.read_kept::<String>(file).is_some());
     }
     assert_eq!(
-        decoded::kept(&core.at(&files[0])),
+        core.shared.decoded.kept(&core.at(&files[0])),
         0,
         "least recently used goes"
     );
-    assert_eq!(decoded::kept(&core.at(&files[5])), 1);
+    assert_eq!(core.shared.decoded.kept(&core.at(&files[5])), 1);
     // Over a quarter of the budget: never kept.
     let huge = format!("{PAGES}/AP1/huge.json");
     fs::write(
@@ -989,8 +999,29 @@ fn kept_pages_are_bounded() {
     )
     .unwrap();
     assert!(core.read_kept::<String>(&huge).is_some());
-    assert_eq!(decoded::kept(&core.at(&huge)), 0);
+    assert_eq!(core.shared.decoded.kept(&core.at(&huge)), 0);
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn each_core_keeps_its_own_copies() {
+    let (core, dir) = kept_fixture("kept-own-a", 1);
+    let (other, other_dir) = kept_fixture("kept-own-b", 1);
+    // Four pages just under a quarter of the budget each fill this core's budget.
+    let big = (1 << 20) - 200;
+    let files: Vec<String> = (0..4).map(|n| format!("{PAGES}/AP1/big{n}.json")).collect();
+    for file in &files {
+        fs::write(core.at(file), serde_json::to_vec(&"x".repeat(big)).unwrap()).unwrap();
+        assert!(core.read_kept::<String>(file).is_some());
+    }
+    // Another core's reads don't spend this one's budget, and its clears don't reach here.
+    assert!(first_course(&other).is_some());
+    other.forget(&[]);
+    for file in &files {
+        assert_eq!(core.shared.decoded.kept(&core.at(file)), 1, "{file}");
+    }
+    let _ = fs::remove_dir_all(&dir);
+    let _ = fs::remove_dir_all(&other_dir);
 }
 
 /// `cargo test --release -p vtop-ffi cached_page_bench -- --ignored --nocapture`

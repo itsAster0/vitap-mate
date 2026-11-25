@@ -24,7 +24,7 @@ use vtop_core::sync::RwLock;
 
 use crate::pages::records;
 use crate::remote::edge;
-use crate::store::{self, decoded};
+use crate::store;
 use crate::{
     ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS, SESSION,
     Session, Shared, TIMETABLE, traced, traced_sync,
@@ -177,7 +177,9 @@ impl Core {
                         info!("no semester picked: nothing to clear");
                         return Ok(());
                     };
-                    remove_dir(&self.at(PAGES).join(semester));
+                    let folder = self.at(PAGES).join(semester);
+                    remove_dir(&folder);
+                    self.shared.decoded.forget(&folder);
                 }
             }
             info!(?scope, "cache cleared");
@@ -405,7 +407,6 @@ fn remove_dir(path: &Path) {
     {
         warn!(%error, "not removed");
     }
-    decoded::forget(path);
 }
 
 #[cfg(test)]

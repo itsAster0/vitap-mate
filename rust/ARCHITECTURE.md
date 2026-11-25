@@ -86,8 +86,8 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   copy is used only while the file's length, modified time and inode are
   what they were when it was read; a write drops it, and sign-out,
   another student, Developer's clears and a forgotten pick drop what they
-  remove. At most 4 MB of JSON is kept, the least recently used going
-  first.
+  remove. At most 4 MB of JSON is kept per core (on `Shared`, so a core's
+  budget and clears are its own), the least recently used going first.
 - **Route policy** (`remote/route/plan.rs`). Which route to try, the 5-minute
   skips and the steps of a server fetch (consent, the fetch, one sign-in
   again) are pure: no I/O and no clock, the caller passes `now`.
@@ -112,9 +112,9 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   student signs in again). Kotlin hears where the account stands (`AccountStatus`:
   signed out, demo, signed in, password rejected by the phone or the server) from
   `Core::watch_account` (`AccountWatch.kt`) and keeps no copy of its own. Kotlin gets the plain text only from `saved_password`, for the
-  Account page. Decoded copies and the
-  log pipeline stay process-wide: `obs_init` runs before the core, so Kotlin's
-  start-up lines (Gmail) reach the log file.
+  Account page. The log pipeline stays
+  process-wide: `obs_init` runs before the core, so Kotlin's start-up lines
+  (Gmail) reach the log file.
 
 ## VTOP from the phone
 
