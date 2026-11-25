@@ -57,12 +57,14 @@ import com.composables.icons.lucide.Zap
 import kotlinx.coroutines.launch
 import vitapmate.core.AccessKey
 import vitapmate.core.Core
+import vitapmate.core.ServerAccount
 import vitapmate.core.ServerOptions
 import vitapmate.core.LiveTopic
 import vitapmate.core.ServerSession
 import vitapmate.core.ServerStatus
 import vitapmate.core.ServerVault
 import vitapmate.core.SessionSource
+import vitapmate.core.SignInOutcome
 import vitapmate.data.Gmail
 import vitapmate.data.Problem
 import vitapmate.data.ServerFailure
@@ -293,12 +295,13 @@ fun ServerScreen() {
                     if (s.linked && s.signIns.isNotEmpty()) item {
                         ListGroup("Last sign-ins") {
                             s.signIns.forEachIndexed { i, signIn ->
+                                val failed = signIn.outcome as? SignInOutcome.Failed
                                 TimelineItem(
-                                    "${if (signIn.ok) "Signed in" else "Failed"} on ${if (signIn.byServer) "the server" else "a phone"}",
+                                    "${if (failed == null) "Signed in" else "Failed"} on ${if (signIn.byServer) "the server" else "a phone"}",
                                     "server.sign_in.$i",
                                     ago(signIn.at),
-                                    signIn.reason,
-                                    failed = !signIn.ok,
+                                    failed?.reason,
+                                    failed = failed != null,
                                 )
                             }
                             val off = "clear_sign_ins" in unsupported
@@ -484,3 +487,12 @@ private fun keyText(key: AccessKey) =
 
 /** The Server page's calls, as flows `server.<name>`. */
 private val run = ServerCalls("server", "Server")
+
+// What this phone sees of the account ([ServerAccount]), as the screen reads it.
+private val ServerStatus.linkedAccount get() = account as? ServerAccount.Linked
+private val ServerStatus.linked get() = linkedAccount != null
+private val ServerStatus.session get() = linkedAccount?.session ?: ServerSession.None
+private val ServerStatus.vault get() = linkedAccount?.vault ?: ServerVault.None
+private val ServerStatus.signIns get() = linkedAccount?.signIns.orEmpty()
+private val ServerStatus.phones get() = linkedAccount?.phones.orEmpty()
+private val ServerStatus.keys get() = linkedAccount?.keys.orEmpty()

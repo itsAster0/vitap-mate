@@ -75,17 +75,19 @@ fn keys_read_from_the_account_view() {
 
 #[test]
 fn other_phones_with_keys_are_listed() {
-    let view = json!({
+    let key = |phone: &str| json!({ "id": "k", "label": "MCP", "createdAt": 1, "lastUsedAt": null, "phoneId": phone });
+    let view: AppsView = serde_json::from_value(json!({
+        "thisPhone": true,
         "phones": [
             { "id": "me", "label": "Pixel", "seenAt": 9, "thisPhone": true },
             { "id": "old", "label": "Pixel", "seenAt": 5, "thisPhone": false },
             { "id": "idle", "label": "Tab", "seenAt": 4, "thisPhone": false },
         ],
-        "keys": [
-            { "phoneId": "me" }, { "phoneId": "old" }, { "phoneId": "old" }, { "phoneId": "gone" },
-        ],
-    });
-    let found = elsewhere(&view);
+        "keys": [key("me"), key("old"), key("old"), key("gone")],
+    }))
+    .unwrap();
+    assert!(view.this_phone);
+    let found = elsewhere(&view.phones, &view.keys);
     assert_eq!(found.len(), 2);
     assert_eq!(
         found,

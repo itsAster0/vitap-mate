@@ -80,7 +80,17 @@ async fn status_reads_everything_the_server_keeps() {
     let core = signed_in(&core.dir, server.clone());
     keep_token(&core, &server);
     let status = core.status_with("f-s", "Load").await.unwrap();
-    assert!(status.linked && status.forwarding);
+    assert!(status.forwarding);
+    let ServerAccount::Linked {
+        session,
+        vault,
+        sign_ins,
+        phones,
+        keys,
+    } = &status.account
+    else {
+        panic!("not linked: {:?}", status.account);
+    };
     assert_eq!(
         (
             status.registration_number.as_str(),
@@ -98,33 +108,30 @@ async fn status_reads_everything_the_server_keeps() {
         }
     );
     assert_eq!(
-        status.session,
+        *session,
         ServerSession::Saved {
             at: 9,
             by: SessionSource::Phone
         }
     );
     assert_eq!(
-        (status.vault, status.credentials_rejected_at),
-        (ServerVault::None, Some(3))
+        (vault, status.credentials_rejected_at),
+        (&ServerVault::None, Some(3))
     );
     assert_eq!(
-        status.sign_ins,
+        *sign_ins,
         [ServerSignIn {
             at: 8,
             by_server: true,
-            ok: false,
-            reason: Some("VTOP down".into())
+            outcome: SignInOutcome::Failed {
+                reason: Some("VTOP down".into())
+            },
         }]
     );
-    assert_eq!(status.phones.len(), 2);
-    assert!(status.phones[0].this_phone && !status.phones[1].this_phone);
+    assert_eq!(phones.len(), 2);
+    assert!(phones[0].this_phone && !phones[1].this_phone);
     assert_eq!(
-        (
-            status.keys.len(),
-            status.keys[0].id.as_str(),
-            status.keys[0].created_at
-        ),
+        (keys.len(), keys[0].id.as_str(), keys[0].created_at),
         (1, "ab12cd34", 6)
     );
     assert_eq!(
@@ -167,7 +174,7 @@ async fn an_older_server_and_an_unlinked_phone_still_show_what_applies() {
     let core = signed_in(&core.dir, server.clone());
     keep_token(&core, &server);
     let status = core.status_with("f", "Load").await.unwrap();
-    assert!(!status.linked && status.mailbox.is_none());
+    assert!(status.account == ServerAccount::Unlinked && status.mailbox.is_none());
     assert_eq!(
         (status.created_at, status.options.clone()),
         (None, ServerOptions::default())

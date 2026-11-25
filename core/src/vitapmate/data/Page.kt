@@ -159,7 +159,7 @@ class PageHandle<T> internal constructor(
             val fresh = Activity.track("Refreshing ${id.replace('_', ' ')}", flow) {
                 withContext(Dispatchers.IO) {
                     val core = AppCore.await()
-                    fetch(core, flow).also { udp = core.routeStatus(flow).lastUsed == Route.UDP }
+                    fetch(core, flow).also { udp = core.routeStatus(flow).lastUse?.route == Route.UDP }
                 }
             }
             val ms = (System.nanoTime() - start) / 1_000_000

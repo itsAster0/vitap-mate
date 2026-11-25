@@ -16538,6 +16538,50 @@ public object FfiConverterTypeKeyUse: FfiConverterRustBuffer<KeyUse> {
 
 
 
+/**
+ * The route VTOP's last answer came by, and when.
+ */
+data class LastRouteUse (
+    val `route`: Route
+    , 
+    /**
+     * Unix seconds.
+     */
+    val `at`: kotlin.Long
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLastRouteUse: FfiConverterRustBuffer<LastRouteUse> {
+    override fun read(buf: ByteBuffer): LastRouteUse {
+        return LastRouteUse(
+            FfiConverterTypeRoute.read(buf),
+            FfiConverterLong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LastRouteUse) = (
+            FfiConverterTypeRoute.allocationSize(value.`route`) +
+            FfiConverterLong.allocationSize(value.`at`)
+    )
+
+    override fun write(value: LastRouteUse, buf: ByteBuffer) {
+            FfiConverterTypeRoute.write(value.`route`, buf)
+            FfiConverterLong.write(value.`at`, buf)
+    }
+}
+
+
+
 data class Lecture (
     val `serial`: kotlin.String
     , 
@@ -18143,11 +18187,9 @@ data class RouteStatus (
     val `chosen`: Route
     , 
     /**
-     * The route VTOP's last answer came by, and when (unix seconds).
+     * None before VTOP answered by any route.
      */
-    val `lastUsed`: Route?
-    , 
-    val `lastUsedAt`: kotlin.Long?
+    val `lastUse`: LastRouteUse?
     , 
     val `skipped`: List<SkippedRoute>
     
@@ -18167,23 +18209,20 @@ public object FfiConverterTypeRouteStatus: FfiConverterRustBuffer<RouteStatus> {
     override fun read(buf: ByteBuffer): RouteStatus {
         return RouteStatus(
             FfiConverterTypeRoute.read(buf),
-            FfiConverterOptionalTypeRoute.read(buf),
-            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalTypeLastRouteUse.read(buf),
             FfiConverterSequenceTypeSkippedRoute.read(buf),
         )
     }
 
     override fun allocationSize(value: RouteStatus) = (
             FfiConverterTypeRoute.allocationSize(value.`chosen`) +
-            FfiConverterOptionalTypeRoute.allocationSize(value.`lastUsed`) +
-            FfiConverterOptionalLong.allocationSize(value.`lastUsedAt`) +
+            FfiConverterOptionalTypeLastRouteUse.allocationSize(value.`lastUse`) +
             FfiConverterSequenceTypeSkippedRoute.allocationSize(value.`skipped`)
     )
 
     override fun write(value: RouteStatus, buf: ByteBuffer) {
             FfiConverterTypeRoute.write(value.`chosen`, buf)
-            FfiConverterOptionalTypeRoute.write(value.`lastUsed`, buf)
-            FfiConverterOptionalLong.write(value.`lastUsedAt`, buf)
+            FfiConverterOptionalTypeLastRouteUse.write(value.`lastUse`, buf)
             FfiConverterSequenceTypeSkippedRoute.write(value.`skipped`, buf)
     }
 }
@@ -18684,9 +18723,7 @@ data class ServerSignIn (
      */
     val `byServer`: kotlin.Boolean
     , 
-    val `ok`: kotlin.Boolean
-    , 
-    val `reason`: kotlin.String?
+    val `outcome`: SignInOutcome
     
 ){
     
@@ -18705,33 +18742,27 @@ public object FfiConverterTypeServerSignIn: FfiConverterRustBuffer<ServerSignIn>
         return ServerSignIn(
             FfiConverterLong.read(buf),
             FfiConverterBoolean.read(buf),
-            FfiConverterBoolean.read(buf),
-            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeSignInOutcome.read(buf),
         )
     }
 
     override fun allocationSize(value: ServerSignIn) = (
             FfiConverterLong.allocationSize(value.`at`) +
             FfiConverterBoolean.allocationSize(value.`byServer`) +
-            FfiConverterBoolean.allocationSize(value.`ok`) +
-            FfiConverterOptionalString.allocationSize(value.`reason`)
+            FfiConverterTypeSignInOutcome.allocationSize(value.`outcome`)
     )
 
     override fun write(value: ServerSignIn, buf: ByteBuffer) {
             FfiConverterLong.write(value.`at`, buf)
             FfiConverterBoolean.write(value.`byServer`, buf)
-            FfiConverterBoolean.write(value.`ok`, buf)
-            FfiConverterOptionalString.write(value.`reason`, buf)
+            FfiConverterTypeSignInOutcome.write(value.`outcome`, buf)
     }
 }
 
 
 
 data class ServerStatus (
-    /**
-     * This phone is one of the account's phones; the account's lists are empty when it is not.
-     */
-    val `linked`: kotlin.Boolean
+    val `account`: ServerAccount
     , 
     val `registrationNumber`: kotlin.String
     , 
@@ -18759,20 +18790,7 @@ data class ServerStatus (
     , 
     val `device`: ServerDevice
     , 
-    val `session`: ServerSession
-    , 
-    val `vault`: ServerVault
-    , 
     val `credentialsRejectedAt`: kotlin.Long?
-    , 
-    /**
-     * Newest first, at most 10.
-     */
-    val `signIns`: List<ServerSignIn>
-    , 
-    val `phones`: List<LinkedPhone>
-    , 
-    val `keys`: List<AccessKey>
     
 ){
     
@@ -18789,7 +18807,7 @@ data class ServerStatus (
 public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus> {
     override fun read(buf: ByteBuffer): ServerStatus {
         return ServerStatus(
-            FfiConverterBoolean.read(buf),
+            FfiConverterTypeServerAccount.read(buf),
             FfiConverterString.read(buf),
             FfiConverterOptionalLong.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -18797,17 +18815,12 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalTypeServerMailbox.read(buf),
             FfiConverterTypeServerDevice.read(buf),
-            FfiConverterTypeServerSession.read(buf),
-            FfiConverterTypeServerVault.read(buf),
             FfiConverterOptionalLong.read(buf),
-            FfiConverterSequenceTypeServerSignIn.read(buf),
-            FfiConverterSequenceTypeLinkedPhone.read(buf),
-            FfiConverterSequenceTypeAccessKey.read(buf),
         )
     }
 
     override fun allocationSize(value: ServerStatus) = (
-            FfiConverterBoolean.allocationSize(value.`linked`) +
+            FfiConverterTypeServerAccount.allocationSize(value.`account`) +
             FfiConverterString.allocationSize(value.`registrationNumber`) +
             FfiConverterOptionalLong.allocationSize(value.`createdAt`) +
             FfiConverterOptionalString.allocationSize(value.`semesterId`) +
@@ -18815,16 +18828,11 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
             FfiConverterBoolean.allocationSize(value.`forwarding`) +
             FfiConverterOptionalTypeServerMailbox.allocationSize(value.`mailbox`) +
             FfiConverterTypeServerDevice.allocationSize(value.`device`) +
-            FfiConverterTypeServerSession.allocationSize(value.`session`) +
-            FfiConverterTypeServerVault.allocationSize(value.`vault`) +
-            FfiConverterOptionalLong.allocationSize(value.`credentialsRejectedAt`) +
-            FfiConverterSequenceTypeServerSignIn.allocationSize(value.`signIns`) +
-            FfiConverterSequenceTypeLinkedPhone.allocationSize(value.`phones`) +
-            FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`)
+            FfiConverterOptionalLong.allocationSize(value.`credentialsRejectedAt`)
     )
 
     override fun write(value: ServerStatus, buf: ByteBuffer) {
-            FfiConverterBoolean.write(value.`linked`, buf)
+            FfiConverterTypeServerAccount.write(value.`account`, buf)
             FfiConverterString.write(value.`registrationNumber`, buf)
             FfiConverterOptionalLong.write(value.`createdAt`, buf)
             FfiConverterOptionalString.write(value.`semesterId`, buf)
@@ -18832,12 +18840,7 @@ public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus>
             FfiConverterBoolean.write(value.`forwarding`, buf)
             FfiConverterOptionalTypeServerMailbox.write(value.`mailbox`, buf)
             FfiConverterTypeServerDevice.write(value.`device`, buf)
-            FfiConverterTypeServerSession.write(value.`session`, buf)
-            FfiConverterTypeServerVault.write(value.`vault`, buf)
             FfiConverterOptionalLong.write(value.`credentialsRejectedAt`, buf)
-            FfiConverterSequenceTypeServerSignIn.write(value.`signIns`, buf)
-            FfiConverterSequenceTypeLinkedPhone.write(value.`phones`, buf)
-            FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
     }
 }
 
@@ -23707,6 +23710,104 @@ public object FfiConverterTypeSealing : FfiConverterRustBuffer<Sealing>{
 
 
 /**
+ * What the server shows of the account to one of its phones.
+ */
+sealed class ServerAccount {
+    
+    /**
+     * This phone isn't one of the account's phones: the server shows it nothing it keeps.
+     */
+    object Unlinked : ServerAccount()
+    
+    
+    data class Linked(
+        val `session`: vitapmate.core.ServerSession, 
+        val `vault`: vitapmate.core.ServerVault, 
+        /**
+         * Newest first, at most 10.
+         */
+        val `signIns`: List<vitapmate.core.ServerSignIn>, 
+        val `phones`: List<vitapmate.core.LinkedPhone>, 
+        val `keys`: List<vitapmate.core.AccessKey>) : ServerAccount()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerAccount : FfiConverterRustBuffer<ServerAccount>{
+    override fun read(buf: ByteBuffer): ServerAccount {
+        return when(buf.getInt()) {
+            1 -> ServerAccount.Unlinked
+            2 -> ServerAccount.Linked(
+                FfiConverterTypeServerSession.read(buf),
+                FfiConverterTypeServerVault.read(buf),
+                FfiConverterSequenceTypeServerSignIn.read(buf),
+                FfiConverterSequenceTypeLinkedPhone.read(buf),
+                FfiConverterSequenceTypeAccessKey.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ServerAccount): ULong = when(value) {
+        is ServerAccount.Unlinked -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is ServerAccount.Linked -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeServerSession.allocationSize(value.`session`)
+                + FfiConverterTypeServerVault.allocationSize(value.`vault`)
+                + FfiConverterSequenceTypeServerSignIn.allocationSize(value.`signIns`)
+                + FfiConverterSequenceTypeLinkedPhone.allocationSize(value.`phones`)
+                + FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`)
+            )
+        }
+    }
+
+    override fun write(value: ServerAccount, buf: ByteBuffer) {
+        when(value) {
+            is ServerAccount.Unlinked -> {
+                buf.putInt(1)
+                Unit
+            }
+            is ServerAccount.Linked -> {
+                buf.putInt(2)
+                FfiConverterTypeServerSession.write(value.`session`, buf)
+                FfiConverterTypeServerVault.write(value.`vault`, buf)
+                FfiConverterSequenceTypeServerSignIn.write(value.`signIns`, buf)
+                FfiConverterSequenceTypeLinkedPhone.write(value.`phones`, buf)
+                FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
  * The sealed VTOP session the server keeps for connected apps.
  */
 sealed class ServerSession {
@@ -23973,6 +24074,85 @@ public object FfiConverterTypeSignIn : FfiConverterRustBuffer<SignIn>{
             is SignIn.NeedsOtp -> {
                 buf.putInt(2)
                 FfiConverterString.write(value.`message`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * How a [`ServerSignIn`] went.
+ */
+sealed class SignInOutcome {
+    
+    object SignedIn : SignInOutcome()
+    
+    
+    /**
+     * With VTOP's reason when the server kept one.
+     */
+    data class Failed(
+        val `reason`: kotlin.String?) : SignInOutcome()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSignInOutcome : FfiConverterRustBuffer<SignInOutcome>{
+    override fun read(buf: ByteBuffer): SignInOutcome {
+        return when(buf.getInt()) {
+            1 -> SignInOutcome.SignedIn
+            2 -> SignInOutcome.Failed(
+                FfiConverterOptionalString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: SignInOutcome): ULong = when(value) {
+        is SignInOutcome.SignedIn -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is SignInOutcome.Failed -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterOptionalString.allocationSize(value.`reason`)
+            )
+        }
+    }
+
+    override fun write(value: SignInOutcome, buf: ByteBuffer) {
+        when(value) {
+            is SignInOutcome.SignedIn -> {
+                buf.putInt(1)
+                Unit
+            }
+            is SignInOutcome.Failed -> {
+                buf.putInt(2)
+                FfiConverterOptionalString.write(value.`reason`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -24978,6 +25158,38 @@ public object FfiConverterOptionalTypeHostel: FfiConverterRustBuffer<Hostel?> {
         } else {
             buf.put(1)
             FfiConverterTypeHostel.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeLastRouteUse: FfiConverterRustBuffer<LastRouteUse?> {
+    override fun read(buf: ByteBuffer): LastRouteUse? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeLastRouteUse.read(buf)
+    }
+
+    override fun allocationSize(value: LastRouteUse?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeLastRouteUse.allocationSize(value)
+        }
+    }
+
+    override fun write(value: LastRouteUse?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeLastRouteUse.write(value, buf)
         }
     }
 }
@@ -26226,38 +26438,6 @@ public object FfiConverterOptionalTypeProofFrame: FfiConverterRustBuffer<ProofFr
         } else {
             buf.put(1)
             FfiConverterTypeProofFrame.write(value, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterOptionalTypeRoute: FfiConverterRustBuffer<Route?> {
-    override fun read(buf: ByteBuffer): Route? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterTypeRoute.read(buf)
-    }
-
-    override fun allocationSize(value: Route?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterTypeRoute.allocationSize(value)
-        }
-    }
-
-    override fun write(value: Route?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterTypeRoute.write(value, buf)
         }
     }
 }

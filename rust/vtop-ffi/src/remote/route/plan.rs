@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use super::{Route, RouteStatus, SkippedRoute};
+use super::{LastRouteUse, Route, RouteStatus, SkippedRoute};
 
 /// How long a failed route is skipped before it is tried again.
 pub(super) const SKIP_S: i64 = 5 * 60;
@@ -92,8 +92,7 @@ impl RoutePlan {
         skipped.sort_by_key(|skip| skip.until);
         RouteStatus {
             chosen: self.chosen,
-            last_used: self.last.map(|(route, _)| route),
-            last_used_at: self.last.map(|(_, at)| at),
+            last_use: self.last.map(|(route, at)| LastRouteUse { route, at }),
             skipped,
         }
     }
@@ -274,8 +273,11 @@ mod tests {
         let status = plan.status(NOW + 30);
         assert_eq!(status.chosen, Route::Udp);
         assert_eq!(
-            (status.last_used, status.last_used_at),
-            (Some(Route::Direct), Some(NOW + 20))
+            status.last_use,
+            Some(LastRouteUse {
+                route: Route::Direct,
+                at: NOW + 20
+            })
         );
         let skips: Vec<_> = status
             .skipped
@@ -300,7 +302,10 @@ mod tests {
         plan.on_result(Route::Server, failed("x"), NOW);
         plan.choose(Route::Server);
         assert!(plan.active(Route::Server, NOW));
-        assert_eq!(plan.status(NOW).last_used, Some(Route::Server));
+        assert_eq!(
+            plan.status(NOW).last_use.map(|last| last.route),
+            Some(Route::Server)
+        );
         plan.forget();
         assert_eq!(plan, RoutePlan::new());
     }

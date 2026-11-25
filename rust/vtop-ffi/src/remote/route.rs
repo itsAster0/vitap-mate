@@ -69,10 +69,17 @@ pub struct SkippedRoute {
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct RouteStatus {
     pub chosen: Route,
-    /// The route VTOP's last answer came by, and when (unix seconds).
-    pub last_used: Option<Route>,
-    pub last_used_at: Option<i64>,
+    /// None before VTOP answered by any route.
+    pub last_use: Option<LastRouteUse>,
     pub skipped: Vec<SkippedRoute>,
+}
+
+/// The route VTOP's last answer came by, and when.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct LastRouteUse {
+    pub route: Route,
+    /// Unix seconds.
+    pub at: i64,
 }
 
 /// [`FILE`] on disk: `{"route":"server"}`.

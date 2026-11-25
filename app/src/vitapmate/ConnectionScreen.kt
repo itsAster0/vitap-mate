@@ -210,19 +210,18 @@ private fun RouteHero(status: RouteStatus) {
             PathLink(second)
             PathNode(Lucide.School, "VTOP", CircleShape)
         }
-        val used = status.lastUsed
-        val at = status.lastUsedAt
+        val last = status.lastUse
         // "2 min ago" moves on by itself.
         val now by rememberNow()
-        val ago = remember(now, at) { at?.let(::ago) }
+        val ago = remember(now, last) { last?.let { ago(it.at) } }
         Row(
             Modifier.fillMaxWidth().background(AppTheme.colors.card, MaterialTheme.shapes.large).padding(horizontal = 12.dp, vertical = 10.dp).testTag("connection.last_used"),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Dot(size = 8.dp, color = if (used != null && at != null) tones.success.base else scheme.outlineVariant)
+            Dot(size = 8.dp, color = if (last != null) tones.success.base else scheme.outlineVariant)
             Text(
-                if (used != null && ago != null) "Last refresh: ${used.title()}, $ago" else "Nothing fetched since the app opened",
+                if (last != null && ago != null) "Last refresh: ${last.route.title()}, $ago" else "Nothing fetched since the app opened",
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurface,
             )

@@ -25,8 +25,17 @@ pub struct ServerSignIn {
     pub at: i64,
     /// The server signed in with the saved password, else a phone did.
     pub by_server: bool,
-    pub ok: bool,
-    pub reason: Option<String>,
+    pub outcome: SignInOutcome,
+}
+
+/// How a [`ServerSignIn`] went.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum SignInOutcome {
+    SignedIn,
+    /// With VTOP's reason when the server kept one.
+    Failed {
+        reason: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -115,10 +124,24 @@ pub enum ServerVault {
     },
 }
 
+/// What the server shows of the account to one of its phones.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ServerAccount {
+    /// This phone isn't one of the account's phones: the server shows it nothing it keeps.
+    Unlinked,
+    Linked {
+        session: ServerSession,
+        vault: ServerVault,
+        /// Newest first, at most 10.
+        sign_ins: Vec<ServerSignIn>,
+        phones: Vec<LinkedPhone>,
+        keys: Vec<AccessKey>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ServerStatus {
-    /// This phone is one of the account's phones; the account's lists are empty when it is not.
-    pub linked: bool,
+    pub account: ServerAccount,
     pub registration_number: String,
     /// When the server made the account (None from servers that don't say, or no account yet).
     pub created_at: Option<i64>,
@@ -130,13 +153,7 @@ pub struct ServerStatus {
     /// This phone's forwarding address and the phones on it.
     pub mailbox: Option<ServerMailbox>,
     pub device: ServerDevice,
-    pub session: ServerSession,
-    pub vault: ServerVault,
     pub credentials_rejected_at: Option<i64>,
-    /// Newest first, at most 10.
-    pub sign_ins: Vec<ServerSignIn>,
-    pub phones: Vec<LinkedPhone>,
-    pub keys: Vec<AccessKey>,
 }
 
 #[derive(Deserialize)]
@@ -214,6 +231,22 @@ struct SignInView {
     reason: Option<String>,
 }
 
+impl From<SignInView> for ServerSignIn {
+    fn from(view: SignInView) -> Self {
+        Self {
+            at: view.at,
+            by_server: view.by == "server",
+            outcome: if view.ok {
+                SignInOutcome::SignedIn
+            } else {
+                SignInOutcome::Failed {
+                    reason: view.reason,
+                }
+            },
+        }
+    }
+}
+
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct DeviceView {
@@ -232,7 +265,7 @@ struct MailPhoneView {
     this_device: bool,
 }
 
-fn unexpected(_: serde_json::Error) -> CoreError {
+pub(crate) fn unexpected(_: serde_json::Error) -> CoreError {
     CoreError::Other {
         reason: "The server sent an unexpected answer.".into(),
     }
@@ -598,8 +631,33 @@ impl Core {
             mailbox = mailbox.is_some(),
             "server status"
         );
+        let linked = if account.this_phone {
+            ServerAccount::Linked {
+                session: status.session(),
+                vault: status.vault(),
+                sign_ins: status
+                    .sign_ins
+                    .into_iter()
+                    .map(ServerSignIn::from)
+                    .collect(),
+                phones: account
+                    .phones
+                    .into_iter()
+                    .map(|p| LinkedPhone {
+                        id: p.id,
+                        label: p.label,
+                        added_at: p.added_at,
+                        seen_at: p.seen_at,
+                        this_phone: p.this_phone,
+                    })
+                    .collect(),
+                keys: account.keys.into_iter().map(AccessKey::from).collect(),
+            }
+        } else {
+            ServerAccount::Unlinked
+        };
         Ok(ServerStatus {
-            linked: account.this_phone,
+            account: linked,
             registration_number: account.registration_number,
             created_at: account.created_at,
             semester_id: account.semester_id,
@@ -615,31 +673,7 @@ impl Core {
                 push_token: device.push_token,
                 registered_at: device.created_at,
             },
-            session: status.session(),
-            vault: status.vault(),
             credentials_rejected_at: account.credentials_rejected_at,
-            sign_ins: status
-                .sign_ins
-                .into_iter()
-                .map(|s| ServerSignIn {
-                    at: s.at,
-                    by_server: s.by == "server",
-                    ok: s.ok,
-                    reason: s.reason,
-                })
-                .collect(),
-            phones: account
-                .phones
-                .into_iter()
-                .map(|p| LinkedPhone {
-                    id: p.id,
-                    label: p.label,
-                    added_at: p.added_at,
-                    seen_at: p.seen_at,
-                    this_phone: p.this_phone,
-                })
-                .collect(),
-            keys: account.keys.into_iter().map(AccessKey::from).collect(),
         })
     }
 

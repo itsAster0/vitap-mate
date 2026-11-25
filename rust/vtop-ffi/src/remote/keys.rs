@@ -11,6 +11,7 @@ use tracing::info;
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
 use crate::remote::consent::CookieKind;
+use crate::remote::server::unexpected;
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, dev, traced};
 
@@ -90,32 +91,51 @@ pub struct ConnectedApps {
     pub elsewhere: Vec<KeyPhone>,
 }
 
+/// The account view (`account:view`) as Connected apps reads it.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppsView {
+    #[serde(default)]
+    this_phone: bool,
+    #[serde(default)]
+    phones: Vec<KeyPhoneView>,
+    #[serde(default)]
+    keys: Vec<KeyView>,
+}
+
+/// One of the account's phones in [`AppsView`].
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KeyPhoneView {
+    id: String,
+    label: Option<String>,
+    seen_at: i64,
+    #[serde(default)]
+    this_phone: bool,
+}
+
 /// The other phones that answer for keys, from the account view's `phones` and `keys`.
-fn elsewhere(view: &Value) -> Vec<KeyPhone> {
-    let list = |key: &str| view[key].as_array().cloned().unwrap_or_default();
-    let phones = list("phones");
+fn elsewhere(phones: &[KeyPhoneView], keys: &[KeyView]) -> Vec<KeyPhone> {
     let count = |phone: Option<&str>| {
-        list("keys")
-            .iter()
+        keys.iter()
             .filter(|key| match phone {
-                Some(id) => key["phoneId"] == id,
-                None => !phones.iter().any(|p| p["id"] == key["phoneId"]),
+                Some(id) => key.phone_id.as_deref() == Some(id),
+                None => !phones
+                    .iter()
+                    .any(|p| key.phone_id.as_deref() == Some(p.id.as_str())),
             })
             .count() as u32
     };
     let mut found: Vec<KeyPhone> = phones
         .iter()
-        .filter(|phone| phone["thisPhone"] != true)
-        .filter_map(|phone| {
-            let id = phone["id"].as_str()?;
-            Some(KeyPhone {
-                owner: KeyOwner::Phone {
-                    id: id.into(),
-                    label: phone["label"].as_str().map(str::to_string),
-                    seen_at: phone["seenAt"].as_i64()?,
-                },
-                keys: count(Some(id)),
-            })
+        .filter(|phone| !phone.this_phone)
+        .map(|phone| KeyPhone {
+            owner: KeyOwner::Phone {
+                id: phone.id.clone(),
+                label: phone.label.clone(),
+                seen_at: phone.seen_at,
+            },
+            keys: count(Some(&phone.id)),
         })
         .collect();
     found.push(KeyPhone {
@@ -152,6 +172,9 @@ pub(crate) struct KeyView {
     label: String,
     created_at: i64,
     last_used_at: Option<i64>,
+    /// The phone that answers for it.
+    #[serde(default)]
+    phone_id: Option<String>,
     #[serde(default)]
     outings: bool,
     #[serde(default)]
@@ -255,18 +278,14 @@ impl Core {
                 .account_call(&flow, Kind::Query, "account:view", action, true, json!({}))
                 .await?
                 .map_err(refused)?;
-            let keys: Vec<AccessKey> = serde_json::from_value::<Vec<KeyView>>(
-                view.get("keys").cloned().unwrap_or_default(),
-            )
-            .unwrap_or_default()
-            .into_iter()
-            .map(AccessKey::from)
-            .collect();
-            let linked = view
-                .get("thisPhone")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let elsewhere = if linked { elsewhere(&view) } else { vec![] };
+            let view: AppsView = serde_json::from_value(view).map_err(unexpected)?;
+            let linked = view.this_phone;
+            let elsewhere = if linked {
+                elsewhere(&view.phones, &view.keys)
+            } else {
+                vec![]
+            };
+            let keys: Vec<AccessKey> = view.keys.into_iter().map(AccessKey::from).collect();
             info!(
                 linked,
                 keys = keys.len(),
