@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, MutexGuard, PoisonError};
 
 use futures::channel::oneshot;
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::remote::regno::RegnoAnswer;
-use crate::{Core, CoreError, Shared, traced_sync, unix_now};
+use crate::{Core, CoreError, Shared, store, traced_sync, unix_now};
 
 pub(crate) const FILE: &str = "consent.json";
 /// How long an answer covers the rest of its flow (one screen's pages, `sync.all`).
@@ -185,11 +185,18 @@ pub(crate) fn forget(shared: &Shared) {
     state.answered.clear();
 }
 
-fn save_to_disk(path: &Path, remembered: BTreeSet<CookieKind>) {
-    let stored = Stored { remembered };
+/// Writes the remembered kinds with `state` held, so two saves land in the order they were
+/// made, through a temporary file, so a crash leaves the old ticks or the new ones.
+fn save(state: &State) {
+    let Some(path) = &state.path else {
+        return;
+    };
+    let stored = Stored {
+        remembered: state.remembered.clone(),
+    };
     let result = serde_json::to_vec(&stored)
         .map_err(std::io::Error::other)
-        .and_then(|bytes| fs::write(path, bytes));
+        .and_then(|bytes| store::write_atomic(path, &bytes));
     if let Err(error) = result {
         warn!(%error, "consent not saved");
     }
@@ -310,19 +317,13 @@ async fn decide(
             )
             .await;
         let send = matches!(answer, Ok(CookieAnswer::Allow { .. }));
-        let (decision, to_save, waiters) = {
+        let (decision, waiters) = {
             let mut state = shared.consent();
             state.answered.insert(key.clone(), (unix_now(), send));
-            let to_save = match &answer {
-                Ok(CookieAnswer::Allow { remember: true }) => {
-                    state.remembered.insert(kind);
-                    state
-                        .path
-                        .clone()
-                        .map(|path| (path, state.remembered.clone()))
-                }
-                _ => None,
-            };
+            if let Ok(CookieAnswer::Allow { remember: true }) = &answer {
+                state.remembered.insert(kind);
+                save(&state);
+            }
             let waiters = state.in_flight.remove(&key).unwrap_or_default();
             guard.key = None;
             let decision = match answer {
@@ -330,7 +331,7 @@ async fn decide(
                 Ok(CookieAnswer::Deny) => Denied(DeniedWhy::Asked),
                 Err(_) => Denied(DeniedWhy::Error),
             };
-            (decision, to_save, waiters)
+            (decision, waiters)
         };
         let waiter_decision = if send {
             Sent(SentWhy::Flow)
@@ -343,9 +344,6 @@ async fn decide(
                 reason = "waiter dropped its future before we replied"
             )]
             let _ = tx.send(waiter_decision);
-        }
-        if let Some((path, remembered)) = to_save {
-            save_to_disk(&path, remembered);
         }
         return decision;
     }
@@ -373,16 +371,10 @@ impl Core {
     /// dialog would (choosing Server fetch already says the cookie goes to the server).
     pub fn remember_cookie_consent(&self, flow: String, kind: CookieKind) -> Result<(), CoreError> {
         traced_sync("remember_cookie_consent", &flow, || {
-            let to_save = {
+            {
                 let mut state = self.shared.consent();
                 state.remembered.insert(kind);
-                state
-                    .path
-                    .clone()
-                    .map(|path| (path, state.remembered.clone()))
-            };
-            if let Some((path, remembered)) = to_save {
-                save_to_disk(&path, remembered);
+                save(&state);
             }
             info!(?kind, "cookie consent remembered");
             Ok(())

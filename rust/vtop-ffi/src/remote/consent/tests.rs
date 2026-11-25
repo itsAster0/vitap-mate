@@ -344,6 +344,27 @@ fn a_yes_given_by_choosing_server_fetch_is_kept() {
     assert!(core.at(FILE).exists());
 }
 
+#[test]
+fn ticks_replace_the_file_instead_of_rewriting_it_in_place() {
+    let core = core("atomic");
+    core.remember_cookie_consent("f".into(), CookieKind::Route)
+        .unwrap();
+    // A second name for the old file: written in place, it would change too (and a crash
+    // halfway would leave half a file).
+    let old = core.at("consent.old.json");
+    fs::hard_link(core.at(FILE), &old).unwrap();
+    let before = fs::read_to_string(&old).unwrap();
+    core.remember_cookie_consent("f".into(), CookieKind::Account)
+        .unwrap();
+    assert_eq!(fs::read_to_string(&old).unwrap(), before);
+    let saved = fs::read_to_string(core.at(FILE)).unwrap();
+    assert!(
+        saved.contains("route") && saved.contains("account"),
+        "{saved}"
+    );
+    let _ = fs::remove_dir_all(&core.dir);
+}
+
 #[tokio::test]
 async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
     struct GatedGate {
