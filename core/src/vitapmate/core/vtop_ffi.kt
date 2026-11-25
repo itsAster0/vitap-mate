@@ -1502,7 +1502,7 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_mark_changes_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_mark_page_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,`page`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_method_core_mark_page_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_trim_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,`maxBytes`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -2115,7 +2115,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_changes_seen() and 0xFFFF) != 40073) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_page_seen() and 0xFFFF) != 6101) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_page_seen() and 0xFFFF) != 48595) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_trim_changes() and 0xFFFF) != 34611) {
@@ -4789,10 +4789,9 @@ public interface CoreInterface {
     fun `markChangesSeen`(`flow`: kotlin.String)
     
     /**
-     * The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
-     * changes so far count as seen. Other pages do nothing.
+     * The student opened the page that shows `kind`: its changes so far count as seen.
      */
-    fun `markPageSeen`(`flow`: kotlin.String, `page`: kotlin.String)
+    fun `markPageSeen`(`flow`: kotlin.String, `kind`: ChangeKind)
     
     /**
      * Drops the oldest changes until the file is at most `max_bytes`.
@@ -6132,9 +6131,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
-     * changes so far count as seen. Other pages do nothing.
-     */override fun `markPageSeen`(`flow`: kotlin.String, `page`: kotlin.String)
+     * The student opened the page that shows `kind`: its changes so far count as seen.
+     */override fun `markPageSeen`(`flow`: kotlin.String, `kind`: ChangeKind)
         = 
     callWithHandle {
     uniffiRustCall() { _status ->
@@ -6142,7 +6140,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         it,
         
         FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`page`),_status)
+        FfiConverterTypeChangeKind.lower(`kind`),_status)
 }
     }
     

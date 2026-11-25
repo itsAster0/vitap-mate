@@ -28,7 +28,7 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
 import kotlinx.coroutines.launch
-import vitapmate.data.NOTIFY_KINDS
+import vitapmate.core.ChangeKind
 import vitapmate.data.SYNC_HOURS
 import vitapmate.data.Settings
 import vitapmate.data.SyncHealth
@@ -133,13 +133,14 @@ fun BackgroundSyncSetting(details: @Composable ColumnScope.(on: Boolean) -> Unit
             )
             Text("Notify about", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (kind in NOTIFY_KINDS) {
+                for (kind in ChangeKind.entries) {
                     val active = Settings.notifies(kind)
+                    val name = kind.name.lowercase()
                     FilterChip(
                         active,
                         { Settings.setNotifies(kind, !active) },
-                        { Text(kind.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge) },
-                        Modifier.testTag("settings.notify.$kind"),
+                        { Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge) },
+                        Modifier.testTag("settings.notify.$name"),
                         leadingIcon = if (active) {
                             { Icon(Lucide.Check, null, Modifier.size(16.dp)) }
                         } else null,

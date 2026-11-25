@@ -94,14 +94,12 @@ private object Unseen {
     }
 }
 
-/** A page was opened: its kind's changes count as seen, and the bell's count follows. */
+/** A page was opened: the changes it shows count as seen, and the bell's count follows. */
 suspend fun pageOpened(page: String) {
-    if (page !in CHANGE_PAGES) return
-    orNull { coreFlow("inbox.page_seen") { c, id -> c.markPageSeen(id, page) } } ?: return
+    val kind = ChangeKind.entries.firstOrNull { pageOf(it) == page } ?: return
+    orNull { coreFlow("inbox.page_seen") { c, id -> c.markPageSeen(id, kind) } } ?: return
     Unseen.read()
 }
-
-private val CHANGE_PAGES = ChangeKind.entries.map(::pageOf).toSet()
 
 /** The unread count, read again after each VTOP run finishes (More's card and Changes row). */
 @Composable

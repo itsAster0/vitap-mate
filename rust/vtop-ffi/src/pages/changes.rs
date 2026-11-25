@@ -165,17 +165,13 @@ impl Core {
         });
     }
 
-    /// The student opened `page` (a feature id: "attendance", "outing", "coursepage"): its
-    /// changes so far count as seen. Other pages do nothing.
-    pub fn mark_page_seen(&self, flow: String, page: String) {
+    /// The student opened the page that shows `kind`: its changes so far count as seen.
+    pub fn mark_page_seen(&self, flow: String, kind: ChangeKind) {
         #[expect(
             clippy::let_underscore_must_use,
             reason = "traced_sync already logs the error"
         )]
         let _ = traced_sync("mark_page_seen", &flow, || {
-            let Some(kind) = kind_of_page(&page) else {
-                return Ok(());
-            };
             self.update_store(|store| {
                 if let Some(newest) = store.changes.iter().find(|c| c.kind == kind) {
                     let at = newest.at_ms;
@@ -227,21 +223,6 @@ impl Core {
             Ok(())
         });
     }
-}
-
-/// The kind a feature's page shows.
-fn kind_of_page(page: &str) -> Option<ChangeKind> {
-    Some(match page {
-        "attendance" => ChangeKind::Attendance,
-        "marks" => ChangeKind::Marks,
-        "timetable" => ChangeKind::Timetable,
-        "exams" => ChangeKind::Exams,
-        "grades" => ChangeKind::Grades,
-        "outing" => ChangeKind::Outing,
-        "coursepage" => ChangeKind::Files,
-        "calendar" => ChangeKind::Calendar,
-        _ => return None,
-    })
 }
 
 #[cfg(test)]

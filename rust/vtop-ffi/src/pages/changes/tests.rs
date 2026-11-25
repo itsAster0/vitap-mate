@@ -579,9 +579,9 @@ fn core_records_only_after_a_primed_copy() {
     assert_eq!(core.unseen_changes("t".into()), 1);
     assert_eq!(core.unseen_change_ids("t".into()).len(), 1);
     // Another page leaves it new; its own page sees it.
-    core.mark_page_seen("t".into(), "marks".into());
+    core.mark_page_seen("t".into(), ChangeKind::Marks);
     assert_eq!(core.unseen_changes("t".into()), 1);
-    core.mark_page_seen("t".into(), "attendance".into());
+    core.mark_page_seen("t".into(), ChangeKind::Attendance);
     assert_eq!(core.unseen_changes("t".into()), 0);
     std::thread::sleep(std::time::Duration::from_millis(2));
     core.write(&file, &att("32", "39", "82%"));

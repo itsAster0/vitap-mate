@@ -223,7 +223,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             // New changes since the last notification, of the kinds switched on.
             val since = prefs.getLong("notified_ms", System.currentTimeMillis() - 86_400_000L)
             val fresh = withContext(Dispatchers.IO) { AppCore.await().changes(f) }
-                .filter { it.atMs > since && Settings.notifies(it.kind.name.lowercase()) }
+                .filter { it.atMs > since && Settings.notifies(it.kind) }
             BackgroundSync.notify(app, fresh)
             LiveUpdates.outings(app, "live.sync")
             prefs.edit().putLong("notified_ms", System.currentTimeMillis()).apply()

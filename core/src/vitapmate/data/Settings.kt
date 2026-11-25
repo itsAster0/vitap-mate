@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import kotlin.reflect.KProperty
+import vitapmate.core.ChangeKind
 
 /** The display sizes offered, in percent of the app's own fit (100); 0 follows the phone's display size. */
 val DISPLAY_SIZES = listOf(0, 90, 100, 110)
@@ -15,7 +16,7 @@ object Settings {
     @Volatile private var prefs: SharedPreferences? = null
     private val all = mutableListOf<Pref<*>>()
     private val tuned = mutableStateMapOf<Tunable, Int>()
-    private val notifyOff = mutableStateMapOf<String, Boolean>()
+    private val notifyOff = mutableStateMapOf<ChangeKind, Boolean>()
 
     /** One saved value: Compose state, read by [load] and written through on every set. */
     private class Pref<T>(val key: String, val default: T, val read: SharedPreferences.(String, T) -> T, val write: SharedPreferences.Editor.(String, T) -> Unit) {
@@ -170,7 +171,6 @@ object Settings {
     /** The course part background sync last checked for new files ([VtopSync]). */
     var syncCourse by text("settings_sync_course")
 
-    /** Whether background sync notifies about changes of [kind] ("attendance", "marks", "timetable", "exams", "grades"). */
     /**
      * Forgets what was set up for the student who signed out or was replaced: the OTP source
      * (their Gmail or address), background sync built on it, and where sync left off. The caller
@@ -185,12 +185,16 @@ object Settings {
         wrappedHideGrades = emptySet()
     }
 
-    fun notifies(kind: String): Boolean = notifyOff[kind] != true
+    /** Whether background sync notifies about changes of [kind]. */
+    fun notifies(kind: ChangeKind): Boolean = notifyOff[kind] != true
 
-    fun setNotifies(kind: String, on: Boolean) {
+    fun setNotifies(kind: ChangeKind, on: Boolean) {
         if (on) notifyOff.remove(kind) else notifyOff[kind] = true
-        prefs?.edit { putBoolean("settings_notify_$kind", on) }
+        prefs?.edit { putBoolean(notifyKey(kind), on) }
     }
+
+    /** `settings_notify_attendance`, ...: the key older apps saved under too. */
+    private fun notifyKey(kind: ChangeKind) = "settings_notify_${kind.name.lowercase()}"
 
     /** [t]'s value, in its unit. */
     fun tunable(t: Tunable): Int = tuned[t] ?: t.default
@@ -218,7 +222,7 @@ object Settings {
         }
         all.forEach { it.load(p) }
         Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
-        NOTIFY_KINDS.forEach { k -> if (!p.getBoolean("settings_notify_$k", true)) notifyOff[k] = true }
+        ChangeKind.entries.forEach { k -> if (!p.getBoolean(notifyKey(k), true)) notifyOff[k] = true }
         // Set last: once [prefs] is there, every value has been read.
         prefs = p
     }
@@ -226,7 +230,7 @@ object Settings {
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncHealth is SyncHealth.Paused), "notifyOff" to notifyOff.keys.sorted()) +
+            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncHealth is SyncHealth.Paused), "notifyOff" to notifyOff.keys.map { it.name.lowercase() }.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 
@@ -261,9 +265,6 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
 /** The background sync intervals on offer, in hours. */
 val SYNC_HOURS = listOf(3, 6, 12, 24)
 const val SYNC_HOURS_DEFAULT = 3
-
-/** The kinds of change the inbox records and background sync can notify about. */
-val NOTIFY_KINDS = listOf("attendance", "marks", "timetable", "exams", "grades", "outing", "files", "calendar")
 
 enum class ThemeMode { System, Light, Dark }
 
