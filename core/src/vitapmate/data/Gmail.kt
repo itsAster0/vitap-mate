@@ -102,8 +102,63 @@ object Gmail {
     /** A code found in the mailbox; [messageId] so a code VTOP turns down isn't tried again. */
     class Otp(val code: String, val messageId: String)
 
-    /** What went wrong, for the student; [code] is stable, for logs. */
-    class GmailException(val code: String, message: String) : Exception(message)
+    /** What went wrong: [message] for the student, [id] stable, for logs. */
+    sealed class GmailError(val id: String, val message: String) {
+        /** Google wasn't reached, or its answer didn't come back: worth another try. */
+        sealed class Network(id: String) : GmailError(id, "Couldn't reach Google. Check your connection.")
+
+        /** Nothing reached Google: safe to send again, even the one-time sign-in code. */
+        data object Unreachable : Network("unreachable")
+
+        data object Offline : Network("offline")
+
+        data object BadFile : GmailError("bad_file", "This isn't a Google OAuth client file.")
+
+        data object BadJson : GmailError("bad_json", "This isn't a valid Google OAuth JSON file.")
+
+        /** A Web application client (or a file without a Desktop app one), [message] saying which. */
+        class WrongClientType(message: String) : GmailError("wrong_client_type", message)
+
+        data object BadClientId : GmailError("bad_client_id", "The file has no valid Google OAuth client ID.")
+
+        data object NoTokens : GmailError("no_tokens", "Google didn't send the tokens. Try again.")
+
+        data object NoScope : GmailError("no_scope", "Tick the Gmail permission on Google's screen, then try again.")
+
+        data object NoEmail : GmailError("no_email", "Couldn't read your Google account's email.")
+
+        /** Not the student's college account; [message] says which to use. */
+        class WrongAccount(message: String) : GmailError("wrong_account", message)
+
+        data object GmailOff : GmailError("gmail_off", "Gmail didn't let the app in. Turn on the Gmail API in your project (step 2), wait a minute and connect again.")
+
+        data object NotConnected : GmailError("not_connected", "Gmail isn't connected.")
+
+        /** Google's sign-in page answered with [error] (`access_denied`, ...). */
+        class SignInRefused(error: String) : GmailError(
+            error,
+            if (error == "access_denied") "Google denied access. Is your college email a test user (step 4)?" else "Google sign-in failed: $error.",
+        )
+
+        data object BadState : GmailError("bad_state", "Google's answer didn't match this sign-in. Try again.")
+
+        data object Timeout : GmailError("timeout", "Google sign-in took too long. Try again.")
+
+        data object Unauthorized : GmailError("unauthorized", "Gmail turned down the sign-in. Connect Gmail again.")
+
+        /** HTTP 403, with Google's [status] when it gave one. */
+        class Forbidden(status: String) : GmailError("forbidden", "Gmail refused access ($status).")
+
+        data object InvalidGrant : GmailError("invalid_grant", "Google ended the connection.")
+
+        data object InvalidClient : GmailError("invalid_client", "Google doesn't know this client. Import a new client JSON.")
+
+        class Http(status: Int) : GmailError("http_$status", "Google answered HTTP $status.")
+
+        data object Ended : GmailError("ended", "Google ended the Gmail connection (a project in Testing does this every 7 days). Reconnect it in Settings → OTP auto-fill.")
+    }
+
+    class GmailException(val error: GmailError) : Exception(error.message)
 
     /** The connected account, or null. Compose state, written only under [lock], so no change is lost. */
     var account by mutableStateOf<Account?>(null)
@@ -125,14 +180,14 @@ object Gmail {
 
     /** The client in Google Cloud's JSON ([bytes]), or a [GmailException] saying what's wrong. */
     fun parseClient(bytes: ByteArray): Client {
-        if (bytes.isEmpty() || bytes.size > 64 * 1024) throw GmailException("bad_file", "This isn't a Google OAuth client file.")
-        val json = runCatching { JSONObject(String(bytes)) }.getOrNull() ?: throw GmailException("bad_json", "This isn't a valid Google OAuth JSON file.")
-        if (json.has("web")) throw GmailException("wrong_client_type", "Create a Desktop app OAuth client, not a Web application client.")
+        if (bytes.isEmpty() || bytes.size > 64 * 1024) throw GmailException(GmailError.BadFile)
+        val json = runCatching { JSONObject(String(bytes)) }.getOrNull() ?: throw GmailException(GmailError.BadJson)
+        if (json.has("web")) throw GmailException(GmailError.WrongClientType("Create a Desktop app OAuth client, not a Web application client."))
         val installed = json.optJSONObject("installed")
-            ?: throw GmailException("wrong_client_type", "Pick the JSON downloaded for a Desktop app OAuth client.")
+            ?: throw GmailException(GmailError.WrongClientType("Pick the JSON downloaded for a Desktop app OAuth client."))
         val id = installed.optString("client_id").trim()
         if (!id.endsWith(CLIENT_SUFFIX) || id.length <= CLIENT_SUFFIX.length) {
-            throw GmailException("bad_client_id", "The file has no valid Google OAuth client ID.")
+            throw GmailException(GmailError.BadClientId)
         }
         val secret = installed.optString("client_secret").trim().ifEmpty { null }
         return Client(id, secret, installed.optString("project_id").trim().ifEmpty { "Google Cloud project" })
@@ -194,12 +249,12 @@ object Gmail {
         val access = tokens.optString("access_token")
         val refresh = tokens.optString("refresh_token")
         try {
-            if (access.isEmpty() || refresh.isEmpty()) throw GmailException("no_tokens", "Google didn't send the tokens. Try again.")
+            if (access.isEmpty() || refresh.isEmpty()) throw GmailException(GmailError.NoTokens)
             if (SCOPE !in tokens.optString("scope").split(' ')) {
-                throw GmailException("no_scope", "Tick the Gmail permission on Google's screen, then try again.")
+                throw GmailException(GmailError.NoScope)
             }
-            val email = emailFrom(tokens.optString("id_token")) ?: throw GmailException("no_email", "Couldn't read your Google account's email.")
-            collegeAccountProblem(email, regno)?.let { throw GmailException("wrong_account", it) }
+            val email = emailFrom(tokens.optString("id_token")) ?: throw GmailException(GmailError.NoEmail)
+            collegeAccountProblem(email, regno)?.let { throw GmailException(GmailError.WrongAccount(it)) }
             verifyGmail(access, flow)
             val ends = tokens.optLong("refresh_token_expires_in", 0).takeIf { it > 0 }?.let { System.currentTimeMillis() + it * 1000 } ?: 0
             val saved = lock.withLock {
@@ -250,7 +305,7 @@ object Gmail {
         try {
             newest(token, since - CLOCK_SLACK_S, tried, flow)
         } catch (e: GmailException) {
-            if (e.code != "unauthorized") throw e
+            if (e.error != GmailError.Unauthorized) throw e
             token = token(flow, force = true)
             newest(token, since - CLOCK_SLACK_S, tried, flow)
         }
@@ -284,7 +339,7 @@ object Gmail {
         try {
             get("$API/profile", token, flow)
         } catch (e: GmailException) {
-            if (e.code == "forbidden") throw GmailException("gmail_off", "Gmail didn't let the app in. Turn on the Gmail API in your project (step 2), wait a minute and connect again.")
+            if (e.error is GmailError.Forbidden) throw GmailException(GmailError.GmailOff)
             throw e
         }
     }
@@ -296,12 +351,12 @@ object Gmail {
 
     /** A live access token, refreshed when it expires within a minute (or always, with [force]). */
     private suspend fun token(flow: String, force: Boolean): String = lock.withLock {
-        val a = account ?: throw GmailException("not_connected", "Gmail isn't connected.")
+        val a = account ?: throw GmailException(GmailError.NotConnected)
         if (!force && a.expiresAtMs > System.currentTimeMillis() + 60_000) return@withLock a.accessToken
         val tokens = try {
             post(TOKEN, flow, "refresh_token" to a.refreshToken, "client_id" to a.client.id, "client_secret" to a.client.secret, "grant_type" to "refresh_token")
         } catch (e: GmailException) {
-            if (e.code == "invalid_grant") {
+            if (e.error == GmailError.InvalidGrant) {
                 save(a.copy(ended = true))
                 Log.info(SRC, "grant ended", flow)
                 throw ENDED
@@ -340,13 +395,13 @@ object Gmail {
                 reply(it, 200, if (done) "Almost done: go back to Vitap Mate to finish connecting Gmail." else "Google sign-in didn't finish. Go back to Vitap Mate and try again.")
                 if (error != null) {
                     Log.info(SRC, "sign-in refused", flow, mapOf("error" to error))
-                    throw GmailException(error, if (error == "access_denied") "Google denied access. Is your college email a test user (step 4)?" else "Google sign-in failed: $error.")
+                    throw GmailException(GmailError.SignInRefused(error))
                 }
-                if (!done) throw GmailException("bad_state", "Google's answer didn't match this sign-in. Try again.")
+                if (!done) throw GmailException(GmailError.BadState)
                 return code
             }
         }
-        throw GmailException("timeout", "Google sign-in took too long. Try again.")
+        throw GmailException(GmailError.Timeout)
     }
 
     private fun reply(socket: java.net.Socket, status: Int, text: String) {
@@ -374,7 +429,7 @@ object Gmail {
                 return call().also { if (tries > 1) Log.info(SRC, "reached Google", flow, mapOf("tries" to "$tries")) }
             } catch (e: GmailException) {
                 val remaining = deadline - System.currentTimeMillis()
-                if (e.code != "unreachable" || remaining <= 0) throw e
+                if (e.error != GmailError.Unreachable || remaining <= 0) throw e
                 awaitReachable(remaining, backoffMs)
                 backoffMs = (backoffMs * 2).coerceAtMost(RETRY_MAX_MS)
             }
@@ -467,7 +522,7 @@ object Gmail {
             Log.warn(SRC, "$method $path failed: ${e::class.simpleName}", flow)
             // Nothing reached Google: safe to send again, even the one-time sign-in code.
             val unsent = e is UnknownHostException || e is ConnectException
-            throw GmailException(if (unsent) "unreachable" else "offline", "Couldn't reach Google. Check your connection.")
+            throw GmailException(if (unsent) GmailError.Unreachable else GmailError.Offline)
         } finally {
             conn.disconnect()
         }
@@ -475,15 +530,15 @@ object Gmail {
         val parsed = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
         return when {
             code in 200..299 -> parsed
-            code == 401 -> throw GmailException("unauthorized", "Gmail turned down the sign-in. Connect Gmail again.")
-            code == 403 -> throw GmailException("forbidden", "Gmail refused access (${parsed.optJSONObject("error")?.optString("status") ?: "403"}).")
-            parsed.optString("error") == "invalid_grant" -> throw GmailException("invalid_grant", "Google ended the connection.")
-            parsed.optString("error") == "invalid_client" -> throw GmailException("invalid_client", "Google doesn't know this client. Import a new client JSON.")
-            else -> throw GmailException("http_$code", "Google answered HTTP $code.")
+            code == 401 -> throw GmailException(GmailError.Unauthorized)
+            code == 403 -> throw GmailException(GmailError.Forbidden(parsed.optJSONObject("error")?.optString("status") ?: "403"))
+            parsed.optString("error") == "invalid_grant" -> throw GmailException(GmailError.InvalidGrant)
+            parsed.optString("error") == "invalid_client" -> throw GmailException(GmailError.InvalidClient)
+            else -> throw GmailException(GmailError.Http(code))
         }
     }
 
-    private val ENDED get() = GmailException("ended", "Google ended the Gmail connection (a project in Testing does this every 7 days). Reconnect it in Settings → OTP auto-fill.")
+    private val ENDED get() = GmailException(GmailError.Ended)
 
     // --- helpers ---
 

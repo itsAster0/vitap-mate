@@ -271,9 +271,9 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Gmail.GmailException) {
-                        Log.warn(src, "gmail pull failed: ${e.code}", id)
+                        Log.warn(src, "gmail pull failed: ${e.error.id}", id)
                         // Offline is worth another try; a revoked grant or a refusal isn't.
-                        if (e.code != "offline" && e.code != "unreachable") {
+                        if (e.error !is Gmail.GmailError.Network) {
                             error = e.message
                             break
                         }

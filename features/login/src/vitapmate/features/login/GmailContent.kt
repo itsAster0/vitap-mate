@@ -166,7 +166,7 @@ private class Connecting(private val scope: CoroutineScope, private val open: (S
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Gmail.GmailException) {
-                Log.info(SRC, "connect failed: ${e.code}")
+                Log.info(SRC, "connect failed: ${e.error.id}")
                 problem = e.message
             } catch (e: Throwable) {
                 Log.warn(SRC, "connect failed: ${e::class.simpleName}")
@@ -262,7 +262,7 @@ private fun Setup() {
                     connecting.problem = null
                     Log.info(SRC, "client imported", id)
                 } catch (e: Gmail.GmailException) {
-                    Log.info(SRC, "client refused: ${e.code}", id)
+                    Log.info(SRC, "client refused: ${e.error.id}", id)
                     connecting.problem = e.message
                 }
             }

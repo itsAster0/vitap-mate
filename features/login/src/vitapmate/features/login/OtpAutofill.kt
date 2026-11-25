@@ -126,8 +126,8 @@ object OtpAutofill {
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Gmail.GmailException) {
-                            if (e.code != "offline" && e.code != "unreachable") {
-                                why = if (Gmail.account?.needsReconnect == true) PauseReason.GmailReconnect else PauseReason.GmailRefused(e.code)
+                            if (e.error !is Gmail.GmailError.Network) {
+                                why = if (Gmail.account?.needsReconnect == true) PauseReason.GmailReconnect else PauseReason.GmailRefused(e.error.id)
                                 return@withTimeoutOrNull
                             }
                             null
