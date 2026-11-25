@@ -8,7 +8,6 @@ use tracing::field::{Field, Visit};
 use tracing::span::Attributes;
 use tracing::{Event, Id, Subscriber};
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
-use vtop_core::sync::RwLock;
 
 use super::*;
 use crate::{ACCOUNT, Account, Session};
@@ -124,7 +123,7 @@ pub(crate) fn signed_in(core: &Core) {
         registration_number: None,
     };
     let session = Session::new(account, &core.shared).unwrap();
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     crate::remote::regno::tests::shared(core, "22BCE0001");
 }
 
@@ -279,8 +278,7 @@ fn another_student_forgets_remembered_kinds() {
         password: "pw".into(),
         registration_number: None,
     };
-    let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));
-    core.install(Some(slot.clone()));
+    let slot = core.install(Session::new(account, &core.shared).unwrap());
     core.save(&slot, &block_on(slot.read()));
     assert!(core.cookie_consent_remembered("f".into()).is_empty());
     assert!(!core.at(FILE).exists());

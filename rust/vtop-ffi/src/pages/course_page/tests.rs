@@ -235,8 +235,6 @@ async fn serve(head: &'static str, body: Vec<u8>) -> String {
 }
 
 fn signed_in_core(base: String, name: &str) -> (Core, PathBuf) {
-    use std::sync::Arc;
-    use vtop_core::sync::RwLock;
     use vtop_core::{SessionState, VtopClient, VtopConfig};
     let dir = std::env::temp_dir().join(format!("vtop-ffi-file-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -263,7 +261,7 @@ fn signed_in_core(base: String, name: &str) -> (Core, PathBuf) {
         },
     );
     let core = Core::for_test(&dir);
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     (core, dir)
 }
 

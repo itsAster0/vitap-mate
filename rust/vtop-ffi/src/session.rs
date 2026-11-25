@@ -5,7 +5,6 @@ use std::time::SystemTime;
 
 use tracing::{info, warn};
 use vtop_core::VtopError;
-use vtop_core::sync::RwLock;
 use vtop_core::types::PersistedVtopSession;
 
 use crate::remote::route;
@@ -92,8 +91,7 @@ impl Core {
             }
             // Accepted: its cookies become the app's (and the web view's).
             session.cookies.activate(&self.shared.cookies, true);
-            let slot = Arc::new(RwLock::new(session));
-            self.install(Some(slot.clone()));
+            let slot = self.install(session);
             if outcome == SignIn::Done {
                 let session = slot.read().await;
                 obs::set_regno(session.client.registration_number().ok());
@@ -253,7 +251,7 @@ impl Core {
             reason = "traced_sync already logs the error"
         )]
         let _ = traced_sync("sign_out_here", flow, || {
-            self.install(None);
+            self.uninstall();
             // Left on the edge by `leave_old_forwarding`, which `sign_out` calls next.
             self.queue_leave();
             self.shared.cookies.sign_out();

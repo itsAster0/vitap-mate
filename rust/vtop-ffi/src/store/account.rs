@@ -66,14 +66,27 @@ struct Stored {
     sealed: Option<String>,
 }
 
-/// Where the signed-in account stands, for Settings' "Needs attention", the profile and the
-/// sign-in problems. Rust's alone: Kotlin hears it through [`Core::watch_account`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+/// Who is signed in and where their account stands: the app's screens follow it (the login
+/// screen or the shell), Kotlin lets go of a student's things when another one's `username`
+/// comes, and Settings' "Needs attention", the profile and the sign-in problems read the
+/// standing. Rust's alone: Kotlin hears it through [`Core::watch_account`].
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum AccountStatus {
     SignedOut,
+    /// `username` (the VTOP login, as saved) is signed in: their account is saved and their
+    /// session installed, or their password waits on the Keystore.
+    SignedIn {
+        username: String,
+        standing: Standing,
+    },
+}
+
+/// Where a signed-in account stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum Standing {
+    Good,
     /// The demo account: what needs a real VTOP session or the server is hidden.
     Demo,
-    SignedIn,
     /// VTOP rejected the saved password: the student updates it on the Account page.
     PasswordRejected {
         by: RejectedBy,
@@ -370,28 +383,45 @@ impl Core {
         self.write(ACCOUNT, &stored);
     }
 
-    /// Where the account stands: signed out unless a session is installed (or its password is
-    /// waiting on the Keystore); a rejection as saved beside it, this phone's first.
+    /// Where the account stands now, as the listener would hear it.
+    #[cfg(test)]
     pub(crate) fn account_status(&self) -> AccountStatus {
-        if !self.has_account() {
+        let watch = self
+            .shared
+            .account_watch
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        self.account_status_after(watch.heard.as_ref())
+    }
+
+    /// Where the account stands after `heard`: the installed (or locked) student, once their
+    /// account is saved; a rejection as saved beside it, this phone's first. A sign-in waiting
+    /// for its first OTP has saved nothing yet, so the phone is still whoever `heard` said
+    /// (another student, whose account and pages stay until the code is accepted, or nobody).
+    fn account_status_after(&self, heard: Option<&AccountStatus>) -> AccountStatus {
+        let Some(username) = self.student() else {
             return AccountStatus::SignedOut;
-        }
-        let Some(stored) = self.read::<Stored>(ACCOUNT) else {
-            return AccountStatus::SignedIn;
         };
-        if stored.username == demo::USERNAME {
-            AccountStatus::Demo
+        let Some(stored) = self
+            .read::<Stored>(ACCOUNT)
+            .filter(|stored| stored.username.eq_ignore_ascii_case(&username))
+        else {
+            return heard.cloned().unwrap_or(AccountStatus::SignedOut);
+        };
+        let standing = if username == demo::USERNAME {
+            Standing::Demo
         } else if stored.rejected {
-            AccountStatus::PasswordRejected {
+            Standing::PasswordRejected {
                 by: RejectedBy::Phone,
             }
         } else if stored.server_rejected {
-            AccountStatus::PasswordRejected {
+            Standing::PasswordRejected {
                 by: RejectedBy::Server,
             }
         } else {
-            AccountStatus::SignedIn
-        }
+            Standing::Good
+        };
+        AccountStatus::SignedIn { username, standing }
     }
 
     /// Tells the listener the status, when it changed since it last heard. The watch's lock is
@@ -405,10 +435,10 @@ impl Core {
         let Some(listener) = watch.listener.clone() else {
             return;
         };
-        let status = self.account_status();
-        if watch.heard != Some(status) {
+        let status = self.account_status_after(watch.heard.as_ref());
+        if watch.heard.as_ref() != Some(&status) {
             info!(?status, "account status");
-            watch.heard = Some(status);
+            watch.heard = Some(status.clone());
             listener.changed(status);
         }
     }
@@ -566,10 +596,18 @@ mod tests {
         }
     }
 
-    const PHONE: AccountStatus = AccountStatus::PasswordRejected {
+    /// 22BCE0001 signed in, as `standing`.
+    fn signed_in(standing: Standing) -> AccountStatus {
+        AccountStatus::SignedIn {
+            username: "22BCE0001".into(),
+            standing,
+        }
+    }
+
+    const PHONE: Standing = Standing::PasswordRejected {
         by: RejectedBy::Phone,
     };
-    const SERVER: AccountStatus = AccountStatus::PasswordRejected {
+    const SERVER: Standing = Standing::PasswordRejected {
         by: RejectedBy::Server,
     };
 
@@ -587,10 +625,10 @@ mod tests {
 
         let session = crate::Session::new(account("pw-1"), &core.shared).unwrap();
         core.write_account(&session.account, false);
-        core.install(Some(Arc::new(vtop_core::sync::RwLock::new(session))));
-        assert_eq!(heard.take(), [AccountStatus::SignedIn]);
+        core.install(session);
+        assert_eq!(heard.take(), [signed_in(Standing::Good)]);
         core.password_rejected_on_server("f".into());
-        assert_eq!(heard.take(), [SERVER]);
+        assert_eq!(heard.take(), [signed_in(SERVER)]);
         // Written again (a sign-in saving the registration number): the server's flag stays.
         core.write_account(&account("pw-1"), false);
         assert!(heard.take().is_empty());
@@ -598,9 +636,13 @@ mod tests {
 
         // As after the process died: read back from account.json.
         let core = open(&dir, &cipher);
-        assert_eq!(core.account_status(), SERVER);
+        assert_eq!(core.account_status(), signed_in(SERVER));
         core.write_account(&account("pw-1"), true);
-        assert_eq!(core.account_status(), PHONE, "this phone's first");
+        assert_eq!(
+            core.account_status(),
+            signed_in(PHONE),
+            "this phone's first"
+        );
         assert!(
             !core.current().unwrap().read().await.is_password_rejected(),
             "the open session went on as it was"
@@ -612,10 +654,43 @@ mod tests {
         );
         core.set_server_rejected(false);
         core.write_account(&account("pw-2"), false);
-        assert_eq!(core.account_status(), AccountStatus::SignedIn);
+        assert_eq!(core.account_status(), signed_in(Standing::Good));
         core.sign_out_here("f");
         assert_eq!(core.account_status(), AccountStatus::SignedOut);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_sign_in_counts_once_its_account_is_saved() {
+        let core = core("status-pending", &Fake::new("phone-a"));
+        let heard = Arc::new(Heard::default());
+        core.watch_account("f".into(), heard.clone());
+        assert_eq!(heard.take(), [AccountStatus::SignedOut]);
+        // Waiting for its first OTP: the login screen stays.
+        let slot = core.install(crate::Session::new(account("pw-1"), &core.shared).unwrap());
+        assert!(heard.take().is_empty());
+        core.save(&slot, &*slot.read().await);
+        assert_eq!(heard.take(), [signed_in(Standing::Good)]);
+
+        // Another student's sign-in waiting for its OTP: the phone is still the last one's.
+        let other = Account {
+            username: "22BCE0002".into(),
+            ..account("pw-2")
+        };
+        let slot = core.install(crate::Session::new(other, &core.shared).unwrap());
+        assert!(heard.take().is_empty());
+        assert_eq!(core.account_status(), signed_in(Standing::Good));
+        core.save(&slot, &*slot.read().await);
+        assert_eq!(
+            heard.take(),
+            [AccountStatus::SignedIn {
+                username: "22BCE0002".into(),
+                standing: Standing::Good,
+            }]
+        );
+        core.sign_out_here("f");
+        assert_eq!(heard.take(), [AccountStatus::SignedOut]);
+        let _ = fs::remove_dir_all(&core.dir);
     }
 
     /// Signs `core` out on another thread when asked to seal, as a sign-out landing in the
@@ -679,8 +754,7 @@ mod tests {
             },
         ));
         let session = crate::Session::new(account("pw-1"), &core.shared).unwrap();
-        let slot = Arc::new(vtop_core::sync::RwLock::new(session));
-        core.install(Some(slot.clone()));
+        let slot = core.install(session);
         core.watch_account("f".into(), Arc::new(HearsSignOut(Mutex::new(told))));
         *cipher.core.lock().unwrap() = Some(Arc::downgrade(&core));
 
@@ -843,7 +917,11 @@ mod tests {
         let core = open(&first.dir, &cipher);
         let heard = Arc::new(Heard::default());
         core.watch_account("f".into(), heard.clone());
-        assert!(matches!(heard.take()[..], [AccountStatus::SignedIn { .. }]));
+        assert_eq!(
+            heard.take(),
+            [signed_in(Standing::Good)],
+            "while it waits on the Keystore"
+        );
         // Opened again on the next call, it is another phone's after all.
         fs::write(
             core.at(ACCOUNT),

@@ -1,7 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-use vtop_core::sync::RwLock;
-
 use super::{OtpChallenge, OtpListener};
 use crate::remote::consent;
 use crate::{Account, Core, CoreError, OtpVia, Session, Slot};
@@ -38,8 +36,7 @@ fn awaiting(name: &str, attended: bool) -> (Core, Arc<Slot>, Arc<Told>) {
         password: "pw".into(),
         registration_number: None,
     };
-    let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));
-    core.install(Some(slot.clone()));
+    let slot = core.install(Session::new(account, &core.shared).unwrap());
     consent::tests::install(&core, attended, false);
     let told = Arc::new(Told::default());
     core.shared.otp.set_listener(told.clone());
@@ -141,7 +138,7 @@ async fn a_fresh_sign_in_under_the_prompt_keeps_it_open() {
 async fn sign_out_or_a_rejected_password_ends_the_wait() {
     let (core, slot, told) = awaiting("signed-out", true);
     let wait = core.wait_for_otp(&slot, "marks.refresh", 0, otp_required());
-    let outcome = while_waiting(wait, || core.install(None)).await;
+    let outcome = while_waiting(wait, || core.uninstall()).await;
     assert_eq!(outcome, Err(CoreError::NotSignedIn));
     assert_eq!(told.last(), None);
 
@@ -167,7 +164,7 @@ async fn a_rejected_password_never_signs_in_afresh_for_a_code() {
         registration_number: None,
     };
     let session = Session::new(account, &core.shared).unwrap().rejected(true);
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     // No challenge left to answer: a fresh sign-in would try the rejected password on VTOP.
     assert_eq!(
         core.submit_otp("f".into(), "123456".into()).await,

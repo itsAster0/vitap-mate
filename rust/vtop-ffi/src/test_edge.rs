@@ -306,7 +306,6 @@ fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
 /// A core signed in to VTOP at `base` (the mock server also answers VTOP's session check),
 /// whose server is `base` too.
 pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
-    use vtop_core::sync::RwLock;
     use vtop_core::{SessionState, VtopClient, VtopConfig};
     std::fs::write(dir.join(crate::remote::edge::SERVER_FILE), &base).unwrap();
     let client = VtopClient::builder()
@@ -331,7 +330,7 @@ pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
         },
     );
     let core = Core::for_test(dir);
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     // The student said Share; `remote::regno`'s own tests start from Unasked.
     crate::remote::regno::tests::shared(&core, "22BCE0001");
     core

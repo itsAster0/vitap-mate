@@ -15,7 +15,6 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tracing::{info, warn};
-use vtop_core::sync::RwLock;
 
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
@@ -75,10 +74,9 @@ pub(crate) fn refuse(account: &Account) -> Result<(), CoreError> {
 }
 
 impl Core {
-    /// Signed in as the demo account (Kotlin hears it as [`crate::AccountStatus::Demo`]).
+    /// Signed in as the demo account (Kotlin hears it as [`crate::Standing::Demo`]).
     pub(crate) fn is_demo(&self) -> bool {
-        self.read_account()
-            .is_some_and(|saved| saved.username == USERNAME)
+        self.student().is_some_and(|username| username == USERNAME)
     }
 
     /// Signs in as the demo account: the sample pages from `server`, then the account saved
@@ -114,8 +112,7 @@ impl Core {
                 reason: "This demo needs a newer app.".into(),
             });
         }
-        let slot = Arc::new(RwLock::new(crate::Session::new(account, &self.shared)?));
-        self.install(Some(slot.clone()));
+        let slot = self.install(crate::Session::new(account, &self.shared)?);
         self.save(&slot, &*slot.read().await);
         // After the save, which drops the last account's files (this one among them).
         self.write_bytes(FILE, &bytes);

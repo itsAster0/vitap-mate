@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
-use vtop_core::sync::RwLock;
 use vtop_core::{SessionState, VtopClient, VtopConfig};
 
 use super::*;
@@ -534,7 +533,7 @@ async fn core_on(mock: &MockVtop, name: &str) -> (Core, PathBuf) {
         },
     );
     let core = Core::for_test(&dir);
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     (core, dir)
 }
 

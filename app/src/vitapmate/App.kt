@@ -20,7 +20,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
-import vitapmate.core.Core
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import vitapmate.core.AccountStatus
 import vitapmate.data.AccountWatch
 import vitapmate.data.AppCore
 import vitapmate.data.InspectorOpener
@@ -28,8 +30,6 @@ import vitapmate.data.LocalInspector
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
 import vitapmate.data.attempt
-import vitapmate.data.coreFlow
-import vitapmate.data.orNull
 import vitapmate.features.login.ChooseSemester
 import vitapmate.features.login.FetchOtpOverlay
 import vitapmate.features.login.LoginScreen
@@ -42,49 +42,55 @@ import vitapmate.ui.LocalSignIn
 import vitapmate.ui.ToastHost
 
 /**
- * The [AppSession]: signed out, the login screen; signed in without a semester picked:
- * [ChooseSemester] (the first time, [Onboarding] after it); then the shell. Any screen's
- * "Details" opens a flow here.
+ * The [AppSession], following who Rust says is signed in: signed out, the login screen; signed
+ * in without a semester picked: [ChooseSemester] (the first time, [Onboarding] after it); then
+ * the shell. Any screen's "Details" opens a flow here.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun App() {
     var session by remember { mutableStateOf<AppSession>(AppSession.Booting) }
     val on = { e: SessionEvent -> session = next(session, e) }
+    // Who is signed in is Rust's: the phase follows its status from the start.
     LaunchedEffect(Unit) {
-        attempt { coreFlow("app_start", Core::signedInUser) }
-            .fold({ on(SessionEvent.Booted(it)) }, { on(SessionEvent.BootError(it)) })
-    }
-    val signedIn = session.signedIn
-    // After signing in, the avatar needs the new name.
-    LaunchedEffect(signedIn, accountVersion) {
-        if (signedIn && (session.user == null || accountVersion > 0)) {
-            on(SessionEvent.UserRead(orNull { coreFlow("app_user", Core::signedInUser) }))
+        attempt { AppCore.await() }.onFailure { on(SessionEvent.BootError(it)) }.onSuccess {
+            AccountWatch.heard.filterNotNull().collect { on(SessionEvent.Account((it as? AccountStatus.SignedIn)?.username)) }
         }
     }
-    // The saved pick, read once per sign-in before choosing between the picker and the shell;
-    // then each time the pick comes or goes.
+    val signedIn = session.signedIn
+    val nav = rememberNav()
+    // Signed out (here, or the saved account gone): the login screen, on the first tab after.
+    LaunchedEffect(signedIn) {
+        if (!signedIn && session !is AppSession.Booting) nav.goTab(navTabs.first())
+    }
+    // The saved pick, read once per student (after the last one's things went) before choosing
+    // between the picker and the shell; then each time the pick comes or goes.
+    val loading = (session as? AppSession.LoadingAccount)?.user
+    LaunchedEffect(loading) {
+        val user = loading ?: return@LaunchedEffect
+        AccountTeardown.settled.first { it.equals(user, ignoreCase = true) }
+        flow("semesters.check") { SemesterChoice.readCache(it) }
+        on(SessionEvent.AccountRead(SemesterChoice.selected != null, setup()))
+    }
     LaunchedEffect(signedIn) {
         if (!signedIn) return@LaunchedEffect
-        flow("semesters.check") { SemesterChoice.readCache(it) }
-        on(SessionEvent.AccountRead(SemesterChoice.selected != null, Settings.onboarded))
-        snapshotFlow { SemesterChoice.selected != null }.collect { on(SessionEvent.PickChanged(it, Settings.onboarded)) }
+        snapshotFlow { SemesterChoice.selected != null }.collect { on(SessionEvent.PickChanged(it, setup())) }
     }
-    val nav = rememberNav()
+    // The setup page is kept pending until done, so a restart on it opens it again.
+    LaunchedEffect(session is AppSession.Onboarding) {
+        if (session is AppSession.Onboarding) Settings.onboardingPending = true
+    }
     val deviceAuth = rememberDeviceAuth()
-    // A problem's "Sign in": a rejected password is fixed on the Account page in place (the
-    // cache stays); with no saved account the login screen signs in again.
-    val toLogin = {
-        Log.info("ui.shell", "sign in again")
-        nav.goTab(navTabs.first())
-        on(SessionEvent.SignedOut)
-    }
-    val signIn = {
-        if (AccountWatch.rejected) {
+    // A problem's "Sign in": signed in (VTOP rejected the password, or turned the saved details
+    // down), they are fixed on the Account page in place, so the cache stays; signed out, the
+    // login screen is already up.
+    val signIn: () -> Unit = {
+        if (AccountWatch.username != null) {
             Log.info("ui.shell", "update password")
             deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) }
         } else {
-            toLogin()
+            Log.info("ui.shell", "sign in again")
+            nav.goTab(navTabs.first())
         }
     }
     // Update priority 5: nothing of the app until it's updated.
@@ -108,11 +114,9 @@ fun App() {
                 AppSession.Booting, is AppSession.LoadingAccount -> {}
                 is AppSession.BootFailed -> EmptyState(Lucide.TriangleAlert, "Couldn't start", Modifier.align(Alignment.Center), message = "${s.error}")
                 AppSession.SignedOut -> {
-                    LoginScreen {
-                        on(SessionEvent.SignedIn)
-                        // Signed in over another student: leaves their address now, not at the next start.
-                        AppCore.leaveOldForwarding()
-                    }
+                    // Rust's status moves the app on once signed in; addresses a sign-out couldn't
+                    // leave (offline) are left now, not at the next start.
+                    LoginScreen { AppCore.leaveOldForwarding() }
                     // Signed out, the only screen over the login is a flow opened from "Details".
                     (nav.top as? Route.FlowLog)?.let {
                         BackHandler { nav.pop() }
@@ -123,9 +127,10 @@ fun App() {
                 is AppSession.Onboarding -> Onboarding {
                     Log.info("ui.shell", "onboarding done")
                     Settings.onboarded = true
+                    Settings.onboardingPending = false
                     on(SessionEvent.OnboardingDone)
                 }
-                is AppSession.Ready -> Shell(nav, onSignedOut = toLogin)
+                is AppSession.Ready -> Shell(nav)
             }
             FetchOtpOverlay()
             UpdatePillHost()
@@ -133,4 +138,11 @@ fun App() {
             DownloadFolderPrompt()
         }
     }
+}
+
+/** How far this install got with the setup page ([Settings.onboarded], [Settings.onboardingPending]). */
+private fun setup(): Setup = when {
+    Settings.onboarded -> Setup.Done
+    Settings.onboardingPending -> Setup.Pending
+    else -> Setup.NotYet
 }

@@ -65,7 +65,7 @@ pub use pages::records::{
     project_attendance,
 };
 pub use store::account::{
-    AccountListener, AccountStatus, Opening, PasswordCipher, RejectedBy, Sealing,
+    AccountListener, AccountStatus, Opening, PasswordCipher, RejectedBy, Sealing, Standing,
 };
 pub use store::cookies::SharedCookies;
 
@@ -422,13 +422,20 @@ impl Session {
 
 type Slot = RwLock<Session>;
 
-/// Who [`Core`] is signed in as.
+/// Who [`Core`] is signed in as. `username` is the session's account's (fixed for a slot but
+/// for Developer's in-place change, [`Core::rename_student`]), so the [`AccountStatus`] names
+/// the installed student without asking the session's lock.
 enum Signed {
     Out,
     /// An account is saved but the Keystore didn't open its password when the core opened:
     /// [`Core::current`] opens it again, so a Keystore hiccup doesn't sign the student out.
-    Locked,
-    In(Arc<Slot>),
+    Locked {
+        username: String,
+    },
+    In {
+        slot: Arc<Slot>,
+        username: String,
+    },
 }
 
 /// What the app hands [`Core::new`]: its HTTP stack, cookie store, sockets, consent prompt,
@@ -634,7 +641,11 @@ impl Core {
         };
         let rejected = saved.rejected;
         let account = match saved.password {
-            store::account::SavedPassword::Locked => return Ok(Signed::Locked),
+            store::account::SavedPassword::Locked => {
+                return Ok(Signed::Locked {
+                    username: saved.username,
+                });
+            }
             store::account::SavedPassword::Gone => return Ok(Signed::Out),
             store::account::SavedPassword::Open(_) => saved.usable(),
         };
@@ -646,7 +657,10 @@ impl Core {
             .read::<PersistedVtopSession>(SESSION)
             .filter(|saved| dev::reusable(&self.shared, saved));
         self.restore(&session, saved);
-        Ok(Signed::In(Arc::new(RwLock::new(session))))
+        Ok(Signed::In {
+            username: session.account.username.clone(),
+            slot: Arc::new(RwLock::new(session)),
+        })
     }
 
     /// A core on `dir` (its cache folder too), signed out, with no platform.
@@ -667,9 +681,24 @@ impl Core {
         }
     }
 
-    fn install(&self, slot: Option<Arc<Slot>>) {
-        *self.slot.lock().unwrap_or_else(PoisonError::into_inner) =
-            slot.map_or(Signed::Out, Signed::In);
+    /// Makes `session` the signed-in one, in its own slot.
+    fn install(&self, session: Session) -> Arc<Slot> {
+        let username = session.account.username.clone();
+        let slot = Arc::new(RwLock::new(session));
+        self.put(Signed::In {
+            slot: slot.clone(),
+            username,
+        });
+        slot
+    }
+
+    /// Drops the signed-in session (a sign-out).
+    fn uninstall(&self) {
+        self.put(Signed::Out);
+    }
+
+    fn put(&self, signed: Signed) {
+        *self.slot.lock().unwrap_or_else(PoisonError::into_inner) = signed;
         // The last session's prompt (and the calls waiting on it) end with it.
         self.shared.otp.close_all();
         self.shared.identity_may_have_changed();
@@ -689,19 +718,19 @@ impl Core {
     fn current(&self) -> Result<Arc<Slot>, CoreError> {
         let (current, reopened) = {
             let mut signed = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
-            let reopened = matches!(*signed, Signed::Locked);
+            let reopened = matches!(*signed, Signed::Locked { .. });
             if reopened {
                 *signed = self.restore_saved().unwrap_or_else(|error| {
                     warn!(%error, "saved account not restored");
                     Signed::Out
                 });
-                if let Signed::In(_) = *signed {
+                if let Signed::In { .. } = *signed {
                     info!("saved password opened on a later try");
                 }
             }
             let current = match &*signed {
-                Signed::In(slot) => Ok(slot.clone()),
-                Signed::Locked => Err(CoreError::PasswordLocked),
+                Signed::In { slot, .. } => Ok(slot.clone()),
+                Signed::Locked { .. } => Err(CoreError::PasswordLocked),
                 Signed::Out => Err(CoreError::NotSignedIn),
             };
             (current, reopened)
@@ -711,6 +740,26 @@ impl Core {
             self.account_changed();
         }
         current
+    }
+
+    /// The signed-in student's username (their password perhaps not opened yet); None signed out.
+    fn student(&self) -> Option<String> {
+        match &*self.slot.lock().unwrap_or_else(PoisonError::into_inner) {
+            Signed::Out => None,
+            Signed::Locked { username } | Signed::In { username, .. } => Some(username.clone()),
+        }
+    }
+
+    /// `slot`'s account took `username` in place (Developer → Set credentials).
+    fn rename_student(&self, slot: &Arc<Slot>, username: &str) {
+        if let Signed::In {
+            slot: current,
+            username: named,
+        } = &mut *self.slot.lock().unwrap_or_else(PoisonError::into_inner)
+            && Arc::ptr_eq(current, slot)
+        {
+            username.clone_into(named);
+        }
     }
 
     /// Whether `slot` is still the signed-in one (not signed out meanwhile).

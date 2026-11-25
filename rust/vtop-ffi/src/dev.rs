@@ -5,7 +5,6 @@
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use serde_json::json;
@@ -19,8 +18,6 @@ use vtop_core::types::{
     AttendanceData, ExamScheduleData, FullAttendanceData, MarksData, PersistedVtopSession,
     SemesterData, TimetableData,
 };
-
-use vtop_core::sync::RwLock;
 
 use crate::pages::records;
 use crate::remote::edge;
@@ -150,13 +147,14 @@ impl Core {
                     self.restore(&fresh, Some(saved));
                     (session.client, session.cookies) = (fresh.client, fresh.cookies);
                     session.account = account.clone();
+                    self.rename_student(&slot, &account.username);
                     if session.is_password_rejected() {
                         session.phase = crate::SessionPhase::Active;
                     }
                 }
                 Err(_) => {
                     self.restore(&fresh, self.read::<PersistedVtopSession>(SESSION));
-                    self.install(Some(Arc::new(RwLock::new(fresh))));
+                    self.install(fresh);
                 }
             }
             self.write_account(&account, false);
@@ -463,7 +461,7 @@ mod tests {
         fs::write(dir.join(SESSION), "{}").unwrap();
         let mut session = Session::new(account, &core.shared).unwrap();
         session.begin_otp(crate::OtpVia::Phone, "pending".into());
-        core.install(Some(Arc::new(RwLock::new(session))));
+        core.install(session);
 
         core.dev_clear_session("f".into()).await.unwrap();
         assert!(!dir.join(SESSION).exists());

@@ -67,7 +67,6 @@ import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PauseReason
 import vitapmate.data.SavedPasswords
-import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
@@ -84,7 +83,7 @@ import vitapmate.ui.showToast
 /** Route id of Settings → Account (opened after [DeviceAuth]). */
 const val ACCOUNT = "account"
 
-/** Bumped when the saved account changes in place (Account, Developer): the app reads the username again. */
+/** Bumped when the saved account changes (Account, Developer, another student): Settings reads the username again. */
 var accountVersion by mutableIntStateOf(0)
 
 /**
@@ -144,14 +143,9 @@ fun AccountScreen() {
                     // Paused over the old password: the next run can try again.
                     Settings.syncHealth = Settings.syncHealth.resumedIf { it == PauseReason.PasswordRejected }
                     savedPassword = password
-                    if (other) {
-                        AccountTeardown.forgetStudent(context, flowId)
-                        flow("account.semesters") { SemesterChoice.readCache(it) }
-                        // The last student's Mailbox would keep sending this phone their OTPs.
-                        AppCore.leaveOldForwarding()
-                        AppCore.proveInBackground()
-                    }
-                    accountVersion++
+                    // Another student: the app lets go of the last one's things as Rust reports
+                    // the switch ([AccountTeardown.follow]), wherever this page is by then.
+                    if (!other) accountVersion++
                     haptics.confirm()
                     // Keeps the phone's password manager in step with what VTOP just accepted.
                     if (changed) SavedPasswords.offerSave(context, username.trim(), password)

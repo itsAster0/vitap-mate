@@ -61,7 +61,7 @@ import vitapmate.observability.StateRegistry
 /** Signed in: the screen on top of the back stack, the floating nav bar over it on tab roots. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Shell(nav: Nav, onSignedOut: () -> Unit) {
+fun Shell(nav: Nav) {
     val tabs = navTabs
     val scroll = FloatingToolbarDefaults.exitAlwaysScrollBehavior(FloatingToolbarExitDirection.Bottom)
     // Keeps each tab's saveable state (scroll, selections) while another tab is shown.
@@ -132,7 +132,7 @@ fun Shell(nav: Nav, onSignedOut: () -> Unit) {
                 // Switching tabs fades through; screens pushed on a tab slide in (the default).
                 val meta = if (route == nav.root) tabFade else emptyMap()
                 NavEntry(route, route.key, meta) {
-                    CompositionLocalProvider(LocalTabReselect provides reselect, LocalRoute provides it) { Entry(it, tabStates, onSignedOut) }
+                    CompositionLocalProvider(LocalTabReselect provides reselect, LocalRoute provides it) { Entry(it, tabStates) }
                 }
             },
         )
@@ -166,7 +166,7 @@ private val fadeThrough: AnimatedContentTransitionScope<*>.() -> ContentTransfor
 private val tabFade = NavDisplay.transitionSpec { fadeThrough() } + NavDisplay.popTransitionSpec { fadeThrough() }
 
 @Composable
-private fun Entry(route: Route, tabStates: SaveableStateHolder, onSignedOut: () -> Unit) {
+private fun Entry(route: Route, tabStates: SaveableStateHolder) {
     when (route) {
         Route.Tabs -> TabsScreen()
         is Route.FlowLog -> FlowScreen(route.flow)
@@ -186,7 +186,7 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder, onSignedOut: () 
         }
         is Route.Screen -> when (route.id) {
             MORE -> MoreScreen()
-            SETTINGS -> SettingsScreen(onSignedOut)
+            SETTINGS -> SettingsScreen()
             INSPECTOR -> InspectorScreen()
             ACTIVITY -> ActivityScreen()
             ACTIVITY_HISTORY -> ActivityScreen(showOlder = true)

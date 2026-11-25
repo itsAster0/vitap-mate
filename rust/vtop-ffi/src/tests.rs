@@ -144,7 +144,7 @@ async fn pages_wait_for_a_picked_semester() {
     };
     let core = Core::for_test(&dir);
     let session = Session::new(account, &core.shared).unwrap();
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     // Before any network call: no pick, no request.
     assert_eq!(
         core.fetch_attendance("f".into()).await,
@@ -376,10 +376,7 @@ async fn another_student_signing_in_drops_the_last_ones_pages() {
         registration_number: None,
     };
     let core = Core::for_test(&dir);
-    let slot = Arc::new(RwLock::new(
-        Session::new(account("21BCE0002"), &core.shared).unwrap(),
-    ));
-    core.install(Some(slot.clone()));
+    let slot = core.install(Session::new(account("21BCE0002"), &core.shared).unwrap());
 
     // "Sign in again" with another account: the last one's semesters, pick, pages and
     // forwarding address go.
@@ -418,8 +415,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     };
     let core =
         Core::for_test(std::env::temp_dir().join(format!("vtop-ffi-otp-{}", std::process::id())));
-    let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));
-    core.install(Some(slot.clone()));
+    let slot = core.install(Session::new(account, &core.shared).unwrap());
     let waiting = |cookies: &str, otp: Option<u64>| SessionState {
         cookies: cookies.into(),
         csrf_token: Some("csrf".into()),
@@ -545,8 +541,7 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
     );
 
     // A sign-in saves without cookies; signing out empties the store.
-    let slot = Arc::new(RwLock::new(second));
-    core.install(Some(slot.clone()));
+    let slot = core.install(second);
     core.save(&slot, &*slot.read().await);
     assert_eq!(
         core.read::<PersistedVtopSession>(SESSION).unwrap().cookies,
@@ -579,7 +574,7 @@ async fn clearing_the_session_empties_the_shared_store() {
     let session = Session::new(account, &core.shared).unwrap();
     session.cookies.activate(&core.shared.cookies, false);
     memory.set_cookies(vtop.clone(), vec!["JSESSIONID=live; Path=/vtop".into()]);
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     assert_eq!(
         core.dev_cookie_editor_json("f".into())
             .await
@@ -706,16 +701,15 @@ fn core_signed_in_ago(base: String, name: &str, age: u64) -> (Core, Arc<Slot>, P
             logged_in_at: Some(unix_now() as u64 - age),
         })
         .unwrap();
-    let slot = Arc::new(RwLock::new(Session::for_test(
+    let core = Core::for_test(&dir);
+    let slot = core.install(Session::for_test(
         client,
         Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
             registration_number: None,
         },
-    )));
-    let core = Core::for_test(&dir);
-    core.install(Some(slot.clone()));
+    ));
     (core, slot, dir)
 }
 

@@ -36,10 +36,16 @@ async fn demo_reads_sample_pages_and_never_calls_vtop() {
     };
     let core = Core::for_test(&dir);
     let session = crate::Session::new(account.clone(), &core.shared).unwrap();
-    core.install(Some(Arc::new(RwLock::new(session))));
+    core.install(session);
     core.write_account(&account, false);
 
-    assert_eq!(core.account_status(), crate::AccountStatus::Demo);
+    assert_eq!(
+        core.account_status(),
+        crate::AccountStatus::SignedIn {
+            username: USERNAME.into(),
+            standing: crate::Standing::Demo
+        }
+    );
     let semesters = core.fetch_semesters("demo-semesters".into()).await.unwrap();
     assert_eq!(semesters.items.len(), 1);
     // A page recorded for another day stands in for this one.
@@ -109,7 +115,13 @@ async fn edge_demo_signs_in_and_every_page_reads() {
     };
     let signed = core.open_demo(account, EDGE_DEMO.as_bytes().to_vec()).await;
     assert_eq!(signed, Ok(SignIn::Done));
-    assert_eq!(core.account_status(), crate::AccountStatus::Demo);
+    assert_eq!(
+        core.account_status(),
+        crate::AccountStatus::SignedIn {
+            username: USERNAME.into(),
+            standing: crate::Standing::Demo
+        }
+    );
 
     let bundle: Bundle = serde_json::from_str(EDGE_DEMO).unwrap();
     assert!(bundle.schema <= SCHEMA, "the edge's demo needs a newer app");

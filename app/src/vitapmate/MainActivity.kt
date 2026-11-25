@@ -34,6 +34,8 @@ class MainActivity : ComponentActivity() {
         // Settings first: the core reads the developer settings when it starts.
         Settings.load(applicationContext)
         AppCore.start(applicationContext)
+        // Another student can only sign in from the app's screens: followed from here on.
+        AccountTeardown.follow(applicationContext)
         super.onCreate(savedInstanceState)
         opened(intent)
         // Keeps the background job in step with the settings (an update can drop it).

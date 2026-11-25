@@ -143,6 +143,16 @@ object Settings {
     /** The setup page after the first semester pick (app's Onboarding) was seen; shown once per install. */
     var onboarded by flag("settings_onboarded", false)
 
+    /** A semester was picked the first time, and the setup page that follows isn't done yet. */
+    var onboardingPending by flag("settings_onboarding_pending", false)
+
+    /**
+     * The student (their username, as [AccountWatch] names them) whose things Kotlin keeps:
+     * the rest of these settings, their photo and Gmail grant. Another one signing in lets go
+     * of them; null signed out, or from before this was kept.
+     */
+    var student by text("settings_student")
+
     /** Semester ids whose Wrapped was opened. */
     var wrappedSeen by ids("settings_wrapped_seen")
 
@@ -186,6 +196,7 @@ object Settings {
         syncCourse = null
         wrappedSeen = emptySet()
         wrappedHideGrades = emptySet()
+        student = null
     }
 
     /** Whether background sync notifies about changes of [kind]. */

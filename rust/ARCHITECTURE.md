@@ -109,9 +109,13 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   password the file keeps whether VTOP rejected it, on this phone's sign-in
   (`rejected`, the session's `SessionPhase::PasswordRejected` in memory) or the
   server's (`server_rejected`, from the `credentials_rejected` push, until the
-  student signs in again). Kotlin hears where the account stands (`AccountStatus`:
-  signed out, demo, signed in, password rejected by the phone or the server) from
-  `Core::watch_account` (`AccountWatch.kt`) and keeps no copy of its own. Kotlin gets the plain text only from `saved_password`, for the
+  student signs in again). Kotlin hears who is signed in and where their account
+  stands (`AccountStatus`: signed out, or the installed student's username once
+  their account is saved, with a `Standing`: good, demo, password rejected by the
+  phone or the server) from `Core::watch_account` (`AccountWatch.kt`) and keeps no
+  copy of its own: the app's phase follows it, and another username lets go of the
+  last student's Kotlin things (`AccountTeardown.follow`). A sign-in still waiting
+  for its first OTP changes nothing it reports. Kotlin gets the plain text only from `saved_password`, for the
   Account page. The log pipeline stays
   process-wide: `obs_init` runs before the core, so Kotlin's start-up lines
   (Gmail) reach the log file.

@@ -953,7 +953,8 @@ async fn a_setup_finished_after_a_sign_out_is_queued_to_leave() {
     // The sign-out came while `mail:register` was answering: the address isn't saved for the
     // next student, and this install leaves it.
     let slot = core.current().unwrap();
-    core.install(None);
+    let username = slot.read().await.account.username.clone();
+    core.uninstall();
     assert_eq!(
         core.save_new_mailbox(&slot, mailbox(ID)),
         Err(CoreError::NotSignedIn)
@@ -963,7 +964,10 @@ async fn a_setup_finished_after_a_sign_out_is_queued_to_leave() {
     assert_eq!(queue.len(), 1);
     assert_eq!(queue[0].id, ID);
     // Still signed in, with an address saved meanwhile: that one stays.
-    core.install(Some(slot.clone()));
+    core.put(crate::Signed::In {
+        slot: slot.clone(),
+        username,
+    });
     core.save_new_mailbox(&slot, mailbox("zzzzzzzzzz")).unwrap();
     core.save_new_mailbox(&slot, mailbox(ID)).unwrap();
     assert_eq!(core.saved_mailbox().unwrap().1, "zzzzzzzzzz");

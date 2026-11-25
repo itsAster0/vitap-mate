@@ -77,7 +77,7 @@ import vitapmate.ui.rememberHaptics
 /** Account (with the semester), appearance (theme, colours, tabs), diagnostics and about. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(onSignedOut: () -> Unit) {
+fun SettingsScreen() {
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
     val deviceAuth = rememberDeviceAuth()
@@ -304,7 +304,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             "Sign out",
             {
                 confirmSignOut = false
-                AccountTeardown.signOut(context, onSignedOut)
+                AccountTeardown.signOut(context)
             },
             icon = Lucide.LogOut,
             danger = true,

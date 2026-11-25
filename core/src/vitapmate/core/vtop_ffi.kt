@@ -21280,8 +21280,10 @@ public object FfiConverterTypeWrappedTime: FfiConverterRustBuffer<WrappedTime> {
 
 
 /**
- * Where the signed-in account stands, for Settings' "Needs attention", the profile and the
- * sign-in problems. Rust's alone: Kotlin hears it through [`Core::watch_account`].
+ * Who is signed in and where their account stands: the app's screens follow it (the login
+ * screen or the shell), Kotlin lets go of a student's things when another one's `username`
+ * comes, and Settings' "Needs attention", the profile and the sign-in problems read the
+ * standing. Rust's alone: Kotlin hears it through [`Core::watch_account`].
  */
 sealed class AccountStatus {
     
@@ -21289,19 +21291,12 @@ sealed class AccountStatus {
     
     
     /**
-     * The demo account: what needs a real VTOP session or the server is hidden.
+     * `username` (the VTOP login, as saved) is signed in: their account is saved and their
+     * session installed, or their password waits on the Keystore.
      */
-    object Demo : AccountStatus()
-    
-    
-    object SignedIn : AccountStatus()
-    
-    
-    /**
-     * VTOP rejected the saved password: the student updates it on the Account page.
-     */
-    data class PasswordRejected(
-        val `by`: vitapmate.core.RejectedBy) : AccountStatus()
+    data class SignedIn(
+        val `username`: kotlin.String, 
+        val `standing`: vitapmate.core.Standing) : AccountStatus()
         
     {
         
@@ -21326,10 +21321,9 @@ public object FfiConverterTypeAccountStatus : FfiConverterRustBuffer<AccountStat
     override fun read(buf: ByteBuffer): AccountStatus {
         return when(buf.getInt()) {
             1 -> AccountStatus.SignedOut
-            2 -> AccountStatus.Demo
-            3 -> AccountStatus.SignedIn
-            4 -> AccountStatus.PasswordRejected(
-                FfiConverterTypeRejectedBy.read(buf),
+            2 -> AccountStatus.SignedIn(
+                FfiConverterString.read(buf),
+                FfiConverterTypeStanding.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -21342,23 +21336,12 @@ public object FfiConverterTypeAccountStatus : FfiConverterRustBuffer<AccountStat
                 4UL
             )
         }
-        is AccountStatus.Demo -> {
-            // Add the size for the Int that specifies the variant plus the size needed for all fields
-            (
-                4UL
-            )
-        }
         is AccountStatus.SignedIn -> {
             // Add the size for the Int that specifies the variant plus the size needed for all fields
             (
                 4UL
-            )
-        }
-        is AccountStatus.PasswordRejected -> {
-            // Add the size for the Int that specifies the variant plus the size needed for all fields
-            (
-                4UL
-                + FfiConverterTypeRejectedBy.allocationSize(value.`by`)
+                + FfiConverterString.allocationSize(value.`username`)
+                + FfiConverterTypeStanding.allocationSize(value.`standing`)
             )
         }
     }
@@ -21369,17 +21352,10 @@ public object FfiConverterTypeAccountStatus : FfiConverterRustBuffer<AccountStat
                 buf.putInt(1)
                 Unit
             }
-            is AccountStatus.Demo -> {
-                buf.putInt(2)
-                Unit
-            }
             is AccountStatus.SignedIn -> {
-                buf.putInt(3)
-                Unit
-            }
-            is AccountStatus.PasswordRejected -> {
-                buf.putInt(4)
-                FfiConverterTypeRejectedBy.write(value.`by`, buf)
+                buf.putInt(2)
+                FfiConverterString.write(value.`username`, buf)
+                FfiConverterTypeStanding.write(value.`standing`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -24225,6 +24201,102 @@ public object FfiConverterTypeSignInOutcome : FfiConverterRustBuffer<SignInOutco
             is SignInOutcome.Failed -> {
                 buf.putInt(2)
                 FfiConverterOptionalString.write(value.`reason`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Where a signed-in account stands.
+ */
+sealed class Standing {
+    
+    object Good : Standing()
+    
+    
+    /**
+     * The demo account: what needs a real VTOP session or the server is hidden.
+     */
+    object Demo : Standing()
+    
+    
+    /**
+     * VTOP rejected the saved password: the student updates it on the Account page.
+     */
+    data class PasswordRejected(
+        val `by`: vitapmate.core.RejectedBy) : Standing()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStanding : FfiConverterRustBuffer<Standing>{
+    override fun read(buf: ByteBuffer): Standing {
+        return when(buf.getInt()) {
+            1 -> Standing.Good
+            2 -> Standing.Demo
+            3 -> Standing.PasswordRejected(
+                FfiConverterTypeRejectedBy.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: Standing): ULong = when(value) {
+        is Standing.Good -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is Standing.Demo -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is Standing.PasswordRejected -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeRejectedBy.allocationSize(value.`by`)
+            )
+        }
+    }
+
+    override fun write(value: Standing, buf: ByteBuffer) {
+        when(value) {
+            is Standing.Good -> {
+                buf.putInt(1)
+                Unit
+            }
+            is Standing.Demo -> {
+                buf.putInt(2)
+                Unit
+            }
+            is Standing.PasswordRejected -> {
+                buf.putInt(3)
+                FfiConverterTypeRejectedBy.write(value.`by`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
