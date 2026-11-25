@@ -161,24 +161,25 @@ impl Core {
     pub(crate) fn sweep_temporary(&self) {
         let own = std::process::id();
         let mut folders = vec![
-            (self.dir.clone(), false),
-            (self.cache.clone(), false),
-            (self.at(udp::WIRE_DIR), false),
-            (self.at(PAGES), true),
+            (self.dir.clone(), Sweep::Folder),
+            (self.cache.clone(), Sweep::Folder),
+            (self.at(udp::WIRE_DIR), Sweep::Wire),
+            (self.at(PAGES), Sweep::Tree),
         ];
         let mut removed = 0_u32;
-        while let Some((folder, deep)) = folders.pop() {
+        while let Some((folder, sweep)) = folders.pop() {
             let Ok(entries) = fs::read_dir(&folder) else {
                 continue;
             };
             for entry in entries.flatten() {
                 let path = entry.path();
+                let name = entry.file_name();
                 let is_dir = entry.file_type().is_ok_and(|kind| kind.is_dir());
                 if is_dir {
-                    if deep {
-                        folders.push((path, true));
+                    if sweep == Sweep::Tree {
+                        folders.push((path, Sweep::Tree));
                     }
-                } else if orphan(&entry.file_name(), own) {
+                } else if orphan(&name, own) || (sweep == Sweep::Wire && old_wire_temp(&name)) {
                     match fs::remove_file(&path) {
                         Ok(()) => removed += 1,
                         Err(error) => warn!(%error, "temporary file not removed"),
@@ -190,6 +191,17 @@ impl Core {
             info!(removed, "temporary files left by a crash removed");
         }
     }
+}
+
+/// How [`Core::sweep_temporary`] goes through a folder.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Sweep {
+    /// Its own files only.
+    Folder,
+    /// Its files and every folder under it (the cached pages).
+    Tree,
+    /// vtop-wire's sessions, which also had temporary files of an older name.
+    Wire,
 }
 
 /// Whether `name` is [`write_atomic`]'s temporary file (`<file>.<pid>.<n>.tmp`) from another
@@ -207,6 +219,16 @@ fn orphan(name: &OsStr, own: u32) -> bool {
         && pid
             .parse::<u32>()
             .is_ok_and(|pid| pid != own && pid <= PID_MAX)
+}
+
+/// Whether `name` is the temporary file older vtop-wire versions wrote (`<stem>.tmp<pid>`).
+/// None is being written now, whatever its pid: vtop-wire writes [`orphan`]'s name instead.
+fn old_wire_temp(name: &OsStr) -> bool {
+    name.to_str()
+        .and_then(|name| name.rsplit_once(".tmp"))
+        .is_some_and(|(stem, pid)| {
+            !stem.is_empty() && !pid.is_empty() && pid.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 /// Writes `bytes` to `path` through a temporary file beside it, synced before it replaces
@@ -255,6 +277,7 @@ mod tests {
     use std::fs;
 
     use crate::remote::backend::{KEPT_SIGN_OUT, Refresh};
+    use crate::remote::udp;
     use crate::{Core, PAGES};
 
     #[tokio::test]
@@ -335,12 +358,17 @@ mod tests {
         let dir = scratch("sweep");
         let pages = dir.join(PAGES).join("AP1").join("attendance_detail");
         fs::create_dir_all(&pages).unwrap();
+        let wire = dir.join(udp::WIRE_DIR);
+        fs::create_dir_all(&wire).unwrap();
         let own = std::process::id();
         let other = if own == 4321 { 4322 } else { 4321 };
         let orphans = [
             dir.join(format!("account.json.{other}.0.tmp")),
             dir.join(format!("account_token.json.{other}.7.tmp")),
             pages.join(format!("CSE1001.json.{other}.3.tmp")),
+            // vtop-wire's own name before it took this one (`<stem>.tmp<pid>`), any pid.
+            wire.join(format!("session.tmp{other}")),
+            wire.join(format!("session.tmp{own}")),
         ];
         let kept = [
             // This process's own write, under way.
@@ -349,6 +377,10 @@ mod tests {
             dir.join("settings.json.81234567890123.4.tmp"),
             dir.join("notes.tmp"),
             dir.join("account.json"),
+            wire.join("session.json"),
+            wire.join("session.tmpx"),
+            // The old vtop-wire name only counts in its own folder.
+            dir.join(format!("account.tmp{other}")),
         ];
         for path in orphans.iter().chain(&kept) {
             fs::write(path, "x").unwrap();
