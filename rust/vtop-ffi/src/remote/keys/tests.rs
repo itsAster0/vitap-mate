@@ -56,6 +56,9 @@ fn keys_read_from_the_account_view() {
         { "id": "ab12cd34", "label": "Browser", "createdAt": 10, "lastUsedAt": 20, "phoneId": "p", "outings": false,
           "uses": [{ "at": 20, "via": "extension" }] },
         { "id": "ef56ab78", "label": "MCP", "createdAt": 11, "lastUsedAt": null, "phoneId": "p", "outings": true },
+        // Renamed: the kind the server keeps, not the name, says what it is.
+        { "id": "cd90ef12", "label": "Chrome on my laptop", "kind": "browser", "createdAt": 12, "lastUsedAt": null, "phoneId": "p" },
+        { "id": "ab34cd56", "label": "Browser", "kind": "mcp", "createdAt": 13, "lastUsedAt": null, "phoneId": "p" },
     ]))
     .unwrap();
     let keys: Vec<AccessKey> = views.into_iter().map(AccessKey::from).collect();
@@ -72,6 +75,10 @@ fn keys_read_from_the_account_view() {
         (KeyKind::Mcp, true, None)
     );
     assert!(keys[1].uses.is_empty());
+    assert_eq!(
+        (keys[2].kind, keys[3].kind),
+        (KeyKind::Browser, KeyKind::Mcp)
+    );
 }
 
 #[test]
@@ -173,6 +180,7 @@ async fn keys_are_made_as_the_student() {
             "Make an access key",
             true,
             Some("ABCDE12345".into()),
+            Some("  Chrome on my laptop ".into()),
         )
         .await
         .unwrap();
@@ -181,11 +189,24 @@ async fn keys_are_made_as_the_student() {
         ("ab12cd34", "vtm_secret")
     );
     assert_eq!(paths(&edge), ["auth:token", "keys:create"]);
-    let edge = edge.lock().unwrap();
-    assert!(edge.requests.iter().all(|r| r.signed && r.flow == "f-key"));
+    {
+        let edge = edge.lock().unwrap();
+        assert!(edge.requests.iter().all(|r| r.signed && r.flow == "f-key"));
+        assert_eq!(
+            edge.requests[1].body,
+            json!({ "label": "Browser", "outings": true, "pairCode": "ABCDE12345", "name": "Chrome on my laptop" })
+        );
+    }
+    can(&edge, "keys:rename", 200, json!(null));
+    core.rename_key("f-rename".into(), "ab12cd34".into(), " Work laptop ".into())
+        .await
+        .unwrap();
+    let renamed = edge.lock().unwrap();
+    let call = renamed.requests.last().unwrap();
+    assert_eq!(call.path, "keys:rename");
     assert_eq!(
-        edge.requests[1].body,
-        json!({ "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
+        call.body,
+        json!({ "id": "ab12cd34", "label": "Work laptop" })
     );
 }
 
@@ -263,13 +284,21 @@ async fn refusals_read_as_what_to_do() {
         Err(CoreError::Other { reason }) => reason,
         other => panic!("{other:?}"),
     };
-    let full = core.create_key_with("f", "Key", false, None).await;
+    let full = core.create_key_with("f", "Key", false, None, None).await;
     assert!(reason(full).starts_with("Revoke a key first"));
     let bad = core
-        .create_key_with("f", "Key", false, Some("ABCDE12345".into()))
+        .create_key_with(
+            "f",
+            "Key",
+            false,
+            Some("ABCDE12345".into()),
+            Some(" ".into()),
+        )
         .await;
     assert!(reason(bad).starts_with("Check the code"));
     assert_eq!(edge.lock().unwrap().requests[1].body["label"], "MCP");
+    // A blank name isn't sent: the server names it.
+    assert!(edge.lock().unwrap().requests[2].body.get("name").is_none());
 }
 
 #[tokio::test]
@@ -280,7 +309,11 @@ async fn account_calls_never_ask_or_send_the_session() {
     let core = signed_in(&core("consent").dir, server);
     let gate = consent::tests::no(&core);
     assert!(core.connected_apps("f".into()).await.is_err());
-    assert!(core.create_key("f2".into(), false, None).await.is_err());
+    assert!(
+        core.create_key("f2".into(), false, None, None)
+            .await
+            .is_err()
+    );
     assert_eq!(gate.asks(), 0);
     assert!(edge.lock().unwrap().requests.is_empty());
 }

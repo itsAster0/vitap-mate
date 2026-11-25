@@ -226,9 +226,12 @@ export function keyIp(ips: readonly string[], ip: string): { seen: boolean; ips:
 export const MAX_KEY_USES = 10;
 
 /** An access key as the account sees it. */
+export type KeyKind = "browser" | "mcp";
+
 export type KeyRecord = {
   hash: string;
   label: string;
+  kind: KeyKind;
   createdAt: number;
   lastUsedAt: number | null;
   /** The install of the phone that created it: the only phone its session requests go to. */
@@ -400,7 +403,7 @@ export class AccountRecord {
       forwarding,
       signIns: signIns.map((s) => ({ ...s })),
       phones,
-      keys: keys.map((key) => ({ id: keyId(key.hash), label: key.label, lastUsedAt: key.lastUsedAt, uses: key.uses.map((u) => ({ ...u })) })),
+      keys: keys.map((key) => ({ id: keyId(key.hash), label: key.label, kind: key.kind, lastUsedAt: key.lastUsedAt, uses: key.uses.map((u) => ({ ...u })) })),
     };
   }
 
@@ -505,6 +508,7 @@ export class AccountRecord {
         ? keys.map((key) => ({
             id: keyId(key.hash),
             label: key.label,
+            kind: key.kind,
             createdAt: key.createdAt,
             lastUsedAt: key.lastUsedAt,
             phoneId: phoneId(key.deviceId),

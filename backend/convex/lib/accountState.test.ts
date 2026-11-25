@@ -52,7 +52,7 @@ function phone(device: string): PhoneRecord {
 }
 
 function key(hash: string, deviceId: string): KeyRecord {
-  return { hash, label: "k", createdAt: NOW, lastUsedAt: null, deviceId, outings: false, uses: [] };
+  return { hash, label: "k", kind: "mcp", createdAt: NOW, lastUsedAt: null, deviceId, outings: false, uses: [] };
 }
 
 describe("settings and ids", () => {

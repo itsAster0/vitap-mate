@@ -19,7 +19,7 @@ convex/proxy.ts         proxy:info, the Proxy route's Worker (PROXY_URL)
 convex/pair.ts          pair:info and pairing a browser or AI app
 convex/devices.ts       the install itself
 convex/sessions.ts      key holders' session requests, sessions:pending, sessions:answer, sessions:scrubRequest (30 s cookie scrub when storage off), sessions:evictMcpCache
-convex/keys.ts          access keys for the extension and MCP (revoking evicts MCP RAM cache)
+convex/keys.ts          access keys for the extension and MCP: named when made, renamed, revoked (revoking evicts MCP RAM cache)
 convex/extension.ts     the extension's live queries (extension:key, request, pairing)
 convex/guides.ts        public queries serving guides/*.json
 convex/identity.ts      internal caller check for actions

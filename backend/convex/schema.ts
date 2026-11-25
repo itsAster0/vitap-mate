@@ -138,6 +138,9 @@ export default defineSchema({
     outings: v.boolean(),
     /** Its latest uses, newest first, at most 10. */
     uses: v.array(v.object({ at: v.number(), via: v.union(v.literal("extension"), v.literal("mcp")) })),
+    /** Who it is for: the extension (paired with its code) or an AI app. Absent on keys made before
+     * it was kept, read from the label then (`keyOf`). */
+    kind: v.optional(v.union(v.literal("browser"), v.literal("mcp"))),
     /** The key's latest addresses (the extension's, or the AI app's as our engine saw it on
      * `/mcp`), newest first, at most `MAX_KEY_IPS`: a request from one not listed shows as a new
      * IP on the phone. */

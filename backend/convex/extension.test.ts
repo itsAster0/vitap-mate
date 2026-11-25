@@ -144,7 +144,10 @@ describe("live queries", () => {
     const codeHash = await sha256Hex("ABCDEFGHJK");
     expect(await t.query(api.extension.pairing, { codeHash })).toEqual({ ready: false });
     expect(await t.query(api.extension.pairing, { codeHash: "nope" })).toEqual({ ready: false });
-    await as.action(api.keys.create, { flow: "f", pairCode: "ABCDE-FGHJK" });
+    await as.action(api.keys.create, { flow: "f", pairCode: "ABCDE-FGHJK", label: "Browser", name: "Chrome on my laptop" });
+    // The student's name for it, and it stays an extension key whatever it's called.
+    const [row] = await t.run((ctx) => ctx.db.query("accessKeys").collect());
+    expect(row).toMatchObject({ label: "Chrome on my laptop", kind: "browser" });
     const approved = await t.query(api.extension.pairing, { codeHash });
     expect(approved).toEqual({ ready: true });
     const res = (await (await post(t, "/v1/pair", { code: "ABCDE-FGHJK" })).json()) as { status: string };

@@ -132,8 +132,12 @@ export async function keyRows(ctx: QueryCtx, accountId: Id<"accounts">): Promise
   return rows.sort((a, b) => a.createdAt - b.createdAt);
 }
 
+/** The label paired extension keys had before keys kept their kind (and could be renamed). */
+const OLD_BROWSER_LABEL = "Browser";
+
 export function keyOf(row: Doc<"accessKeys">): KeyRecord {
-  return { hash: row.keyHash, label: row.label, createdAt: row.createdAt, lastUsedAt: row.lastUsedAt, deviceId: row.deviceId, outings: row.outings, uses: row.uses };
+  const kind = row.kind ?? (row.label === OLD_BROWSER_LABEL ? "browser" : "mcp");
+  return { hash: row.keyHash, label: row.label, kind, createdAt: row.createdAt, lastUsedAt: row.lastUsedAt, deviceId: row.deviceId, outings: row.outings, uses: row.uses };
 }
 
 export async function keysOf(ctx: QueryCtx, accountId: Id<"accounts">): Promise<KeyRecord[]> {

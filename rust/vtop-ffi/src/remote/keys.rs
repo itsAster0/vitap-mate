@@ -251,6 +251,9 @@ pub(crate) struct KeyView {
     outings: bool,
     #[serde(default)]
     uses: Vec<UseView>,
+    /// "browser" or "mcp"; absent from a server before keys kept it (read from the label then).
+    #[serde(default)]
+    kind: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -266,10 +269,11 @@ impl From<KeyView> for AccessKey {
             _ => KeyKind::Mcp,
         };
         Self {
-            kind: if view.label == BROWSER_LABEL {
-                KeyKind::Browser
-            } else {
-                KeyKind::Mcp
+            kind: match view.kind.as_deref() {
+                Some("browser") => KeyKind::Browser,
+                Some(_) => KeyKind::Mcp,
+                None if view.label == BROWSER_LABEL => KeyKind::Browser,
+                None => KeyKind::Mcp,
             },
             uses: view
                 .uses
@@ -400,16 +404,37 @@ impl Core {
     }
 
     /// Makes a key: for the extension that shows `pair_code` (it collects the key from the server),
-    /// else for an MCP client.
+    /// else for an MCP client. `name` is what the student calls it; without one the server names
+    /// it (an AI app's own name, else "Browser" or "MCP").
     pub async fn create_key(
         &self,
         flow: String,
         outings: bool,
         pair_code: Option<String>,
+        name: Option<String>,
     ) -> Result<NewKey, CoreError> {
         traced("create_key", &flow, async {
-            self.create_key_with(&flow, "Make an access key", outings, pair_code)
+            self.create_key_with(&flow, "Make an access key", outings, pair_code, name)
                 .await
+        })
+        .await
+    }
+
+    /// Names key `id` as the student calls it.
+    pub async fn rename_key(
+        &self,
+        flow: String,
+        id: String,
+        name: String,
+    ) -> Result<(), CoreError> {
+        traced("rename_key", &flow, async {
+            let (path, action) = ("keys:rename", "Rename an access key");
+            let body = json!({ "id": id, "label": name.trim() });
+            self.account_call(&flow, Kind::Mutation, path, action, true, body)
+                .await?
+                .map_err(refused)?;
+            info!("key renamed");
+            Ok(())
         })
         .await
     }
@@ -589,6 +614,7 @@ impl Core {
         action: &str,
         outings: bool,
         pair_code: Option<String>,
+        name: Option<String>,
     ) -> Result<NewKey, CoreError> {
         let paired = pair_code.is_some();
         let mut body = json!({
@@ -597,6 +623,13 @@ impl Core {
         });
         if let Some(code) = pair_code {
             crate::json_set(&mut body, "pairCode", json!(code));
+        }
+        if let Some(name) = name
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        {
+            crate::json_set(&mut body, "name", json!(name));
         }
         // The JWT links this phone to the account, so the key is always this phone's.
         let answer = self

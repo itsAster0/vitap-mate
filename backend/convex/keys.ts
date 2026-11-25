@@ -26,7 +26,7 @@ type Created = { id: string; key: string; mcpUrl: string; app: { name: string; h
  * (`/v1/pair`), or an MCP client's authorize page gets it, named after the client. An action:
  * the key comes from real randomness. */
 export const create = action({
-  args: { flow: v.string(), label: v.optional(v.string()), outings: v.optional(v.boolean()), pairCode: v.optional(v.string()) },
+  args: { flow: v.string(), label: v.optional(v.string()), name: v.optional(v.string()), outings: v.optional(v.boolean()), pairCode: v.optional(v.string()) },
   handler: async (ctx, args): Promise<Created> => {
     const me = await actionCaller(ctx);
     if (!me.account) return fail("demo_unavailable", "The demo account can't do this.");
@@ -38,6 +38,7 @@ export const create = action({
       keyHash: await sha256Hex(key),
       codeHash: pair === undefined ? null : await sha256Hex(pair),
       label: args.label ?? null,
+      name: args.name?.trim() || null,
       outings: args.outings === true,
       mcpUrl: mcpUrl(),
     });
@@ -52,6 +53,8 @@ export const store = internalMutation({
     keyHash: v.string(),
     codeHash: v.union(v.string(), v.null()),
     label: v.union(v.string(), v.null()),
+    /** The name the student gave it; else an AI app's own name, else `label` (what older apps send). */
+    name: v.union(v.string(), v.null()),
     outings: v.boolean(),
     mcpUrl: v.string(),
   },
@@ -83,7 +86,8 @@ export const store = internalMutation({
     await ctx.db.insert("accessKeys", {
       keyHash: args.keyHash,
       accountId,
-      label: keyLabel(mcp?.name ?? args.label ?? undefined),
+      label: keyLabel(args.name ?? mcp?.name ?? args.label ?? undefined),
+      kind: args.codeHash !== null && mcp === null ? "browser" : "mcp",
       createdAt: at,
       lastUsedAt: null,
       deviceId: me.deviceId,
@@ -113,6 +117,18 @@ export const revoke = mutation({
       regno: me.regno,
     });
     log({ flow, regno: me.regno }, "keys: revoked a key");
+    return null;
+  },
+});
+
+/** Names a key as the student calls it. */
+export const rename = mutation({
+  args: { flow: v.string(), id: v.string(), label: v.string() },
+  handler: async (ctx, { flow, id, label }) => {
+    const me = await realCaller(ctx);
+    if (!label.trim()) fail("bad_request", "A key needs a name.");
+    await ctx.db.patch((await keyById(ctx, me.account._id, id))._id, { label: keyLabel(label) });
+    log({ flow, regno: me.regno }, "keys: renamed a key");
     return null;
   },
 });

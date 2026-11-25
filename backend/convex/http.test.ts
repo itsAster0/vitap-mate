@@ -119,6 +119,10 @@ describe("access keys", () => {
     await as.mutation(api.keys.setOutings, { flow: "f", id: made.id, outings: true });
     expect((await json(await t.fetch("/v1/whoami", { headers: { authorization: `Bearer ${made.key}` } }))).keyOutings).toBe(true);
     expect(await codeOf(as.mutation(api.keys.setOutings, { flow: "f", id: "nope", outings: true }))).toBe("key_not_found");
+    // Renamed: the new name shows; a blank one is refused.
+    await as.mutation(api.keys.rename, { flow: "f", id: made.id, label: "  Claude on my laptop " });
+    expect((await json(await t.fetch("/v1/whoami", { headers: { authorization: `Bearer ${made.key}` } }))).keyLabel).toBe("Claude on my laptop");
+    expect(await codeOf(as.mutation(api.keys.rename, { flow: "f", id: made.id, label: "  " }))).toBe("bad_request");
     await as.mutation(api.keys.revoke, { flow: "f", id: made.id });
     expect((await t.fetch("/v1/whoami", { headers: { authorization: `Bearer ${made.key}` } })).status).toBe(401);
     expect(await codeOf(as.mutation(api.keys.revoke, { flow: "f", id: made.id }))).toBe("key_not_found");

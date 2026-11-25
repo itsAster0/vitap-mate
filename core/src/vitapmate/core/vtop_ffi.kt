@@ -1320,6 +1320,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_pending_session_requests(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_rename_key(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_revoke_key(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_key_outings(
@@ -1679,7 +1681,7 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_connected_apps(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_link_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -1688,6 +1690,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_pair_app(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_pending_session_requests(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_rename_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`name`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_revoke_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
     ): Long
@@ -2396,7 +2400,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 52754) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 22913) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 7524) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_link_phone() and 0xFFFF) != 12987) {
@@ -2409,6 +2413,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_pending_session_requests() and 0xFFFF) != 34418) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_rename_key() and 0xFFFF) != 436) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_revoke_key() and 0xFFFF) != 40996) {
@@ -5688,9 +5695,10 @@ public interface CoreInterface {
     
     /**
      * Makes a key: for the extension that shows `pair_code` (it collects the key from the server),
-     * else for an MCP client.
+     * else for an MCP client. `name` is what the student calls it; without one the server names
+     * it (an AI app's own name, else "Browser" or "MCP").
      */
-    suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?): NewKey
+    suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?, `name`: kotlin.String?): NewKey
     
     /**
      * Links this phone to the account without making a key (after a reinstall, so the keys
@@ -5715,6 +5723,11 @@ public interface CoreInterface {
      * an identity.
      */
     suspend fun `pendingSessionRequests`(`flow`: kotlin.String): List<SessionRequest>
+    
+    /**
+     * Names key `id` as the student calls it.
+     */
+    suspend fun `renameKey`(`flow`: kotlin.String, `id`: kotlin.String, `name`: kotlin.String)
     
     suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String)
     
@@ -8039,11 +8052,12 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Makes a key: for the extension that shows `pair_code` (it collects the key from the server),
-     * else for an MCP client.
+     * else for an MCP client. `name` is what the student calls it; without one the server names
+     * it (an AI app's own name, else "Browser" or "MCP").
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?) : NewKey {
+    override suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?, `name`: kotlin.String?) : NewKey {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_vtop_ffi_fn_method_core_create_key(
@@ -8052,6 +8066,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         FfiConverterString.lower(`flow`),
         FfiConverterBoolean.lower(`outings`),
         FfiConverterOptionalString.lower(`pairCode`),
+        FfiConverterOptionalString.lower(`name`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -8166,6 +8181,34 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterSequenceTypeSessionRequest.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Names key `id` as the student calls it.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `renameKey`(`flow`: kotlin.String, `id`: kotlin.String, `name`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_rename_key(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+        FfiConverterString.lower(`name`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
         // Error FFI converter
         CoreException.ErrorHandler,
     )

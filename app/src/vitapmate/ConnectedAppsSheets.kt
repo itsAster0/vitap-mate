@@ -59,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.TriangleAlert
@@ -67,6 +68,7 @@ import vitapmate.core.AccessKey
 import vitapmate.core.KeyKind
 import vitapmate.core.LiveTopic
 import vitapmate.core.NewKey
+import vitapmate.core.PairApp
 import vitapmate.core.ServerSignIn
 import vitapmate.core.SignInOutcome
 import vitapmate.core.pairCode
@@ -102,6 +104,24 @@ private fun Sheet(tag: String, onDismiss: () -> Unit, full: Boolean = false, con
     }
 }
 
+/** The name a key goes by in Connected apps and on the approve sheet. */
+@Composable
+private fun KeyNameField(name: String, onName: (String) -> Unit, tag: String, enabled: Boolean = true, onDone: (() -> Unit)? = null) = OutlinedTextField(
+    vitapmate.ui.rememberSyncedTextFieldState(name) { onName(it) },
+    Modifier.fillMaxWidth().testTag(tag),
+    enabled = enabled,
+    label = { Text("Name") },
+    placeholder = { Text("Chrome on my laptop") },
+    inputTransformation = InputTransformation.maxLengthReject(KEY_NAME_MAX),
+    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+    onKeyboardAction = { onDone?.invoke() },
+    lineLimits = TextFieldLineLimits.SingleLine,
+    shape = MaterialTheme.shapes.large,
+)
+
+/** The server's limit for a key's name (`MAX_LABEL_CHARS`). */
+private const val KEY_NAME_MAX = 60
+
 @Composable
 private fun Note(text: String) = Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
@@ -125,6 +145,9 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
     }
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    // A code read and checked: what it pairs, waiting for its name.
+    var naming by remember { mutableStateOf<Pairing?>(null) }
+    var name by remember { mutableStateOf("") }
     val code = pairCode(text)
 
     fun pair(code: String) {
@@ -132,20 +155,27 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
             busy = true
             val app = appsCall("pair_app") { c, f -> c.pairApp(f, code) }.getOrElse { busy = false; haptics.reject(); return@launch }
             busy = false
-            deviceAuth.confirm(app?.let { "Connect ${it.name} (${it.host})" } ?: "Pair a browser") {
-                scope.launch {
-                    busy = true
-                    appsCall("pair") { c, f -> c.createKey(f, false, code) }
-                        .onSuccess {
-                            haptics.confirm()
-                            if (app == null) showToast("Browser paired", "The extension signs in to VTOP by itself now.")
-                            else showToast("${app.name} connected", "It can read your VTOP data now; outings stay off unless you turn them on.")
-                            if (!Push.canNotify(context)) notify.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            onDone()
-                        }
-                        .onFailure { haptics.reject() }
-                    busy = false
-                }
+            name = app?.name.orEmpty()
+            naming = Pairing(code, app)
+        }
+    }
+
+    fun connect(pairing: Pairing) {
+        val app = pairing.app
+        val code = pairing.code
+        deviceAuth.confirm(app?.let { "Connect ${it.name} (${it.host})" } ?: "Pair a browser") {
+            scope.launch {
+                busy = true
+                appsCall("pair") { c, f -> c.createKey(f, false, code, name.ifBlank { null }) }
+                    .onSuccess {
+                        haptics.confirm()
+                        if (app == null) showToast("Browser paired", "The extension signs in to VTOP by itself now.")
+                        else showToast("${app.name} connected", "It can read your VTOP data now; outings stay off unless you turn them on.")
+                        if (!Push.canNotify(context)) notify.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        onDone()
+                    }
+                    .onFailure { haptics.reject() }
+                busy = false
             }
         }
     }
@@ -167,6 +197,19 @@ internal fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
             runCatching { typing.requestFocus() }
         },
     )
+
+    naming?.let { pairing ->
+        Sheet("connected_apps.pair_name_sheet", onDismiss) {
+            Text(pairing.app?.let { "Name ${it.name}" } ?: "Name this browser", style = MaterialTheme.typography.titleLarge)
+            Note("It shows by this name in Connected apps and when it asks your phone for a session. You can rename it later.")
+            KeyNameField(name, { name = it }, "connected_apps.pair_name", enabled = !busy) { if (!busy) connect(pairing) }
+            Button(if (busy) null else { { connect(pairing) } }, Modifier.fillMaxWidth().testTag("connected_apps.pair_connect")) {
+                if (busy) LoadingIndicator() else Text(if (pairing.app == null) "Pair" else "Connect")
+            }
+            if (busy) Note(proofStage())
+        }
+        return
+    }
 
     Sheet("connected_apps.pair_sheet", onDismiss) {
         Text("Pair a browser", style = MaterialTheme.typography.titleLarge)
@@ -203,6 +246,7 @@ internal fun NewMcpSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
     val deviceAuth = rememberDeviceAuth()
     val haptics = rememberHaptics()
     var outings by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var made by remember { mutableStateOf<NewKey?>(null) }
 
@@ -211,6 +255,7 @@ internal fun NewMcpSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
         val key = made
         if (key == null) {
             Note("Add vitapmate to Claude or another AI app that speaks MCP. It can read your attendance, marks, timetable and other VTOP pages.")
+            KeyNameField(name, { name = it }, "connected_apps.mcp_name", enabled = !busy)
             GroupItem(
                 "Outings",
                 "connected_apps.mcp_outings",
@@ -226,7 +271,7 @@ internal fun NewMcpSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
                         deviceAuth.confirm("New MCP key") {
                             scope.launch {
                                 busy = true
-                                appsCall("new_mcp") { c, f -> c.createKey(f, outings, null) }
+                                appsCall("new_mcp") { c, f -> c.createKey(f, outings, null, name.ifBlank { null }) }
                                     .onSuccess { made = it; haptics.confirm(); onDone() }
                                     .onFailure { haptics.reject() }
                                 busy = false
@@ -270,6 +315,8 @@ internal fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Un
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     var outings by remember { mutableStateOf(key.outings) }
+    var label by remember { mutableStateOf(key.label) }
+    var renaming by remember { mutableStateOf<String?>(null) }
     var confirmRevoke by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
@@ -287,10 +334,11 @@ internal fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Un
             Box(Modifier.size(52.dp).background(MaterialTheme.colorScheme.secondaryContainer, key.kind.shape), Alignment.Center) {
                 Icon(key.kind.icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
             }
-            Column {
-                Text(key.label, style = MaterialTheme.typography.titleLarge)
+            Column(Modifier.weight(1f)) {
+                Text(label, Modifier.testTag("connected_apps.key_name"), style = MaterialTheme.typography.titleLarge)
                 Note("${key.kind.label} · made ${ago(key.createdAt)}")
             }
+            IconButton({ renaming = label }, Modifier.testTag("connected_apps.rename"), enabled = !busy) { Icon(Lucide.Pencil, "Rename") }
         }
         Box(Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 14.dp)) {
             GroupItem(
@@ -327,10 +375,33 @@ internal fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Un
         }
     }
 
+    renaming?.let { draft ->
+        AppDialog(
+            { renaming = null },
+            "Rename key",
+            "Rename",
+            {
+                renaming = null
+                scope.launch {
+                    busy = true
+                    appsCall("rename") { c, f -> c.renameKey(f, key.id, draft) }.onSuccess {
+                        label = draft.trim()
+                        haptics.confirm()
+                        onChanged()
+                    }
+                    busy = false
+                }
+            },
+            icon = Lucide.Pencil,
+            confirmEnabled = draft.isNotBlank(),
+            confirmTag = "connected_apps.rename.confirm",
+        ) { KeyNameField(draft, { renaming = it }, "connected_apps.rename_name") }
+    }
+
     if (confirmRevoke) {
         AppDialog(
             { confirmRevoke = false },
-            "Revoke ${key.label}?",
+            "Revoke $label?",
             "Revoke",
             {
                 confirmRevoke = false
@@ -338,7 +409,7 @@ internal fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Un
                     busy = true
                     appsCall("revoke") { c, f -> c.revokeKey(f, key.id) }.onSuccess {
                         haptics.confirm()
-                        showToast("Key revoked", "${key.label} no longer works.")
+                        showToast("Key revoked", "$label no longer works.")
                         onChanged()
                     }
                     busy = false
@@ -421,3 +492,6 @@ internal fun SignInsSheet(onDismiss: () -> Unit) {
         ) { Text("The server forgets these sign-ins. New ones are recorded again.") }
     }
 }
+
+/** A pairing code read and checked, before its key is named: the AI app behind it, or none for the extension. */
+private class Pairing(val code: String, val app: PairApp?)
