@@ -71,7 +71,6 @@ import com.composables.icons.lucide.GraduationCap
 import com.composables.icons.lucide.Lock
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.User
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 import vitapmate.core.CoreException
 import vitapmate.core.CoreInterface
@@ -79,6 +78,7 @@ import vitapmate.core.SignIn
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Problem
+import vitapmate.data.attempt
 import vitapmate.data.SavedPasswords
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
@@ -86,6 +86,22 @@ import vitapmate.observability.flow
 import vitapmate.ui.PasswordField
 import vitapmate.ui.ProblemBanner
 import vitapmate.ui.Space
+
+/** Where the sign-in is; one at a time. */
+internal sealed interface LoginPhase {
+    data object Form : LoginPhase
+
+    /** The form, with VTOP's no to this username and password on the fields. */
+    data object Rejected : LoginPhase
+
+    /** The form, with [problem] (offline, VTOP down, anything unexpected) in the banner. */
+    data class Failed(val problem: Problem) : LoginPhase
+
+    data object SigningIn : LoginPhase
+
+    /** VTOP asked for the emailed code: [challenge]'s sheet is up (or collapsed). */
+    data class Otp(val challenge: OtpChallenge) : LoginPhase
+}
 
 /**
  * Sign-in: VTOP username and password, then the emailed security OTP in a sheet when VTOP asks.
@@ -107,12 +123,16 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
     var username by rememberSaveable { mutableStateOf("") }
     // Not saveable: the password never goes into the saved instance state.
     var password by remember { mutableStateOf("") }
+    // What the form found missing before asking VTOP.
     var usernameError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    var rejected by remember { mutableStateOf(false) }
-    var problem by remember { mutableStateOf<Problem?>(null) }
-    var signingIn by remember { mutableStateOf(false) }
-    var otp by remember { mutableStateOf<OtpChallenge?>(null) }
+    var phase by remember { mutableStateOf<LoginPhase>(LoginPhase.Form) }
+    val signingIn = phase == LoginPhase.SigningIn
+    val rejected = phase == LoginPhase.Rejected
+    val problem = (phase as? LoginPhase.Failed)?.problem
+    val passwordMessage = passwordError ?: "VTOP didn't accept this username and password".takeIf { rejected }
+    // Typing again clears VTOP's no.
+    val edited = { if (rejected) phase = LoginPhase.Form }
     val haptics = rememberHaptics()
     val context = LocalContext.current
     // A saved password from the phone's password manager, offered once when the form opens empty.
@@ -137,11 +157,14 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
     }
 
     fun submit() {
-        if (signingIn) return
-        // A collapsed OTP prompt is still this sign-in: open it again instead of starting over.
-        otp?.let {
-            it.minimized = false
-            return
+        when (val p = phase) {
+            LoginPhase.SigningIn -> return
+            // A collapsed OTP prompt is still this sign-in: open it again instead of starting over.
+            is LoginPhase.Otp -> {
+                p.challenge.minimized = false
+                return
+            }
+            LoginPhase.Form, LoginPhase.Rejected, is LoginPhase.Failed -> {}
         }
         usernameError = "Enter your VTOP username".takeIf { username.isBlank() }
         passwordError = "Enter your VTOP password".takeIf { password.isEmpty() }
@@ -150,33 +173,31 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
             return
         }
         focusManager.clearFocus()
-        problem = null
-        rejected = false
+        phase = LoginPhase.SigningIn
         scope.launch {
-            signingIn = true
             var flowId = ""
-            try {
-                val result = flow("login.sign_in") { id ->
+            val next = attempt {
+                flow("login.sign_in") { id ->
                     flowId = id
                     core().signIn(id, username.trim(), password)
                 }
-                when (result) {
-                    is SignIn.Done -> signedIn()
-                    is SignIn.NeedsOtp -> otp = OtpChallenge(result.message, "login", "ui.login")
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: CoreException.InvalidCredentials) {
-                rejected = true
-                passwordError = "VTOP didn't accept this username and password"
-            } catch (e: CoreException.OtpRequired) {
-                otp = OtpChallenge(e.reason, "login", "ui.login")
-            } catch (e: Throwable) {
-                problem = problemOf(e, flowId)
-            } finally {
-                signingIn = false
-            }
-            Log.info("ui.login", "sign-in result", flowId, mapOf("otp" to "${otp != null}", "rejected" to "$rejected", "problem" to "${problem?.kind}"))
+            }.fold(
+                { result ->
+                    when (result) {
+                        is SignIn.Done -> LoginPhase.Form.also { signedIn() }
+                        is SignIn.NeedsOtp -> LoginPhase.Otp(OtpChallenge(result.message, "login", "ui.login"))
+                    }
+                },
+                { e ->
+                    when (e) {
+                        is CoreException.InvalidCredentials -> LoginPhase.Rejected
+                        is CoreException.OtpRequired -> LoginPhase.Otp(OtpChallenge(e.reason, "login", "ui.login"))
+                        else -> LoginPhase.Failed(problemOf(e, flowId))
+                    }
+                },
+            )
+            phase = next
+            Log.info("ui.login", "sign-in result", flowId, mapOf("otp" to "${next is LoginPhase.Otp}", "rejected" to "${next == LoginPhase.Rejected}", "problem" to "${(next as? LoginPhase.Failed)?.problem?.kind}"))
         }
     }
 
@@ -229,7 +250,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                 Spacer(Modifier.height(Space.xl))
                 AnimatedVisibility(problem != null) {
                     problem?.let {
-                        ProblemBanner(it, { problem = null }, Modifier.padding(bottom = Space.lg), onRetry = ::submit, onSignIn = null)
+                        ProblemBanner(it, { phase = LoginPhase.Form }, Modifier.padding(bottom = Space.lg), onRetry = ::submit, onSignIn = null)
                     }
                 }
                 // One segmented block of the two fields, as on the Account page.
@@ -239,7 +260,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     vitapmate.ui.rememberSyncedTextFieldState(username) {
                         username = it
                         usernameError = null
-                        rejected = false
+                        edited()
                     },
                     Modifier.fillMaxWidth().padding(4.dp).testTag("login.username").semantics { contentType = ContentType.Username },
                     enabled = !signingIn,
@@ -259,21 +280,21 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     colors = fieldColors,
                 )
                 }
-                Box(segmentModifier(passwordError != null), Alignment.CenterStart) {
+                Box(segmentModifier(passwordMessage != null), Alignment.CenterStart) {
                 PasswordField(
                     password,
                     {
                         password = it
                         passwordError = null
-                        rejected = false
+                        edited()
                     },
                     "Password",
                     "login.password",
                     Modifier.fillMaxWidth().padding(4.dp).focusRequester(passwordFocus),
                     enabled = !signingIn,
-                    isError = passwordError != null,
-                    leadingIcon = { circle(Lucide.Lock, passwordError != null) },
-                    supportingText = passwordError?.let { { Text(it, Modifier.testTag("login.password.error")) } },
+                    isError = passwordMessage != null,
+                    leadingIcon = { circle(Lucide.Lock, passwordMessage != null) },
+                    supportingText = passwordMessage?.let { { Text(it, Modifier.testTag("login.password.error")) } },
                     onKeyboardAction = { submit() },
                     shape = MaterialTheme.shapes.large,
                     colors = fieldColors,
@@ -311,39 +332,32 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
         }
     }
 
-    otp?.let { challenge ->
+    (phase as? LoginPhase.Otp)?.challenge?.let { challenge ->
         OtpSheet(
             challenge,
             onSubmit = {
                 scope.launch {
-                    try {
-                        if (challenge.submit(core())) {
-                            haptics.confirm()
-                            otp = null
-                            signedIn()
-                        } else if (challenge.error != null) {
-                            haptics.reject()
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
+                    attempt { challenge.submit(core()) }.fold(
+                        { done ->
+                            if (done) {
+                                haptics.confirm()
+                                phase = LoginPhase.Form
+                                signedIn()
+                            } else if (challenge.error != null) {
+                                haptics.reject()
+                            }
+                        },
                         // The sign-in can't go on (session gone, VTOP changed): start again from the form.
-                        otp = null
-                        problem = problemOf(e, challenge.lastFlow)
-                    }
+                        { e -> phase = LoginPhase.Failed(problemOf(e, challenge.lastFlow)) },
+                    )
                 }
             },
             onResend = { scope.launch { challenge.resend(core()) } },
             onCancel = {
-                otp = null
+                phase = LoginPhase.Form
                 AppScope.launch {
-                    try {
-                        flow("login.cancel_otp") { id -> core().cancelOtp(id) }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Throwable) {
-                        // Signed out meanwhile or nothing pending: logged by flow().
-                    }
+                    // Signed out meanwhile or nothing pending: logged by flow().
+                    attempt { flow("login.cancel_otp") { id -> core().cancelOtp(id) } }
                 }
             },
             core = core,
