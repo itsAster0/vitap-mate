@@ -2302,7 +2302,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_has_server_identity() and 0xFFFF) != 48438) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_live_watch() and 0xFFFF) != 14389) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_live_watch() and 0xFFFF) != 48880) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_prove_in_background() and 0xFFFF) != 60927) {
@@ -2503,13 +2503,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_proofsocket_shutdown() and 0xFFFF) != 9822) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_change() and 0xFFFF) != 22824) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_change() and 0xFFFF) != 27609) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_error() and 0xFFFF) != 1281) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_livelistener_on_error() and 0xFFFF) != 30175) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_livewatch_stop() and 0xFFFF) != 58521) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_livewatch_stop() and 0xFFFF) != 6120) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_attended() and 0xFFFF) != 63750) {

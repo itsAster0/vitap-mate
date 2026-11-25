@@ -15,7 +15,8 @@ use vtop_shared::device_sig;
 
 use crate::Core;
 use crate::convex::CallError;
-use crate::remote::backend::{Backend, Kind, Refresh};
+use crate::remote::backend::identity::Refresh;
+use crate::remote::backend::{Backend, Kind};
 use crate::remote::server_code::ServerCode;
 
 /// One call the fake server got.

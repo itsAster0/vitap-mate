@@ -11,7 +11,7 @@
 
 use tracing::info;
 
-use super::{KeptSignOut, RENEW_AHEAD_MS, Refresh};
+use super::identity::{KeptSignOut, RENEW_AHEAD_MS, Refresh};
 use crate::device::EdgeError;
 use crate::remote::server_code::ServerCode;
 

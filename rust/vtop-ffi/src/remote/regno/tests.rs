@@ -5,7 +5,8 @@ use std::sync::{Arc, Mutex};
 use serde_json::{Value, json};
 
 use super::*;
-use crate::remote::backend::{KEPT_SIGN_OUT, KeptSignOut, Kind};
+use crate::remote::backend::Kind;
+use crate::remote::backend::identity::{KEPT_SIGN_OUT, KeptSignOut};
 use crate::remote::consent::tests::{TestGate, install};
 use crate::test_edge::{Edge, REFRESH, keep_token, paths, serve, signed_in};
 

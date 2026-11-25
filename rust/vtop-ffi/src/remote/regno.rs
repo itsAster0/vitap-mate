@@ -2,7 +2,7 @@
 //! server identity (the account proof, its JWT and refresh token, and everything that goes
 //! with it: Connected apps, mail forwarding, push, the server routes) names the student, so
 //! none is taken until they said Share: [`Core::regno_allowed`] is the one check, made where
-//! the JWT is got (`backend.rs`, `take_identity`). Stopping signs this install out of the
+//! the JWT is got (`backend/identity.rs`, `take_identity`). Stopping signs this install out of the
 //! server: a kept refresh token is sent only to revoke itself. Separate from cookie consent
 //! (`consent.rs`), which is about the VTOP session.
 //!

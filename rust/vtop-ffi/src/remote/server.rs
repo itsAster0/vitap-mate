@@ -433,7 +433,7 @@ impl Core {
                     info!(everywhere, "signed out of the server");
                     self.forget_identity();
                 }
-                Err(error) if crate::remote::backend::signed_out_already(&error) => {
+                Err(error) if crate::remote::backend::identity::signed_out_already(&error) => {
                     info!(code = error.code(), "already signed out of the server");
                     self.forget_identity();
                 }

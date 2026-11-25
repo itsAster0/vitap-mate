@@ -1,9 +1,16 @@
 use std::fs;
 use std::sync::{Arc, Mutex};
 
+use serde_json::{Value, json};
+
 use super::auth::GrantKind;
+use super::identity::{KEPT_SIGN_OUT, KeptAfter, KeptSignOut, Refresh};
+use super::live::{LiveError, LiveListener, LiveTopic};
 use super::*;
+use crate::device::EdgeError;
+use crate::remote::account_token;
 use crate::test_edge::{Edge, REFRESH, keep_token, paths, serve, signed_in};
+use crate::{Core, CoreError};
 
 async fn setup(name: &str) -> (Core, Arc<Mutex<Edge>>, String) {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-backend-{name}-{}", std::process::id()));
@@ -205,27 +212,6 @@ async fn a_missing_function_reads_as_not_found() {
     assert_eq!(answer.unwrap_err().code(), "not_found");
 }
 
-#[test]
-fn convex_errors_keep_their_code_and_text() {
-    let error = CallError::Convex {
-        message: "Uncaught ConvexError".into(),
-        data: json!({ "code": "key_limit", "error": "Too many keys." }),
-    };
-    match edge_error("keys:create", error) {
-        EdgeError::Status { code, message } => {
-            assert_eq!(
-                (code.as_str(), message.as_str()),
-                ("key_limit", "Too many keys.")
-            );
-        }
-        EdgeError::Offline => panic!("offline"),
-    }
-    assert!(matches!(
-        edge_error("x:y", CallError::Closed),
-        EdgeError::Offline
-    ));
-}
-
 #[derive(Default)]
 struct Heard(Mutex<Vec<String>>);
 
@@ -274,22 +260,6 @@ async fn live_watches_follow_as_the_student() {
     ));
 }
 
-#[test]
-fn held_watches_renew_the_jwt_a_minute_early() {
-    let expires = 1_000_000;
-    let due = Some(expires - RENEW_AHEAD_MS);
-    // Far off: it looks again within the check, to notice the watches went.
-    assert_eq!(renew_in(due, 0), Some(KEEP_CHECK));
-    assert_eq!(
-        renew_in(due, expires - RENEW_AHEAD_MS - 5_000),
-        Some(Duration::from_secs(5))
-    );
-    // Due, past due, or no JWT yet: renewed now.
-    assert_eq!(renew_in(due, expires - RENEW_AHEAD_MS), None);
-    assert_eq!(renew_in(due, expires), None);
-    assert_eq!(renew_in(None, 0), None);
-}
-
 #[tokio::test]
 async fn a_sign_out_the_server_missed_is_sent_later() {
     let (core, edge, server) = setup("signout-later").await;
@@ -306,21 +276,6 @@ async fn a_sign_out_the_server_missed_is_sent_later() {
         paths(&edge).last().map(String::as_str),
         Some("auth:signOut")
     );
-}
-
-#[test]
-fn kept_sign_out_format_roundtrips() {
-    // An older version's file: the refresh token alone.
-    let old = json!({ "server": "https://s", "token": "vrt_1", "regno": "22BCE0001" });
-    let kept: KeptSignOut = serde_json::from_value(old).unwrap();
-    assert_eq!(kept.refresh.token, "vrt_1");
-    assert!(!kept.everywhere);
-    let text = json!({
-        "server": "https://s", "token": "vrt_1", "regno": "22BCE0001", "everywhere": true,
-    });
-    let kept: KeptSignOut = serde_json::from_value(text.clone()).unwrap();
-    assert!(kept.everywhere);
-    assert_eq!(serde_json::to_value(&kept).unwrap(), text);
 }
 
 #[tokio::test]
@@ -467,79 +422,4 @@ async fn trailing_slash_on_saved_server_still_uses_kept_refresh_token() {
     can(&edge, "account:view", 200, json!({ "thisPhone": true }));
     view(&core, "f", false).await.unwrap().unwrap();
     assert_eq!(paths(&edge), ["auth:token", "account:view"]);
-}
-
-#[test]
-fn renewal_coordinator_coalesces_requests_and_stops_when_watches_drop() {
-    let mut renewal = Renewal::default();
-    let now = Instant::now();
-    let held_a = Arc::new(());
-    let held_b = Arc::new(());
-    assert!(renewal.watch(&held_a, "f1"), "first watch starts thread");
-    assert!(!renewal.watch(&held_b, "f2"), "second watch reuses thread");
-
-    // Multiple unauthenticated watch failures coalesce into one immediate run and dedupe listeners.
-    let listener_a: Arc<dyn LiveListener> = Arc::new(Heard::default());
-    let listener_b: Arc<dyn LiveListener> = Arc::new(Heard::default());
-    assert!(!renewal.request_now("f1", listener_a.clone()));
-    assert!(!renewal.request_now("f1", listener_a.clone()));
-    assert!(!renewal.request_now("f2", listener_b.clone()));
-    assert_eq!(renewal.pending.len(), 2);
-
-    assert_eq!(
-        renewal.decide(Some(1_000_000), 0, now),
-        RenewDecision::Run { flow: "f2".into() }
-    );
-    assert_eq!(renewal.phase, RenewPhase::Renewing);
-
-    // Server change pokes the coordinator without spawning a second thread.
-    renewal.poke();
-    assert!(renewal.running);
-
-    // No identity stops the coordinator and returns both pending listeners to notify.
-    let (stop, notify) = renewal.finish(&Err(CoreError::ConsentDenied), now);
-    assert!(stop);
-    assert_eq!(notify.len(), 2);
-    assert!(!renewal.running);
-
-    // Restarting then dropping all watches cleanly transitions to Stop.
-    assert!(renewal.watch(&held_a, "f3"));
-    drop(held_a);
-    drop(held_b);
-    assert_eq!(renewal.decide(Some(1_000_000), 0, now), RenewDecision::Stop);
-    assert!(!renewal.running);
-}
-
-#[test]
-fn live_errors_say_what_the_app_does_next() {
-    let status = |code, message: &str| EdgeError::Status {
-        code,
-        message: message.into(),
-    };
-    for code in [
-        ServerCode::Unauthenticated,
-        ServerCode::ServerError,
-        ServerCode::NotFound,
-        ServerCode::BadRequest,
-    ] {
-        assert_eq!(LiveError::of(status(code, "x")), LiveError::Transient);
-    }
-    assert_eq!(
-        LiveError::of(status(ServerCode::DeviceRemoved, "Removed.")),
-        LiveError::NoIdentity {
-            message: "Removed.".into()
-        }
-    );
-    assert_eq!(
-        LiveError::of(status(ServerCode::Unknown("mailbox_full".into()), "Full.")),
-        LiveError::Stopped {
-            message: "Full.".into()
-        }
-    );
-    assert_eq!(
-        LiveError::of(EdgeError::Offline),
-        LiveError::Stopped {
-            message: "The server can't be reached.".into()
-        }
-    );
 }

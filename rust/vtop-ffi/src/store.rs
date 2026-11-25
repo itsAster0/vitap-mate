@@ -285,7 +285,7 @@ fn decode<T: DeserializeOwned>(file: &str, bytes: &[u8]) -> Option<T> {
 mod tests {
     use std::fs;
 
-    use crate::remote::backend::{KEPT_SIGN_OUT, Refresh};
+    use crate::remote::backend::identity::{KEPT_SIGN_OUT, Refresh};
     use crate::remote::udp;
     use crate::{Core, PAGES};
 

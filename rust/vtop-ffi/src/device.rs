@@ -10,7 +10,8 @@ use serde_json::{Value, json};
 use tracing::info;
 use vtop_shared::{device_sig, mail_seal};
 
-use crate::remote::backend::{Kind, Refresh};
+use crate::remote::backend::Kind;
+use crate::remote::backend::identity::Refresh;
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, traced, unix_now};
 
