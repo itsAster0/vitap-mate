@@ -18,6 +18,23 @@ export type APIErrorResponse = {
   error?: string;
 };
 
+export type LoginErrorKind = "cancelled" | "key_unknown" | "unreachable" | "expired" | "failed";
+
+/** Typed error for extension sign-in flows so callers switch on `kind`, never message text. */
+export class LoginError extends Error {
+  readonly kind: LoginErrorKind;
+
+  constructor(kind: LoginErrorKind, message: string) {
+    super(message);
+    this.name = "LoginError";
+    this.kind = kind;
+  }
+}
+
+export function isLoginError(err: unknown, kind?: LoginErrorKind): err is LoginError {
+  return err instanceof LoginError && (kind === undefined || err.kind === kind);
+}
+
 export function validateCookies(cookies: CookieEditorCookie[]) {
   if (cookies.length === 0) throw new Error("The server sent no VTOP cookies. Try again.");
 

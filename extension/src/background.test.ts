@@ -256,9 +256,10 @@ describe("background login flow", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(env.tabsUpdated).toEqual([{ tabId: 7, url: VTOP_CONTENT_URL }]);
-    expect(bg.getState().phase).toBe("done");
-    expect(bg.getState().via).toBe("browser");
-    expect(bg.getState().log.some((e) => e.text.includes("Firefox is still signed in"))).toBe(true);
+    const state = bg.getState();
+    expect(state.phase).toBe("done");
+    expect(state.phase === "done" && state.via).toBe("browser");
+    expect(state.log.some((e) => e.text.includes("Firefox is still signed in"))).toBe(true);
     expect(env.localStore.get("lastLogin")).toMatchObject({ via: "browser" });
   });
 
@@ -283,8 +284,9 @@ describe("background login flow", () => {
     expect(env.cookieValues()).toEqual({ JSESSIONID: "fresh-1" });
     expect(env.tabsUpdated).toEqual([{ tabId: 9, url: VTOP_CONTENT_URL }]);
     expect(bg.getState().phase).toBe("done");
-    expect(bg.getState().via).toBe("phone");
-    expect(bg.getState().source).toMatchObject({ from: "phone", cached: true });
+    const doneState = bg.getState();
+    expect(doneState.phase === "done" && doneState.via).toBe("phone");
+    expect(doneState.phase === "done" && doneState.source).toMatchObject({ from: "phone", cached: true });
     expect(env.tabMessages.at(-1)?.message).toEqual({
       type: "VTOP_MATE_LOADING",
       text: "Signed in",

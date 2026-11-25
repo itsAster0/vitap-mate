@@ -3,7 +3,7 @@
   import Icon from "./Icon.svelte";
   import type { IconName } from "./icons";
   import { cookiePath, wavePath } from "./shapes";
-  import type { LastLogin, LoginPhase, LoginState } from "./state";
+  import { handedOverOf, sourceOf, viaOf, type LastLogin, type LoginPhase, type LoginState, type LoginVia } from "./state";
 
   let {
     login,
@@ -40,19 +40,17 @@
   const NODE_RANK: Record<Node, number> = { chrome: 0, edge: 1, phone: 2, server: 2, vtop: 3 };
 
   function look(node: Node, s: LoginState): NodeLook {
-    const failed = s.phase === "error";
-    const phase = failed ? (s.failedPhase ?? "idle") : s.phase;
-    const rank = RANK[phase];
     if (s.phase === "idle") return "idle";
+    const failed = s.phase === "error";
+    const phase = failed ? s.failedPhase : s.phase;
+    const rank = RANK[phase];
+    const via = viaOf(s);
     // The browser was still signed in: the session never left it.
-    if (s.via === "browser" && node !== "chrome" && node !== "vtop") return "skip";
+    if (via === "browser" && node !== "chrome" && node !== "vtop") return "skip";
     if (node === "phone" || node === "server") {
-      const used = s.via === node || phase === node;
+      const used = via === node || phase === node;
       // The phone was asked first and the server took over.
-      const handedOver =
-        node === "phone" &&
-        (s.via === "server" || phase === "server") &&
-        s.log.some((e) => e.text.startsWith("Waiting for your phone"));
+      const handedOver = node === "phone" && (via === "server" || phase === "server") && Boolean(handedOverOf(s));
       if (rank < 2) return "idle";
       if (handedOver) return "skip";
       if (!used) return "skip";
@@ -72,7 +70,9 @@
       ? {
           phase: "done",
           text: "",
-          via: lastLogin.source?.from === "server" ? "server" : (lastLogin.via as LoginState["via"]),
+          via: lastLogin.source?.from === "server" ? "server" : (lastLogin.via as LoginVia | undefined),
+          startedAt: lastLogin.at - lastLogin.ms,
+          finishedAt: lastLogin.at,
           log: [],
         }
       : login,
@@ -91,8 +91,13 @@
     return to === "done" || to === "now" || to === "err" ? "on" : "";
   }
 
+  const deadline = $derived(
+    login.phase === "request" || login.phase === "phone" || login.phase === "server"
+      ? login.deadline
+      : undefined,
+  );
   const secondsLeft = $derived(
-    login.deadline && login.deadline > now ? Math.ceil((login.deadline - now) / 1000) : 0,
+    deadline && deadline > now ? Math.ceil((deadline - now) / 1000) : 0,
   );
   const serverIn = $derived(
     login.phase === "phone" && login.serverDueAt && login.serverDueAt > now
@@ -100,13 +105,15 @@
       : 0,
   );
   const elapsed = $derived(
-    login.startedAt ? ((login.finishedAt ?? now) - login.startedAt) / 1000 : 0,
+    login.phase === "idle"
+      ? 0
+      : ((login.phase === "done" || login.phase === "error" ? login.finishedAt : now) - login.startedAt) / 1000,
   );
 
   /** The hero: its tone, icon, headline and line under it. */
   const hero = $derived.by(() => {
     if (login.phase === "error") {
-      const text = login.error ?? "The sign-in failed.";
+      const text = login.error;
       const cut = text.indexOf(". ");
       return {
         tone: "bad",
@@ -181,8 +188,9 @@
     };
   });
 
+  const loginSource = $derived(sourceOf(login));
   const cookieSource = $derived(
-    login.phase !== "idle" ? sourceText(login.via, login.source, now) : "",
+    login.phase !== "idle" ? sourceText(viaOf(login), loginSource, now) : "",
   );
 </script>
 
@@ -233,7 +241,7 @@
     </div>
   </div>
 
-  {#if running && login.deadline}
+  {#if running && deadline}
     <div class="wave">
       <svg viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true">
         <defs>
@@ -259,7 +267,7 @@
   {/if}
 
   {#if cookieSource}
-    <div class="source" class:reused={login.source?.cached}>
+    <div class="source" class:reused={loginSource?.cached}>
       <Icon name="cookie" size={14} />{cookieSource}
     </div>
   {/if}

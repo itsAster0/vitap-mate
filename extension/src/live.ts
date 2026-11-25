@@ -5,7 +5,7 @@
 
 import { ConvexClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { UNKNOWN_KEY_MESSAGE, fetchWithTimeout } from "./bridge";
+import { LoginError, UNKNOWN_KEY_MESSAGE, fetchWithTimeout } from "./bridge";
 
 /** `extension:key`: the key's account, or null once it is revoked. Times in seconds. */
 export type KeyView = {
@@ -123,10 +123,10 @@ export function waitForRequest(
   onProgress: (view: Extract<RequestView, { status: "pending" }>) => void,
   firstAnswerMs = FIRST_ANSWER_MS,
 ): Promise<Extract<RequestView, { status: "ready" }>> {
-  if (signal.aborted) return Promise.reject(new Error(CANCELLED));
+  if (signal.aborted) return Promise.reject(new LoginError("cancelled", CANCELLED));
   return new Promise((resolve, reject) => {
     let expiry: ReturnType<typeof setTimeout> | undefined;
-    const silent = setTimeout(() => finish(new Error(UNREACHABLE_MESSAGE)), firstAnswerMs);
+    const silent = setTimeout(() => finish(new LoginError("unreachable", UNREACHABLE_MESSAGE)), firstAnswerMs);
     const stop = client.onUpdate(
       queries.request,
       { requestId },
@@ -135,26 +135,28 @@ export function waitForRequest(
         switch (view.status) {
           case "pending":
             if (expiry === undefined) {
-              expiry = setTimeout(() => finish(new Error(EXPIRED)), Math.max(0, view.expiresAt - Date.now()));
+              expiry = setTimeout(() => finish(new LoginError("expired", EXPIRED)), Math.max(0, view.expiresAt - Date.now()));
             }
             onProgress(view);
             return;
           case "ready":
             return finish(null, view);
           case "error":
-            return finish(new Error(view.error.replace(/^[a-z_]+:\s*/, "") || "The sign-in failed. Try again."));
+            return finish(
+              new LoginError("failed", view.error.replace(/^[a-z_]+:\s*/, "") || "The sign-in failed. Try again."),
+            );
           case "key_unknown":
-            return finish(new Error(UNKNOWN_KEY_MESSAGE));
+            return finish(new LoginError("key_unknown", UNKNOWN_KEY_MESSAGE));
           case "not_found":
-            return finish(new Error(EXPIRED));
+            return finish(new LoginError("expired", EXPIRED));
         }
       },
-      () => finish(new Error(UNREACHABLE_MESSAGE)),
+      () => finish(new LoginError("unreachable", UNREACHABLE_MESSAGE)),
     );
-    const onAbort = () => finish(new Error(CANCELLED));
+    const onAbort = () => finish(new LoginError("cancelled", CANCELLED));
     signal.addEventListener("abort", onAbort, { once: true });
 
-    function finish(error: Error | null, view?: Extract<RequestView, { status: "ready" }>) {
+    function finish(error: LoginError | null, view?: Extract<RequestView, { status: "ready" }>) {
       clearTimeout(silent);
       clearTimeout(expiry);
       signal.removeEventListener("abort", onAbort);

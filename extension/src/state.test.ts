@@ -5,10 +5,11 @@ import {
   createIdleState,
   getSessionStorage,
   isInProgressPhase,
+  isLoginState,
   loadLoginState,
   normalizeRestoredLoginState,
   saveLoginState,
-  type LoginPhase,
+  type InProgressPhase,
   type LoginState,
   type SessionStorageApi,
 } from "./state";
@@ -91,20 +92,46 @@ describe("login state persistence and recovery", () => {
     expect(storage.writeCount()).toBe(1);
   });
 
-  it.each<LoginPhase>(["check", "request", "phone", "server", "cookies", "open"])(
+  it.each<InProgressPhase>(["check", "request", "phone", "server", "cookies", "open"])(
     "normalizes interrupted in-progress phase %s when no login is in flight",
     async (phase) => {
       expect(isInProgressPhase(phase)).toBe(true);
       const storage = fakeSessionStorage();
-      const midLogin: LoginState = {
-        phase,
-        text: "Working…",
-        via: phase === "server" ? "server" : "phone",
-        startedAt: 1000,
-        deadline: 121_000,
-        serverDueAt: 16_000,
-        log: [{ at: 1000, text: "Working…" }],
-      };
+      const midLogin: LoginState =
+        phase === "phone"
+          ? {
+              phase: "phone",
+              text: "Working…",
+              via: "phone",
+              startedAt: 1000,
+              deadline: 121_000,
+              serverDueAt: 16_000,
+              log: [{ at: 1000, text: "Working…" }],
+            }
+          : phase === "server"
+            ? {
+                phase: "server",
+                text: "Working…",
+                via: "server",
+                startedAt: 1000,
+                deadline: 121_000,
+                loginStep: "waiting_otp",
+                log: [{ at: 1000, text: "Working…" }],
+              }
+            : phase === "check"
+              ? {
+                  phase: "check",
+                  text: "Working…",
+                  startedAt: 1000,
+                  log: [{ at: 1000, text: "Working…" }],
+                }
+              : {
+                  phase,
+                  text: "Working…",
+                  via: "phone",
+                  startedAt: 1000,
+                  log: [{ at: 1000, text: "Working…" }],
+                };
 
       await saveLoginState(midLogin, storage.api);
       const restored = await loadLoginState(false, storage.api, 5000);
@@ -112,16 +139,16 @@ describe("login state persistence and recovery", () => {
       expect(restored).toEqual({
         phase: "error",
         text: INTERRUPTED_ERROR,
-        via: midLogin.via,
+        via: phase === "check" ? undefined : phase === "server" ? "server" : "phone",
+        source: undefined,
+        handedOver: undefined,
         startedAt: 1000,
         finishedAt: 5000,
-        deadline: undefined,
-        serverDueAt: undefined,
         error: INTERRUPTED_ERROR,
         failedPhase: phase,
         log: [
           { at: 1000, text: "Working…" },
-          { at: 5000, text: "Interrupted" },
+          { at: 5000, text: "Interrupted", failed: true },
         ],
       });
 
@@ -132,6 +159,15 @@ describe("login state persistence and recovery", () => {
       expect(storage.writeCount()).toBe(2);
     },
   );
+
+  it("rejects phase-invalid states in isLoginState", () => {
+    expect(isLoginState({ phase: "error", text: "x", startedAt: 1, finishedAt: 2, log: [] })).toBe(false);
+    expect(isLoginState({ phase: "done", text: "x", startedAt: 1, log: [] })).toBe(false);
+    expect(isLoginState({ phase: "phone", text: "x", startedAt: 1, via: "server", log: [] })).toBe(false);
+    expect(isLoginState({ phase: "server", text: "x", startedAt: 1, via: "server", loginStep: "bogus", log: [] })).toBe(
+      false,
+    );
+  });
 
   it("keeps in-progress state intact when a login is currently in flight", () => {
     const active: LoginState = {

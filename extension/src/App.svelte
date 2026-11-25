@@ -331,15 +331,15 @@
             <div class="log-title">Steps</div>
             {#each login.log as entry, i}
               {@const last = i === login.log.length - 1}
-              {@const failed =
-                entry.text === "Failed" || entry.text === "Cancelled" || entry.text === "Interrupted"}
+              {@const failed = Boolean(entry.failed)}
+              {@const startedAt = login.phase === "idle" ? entry.at : login.startedAt}
               <div
                 class="step"
                 class:now={last && running}
                 class:fail={failed}
                 class:done={!failed && !(last && running)}
               >
-                <span class="at">{((entry.at - (login.startedAt ?? entry.at)) / 1000).toFixed(1)}s</span>
+                <span class="at">{((entry.at - startedAt) / 1000).toFixed(1)}s</span>
                 <span class="pip"></span>
                 <span>{entry.text}</span>
               </div>

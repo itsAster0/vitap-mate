@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UNKNOWN_KEY_MESSAGE } from "./bridge";
+import { LoginError, UNKNOWN_KEY_MESSAGE, type LoginErrorKind } from "./bridge";
 import {
   CANCELLED,
   UNREACHABLE_MESSAGE,
@@ -53,46 +53,51 @@ describe("waitForRequest", () => {
     expect(f.stopped()).toBe(1);
   });
 
-  it("rejects with what to do", async () => {
-    for (const [view, message] of [
-      [{ status: "error", code: "x", error: "phone_timeout: Open the app.", expiresAt: 0 }, "Open the app."],
-      [{ status: "key_unknown" }, UNKNOWN_KEY_MESSAGE],
-      [{ status: "not_found" }, /did not answer/],
-    ] as [RequestView, string | RegExp][]) {
+  it("rejects with typed LoginError kinds and messages", async () => {
+    for (const [view, kind, message] of [
+      [{ status: "error", code: "x", error: "phone_timeout: Open the app.", expiresAt: 0 }, "failed", "Open the app."],
+      [{ status: "key_unknown" }, "key_unknown", UNKNOWN_KEY_MESSAGE],
+      [{ status: "not_found" }, "expired", /did not answer/],
+    ] as [RequestView, LoginErrorKind, string | RegExp][]) {
       const f = fakeClient();
       const wait = waitForRequest(f.client, "r", new AbortController().signal, () => {});
       f.push(view);
+      await expect(wait).rejects.toThrow(LoginError);
+      await expect(wait).rejects.toMatchObject({ kind });
       await expect(wait).rejects.toThrow(message);
     }
     const f = fakeClient();
     const wait = waitForRequest(f.client, "r", new AbortController().signal, () => {});
     f.fail();
-    await expect(wait).rejects.toThrow(UNREACHABLE_MESSAGE);
+    await expect(wait).rejects.toMatchObject({ kind: "unreachable", message: UNREACHABLE_MESSAGE });
   });
 
   it("gives up on a silent socket, at expiry, and when cancelled", async () => {
     vi.useFakeTimers();
     const silent = waitForRequest(fakeClient().client, "r", new AbortController().signal, () => {}, 1000);
     vi.advanceTimersByTime(1000);
-    await expect(silent).rejects.toThrow(UNREACHABLE_MESSAGE);
+    await expect(silent).rejects.toMatchObject({ kind: "unreachable", message: UNREACHABLE_MESSAGE });
 
     const f = fakeClient();
     const expiring = waitForRequest(f.client, "r", new AbortController().signal, () => {});
     f.push(pending({ expiresAt: Date.now() + 5000 }));
     vi.advanceTimersByTime(5000);
-    await expect(expiring).rejects.toThrow(/did not answer/);
+    await expect(expiring).rejects.toMatchObject({ kind: "expired" });
 
     const abort = new AbortController();
     const cancelled = waitForRequest(fakeClient().client, "r", abort.signal, () => {});
     abort.abort();
-    await expect(cancelled).rejects.toThrow(CANCELLED);
+    await expect(cancelled).rejects.toMatchObject({ kind: "cancelled", message: CANCELLED });
 
     // Already-aborted signal rejects at once without subscribing.
     const preAborted = new AbortController();
     preAborted.abort();
     const onUpdate = vi.fn();
     const unusedClient = { onUpdate, close: async () => {} } as unknown as LiveClient;
-    await expect(waitForRequest(unusedClient, "r", preAborted.signal, () => {})).rejects.toThrow(CANCELLED);
+    await expect(waitForRequest(unusedClient, "r", preAborted.signal, () => {})).rejects.toMatchObject({
+      kind: "cancelled",
+      message: CANCELLED,
+    });
     expect(onUpdate).not.toHaveBeenCalled();
   });
 });

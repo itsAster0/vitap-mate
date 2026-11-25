@@ -1,10 +1,11 @@
 import {
   DEFAULT_BRIDGE_URL,
-  UNKNOWN_KEY_MESSAGE,
+  LoginError,
   fetchWithTimeout,
   friendlyLoginError,
   interpretSessionResponse,
   isAccessKey,
+  isLoginError,
   isLoginRedirect,
   normalizeBridgeUrl,
   progressText,
@@ -30,12 +31,17 @@ import {
   type StateMessage,
 } from "./messages";
 import {
+  applyReportStep,
   createIdleState,
+  handedOverOf,
   loadLoginState,
   saveLoginState,
+  sourceOf,
+  viaOf,
   type LastLogin,
   type LoginPhase,
   type LoginState,
+  type ReportStep,
   type Settings,
 } from "./state";
 
@@ -144,27 +150,18 @@ export function createBackground(deps: BackgroundDeps = {}) {
   function report(
     tabId: number | undefined,
     text: string,
-    change: Partial<LoginState> | ((current: LoginState) => Partial<LoginState>) = {},
+    change: ReportStep | ((current: LoginState) => ReportStep) = {},
     extraLog?: (current: LoginState) => string | undefined,
   ): Promise<LoginState> {
     return commitState((current) => {
-      const patch = typeof change === "function" ? change(current) : change;
-      const at = now();
-      const newStep =
-        (patch.phase !== undefined && patch.phase !== current.phase) ||
-        (patch.loginStep !== undefined && patch.loginStep !== current.loginStep);
-      const note = extraLog?.(current);
-      const log = note ? [...current.log, { at, text: note }] : [...current.log];
-      if (newStep || log.length === 0) {
-        log.push({ at, text });
-      }
-      const next: LoginState = { ...current, ...patch, text, log };
+      const step = typeof change === "function" ? change(current) : change;
+      const next = applyReportStep(current, step, text, now(), extraLog?.(current));
       return {
         next,
         pageMessage: {
           type: "VTOP_MATE_LOADING",
           text,
-          serverDueAt: next.serverDueAt,
+          serverDueAt: next.phase === "phone" ? next.serverDueAt : undefined,
           tone: "active",
         },
       };
@@ -201,7 +198,7 @@ export function createBackground(deps: BackgroundDeps = {}) {
   }
 
   function throwIfCancelled(signal: AbortSignal) {
-    if (signal.aborted) throw new Error(CANCELLED);
+    if (signal.aborted) throw new LoginError("cancelled", CANCELLED);
   }
 
   /** The settings' stored values. */
@@ -278,13 +275,21 @@ export function createBackground(deps: BackgroundDeps = {}) {
           void report(
             tabId,
             progressText(view.stage, undefined, now(), view.login ?? undefined),
-            (current) => ({
-              phase,
-              via: phase === "request" ? current.via : phase,
-              deadline: view.expiresAt,
-              serverDueAt,
-              loginStep: view.login ?? undefined,
-            }),
+            (current): ReportStep => {
+              if (phase === "phone") {
+                return { phase: "phone", via: "phone", deadline: view.expiresAt, serverDueAt };
+              }
+              if (phase === "server") {
+                return {
+                  phase: "server",
+                  via: "server",
+                  deadline: view.expiresAt,
+                  loginStep: view.login ?? undefined,
+                  handedOver: askedPhone || handedOverOf(current),
+                };
+              }
+              return { phase: "request", via: viaOf(current), deadline: view.expiresAt };
+            },
             (current) =>
               phase === "server" && askedPhone && current.phase === "phone"
                 ? "Your phone didn't answer; the server takes over"
@@ -292,8 +297,8 @@ export function createBackground(deps: BackgroundDeps = {}) {
           );
         });
       } catch (err) {
-        if (unreachable && err instanceof Error && err.message === UNKNOWN_KEY_MESSAGE) {
-          throw new Error(UNREACHABLE_MESSAGE);
+        if (unreachable && isLoginError(err, "key_unknown")) {
+          throw new LoginError("unreachable", UNREACHABLE_MESSAGE);
         }
         throw err;
       } finally {
@@ -322,21 +327,20 @@ export function createBackground(deps: BackgroundDeps = {}) {
       const text = cached
         ? `Reusing a session your ${from === "unknown" ? "account" : from} made earlier`
         : `Got a new session from your ${from === "server" ? "server sign-in" : "phone"}`;
-      await report(tabId, text, (current) => ({
+      await report(tabId, text, (current): ReportStep => ({
         phase: "cookies",
-        via: from === "unknown" ? current.via : from,
+        via: from === "unknown" ? viaOf(current) : from,
         source: outcome.source,
-        loginStep: undefined,
       }));
       return outcome.cookies;
     }
-    if (outcome.kind === "error") throw new Error(outcome.message);
+    if (outcome.kind === "error") throw new LoginError("failed", outcome.message);
 
-    throw new Error(friendlyLoginError(200, JSON.stringify({ code: "phone_timeout" })));
+    throw new LoginError("expired", friendlyLoginError(200, JSON.stringify({ code: "phone_timeout" })));
   }
 
   async function install(cookies: CookieEditorCookie[], tabId: number | undefined) {
-    await report(tabId, "Setting the VTOP cookies…", { deadline: undefined });
+    await report(tabId, "Setting the VTOP cookies…");
     await installCookies(chrome.cookies, cookies, async (text) => {
       await report(tabId, text);
     });
@@ -442,39 +446,43 @@ export function createBackground(deps: BackgroundDeps = {}) {
         const finishedAt = now();
         const done = await commitState((current) => ({
           next: {
-            ...current,
             phase: "done",
+            text: current.text,
+            startedAt: current.phase === "idle" ? startedAt : current.startedAt,
             finishedAt,
-            deadline: undefined,
-            serverDueAt: undefined,
-            loginStep: undefined,
+            via: viaOf(current),
+            source: sourceOf(current),
+            handedOver: handedOverOf(current),
             log: [...current.log, { at: finishedAt, text: "Signed in" }],
           },
         }));
         const last: LastLogin = {
           at: finishedAt,
-          via: done.via ?? "phone",
+          via: viaOf(done) ?? "phone",
           ms: finishedAt - startedAt,
-          source: done.source,
+          source: sourceOf(done),
         };
         await chrome.storage.local.set({ lastLogin: last }).catch(() => {});
       } catch (err) {
         const text = err instanceof Error ? err.message : "Unknown login error";
+        const cancelled = isLoginError(err, "cancelled");
         const finishedAt = now();
         await commitState((current) => ({
           next: {
-            ...current,
             phase: "error",
+            text: current.text,
+            startedAt: current.phase === "idle" ? startedAt : current.startedAt,
+            finishedAt,
             failedPhase: current.phase,
             error: text,
-            finishedAt,
-            deadline: undefined,
-            serverDueAt: undefined,
-            loginStep: undefined,
-            log: [...current.log, { at: finishedAt, text: text === CANCELLED ? "Cancelled" : "Failed" }],
+            cancelled: cancelled || undefined,
+            via: viaOf(current),
+            source: sourceOf(current),
+            handedOver: handedOverOf(current),
+            log: [...current.log, { at: finishedAt, text: cancelled ? "Cancelled" : "Failed", failed: true }],
           },
         }));
-        if (text !== CANCELLED) void notify("failed", "Sign-in failed", `${text} Click to try again.`);
+        if (!cancelled) void notify("failed", "Sign-in failed", `${text} Click to try again.`);
         throw err;
       } finally {
         clearInterval(keepalive);
@@ -570,7 +578,7 @@ export function createBackground(deps: BackgroundDeps = {}) {
       })
       .catch(async (err) => {
         const text = err instanceof Error ? err.message : "Unknown login error";
-        const cancelled = text === CANCELLED;
+        const cancelled = isLoginError(err, "cancelled");
         try {
           const tabId = sender.tab?.id ?? (await getActiveTabId());
           await sendToTab(
