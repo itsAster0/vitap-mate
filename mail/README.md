@@ -2,9 +2,9 @@
 
 The Cloudflare Email Worker for backend v3. Mail to the forwarding addresses
 (`otp+<id>@vmate.aster0.dev`) comes here. The Worker keeps no state: it reads the
-address id, the VTOP OTP or Gmail's forwarding confirmation (the same parsing as
-the v2 edge's) and POSTs it to Convex. The contract is in
-`docs/plans/2026-11-23-backend-v3-api.md`, under "Mail Worker → Convex".
+address id, the VTOP OTP or Gmail's forwarding confirmation and POSTs it to
+Convex. The contract is in [`backend/API.md`](../backend/API.md), under
+"Internal routes" (`/internal/mail`).
 
 ```
 POST {CONVEX_URL}/internal/mail
@@ -46,6 +46,7 @@ bun run test
 bun run check
 ```
 
-Deploy only when asked (see the top of `wrangler.toml`): create the queue once,
-set the secret, `bunx wrangler deploy`, then point the Email Routing rule
-`otp@vmate.aster0.dev` at `vmate-mail` instead of `vmate-edge`.
+Deploy only when asked: `bun run deploy` in `deploy/` (`alchemy.run.ts`) deploys
+`vmate-mail` and its `vmate-mail-retry` queue, reading `MAIL_TOKEN` from the
+Convex deployment env. Cloudflare Email Routing routes `otp@vmate.aster0.dev`
+to `vmate-mail`.

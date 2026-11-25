@@ -1,5 +1,5 @@
-# The engine (vtop-bridge), deployed to the Railway service engine-v2 by
-# deploy/alchemy.run.ts (`bun run deploy`) with this folder as context.
+# The engine (vtop-bridge), built on nest, pushed to GHCR and run on hawk
+# (deploy/hawk/compose.yaml) by deploy/alchemy.run.ts (`bun run deploy`).
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src
 COPY . .
