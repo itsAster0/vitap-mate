@@ -6,11 +6,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import vitapmate.core.Forwarding
+import vitapmate.core.ForwardingReadiness
 
 class ForwardingPhaseTest {
-    private val off = Forwarding.Off("noreply.sdc@vitap.ac.in")
-    private val waiting = Forwarding.Waiting("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", null, 10L)
-    private val on = Forwarding.On("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", 20L, 20L)
+    private val off = Forwarding.Off("noreply.sdc@vitap.ac.in", ForwardingReadiness.OFF)
+    private val waiting = Forwarding.Waiting("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", null, 10L, ForwardingReadiness.NEEDS_FILTER)
+    private val on = Forwarding.On("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", 20L, 20L, ForwardingReadiness.READY)
 
     @Test
     fun oneActionAtATime() {
@@ -36,5 +37,9 @@ class ForwardingPhaseTest {
         assertTrue(waiting.hasAddress)
         assertTrue(on.hasAddress)
         assertEquals(listOf(null, 10L, 20L), listOf(off.lastMailAt, waiting.lastMailAt, on.lastMailAt))
+        assertEquals(
+            listOf(ForwardingReadiness.OFF, ForwardingReadiness.OFF, ForwardingReadiness.NEEDS_FILTER, ForwardingReadiness.READY),
+            listOf(null.readiness, off.readiness, waiting.readiness, on.readiness),
+        )
     }
 }

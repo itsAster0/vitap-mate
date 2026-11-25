@@ -51,6 +51,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import com.composables.icons.lucide.RefreshCw
 import vitapmate.core.Forwarding
+import vitapmate.core.ForwardingReadiness
 import vitapmate.core.GmailConfirmation
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
@@ -91,7 +92,8 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             lastOtpAt = status.lastOtpAt
         }
     }
-    val on = status is Forwarding.On
+    val readiness = status.readiness
+    val on = readiness == ForwardingReadiness.READY
     Column(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(accent.subtle).heroCookie()
             .padding(start = Space.lg, top = Space.md, bottom = Space.lg, end = Space.xs),
@@ -107,11 +109,10 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
         }
         // Waiting in the warning tone, the confirmation in the neutral one, working in success.
-        val (label, tone) = when {
-            lastOtpAt != null -> "Working · last OTP ${ago(lastOtpAt)}" to tones.success
-            on -> "Working · no OTP forwarded yet" to tones.success
-            confirmation != null -> "Confirm in Gmail, then create the filter" to neutralTone
-            else -> "Waiting for Gmail's confirmation mail…" to tones.warning
+        val (label, tone) = when (readiness) {
+            ForwardingReadiness.READY -> (if (lastOtpAt != null) "Working · last OTP ${ago(lastOtpAt)}" else "Working · no OTP forwarded yet") to tones.success
+            ForwardingReadiness.NEEDS_FILTER -> "Confirm in Gmail, then create the filter" to neutralTone
+            ForwardingReadiness.NEEDS_CONFIRMATION, ForwardingReadiness.OFF -> "Waiting for Gmail's confirmation mail…" to tones.warning
         }
         Row(
             Modifier.padding(top = Space.xs).background(tone.subtle, CircleShape).padding(horizontal = Space.sm, vertical = 3.dp),
@@ -146,10 +147,10 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             }
         }
     }
-    // Steps 1 and 2 are done once Gmail's confirmation arrives (or forwarding is on); step 3 is
+    // Steps 1 and 2 are done once Gmail's confirmation arrives (or forwarding is ready); step 3 is
     // done once an OTP comes through or the student marks setup done.
-    val added = on || confirmation != null
-    val filtered = on || lastOtpAt != null
+    val added = readiness == ForwardingReadiness.NEEDS_FILTER || readiness == ForwardingReadiness.READY
+    val filtered = readiness == ForwardingReadiness.READY
     fun state(done: Boolean, current: Boolean) = if (done) StepState.Done else if (current) StepState.Current else StepState.Plain
     Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings", state = state(added, true)) {
         "In the Gmail where VTOP's mail arrives (usually @vitapstudent.ac.in): Add a forwarding address, paste yours, then Next → Proceed → OK. " +
@@ -161,7 +162,7 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
     Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
         "Reload Gmail first. Then create a new filter with From ${sender}, tick Forward it to and pick your address, then Create filter."
     }
-    if (!on && confirmation != null) {
+    if (readiness == ForwardingReadiness.NEEDS_FILTER) {
         Button(
             if (MailForwarding.busy != null) null else onDone,
             Modifier.fillMaxWidth().testTag("forwarding.done"),

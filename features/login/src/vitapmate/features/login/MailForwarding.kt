@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vitapmate.core.CoreException
 import vitapmate.core.Forwarding
+import vitapmate.core.ForwardingReadiness
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.OtpSource
@@ -47,11 +48,17 @@ sealed interface ForwardingPhase {
     fun finish(): Idle = Idle(status)
 }
 
+/** How far setup has progressed, as decided by Rust. */
+val Forwarding?.readiness: ForwardingReadiness
+    get() = when (this) {
+        null -> ForwardingReadiness.OFF
+        is Forwarding.Off -> readiness
+        is Forwarding.Waiting -> readiness
+        is Forwarding.On -> readiness
+    }
+
 /** Whether the phone has an address, set up or not. */
-val Forwarding?.hasAddress get() = when (this) {
-    null, is Forwarding.Off -> false
-    is Forwarding.Waiting, is Forwarding.On -> true
-}
+val Forwarding?.hasAddress get() = readiness != ForwardingReadiness.OFF
 
 /** Unix seconds of the latest forwarded mail of either kind. */
 val Forwarding.lastMailAt get() = when (this) {
@@ -78,6 +85,8 @@ object MailForwarding {
     /** The last action's failure (title, message), shown in the sheet, which covers the toasts. */
     var error by mutableStateOf<Pair<String, String>?>(null)
         internal set
+
+    val readiness get() = status.readiness
 
     val isOn get() = status.hasAddress
 

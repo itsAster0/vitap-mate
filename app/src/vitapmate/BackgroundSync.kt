@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
 import vitapmate.core.Core
-import vitapmate.core.Forwarding
+import vitapmate.core.ForwardingReadiness
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.OtpSource
@@ -64,11 +64,8 @@ object BackgroundSync {
      */
     fun available(): Boolean = when (OtpAutofill.inUse()) {
         null -> false
-        OtpSource.Forwarding -> when (val status = MailForwarding.status) {
-            null, is Forwarding.Off -> false
-            is Forwarding.Waiting -> status.lastMailAt != null
-            is Forwarding.On -> true
-        }
+        OtpSource.Forwarding -> MailForwarding.readiness == ForwardingReadiness.NEEDS_FILTER ||
+            MailForwarding.readiness == ForwardingReadiness.READY
         OtpSource.Gmail -> true
     }
 

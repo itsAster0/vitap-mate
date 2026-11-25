@@ -20995,7 +20995,8 @@ sealed class Forwarding {
         /**
          * What the Gmail filter matches in From.
          */
-        val `sender`: kotlin.String) : Forwarding()
+        val `sender`: kotlin.String, 
+        val `readiness`: vitapmate.core.ForwardingReadiness) : Forwarding()
         
     {
         
@@ -21016,7 +21017,8 @@ sealed class Forwarding {
         /**
          * Unix seconds of the latest forwarded mail of either kind.
          */
-        val `lastMailAt`: kotlin.Long?) : Forwarding()
+        val `lastMailAt`: kotlin.Long?, 
+        val `readiness`: vitapmate.core.ForwardingReadiness) : Forwarding()
         
     {
         
@@ -21035,7 +21037,8 @@ sealed class Forwarding {
          * Unix seconds of the latest forwarded OTP; None when marked done before one came.
          */
         val `lastOtpAt`: kotlin.Long?, 
-        val `lastMailAt`: kotlin.Long?) : Forwarding()
+        val `lastMailAt`: kotlin.Long?, 
+        val `readiness`: vitapmate.core.ForwardingReadiness) : Forwarding()
         
     {
         
@@ -21061,18 +21064,21 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
         return when(buf.getInt()) {
             1 -> Forwarding.Off(
                 FfiConverterString.read(buf),
+                FfiConverterTypeForwardingReadiness.read(buf),
                 )
             2 -> Forwarding.Waiting(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterOptionalTypeGmailConfirmation.read(buf),
                 FfiConverterOptionalLong.read(buf),
+                FfiConverterTypeForwardingReadiness.read(buf),
                 )
             3 -> Forwarding.On(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterOptionalLong.read(buf),
                 FfiConverterOptionalLong.read(buf),
+                FfiConverterTypeForwardingReadiness.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -21084,6 +21090,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
             (
                 4UL
                 + FfiConverterString.allocationSize(value.`sender`)
+                + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
             )
         }
         is Forwarding.Waiting -> {
@@ -21094,6 +21101,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterString.allocationSize(value.`sender`)
                 + FfiConverterOptionalTypeGmailConfirmation.allocationSize(value.`confirmation`)
                 + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
+                + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
             )
         }
         is Forwarding.On -> {
@@ -21104,6 +21112,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterString.allocationSize(value.`sender`)
                 + FfiConverterOptionalLong.allocationSize(value.`lastOtpAt`)
                 + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
+                + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
             )
         }
     }
@@ -21113,6 +21122,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
             is Forwarding.Off -> {
                 buf.putInt(1)
                 FfiConverterString.write(value.`sender`, buf)
+                FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
                 Unit
             }
             is Forwarding.Waiting -> {
@@ -21121,6 +21131,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterString.write(value.`sender`, buf)
                 FfiConverterOptionalTypeGmailConfirmation.write(value.`confirmation`, buf)
                 FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
+                FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
                 Unit
             }
             is Forwarding.On -> {
@@ -21129,9 +21140,62 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterString.write(value.`sender`, buf)
                 FfiConverterOptionalLong.write(value.`lastOtpAt`, buf)
                 FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
+                FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * How far mail forwarding's setup has progressed; owned by Rust so the UI,
+ * OTP auto-fill and background sync agree.
+ */
+
+enum class ForwardingReadiness {
+    
+    /**
+     * No address on this phone.
+     */
+    OFF,
+    /**
+     * Address exists, waiting for Gmail's confirmation mail (or a v2 rejoin).
+     */
+    NEEDS_CONFIRMATION,
+    /**
+     * Gmail's confirmation arrived; waiting for the filter (mark done or first OTP).
+     */
+    NEEDS_FILTER,
+    /**
+     * Forwarding is active: an OTP came through or the student marked setup done.
+     */
+    READY;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeForwardingReadiness: FfiConverterRustBuffer<ForwardingReadiness> {
+    override fun read(buf: ByteBuffer) = try {
+        ForwardingReadiness.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ForwardingReadiness) = 4UL
+
+    override fun write(value: ForwardingReadiness, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
     }
 }
 

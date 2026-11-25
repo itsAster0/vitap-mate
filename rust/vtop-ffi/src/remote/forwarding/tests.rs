@@ -707,6 +707,56 @@ fn stored_files_of_every_version_read() {
     assert_eq!(MailboxState::Off.stored(), None);
 }
 
+fn readiness(forwarding: &Forwarding) -> ForwardingReadiness {
+    match forwarding {
+        Forwarding::Off { readiness, .. }
+        | Forwarding::Waiting { readiness, .. }
+        | Forwarding::On { readiness, .. } => *readiness,
+    }
+}
+
+#[test]
+fn readiness_follows_every_stage_of_setup() {
+    assert_eq!(
+        readiness(&view(&MailboxState::Off)),
+        ForwardingReadiness::Off
+    );
+    let m = mailbox(ID);
+    assert_eq!(
+        readiness(&view(&MailboxState::Joined {
+            mailbox: m.clone(),
+            setup: Setup::NEW,
+        })),
+        ForwardingReadiness::NeedsConfirmation
+    );
+    // Kept from v2 (even if previously active) waits for rejoin before reporting ready.
+    assert_eq!(
+        readiness(&view(&MailboxState::NeedsRejoin {
+            mailbox: m.clone(),
+            kept: Setup::Active {
+                last_mail_at: Some(5),
+                last_otp_at: Some(5),
+            },
+        })),
+        ForwardingReadiness::NeedsConfirmation
+    );
+    let confirmed = Setup::NEW.mail(&confirm(10));
+    assert_eq!(
+        readiness(&view(&MailboxState::Joined {
+            mailbox: m.clone(),
+            setup: confirmed.clone(),
+        })),
+        ForwardingReadiness::NeedsFilter
+    );
+    assert_eq!(
+        readiness(&view(&MailboxState::Joined {
+            mailbox: m,
+            setup: confirmed.mark_done(),
+        })),
+        ForwardingReadiness::Ready
+    );
+}
+
 #[test]
 fn setup_moves_only_forward() {
     // Gmail's confirmation shows, with only a Gmail link kept.
