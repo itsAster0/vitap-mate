@@ -39,6 +39,14 @@ Promote the latest internal build to the closed (friends), alpha and beta tracks
 
 upload_internal, then promote_testing: one build on internal, friends, alpha and beta (never production)
 
+### android upload_all
+
+```sh
+[bundle exec] fastlane android upload_all
+```
+
+upload_testing, then promote_production: one build on every track, production as a staged rollout (rollout:0.2 by default)
+
 ### android promote_production
 
 ```sh

@@ -22,7 +22,7 @@ engine use.
   only grows at its end).
 - Sending the VTOP session to our servers without `consent::allowed`.
 - Release lanes: pushing a `v*` tag, `fastlane android upload_internal`,
-  `upload_testing`, `promote_testing`, `promote_production` or `widen_rollout` upload to Play
+  `upload_testing`, `upload_all`, `promote_testing`, `promote_production` or `widen_rollout` upload to Play
   (`status` only reads).
 
 Agents never open PRs or issues, push, or deploy unless asked.
@@ -234,7 +234,8 @@ blocking screen (`app/src/vitapmate/PlayUpdate.kt`). Promotions reuse it.
 
 From a laptop, with the keystore and `keystore/play-service-account.json` in
 place: `bundle install`, then `bundle exec fastlane android upload_internal`
-(or `upload_testing`: upload to internal, then promote to friends, alpha and beta).
+(or `upload_testing`: upload to internal, then promote to friends, alpha and beta;
+`upload_all`: the same, then production as a staged rollout).
 
 ## Version control
 
