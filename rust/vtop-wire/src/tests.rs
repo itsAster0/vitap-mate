@@ -790,7 +790,8 @@ fn state_files_are_replaced_whole_and_leave_no_temporary_file() {
             let path = &path;
             scope.spawn(move || {
                 for _ in 0..20 {
-                    crate::client::write_atomic(path, format!("{writer}").as_bytes()).unwrap();
+                    crate::client::state::write_atomic(path, format!("{writer}").as_bytes())
+                        .unwrap();
                 }
             });
         }
@@ -799,7 +800,7 @@ fn state_files_are_replaced_whole_and_leave_no_temporary_file() {
     assert!(last < 8);
     // A folder can't be replaced by a file: the failed write cleans up after itself.
     std::fs::create_dir(dir.join("taken")).unwrap();
-    assert!(crate::client::write_atomic(&dir.join("taken"), b"x").is_err());
+    assert!(crate::client::state::write_atomic(&dir.join("taken"), b"x").is_err());
     assert_eq!(
         std::fs::read_dir(&dir).unwrap().count(),
         2,
