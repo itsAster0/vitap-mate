@@ -75,7 +75,7 @@
         },
         "Connected apps pairs the browser extension and makes keys for Claude and other AI apps (MCP).",
         {
-          "text": "When the browser extension or an AI app asks for your VTOP session, opening the app shows who asked: the key's name and, for the extension, the IP it asked from, marked new if the key hasn't used it before. Approve or deny there; a notification follows while your phone signs it in.",
+          "text": "When the browser extension or an AI app asks for your VTOP session, opening the app shows who asked: the key's name and the IP it asked from, marked new if the key hasn't used it before. Approve or deny there; a notification follows while your phone signs it in.",
           "since": 3002100
         },
         "Share or print the timetable and grade history as a PDF. Long-press the round button with your initial on either page.",
