@@ -262,6 +262,37 @@ fn reset_forgets_remembered_kinds() {
 }
 
 #[test]
+fn forgetting_one_kind_keeps_the_others() {
+    let core = core("forget-kind");
+    let gate = yes(&core);
+    load(&core);
+    gate.answers.lock().unwrap().push_back(YES_REMEMBER);
+    assert!(check(&core, "f1", CookieKind::Handover, true));
+    core.remember_cookie_consent("f".into(), CookieKind::Route)
+        .unwrap();
+    core.remember_cookie_consent("f".into(), CookieKind::Account)
+        .unwrap();
+    core.forget_cookie_consent("f".into(), CookieKind::Handover)
+        .unwrap();
+    assert_eq!(
+        core.cookie_consent_remembered("f".into()),
+        [CookieKind::Route, CookieKind::Account]
+    );
+    // The flow's yes for that kind went too; the file keeps the others, Account included.
+    assert!(!check(&core, "f1", CookieKind::Handover, false));
+    assert_eq!(
+        fs::read_to_string(core.at(FILE)).unwrap(),
+        r#"{"remembered":["route","account"]}"#
+    );
+    load(&core);
+    assert_eq!(
+        core.cookie_consent_remembered("f".into()),
+        [CookieKind::Route, CookieKind::Account]
+    );
+    let _ = fs::remove_dir_all(&core.dir);
+}
+
+#[test]
 fn another_student_forgets_remembered_kinds() {
     let core = core("switch");
     let gate = yes(&core);

@@ -1,7 +1,10 @@
-//! The Server page (Settings → Account): what the server keeps for this student and the phones
-//! linked to the account (the contract's `account:*`, `devices:*`, `app:*` and `mail:*`). Every
+//! The student's server account as the app shows it (Account, Connected apps, the OTP auto-fill
+//! sheet, Developer): who the server knows, the phones linked to the account, what it stores for
+//! connected apps ([`ServerStorage`]), its sign-ins, this install's registration and the phones on
+//! the forwarding address (the contract's `account:*`, `devices:*`, `app:*` and `mail:*`). Every
 //! call goes as the student this install proved to be ([`Core::account_call`]); the student
-//! comes from the JWT, never from the arguments. Cookies are never logged.
+//! comes from the JWT, never from the arguments. Answers are parsed once here into the records
+//! below. Cookies are never logged.
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -10,9 +13,9 @@ use tracing::info;
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
 use crate::remote::consent::{self, CookieKind};
-use crate::remote::keys::{AccessKey, KeyView, refused};
+use crate::remote::keys::{KeyView, refused};
 use crate::remote::server_code::ServerCode;
-use crate::{Core, CoreError, traced};
+use crate::{Core, CoreError, ForwardingOffKind, traced};
 
 /// This phone's name on the server: its model, or `vitapmate` when the app gave none.
 pub(crate) fn label(shared: &crate::Shared) -> &str {
@@ -48,26 +51,15 @@ pub struct LinkedPhone {
     pub this_phone: bool,
 }
 
-/// How the server serves sessions to connected apps (`account:setSettings`).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, uniffi::Record)]
-#[serde(rename_all = "camelCase", default)]
-pub struct ServerOptions {
+/// How the server uses a saved password (`account:setSettings`); only with one saved.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct VaultOptions {
     /// Sign in with the saved password at once, without asking a phone first.
     pub always_use_vault: bool,
     /// Otherwise, how long a phone gets to answer first: 10, 20 or 45.
     pub phone_wait_secs: u32,
     /// How long the saved password is kept: 86400, 172800, or None (until VTOP rejects it).
     pub vault_ttl_secs: Option<i64>,
-}
-
-impl Default for ServerOptions {
-    fn default() -> Self {
-        Self {
-            always_use_vault: true,
-            phone_wait_secs: 20,
-            vault_ttl_secs: None,
-        }
-    }
 }
 
 /// A phone on this phone's forwarding address.
@@ -81,21 +73,20 @@ pub struct MailPhone {
     pub this_phone: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct ServerMailbox {
-    pub address: String,
-    pub phones: Vec<MailPhone>,
-}
-
 /// This install as the server knows it.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct ServerDevice {
-    /// The first 8 characters of its id; None while it has no identity on the server.
-    pub id: Option<String>,
-    pub label: String,
-    pub push_token: bool,
-    /// From the server; None when it doesn't say (before `devices:info`).
-    pub registered_at: Option<i64>,
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ServerDevice {
+    /// No identity on the server yet (never proved, or removed): nothing to show or remove.
+    Unregistered { label: String },
+    Registered {
+        /// The first 8 characters of its id.
+        id: String,
+        label: String,
+        /// The server holds a push token, so it can wake this phone for a connected app.
+        push_token: bool,
+        /// None from a server that doesn't say.
+        registered_at: Option<i64>,
+    },
 }
 
 /// Who saved the server's sealed VTOP session.
@@ -113,90 +104,133 @@ pub enum ServerSession {
 }
 
 /// The sealed VTOP password the server keeps to sign in by itself.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SavedVault {
+    pub at: i64,
+    /// None: kept until VTOP rejects it or the student forgets it.
+    pub expires_at: Option<i64>,
+    /// It carries Gmail access to read the sign-in code.
+    pub gmail: bool,
+}
+
+/// What the server stores of the student's VTOP for connected apps (`settings.cacheSession`
+/// and what it keeps under it). Off by default: a connected app then gets a session only while
+/// a phone answers, and the server keeps no copy.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum ServerVault {
-    None,
-    /// `expires_at` None: kept until VTOP rejects it or the student forgets it.
-    Saved {
-        at: i64,
-        expires_at: Option<i64>,
-        gmail: bool,
+pub enum ServerStorage {
+    Off,
+    /// Sessions phones hand over are kept (sealed) for a week, for connected apps.
+    SessionOnly {
+        session: ServerSession,
+    },
+    /// A saved password too, so the server signs in when no phone answers.
+    OfflineSignIn {
+        session: ServerSession,
+        vault: SavedVault,
+        options: VaultOptions,
     },
 }
 
-/// What the server shows of the account to one of its phones.
+/// Whether this phone is one of the account's phones (asked for sessions, sees the others).
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum ServerAccount {
-    /// This phone isn't one of the account's phones: the server shows it nothing it keeps.
+pub enum ServerLink {
+    /// Not one of them (after a reinstall or a removal): the server shows it no phones or keys.
     Unlinked,
     Linked {
-        session: ServerSession,
-        vault: ServerVault,
-        /// Newest first, at most 10.
-        sign_ins: Vec<ServerSignIn>,
         phones: Vec<LinkedPhone>,
-        keys: Vec<AccessKey>,
     },
 }
 
+/// The student's account on the server (`account:view`).
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct ServerStatus {
-    pub account: ServerAccount,
+pub struct ServerAccount {
     pub registration_number: String,
-    /// When the server made the account (None from servers that don't say, or no account yet).
+    /// When the server made the account (None from servers that don't say).
     pub created_at: Option<i64>,
-    /// The semester connected apps read.
+    /// The semester connected apps read; None is the newest.
     pub semester_id: Option<String>,
-    pub options: ServerOptions,
+    pub link: ServerLink,
+    pub storage: ServerStorage,
     /// The student has a forwarding address, on this phone or another.
     pub forwarding: bool,
-    /// This phone's forwarding address and the phones on it.
-    pub mailbox: Option<ServerMailbox>,
-    pub device: ServerDevice,
+    /// When VTOP last rejected the saved password on the server.
     pub credentials_rejected_at: Option<i64>,
 }
 
+/// `account:view`'s answer as the server sends it (older servers leave fields out), read once
+/// into [`ServerAccount`] here and into Connected apps' keys in `keys.rs`.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AccountView {
+pub(crate) struct AccountWire {
+    #[serde(default)]
     registration_number: String,
     created_at: Option<i64>,
-    semester_id: Option<String>,
+    pub(crate) semester_id: Option<String>,
     #[serde(default)]
-    settings: ServerOptions,
+    settings: SettingsWire,
+    vault_saved_at: Option<i64>,
+    vault_expires_at: Option<i64>,
+    #[serde(default)]
+    vault_gmail: bool,
+    session_saved_at: Option<i64>,
+    session_source: Option<String>,
     #[serde(default)]
     forwarding: bool,
     credentials_rejected_at: Option<i64>,
     #[serde(default)]
-    this_phone: bool,
+    pub(crate) this_phone: bool,
     #[serde(default)]
-    phones: Vec<PhoneView>,
+    pub(crate) phones: Vec<PhoneWire>,
     #[serde(default)]
-    keys: Vec<KeyView>,
+    pub(crate) keys: Vec<KeyView>,
 }
 
+/// `settings` in [`AccountWire`]; `cacheSession` is absent from servers before storage became a
+/// choice.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+struct SettingsWire {
+    cache_session: Option<bool>,
+    always_use_vault: bool,
+    phone_wait_secs: u32,
+    vault_ttl_secs: Option<i64>,
+}
+
+impl Default for SettingsWire {
+    fn default() -> Self {
+        Self {
+            cache_session: None,
+            always_use_vault: true,
+            phone_wait_secs: 20,
+            vault_ttl_secs: None,
+        }
+    }
+}
+
+impl SettingsWire {
+    fn options(&self) -> VaultOptions {
+        VaultOptions {
+            always_use_vault: self.always_use_vault,
+            phone_wait_secs: self.phone_wait_secs,
+            vault_ttl_secs: self.vault_ttl_secs,
+        }
+    }
+}
+
+/// One of the account's phones in [`AccountWire`].
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct PhoneView {
-    id: String,
-    label: Option<String>,
+pub(crate) struct PhoneWire {
+    pub(crate) id: String,
+    pub(crate) label: Option<String>,
+    #[serde(default)]
     added_at: i64,
-    seen_at: i64,
-    this_phone: bool,
+    pub(crate) seen_at: i64,
+    #[serde(default)]
+    pub(crate) this_phone: bool,
 }
 
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-struct StatusView {
-    session_saved_at: Option<i64>,
-    session_source: Option<String>,
-    vault_saved_at: Option<i64>,
-    vault_expires_at: Option<i64>,
-    vault_gmail: bool,
-    sign_ins: Vec<SignInView>,
-}
-
-impl StatusView {
+impl AccountWire {
     fn session(&self) -> ServerSession {
         match self.session_saved_at {
             None => ServerSession::None,
@@ -211,16 +245,76 @@ impl StatusView {
         }
     }
 
-    fn vault(&self) -> ServerVault {
-        match self.vault_saved_at {
-            None => ServerVault::None,
-            Some(at) => ServerVault::Saved {
-                at,
-                expires_at: self.vault_expires_at,
-                gmail: self.vault_gmail,
+    fn vault(&self) -> Option<SavedVault> {
+        self.vault_saved_at.map(|at| SavedVault {
+            at,
+            expires_at: self.vault_expires_at,
+            gmail: self.vault_gmail,
+        })
+    }
+
+    pub(crate) fn storage(&self) -> ServerStorage {
+        let session = self.session();
+        let vault = self.vault();
+        // A server from before the choice stored whatever it had: on when it keeps something.
+        let on = self
+            .settings
+            .cache_session
+            .unwrap_or(vault.is_some() || session != ServerSession::None);
+        match (on, vault) {
+            (false, _) => ServerStorage::Off,
+            (true, None) => ServerStorage::SessionOnly { session },
+            (true, Some(vault)) => ServerStorage::OfflineSignIn {
+                session,
+                vault,
+                options: self.settings.options(),
             },
         }
     }
+
+    fn into_account(self) -> ServerAccount {
+        let storage = self.storage();
+        let link = if self.this_phone {
+            ServerLink::Linked {
+                phones: self
+                    .phones
+                    .into_iter()
+                    .map(|p| LinkedPhone {
+                        id: p.id,
+                        label: p.label,
+                        added_at: p.added_at,
+                        seen_at: p.seen_at,
+                        this_phone: p.this_phone,
+                    })
+                    .collect(),
+            }
+        } else {
+            ServerLink::Unlinked
+        };
+        ServerAccount {
+            registration_number: self.registration_number,
+            created_at: self.created_at,
+            semester_id: self.semester_id,
+            link,
+            storage,
+            forwarding: self.forwarding,
+            credentials_rejected_at: self.credentials_rejected_at,
+        }
+    }
+}
+
+/// `account:setSettings`' body; without `cache_session` the server keeps what it has (and an
+/// older server, which doesn't know the field, still takes it).
+fn settings_body(cache_session: Option<bool>, options: &VaultOptions) -> Value {
+    let mut settings = json!({
+        "alwaysUseVault": options.always_use_vault,
+        "phoneWaitSecs": options.phone_wait_secs,
+        "vaultTtlSecs": options.vault_ttl_secs,
+    });
+    if let Some(on) = cache_session {
+        crate::json_set(&mut settings, "cacheSession", json!(on));
+    }
+    json!({ "settings": settings })
 }
 
 #[derive(Deserialize)]
@@ -247,12 +341,19 @@ impl From<SignInView> for ServerSignIn {
     }
 }
 
+/// `devices:info`'s answer.
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct DeviceView {
     label: Option<String>,
     push_token: bool,
     created_at: Option<i64>,
+}
+
+/// `mail:devices`' answer.
+#[derive(Deserialize)]
+struct MailDevicesView {
+    devices: Vec<MailPhoneView>,
 }
 
 #[derive(Deserialize)]
@@ -292,21 +393,114 @@ pub struct GmailGrant {
     pub delete_after_reading: bool,
 }
 
-/// Server-page calls; each takes the caller's flow id first.
+/// Server account calls; each takes the caller's flow id first.
 #[uniffi::export]
 impl Core {
-    /// Everything the server keeps for this student and this phone: the account and its options,
-    /// phones, keys, saved session and password, sign-ins, the forwarding address and this
-    /// install's registration.
-    pub async fn server_status(&self, flow: String) -> Result<ServerStatus, CoreError> {
-        traced("server_status", &flow, async {
-            let action = "Load what the server keeps for you";
-            self.status_with(&flow, action).await
+    /// The student's account on the server: whether this phone is linked and the other phones,
+    /// and what the server stores for connected apps. Proves first when there is no identity.
+    pub async fn server_account(&self, flow: String) -> Result<ServerAccount, CoreError> {
+        traced("server_account", &flow, async {
+            let account = self.account_view(&flow, "Load your server account").await?;
+            info!(
+                linked = account.this_phone,
+                phones = account.phones.len(),
+                "server account"
+            );
+            Ok(account.into_account())
         })
         .await
     }
 
-    /// Removes a linked phone (an id from [`ServerStatus::phones`]).
+    /// The account's last VTOP sign-ins (phones and the server), newest first, at most 10;
+    /// none from a server that doesn't list them yet.
+    pub async fn server_sign_ins(&self, flow: String) -> Result<Vec<ServerSignIn>, CoreError> {
+        traced("server_sign_ins", &flow, async {
+            let (path, action) = ("account:signIns", "Load your recent sign-ins");
+            let answer = self
+                .account_call(&flow, Kind::Query, path, action, true, json!({}))
+                .await?;
+            let views: Vec<SignInView> = match answer {
+                Err(error) if error.is(&ServerCode::NotFound) => {
+                    info!(path, "not on this server yet");
+                    Vec::new()
+                }
+                answer => serde_json::from_value(answer.map_err(refused)?).map_err(unexpected)?,
+            };
+            info!(count = views.len(), "server sign-ins");
+            Ok(views.into_iter().map(ServerSignIn::from).collect())
+        })
+        .await
+    }
+
+    /// This install as the server knows it (Developer). Never proves: with no identity it is
+    /// [`ServerDevice::Unregistered`] and nothing is sent.
+    pub async fn server_device(&self, flow: String) -> Result<ServerDevice, CoreError> {
+        traced("server_device", &flow, async {
+            let fallback = label(&self.shared).to_string();
+            if self.device().refresh.is_none() {
+                return Ok(ServerDevice::Unregistered { label: fallback });
+            }
+            let answer = self
+                .device_call(&flow, Kind::Query, "devices:info", json!({}))
+                .await;
+            let view: DeviceView = match answer {
+                Err(error) if error.is(&ServerCode::Unauthenticated) => {
+                    return Ok(ServerDevice::Unregistered { label: fallback });
+                }
+                answer => serde_json::from_value(answer.map_err(refused)?).map_err(unexpected)?,
+            };
+            let (id, _) = self.registration();
+            Ok(ServerDevice::Registered {
+                id: id.chars().take(8).collect(),
+                label: view.label.unwrap_or(fallback),
+                // What the server holds: a token the phone has but never sent can't wake it.
+                push_token: view.push_token,
+                registered_at: view.created_at,
+            })
+        })
+        .await
+    }
+
+    /// The phones on this phone's forwarding address (at most 5). An address the server no
+    /// longer has is forgotten here and answers `ForwardingOff`.
+    pub async fn forwarding_phones(&self, flow: String) -> Result<Vec<MailPhone>, CoreError> {
+        traced("forwarding_phones", &flow, async {
+            let (_, id, _) = self
+                .saved_mailbox()
+                .ok_or_else(|| CoreError::ForwardingOff {
+                    kind: ForwardingOffKind::NotSetUp,
+                    reason: "Mail forwarding is off.".into(),
+                })?;
+            let answer = self
+                .device_call(&flow, Kind::Query, "mail:devices", json!({ "id": id }))
+                .await;
+            let view: MailDevicesView = match answer {
+                Err(error) if error.is(&ServerCode::MailboxNotFound) => {
+                    self.forget_forwarding(&id);
+                    return Err(CoreError::ForwardingOff {
+                        kind: ForwardingOffKind::AddressDeleted,
+                        reason: "The forwarding address was deleted.".into(),
+                    });
+                }
+                answer => serde_json::from_value(answer.map_err(refused)?).map_err(unexpected)?,
+            };
+            info!(count = view.devices.len(), "forwarding phones");
+            Ok(view
+                .devices
+                .into_iter()
+                .map(|p| MailPhone {
+                    id: p.device_id,
+                    label: p.label,
+                    added_at: p.added_at,
+                    seen_at: p.seen_at,
+                    this_phone: p.this_device,
+                })
+                .collect())
+        })
+        .await
+    }
+
+    /// Removes a linked phone (an id from [`ServerLink::Linked`]).
     pub async fn remove_phone(&self, flow: String, id: String) -> Result<(), CoreError> {
         let path = "account:removeDevice";
         let action = "Remove a phone from your account";
@@ -340,9 +534,47 @@ impl Core {
         }
     }
 
+    /// Turns the server's storage for connected apps on or off (`settings.cacheSession`). Off
+    /// deletes on the server what it keeps (the session, the password and its sign-in logins)
+    /// and its MCP copies; on keeps the sessions phones hand over from then on.
+    pub async fn set_server_storage(&self, flow: String, enabled: bool) -> Result<(), CoreError> {
+        traced("set_server_storage", &flow, async {
+            let action = if enabled {
+                "Let the server keep your VTOP session for connected apps"
+            } else {
+                "Delete what the server keeps of your VTOP"
+            };
+            // The server takes the settings whole: the password options stay as they are.
+            let options = self.account_view(&flow, action).await?.settings.options();
+            let body = settings_body(Some(enabled), &options);
+            let path = "account:setSettings";
+            self.account_call(&flow, Kind::Mutation, path, action, true, body)
+                .await?
+                .map_err(refused)?;
+            info!(enabled, "server storage");
+            Ok(())
+        })
+        .await
+    }
+
+    /// Sets how the server uses the saved password (see [`VaultOptions`]); storage stays as it is.
+    pub async fn set_vault_options(
+        &self,
+        flow: String,
+        options: VaultOptions,
+    ) -> Result<(), CoreError> {
+        let path = "account:setSettings";
+        let action = "Change how the server uses your password";
+        let body = settings_body(None, &options);
+        self.account_op("set_vault_options", Some(action), flow, path, body)
+            .await
+            .map(drop)
+    }
+
     /// Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
-    /// while no phone answers. It needs the sign-in code too: the server keeps the password only
-    /// with a forwarding address or [`GmailGrant`], and says so otherwise.
+    /// while no phone answers (it turns storage on). It needs the sign-in code too: the server
+    /// keeps the password only with a forwarding address or [`GmailGrant`], and says so
+    /// otherwise.
     pub async fn save_server_password(
         &self,
         flow: String,
@@ -403,7 +635,7 @@ impl Core {
     /// address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
     /// (for every phone on the account with `everywhere`), then forgets the identity here. Best
     /// effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
-    /// later, the install listed in Server until it goes.
+    /// later, the install listed on the account until it goes.
     pub async fn sign_out_of_server(
         &self,
         flow: String,
@@ -455,34 +687,25 @@ impl Core {
 
     /// Deletes the account on the server: phones, keys, saved session and password, options,
     /// sign-ins and the forwarding address (it belongs to the account). Not this phone's
-    /// registration.
+    /// registration. Sharing the registration number stops and a server route goes back to
+    /// Direct, so the next call doesn't make a new account unasked.
     pub async fn delete_server_account(&self, flow: String) -> Result<(), CoreError> {
         let path = "account:remove";
         let action = "Delete your account on the server";
-        let deleted = self.account_op("delete_server_account", Some(action), flow, path, json!({}));
+        let deleted = self.account_op(
+            "delete_server_account",
+            Some(action),
+            flow.clone(),
+            path,
+            json!({}),
+        );
         if deleted.await? {
             self.forget_identity();
+            self.forget_account_token();
             self.forget_any_forwarding();
+            self.stop_sharing_after_delete(&flow).await;
         }
         Ok(())
-    }
-
-    /// Sets how the server serves sessions (see [`ServerOptions`]).
-    pub async fn set_server_options(
-        &self,
-        flow: String,
-        options: ServerOptions,
-    ) -> Result<(), CoreError> {
-        let settings = json!({ "settings": {
-            "alwaysUseVault": options.always_use_vault,
-            "phoneWaitSecs": options.phone_wait_secs,
-            "vaultTtlSecs": options.vault_ttl_secs,
-        } });
-        let path = "account:setSettings";
-        let action = "Change the server's options";
-        self.account_op("set_server_options", Some(action), flow, path, settings)
-            .await
-            .map(drop)
     }
 
     /// Drops the sign-in history; false when the server doesn't offer it yet.
@@ -513,7 +736,7 @@ impl Core {
             let (_, mailbox, _) = self
                 .saved_mailbox()
                 .ok_or_else(|| CoreError::ForwardingOff {
-                    kind: crate::ForwardingOffKind::NotSetUp,
+                    kind: ForwardingOffKind::NotSetUp,
                     reason: "Mail forwarding is off.".into(),
                 })?;
             let body = json!({ "id": mailbox, "removeDevice": id });
@@ -569,113 +792,18 @@ impl Core {
     }
 }
 
-/// `screen:view`'s arguments: the same for the read and the live watch, so the read is answered
-/// from the watch.
-pub(crate) fn screen_args(mailbox: Option<&str>) -> Value {
-    mailbox.map_or_else(|| json!({}), |id| json!({ "mailbox": id }))
-}
-
 impl Core {
-    /// `screen:view`: the account, this install, what the server keeps once this phone is
-    /// linked, and the phones on its address when it has one; one read, which the Server
-    /// screen's live watch ([`LiveTopic::Server`]) answers locally.
-    async fn status_with(&self, flow: &str, action: &str) -> Result<ServerStatus, CoreError> {
-        let saved = self.saved_mailbox();
-        let screen = self
-            .account_call(
-                flow,
-                Kind::Query,
-                "screen:view",
-                action,
-                true,
-                screen_args(saved.as_ref().map(|(_, id, _)| id.as_str())),
-            )
+    /// `account:view`, read once into [`AccountWire`] (proving first when there's no identity).
+    pub(crate) async fn account_view(
+        &self,
+        flow: &str,
+        action: &str,
+    ) -> Result<AccountWire, CoreError> {
+        let view = self
+            .account_call(flow, Kind::Query, "account:view", action, true, json!({}))
             .await?
             .map_err(refused)?;
-        let part = |key: &str| screen.get(key).cloned().unwrap_or(Value::Null);
-        let account: AccountView = serde_json::from_value(part("account")).map_err(unexpected)?;
-        let device: DeviceView = serde_json::from_value(part("device")).unwrap_or_default();
-        let status: StatusView = match part("status") {
-            Value::Null => StatusView::default(),
-            status => serde_json::from_value(status).map_err(unexpected)?,
-        };
-        let on = part("mailbox");
-        let mailbox = match saved {
-            None => None,
-            Some((_, id, _)) if on.get("gone") == Some(&json!(true)) => {
-                self.forget_forwarding(&id);
-                None
-            }
-            Some((_, _, address)) => {
-                let phones: Vec<MailPhoneView> =
-                    serde_json::from_value(on.get("devices").cloned().unwrap_or_default())
-                        .map_err(unexpected)?;
-                let phones = phones
-                    .into_iter()
-                    .map(|p| MailPhone {
-                        id: p.device_id,
-                        label: p.label,
-                        added_at: p.added_at,
-                        seen_at: p.seen_at,
-                        this_phone: p.this_device,
-                    })
-                    .collect();
-                Some(ServerMailbox { address, phones })
-            }
-        };
-        let (id, _) = self.registration();
-        let id = self.device().refresh.map(|_| id);
-        info!(
-            linked = account.this_phone,
-            phones = account.phones.len(),
-            keys = account.keys.len(),
-            mailbox = mailbox.is_some(),
-            "server status"
-        );
-        let linked = if account.this_phone {
-            ServerAccount::Linked {
-                session: status.session(),
-                vault: status.vault(),
-                sign_ins: status
-                    .sign_ins
-                    .into_iter()
-                    .map(ServerSignIn::from)
-                    .collect(),
-                phones: account
-                    .phones
-                    .into_iter()
-                    .map(|p| LinkedPhone {
-                        id: p.id,
-                        label: p.label,
-                        added_at: p.added_at,
-                        seen_at: p.seen_at,
-                        this_phone: p.this_phone,
-                    })
-                    .collect(),
-                keys: account.keys.into_iter().map(AccessKey::from).collect(),
-            }
-        } else {
-            ServerAccount::Unlinked
-        };
-        Ok(ServerStatus {
-            account: linked,
-            registration_number: account.registration_number,
-            created_at: account.created_at,
-            semester_id: account.semester_id,
-            options: account.settings,
-            forwarding: account.forwarding,
-            mailbox,
-            device: ServerDevice {
-                id: id.map(|id| id.chars().take(8).collect()),
-                label: device
-                    .label
-                    .unwrap_or_else(|| label(&self.shared).to_string()),
-                // What the server holds: a token the phone has but never sent can't wake it.
-                push_token: device.push_token,
-                registered_at: device.created_at,
-            },
-            credentials_rejected_at: account.credentials_rejected_at,
-        })
+        serde_json::from_value(view).map_err(unexpected)
     }
 
     /// An `account:*` mutation as the student, proving first only when asked (`action` is
@@ -700,7 +828,6 @@ impl Core {
         .await
     }
 }
-
 impl Core {
     /// The picked semester, sent with a JWT just taken: a pick made before this install had a
     /// server identity never reached it. Best effort; the demo account refuses it.
@@ -727,8 +854,8 @@ impl Core {
         gmail: Option<GmailGrant>,
     ) -> Result<(), CoreError> {
         // The password leaves the phone whatever carries the call (a kept JWT or a proof,
-        // neither of which asks). Asked, the Server screen's own "Let the server sign in for
-        // you?" is the consent; unasked, only a remembered yes sends.
+        // neither of which asks). Asked, Connected apps' own "Save your password on the
+        // server?" is the consent; unasked, only a remembered yes sends.
         if !ask {
             let host = consent::host(&self.forwarding_server());
             if !consent::allowed(

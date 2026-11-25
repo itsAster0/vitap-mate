@@ -185,9 +185,15 @@ async fn no_identity_proves_and_trades_the_ticket_for_a_jwt() {
     let ws = server.replacen("http://", "ws://", 1);
     let opened = network.opened.lock().unwrap().clone();
     assert_eq!(opened, [format!("{ws}/proof?ticket={CHALLENGE}")]);
+    // Connected apps reads whether the server can wake this phone too.
     assert_eq!(
         paths(&edge),
-        ["auth:proveStart", "auth:token", "account:view"]
+        [
+            "auth:proveStart",
+            "auth:token",
+            "account:view",
+            "devices:info"
+        ]
     );
     {
         let edge = edge.lock().unwrap();
@@ -209,7 +215,7 @@ async fn no_identity_proves_and_trades_the_ticket_for_a_jwt() {
     // The next call goes with the JWT: no second proof.
     core.connected_apps("f2".into()).await.unwrap();
     assert_eq!(network.opened.lock().unwrap().len(), 1);
-    assert_eq!(paths(&edge).len(), 4);
+    assert_eq!(paths(&edge).len(), 6);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -231,7 +237,8 @@ async fn a_refused_refresh_token_is_dropped_and_proved_again_once() {
             "auth:token",
             "auth:proveStart",
             "auth:token",
-            "account:view"
+            "account:view",
+            "devices:info"
         ]
     );
     assert_eq!(core.device().refresh.unwrap().token, "vrt_1");
@@ -346,7 +353,12 @@ async fn a_call_started_during_a_background_proof_waits_for_its_jwt() {
     assert_eq!(network.opened.lock().unwrap().len(), 1);
     assert_eq!(
         paths(&edge),
-        ["auth:proveStart", "auth:token", "account:view"]
+        [
+            "auth:proveStart",
+            "auth:token",
+            "account:view",
+            "devices:info"
+        ]
     );
 }
 

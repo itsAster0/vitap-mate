@@ -313,6 +313,31 @@ impl Core {
         }
     }
 
+    /// After the student deleted their server account: Declined, so no identity (and with it
+    /// a new, empty account) is taken until they share again, and Direct in place of a server
+    /// route. The identity is already gone, so there is nothing to sign out.
+    pub(crate) async fn stop_sharing_after_delete(&self, flow: &str) {
+        if let Some(regno) = self.signed_in_regno().await {
+            let from = self.sharing_of(&regno);
+            let (to, effects) = next(from, RegnoAnswer::NotNow);
+            let saves = effects
+                .into_iter()
+                .filter(|effect| matches!(effect, Effect::Save(_)))
+                .collect();
+            self.run_regno_effects(&regno, saves);
+            self.shared.identity_may_have_changed();
+            info!(
+                flow,
+                kind = "regno",
+                from = from.as_str(),
+                to = to.as_str(),
+                outcome = "account_deleted",
+                "regno sharing"
+            );
+        }
+        self.leave_server_routes(flow);
+    }
+
     /// The one check before a server identity is taken: Ok once the signed-in student said
     /// Share (signed out: Ok, no number goes; only a kept identity is used, to leave). With
     /// `may_ask`, a flow with the student on screen asks first. Else `RegnoNotShared`.

@@ -32,7 +32,7 @@ Agents never open PRs or issues, push, or deploy unless asked.
 project.yaml          Kotlin Toolchain project: one module per layer and feature
 kotlin kotlin.bat     toolchain wrapper (./kotlin build, run, test)
 app/                  shell: feature registry (Features.kt), nav, More, Settings, Connection,
-                      Server, Connected apps, About, Developer, Inspector, MainActivity;
+                      Account, Connected apps, About, Developer, Inspector, MainActivity;
                       res/, jniLibs/ (built, gitignored)
 core/                 vitapmate.core: generated UniFFI bindings (vtop_ffi.kt, do not edit)
                       vitapmate.data: AppCore, pages (rememberPage, PageState), Settings,
@@ -42,7 +42,7 @@ design/               vitapmate.ui: theme, shared components, PageScaffold, Feat
 features/<name>/      one feature per module (module.yaml + src/vitapmate/features/<name>/)
 rust/                 Cargo workspace
   vtop-ffi/           the app's crate: Core, cache, session, records, routes (remote/route.rs),
-                      UDP (remote/udp.rs), server page (remote/server.rs), logs (obs.rs)
+                      UDP (remote/udp.rs), server account (remote/server.rs), logs (obs.rs)
   vtop-proto/         parsers, types and HTTP shapes as page machines, with no I/O
   vtop-core/          VTOP client that runs vtop-proto's machines over a Transport
   vtop-shared/        formats the app, engine and backend share (device_sig, mail_seal, page_dictionary)

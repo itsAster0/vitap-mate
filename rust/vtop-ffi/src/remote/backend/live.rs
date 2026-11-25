@@ -20,8 +20,8 @@ pub enum LiveTopic {
     MailInbox,
     /// `sessions:pending`: connected apps' requests for this phone's VTOP session.
     SessionRequests,
-    /// `screen:view`: what the Server screen shows, its address's phones included.
-    Server,
+    /// `account:signIns`: the account's last VTOP sign-ins.
+    SignIns,
 }
 
 /// Hears a [`Core::live_watch`], on the socket's threads.

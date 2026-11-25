@@ -381,6 +381,20 @@ impl Core {
         })
     }
 
+    /// Asks every time again for `kind` only (the other kinds' ticks stay).
+    pub fn forget_cookie_consent(&self, flow: String, kind: CookieKind) -> Result<(), CoreError> {
+        traced_sync("forget_cookie_consent", &flow, || {
+            {
+                let mut state = self.shared.consent();
+                state.remembered.remove(&kind);
+                state.answered.retain(|(_, answered), _| *answered != kind);
+                save(&state);
+            }
+            info!(?kind, "cookie consent forgotten");
+            Ok(())
+        })
+    }
+
     /// Asks every time again.
     pub fn reset_cookie_consent(&self, flow: String) -> Result<(), CoreError> {
         traced_sync("reset_cookie_consent", &flow, || {

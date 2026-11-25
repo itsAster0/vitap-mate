@@ -11,7 +11,7 @@ use tracing::info;
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
 use crate::remote::consent::CookieKind;
-use crate::remote::server::unexpected;
+use crate::remote::server::{PhoneWire, ServerStorage, unexpected};
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, dev, traced};
 
@@ -89,33 +89,26 @@ pub struct ConnectedApps {
     pub keys: Vec<AccessKey>,
     /// The other phones with keys, most keys first; the unlinked ones as one entry.
     pub elsewhere: Vec<KeyPhone>,
+    /// What the server stores for these apps (Session handover).
+    pub storage: ServerStorage,
+    /// The semester they read; None is the newest.
+    pub semester_id: Option<String>,
+    /// Whether the server can wake this phone for a session request.
+    pub push: ServerPush,
 }
 
-/// The account view (`account:view`) as Connected apps reads it.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AppsView {
-    #[serde(default)]
-    this_phone: bool,
-    #[serde(default)]
-    phones: Vec<KeyPhoneView>,
-    #[serde(default)]
-    keys: Vec<KeyView>,
-}
-
-/// One of the account's phones in [`AppsView`].
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KeyPhoneView {
-    id: String,
-    label: Option<String>,
-    seen_at: i64,
-    #[serde(default)]
-    this_phone: bool,
+/// Whether the server holds a push token for this phone, so a connected app's request reaches
+/// it while the app is closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ServerPush {
+    Token,
+    NoToken,
+    /// The server couldn't say (an older server, or the read failed): no warning.
+    Unknown,
 }
 
 /// The other phones that answer for keys, from the account view's `phones` and `keys`.
-fn elsewhere(phones: &[KeyPhoneView], keys: &[KeyView]) -> Vec<KeyPhone> {
+fn elsewhere(phones: &[PhoneWire], keys: &[KeyView]) -> Vec<KeyPhone> {
     let count = |phone: Option<&str>| {
         keys.iter()
             .filter(|key| match phone {
@@ -291,32 +284,48 @@ pub(crate) fn refused(error: EdgeError) -> CoreError {
 /// Connected-apps calls; each takes the caller's flow id first.
 #[uniffi::export]
 impl Core {
-    /// The account's access keys and whether this phone is linked to it.
+    /// The account's access keys, whether this phone is linked to it, what the server stores
+    /// for connected apps and whether it can wake this phone.
     pub async fn connected_apps(&self, flow: String) -> Result<ConnectedApps, CoreError> {
         traced("connected_apps", &flow, async {
-            let action = "Load your connected apps";
-            let view = self
-                .account_call(&flow, Kind::Query, "account:view", action, true, json!({}))
-                .await?
-                .map_err(refused)?;
-            let view: AppsView = serde_json::from_value(view).map_err(unexpected)?;
+            let view = self.account_view(&flow, "Load your connected apps").await?;
             let linked = view.this_phone;
             let elsewhere = if linked {
                 elsewhere(&view.phones, &view.keys)
             } else {
                 vec![]
             };
+            let storage = view.storage();
+            // After the account view, so an identity it proved for is there; never proves.
+            let push = match self
+                .device_call(&flow, Kind::Query, "devices:info", json!({}))
+                .await
+            {
+                Ok(info) => match info.get("pushToken").and_then(Value::as_bool) {
+                    Some(true) => ServerPush::Token,
+                    Some(false) => ServerPush::NoToken,
+                    None => ServerPush::Unknown,
+                },
+                Err(error) => {
+                    info!(code = error.code(), "push token not read");
+                    ServerPush::Unknown
+                }
+            };
             let keys: Vec<AccessKey> = view.keys.into_iter().map(AccessKey::from).collect();
             info!(
                 linked,
                 keys = keys.len(),
                 elsewhere = elsewhere.len(),
+                ?push,
                 "connected apps"
             );
             Ok(ConnectedApps {
                 linked,
                 keys,
                 elsewhere,
+                storage,
+                semester_id: view.semester_id,
+                push,
             })
         })
         .await

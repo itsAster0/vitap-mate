@@ -44,15 +44,28 @@ async fn semester_push_is_quiet() {
     assert!(edge.lock().unwrap().requests.is_empty());
 }
 
-#[tokio::test]
-async fn status_reads_everything_the_server_keeps() {
-    let core = core("status");
+/// A signed-in core with an identity kept, on a fake server.
+async fn linked(name: &str) -> (Core, Arc<Mutex<Edge>>, String) {
+    let dir = core(name).dir;
     let edge = Arc::new(Mutex::new(Edge::default()));
     let server = serve(edge.clone()).await;
-    mailbox(&core, &server);
-    let account = json!({
+    let core = signed_in(&dir, server.clone());
+    keep_token(&core, &server);
+    (core, edge, server)
+}
+
+fn wire(view: Value) -> AccountWire {
+    serde_json::from_value(view).unwrap()
+}
+
+#[tokio::test]
+async fn the_account_reads_its_link_and_storage_once() {
+    let (core, edge, _) = linked("account").await;
+    let view = json!({
         "registrationNumber": "22BCE0001", "createdAt": 4, "semesterId": "AP2025264", "forwarding": true,
-        "settings": { "alwaysUseVault": false, "phoneWaitSecs": 45, "vaultTtlSecs": 86400 },
+        "settings": { "cacheSession": true, "alwaysUseVault": false, "phoneWaitSecs": 45, "vaultTtlSecs": 86400 },
+        "savedCredentials": true, "vaultSavedAt": 8, "vaultExpiresAt": 86408, "vaultGmail": true,
+        "sessionSavedAt": 9, "sessionSource": "server",
         "credentialsRejectedAt": 3, "thisPhone": true,
         "keys": [{ "id": "ab12cd34", "label": "MCP", "createdAt": 6, "lastUsedAt": null, "phoneId": "p1", "outings": false }],
         "phones": [
@@ -60,130 +73,305 @@ async fn status_reads_everything_the_server_keeps() {
             { "id": "p2", "label": null, "addedAt": 2, "seenAt": 2, "thisPhone": false },
         ],
     });
-    let status = json!({
-        "sessionSavedAt": 9, "sessionSource": "phone", "vaultSavedAt": null, "vaultExpiresAt": null,
-        "vaultGmail": false, "credentialsRejectedAt": 3, "forwarding": null, "phones": 2, "keys": [],
-        "signIns": [{ "at": 8, "by": "server", "ok": false, "reason": "VTOP down" }],
-    });
-    let info = json!({ "deviceId": "d1", "label": "Pixel", "platform": "android", "pushToken": true,
-        "createdAt": 7, "latest": 9 });
-    let devices = json!({ "devices": [
-        { "deviceId": "d1", "label": "Pixel", "addedAt": 1, "seenAt": 2, "thisDevice": true },
-        { "deviceId": "ff", "label": null, "addedAt": 3, "seenAt": 3, "thisDevice": false },
-    ] });
-    can(
-        &edge,
-        "screen:view",
-        200,
-        json!({ "account": account, "device": info, "status": status, "mailbox": devices }),
-    );
-    let core = signed_in(&core.dir, server.clone());
-    keep_token(&core, &server);
-    let status = core.status_with("f-s", "Load").await.unwrap();
-    assert!(status.forwarding);
-    let ServerAccount::Linked {
-        session,
-        vault,
-        sign_ins,
-        phones,
-        keys,
-    } = &status.account
-    else {
-        panic!("not linked: {:?}", status.account);
-    };
+    can(&edge, "account:view", 200, view);
+    let account = core.server_account("f-a".into()).await.unwrap();
     assert_eq!(
-        (
-            status.registration_number.as_str(),
-            status.created_at,
-            status.semester_id.as_deref()
-        ),
-        ("22BCE0001", Some(4), Some("AP2025264"))
-    );
-    assert_eq!(
-        status.options,
-        ServerOptions {
-            always_use_vault: false,
-            phone_wait_secs: 45,
-            vault_ttl_secs: Some(86400)
-        }
-    );
-    assert_eq!(
-        *session,
-        ServerSession::Saved {
-            at: 9,
-            by: SessionSource::Phone
-        }
-    );
-    assert_eq!(
-        (vault, status.credentials_rejected_at),
-        (&ServerVault::None, Some(3))
-    );
-    assert_eq!(
-        *sign_ins,
-        [ServerSignIn {
-            at: 8,
-            by_server: true,
-            outcome: SignInOutcome::Failed {
-                reason: Some("VTOP down".into())
+        account,
+        ServerAccount {
+            registration_number: "22BCE0001".into(),
+            created_at: Some(4),
+            semester_id: Some("AP2025264".into()),
+            link: ServerLink::Linked {
+                phones: vec![
+                    LinkedPhone {
+                        id: "p1".into(),
+                        label: Some("OnePlus CPH2573".into()),
+                        added_at: 1,
+                        seen_at: 5,
+                        this_phone: true,
+                    },
+                    LinkedPhone {
+                        id: "p2".into(),
+                        label: None,
+                        added_at: 2,
+                        seen_at: 2,
+                        this_phone: false,
+                    },
+                ],
             },
-        }]
-    );
-    assert_eq!(phones.len(), 2);
-    assert!(phones[0].this_phone && !phones[1].this_phone);
-    assert_eq!(
-        (keys.len(), keys[0].id.as_str(), keys[0].created_at),
-        (1, "ab12cd34", 6)
-    );
-    assert_eq!(
-        status.device,
-        ServerDevice {
-            id: Some(core.registration().0[..8].into()),
-            label: "Pixel".into(),
-            push_token: true,
-            registered_at: Some(7),
+            storage: ServerStorage::OfflineSignIn {
+                session: ServerSession::Saved {
+                    at: 9,
+                    by: SessionSource::Server
+                },
+                vault: SavedVault {
+                    at: 8,
+                    expires_at: Some(86408),
+                    gmail: true
+                },
+                options: VaultOptions {
+                    always_use_vault: false,
+                    phone_wait_secs: 45,
+                    vault_ttl_secs: Some(86400)
+                },
+            },
+            forwarding: true,
+            credentials_rejected_at: Some(3),
         }
     );
-    let mailbox = status.mailbox.unwrap();
-    assert_eq!(mailbox.address, "otp+k3f9x2ab7q@vmate.aster0.dev");
-    assert!(mailbox.phones[0].this_phone && mailbox.phones[1].id == "ff");
-    // One read, with this install's address.
-    assert_eq!(paths(&edge), ["auth:token", "screen:view"]);
+    // One read; queries share the socket's subscriptions, so they carry no flow.
+    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
     let edge = edge.lock().unwrap();
-    assert_eq!(edge.requests[1].body, json!({ "mailbox": "k3f9x2ab7q" }));
-    // The reads share the socket's subscriptions, so they carry no flow; `auth:token` does.
     assert!(edge.requests.iter().all(|r| r.signed));
-    assert!(
-        edge.requests
-            .iter()
-            .all(|r| (r.path == "auth:token") != r.flow.is_empty())
-    );
+    assert!(edge.requests[1].flow.is_empty());
 }
 
 #[tokio::test]
 async fn an_older_server_and_an_unlinked_phone_still_show_what_applies() {
-    let core = core("older");
-    let edge = Arc::new(Mutex::new(Edge::default()));
-    let server = serve(edge.clone()).await;
-    // No createdAt, settings or device; not linked, so nothing kept is shown.
+    let (core, edge, _) = linked("older").await;
+    // No createdAt or settings; not linked, so no phones.
     can(
         &edge,
-        "screen:view",
+        "account:view",
         200,
-        json!({ "account": { "registrationNumber": "22BCE0001", "thisPhone": false }, "status": null }),
+        json!({ "registrationNumber": "22BCE0001", "thisPhone": false, "phones": [] }),
     );
-    let core = signed_in(&core.dir, server.clone());
+    let account = core.server_account("f".into()).await.unwrap();
+    assert_eq!(
+        (account.link, account.storage, account.created_at),
+        (ServerLink::Unlinked, ServerStorage::Off, None)
+    );
+}
+
+#[test]
+fn storage_reads_into_one_state() {
+    // Off: whatever else the server sent alongside.
+    let off = wire(json!({
+        "settings": { "cacheSession": false, "alwaysUseVault": true, "phoneWaitSecs": 20 },
+        "sessionSavedAt": 7, "vaultSavedAt": 8,
+    }));
+    assert_eq!(off.storage(), ServerStorage::Off);
+    // On with nothing kept yet, and with a session a phone handed over.
+    let on = |extra: Value| {
+        let mut view = json!({ "settings": { "cacheSession": true, "alwaysUseVault": true, "phoneWaitSecs": 20 } });
+        for (key, value) in extra.as_object().unwrap() {
+            view[key] = value.clone();
+        }
+        wire(view).storage()
+    };
+    assert_eq!(
+        on(json!({})),
+        ServerStorage::SessionOnly {
+            session: ServerSession::None
+        }
+    );
+    // A source the server doesn't name: a phone's.
+    assert_eq!(
+        on(json!({ "sessionSavedAt": 7 })),
+        ServerStorage::SessionOnly {
+            session: ServerSession::Saved {
+                at: 7,
+                by: SessionSource::Phone
+            }
+        }
+    );
+    // An expiry or Gmail flag without a saved password is no password.
+    assert_eq!(
+        on(json!({ "vaultExpiresAt": 9, "vaultGmail": true })),
+        ServerStorage::SessionOnly {
+            session: ServerSession::None
+        }
+    );
+    assert_eq!(
+        on(json!({ "vaultSavedAt": 8 })),
+        ServerStorage::OfflineSignIn {
+            session: ServerSession::None,
+            vault: SavedVault {
+                at: 8,
+                expires_at: None,
+                gmail: false
+            },
+            options: VaultOptions {
+                always_use_vault: true,
+                phone_wait_secs: 20,
+                vault_ttl_secs: None
+            },
+        }
+    );
+    // A server from before the choice: on when it keeps something, with its defaults.
+    assert_eq!(wire(json!({})).storage(), ServerStorage::Off);
+    assert!(matches!(
+        wire(json!({ "vaultSavedAt": 8 })).storage(),
+        ServerStorage::OfflineSignIn {
+            options: VaultOptions {
+                always_use_vault: true,
+                phone_wait_secs: 20,
+                ..
+            },
+            ..
+        }
+    ));
+    assert!(matches!(
+        wire(json!({ "sessionSavedAt": 7 })).storage(),
+        ServerStorage::SessionOnly { .. }
+    ));
+}
+
+#[tokio::test]
+async fn storage_goes_on_and_off_with_the_options_kept() {
+    let (core, edge, _) = linked("storage").await;
+    let settings = json!({ "cacheSession": true, "alwaysUseVault": false, "phoneWaitSecs": 45, "vaultTtlSecs": 172800 });
+    can(
+        &edge,
+        "account:view",
+        200,
+        json!({ "settings": settings, "thisPhone": true }),
+    );
+    can(&edge, "account:setSettings", 200, Value::Null);
+    core.set_server_storage("f-off".into(), false)
+        .await
+        .unwrap();
+    can(&edge, "account:setSettings", 200, Value::Null);
+    let options = VaultOptions {
+        always_use_vault: true,
+        phone_wait_secs: 10,
+        vault_ttl_secs: None,
+    };
+    core.set_vault_options("f-opt".into(), options)
+        .await
+        .unwrap();
+    assert_eq!(
+        paths(&edge),
+        [
+            "auth:token",
+            "account:view",
+            "account:setSettings",
+            "account:setSettings"
+        ]
+    );
+    let edge = edge.lock().unwrap();
+    // Off sends the settings whole, the password options as they were.
+    assert_eq!(
+        edge.requests[2].body,
+        json!({ "settings": { "cacheSession": false, "alwaysUseVault": false, "phoneWaitSecs": 45, "vaultTtlSecs": 172800 } })
+    );
+    // The options leave storage to the server (and an older one takes them).
+    assert_eq!(
+        edge.requests[3].body,
+        json!({ "settings": { "alwaysUseVault": true, "phoneWaitSecs": 10, "vaultTtlSecs": null } })
+    );
+    assert_eq!(edge.requests[3].flow, "f-opt");
+}
+
+#[tokio::test]
+async fn sign_ins_read_newest_first_and_an_older_server_has_none() {
+    let (core, edge, _) = linked("sign-ins").await;
+    can(
+        &edge,
+        "account:signIns",
+        200,
+        json!([
+            { "at": 9, "by": "phone", "ok": true, "reason": null },
+            { "at": 8, "by": "server", "ok": false, "reason": "VTOP down" },
+        ]),
+    );
+    assert_eq!(
+        core.server_sign_ins("f".into()).await.unwrap(),
+        [
+            ServerSignIn {
+                at: 9,
+                by_server: false,
+                outcome: SignInOutcome::SignedIn
+            },
+            ServerSignIn {
+                at: 8,
+                by_server: true,
+                outcome: SignInOutcome::Failed {
+                    reason: Some("VTOP down".into())
+                },
+            },
+        ]
+    );
+    // Nothing canned: the fake server has no such function.
+    assert_eq!(core.server_sign_ins("f".into()).await, Ok(vec![]));
+}
+
+#[tokio::test]
+async fn this_device_shows_once_registered_and_never_proves() {
+    let core = core("device");
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
+    assert_eq!(
+        core.server_device("f".into()).await,
+        Ok(ServerDevice::Unregistered {
+            label: "vitapmate".into()
+        })
+    );
+    assert!(paths(&edge).is_empty());
     keep_token(&core, &server);
-    let status = core.status_with("f", "Load").await.unwrap();
-    assert!(status.account == ServerAccount::Unlinked && status.mailbox.is_none());
+    let info = json!({ "deviceId": "d1", "label": "Pixel", "platform": "android", "pushToken": true, "createdAt": 7 });
+    can(&edge, "devices:info", 200, info);
     assert_eq!(
-        (status.created_at, status.options.clone()),
-        (None, ServerOptions::default())
+        core.server_device("f".into()).await,
+        Ok(ServerDevice::Registered {
+            id: core.registration().0[..8].into(),
+            label: "Pixel".into(),
+            push_token: true,
+            registered_at: Some(7),
+        })
     );
+}
+
+#[tokio::test]
+async fn forwarding_phones_read_and_a_deleted_address_is_forgotten() {
+    let (core, edge, server) = linked("mail-phones").await;
+    mailbox(&core, &server);
+    let devices = json!({ "devices": [
+        { "deviceId": "d1", "label": "Pixel", "addedAt": 1, "seenAt": 2, "thisDevice": true },
+        { "deviceId": "ff", "label": null, "addedAt": 3, "seenAt": 3, "thisDevice": false },
+    ] });
+    can(&edge, "mail:devices", 200, devices);
+    let phones = core.forwarding_phones("f".into()).await.unwrap();
+    assert_eq!(phones.len(), 2);
+    assert!(phones[0].this_phone && phones[1].id == "ff");
     assert_eq!(
-        (status.device.id.as_deref(), status.device.label.as_str()),
-        (Some(&core.registration().0[..8]), "vitapmate")
+        edge.lock().unwrap().requests.last().unwrap().body,
+        json!({ "id": "k3f9x2ab7q" })
     );
-    assert_eq!(paths(&edge), ["auth:token", "screen:view"]);
+    can(
+        &edge,
+        "mail:devices",
+        404,
+        json!({ "code": "mailbox_not_found", "error": "x" }),
+    );
+    let gone = core.forwarding_phones("f".into()).await;
+    assert!(matches!(
+        gone,
+        Err(CoreError::ForwardingOff {
+            kind: ForwardingOffKind::AddressDeleted,
+            ..
+        })
+    ));
+    assert!(core.saved_mailbox().is_none());
+}
+
+#[tokio::test]
+async fn deleting_the_account_stops_sharing_and_server_routes() {
+    use crate::remote::regno::RegnoSharing;
+    use crate::remote::route::Route;
+    let (core, edge, server) = linked("delete-account").await;
+    mailbox(&core, &server);
+    core.set_route("r".into(), Route::Udp).unwrap();
+    can(&edge, "account:remove", 200, Value::Null);
+    core.delete_server_account("f".into()).await.unwrap();
+    assert_eq!(core.regno_sharing("f".into()).await, RegnoSharing::Declined);
+    assert_eq!(core.route_status("f".into()).chosen, Route::Direct);
+    assert!(core.device().refresh.is_none() && core.saved_mailbox().is_none());
+    // Nothing more goes as the student: the next account call doesn't prove a new account.
+    let next = core.server_account("f2".into()).await;
+    assert_eq!(next, Err(CoreError::RegnoNotShared));
+    assert_eq!(paths(&edge), ["auth:token", "account:remove"]);
 }
 
 #[tokio::test]
@@ -318,46 +506,4 @@ async fn the_password_goes_sealed_only_when_the_server_can_get_the_code() {
     );
     assert!(sent.get("accountToken").is_none());
     assert!(sent.get("session").is_none());
-}
-
-#[test]
-fn the_kept_session_and_password_read_once_into_one_state_each() {
-    let view = |json: Value| serde_json::from_value::<StatusView>(json).unwrap();
-    let none = view(json!({}));
-    assert_eq!(
-        (none.session(), none.vault()),
-        (ServerSession::None, ServerVault::None)
-    );
-    let saved = view(json!({
-        "sessionSavedAt": 7, "sessionSource": "server",
-        "vaultSavedAt": 8, "vaultExpiresAt": 9, "vaultGmail": true,
-    }));
-    assert_eq!(
-        saved.session(),
-        ServerSession::Saved {
-            at: 7,
-            by: SessionSource::Server
-        }
-    );
-    assert_eq!(
-        saved.vault(),
-        ServerVault::Saved {
-            at: 8,
-            expires_at: Some(9),
-            gmail: true
-        }
-    );
-    // A source the server doesn't name (or an older one): a phone's.
-    assert_eq!(
-        view(json!({ "sessionSavedAt": 7 })).session(),
-        ServerSession::Saved {
-            at: 7,
-            by: SessionSource::Phone
-        }
-    );
-    // An expiry or Gmail flag without a saved password is nothing kept.
-    assert_eq!(
-        view(json!({ "vaultExpiresAt": 9, "vaultGmail": true })).vault(),
-        ServerVault::None
-    );
 }

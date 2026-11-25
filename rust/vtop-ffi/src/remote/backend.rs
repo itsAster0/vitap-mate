@@ -207,12 +207,7 @@ impl Core {
                     ("mail:inbox", json!({ "id": id }))
                 }
                 LiveTopic::SessionRequests => ("sessions:pending", json!({})),
-                LiveTopic::Server => (
-                    "screen:view",
-                    crate::remote::server::screen_args(
-                        self.saved_mailbox().as_ref().map(|(_, id, _)| id.as_str()),
-                    ),
-                ),
+                LiveTopic::SignIns => ("account:signIns", json!({})),
             };
             let stamp = self.ensure_identity(&flow, path, false).await?;
             let backend = self.backend()?;

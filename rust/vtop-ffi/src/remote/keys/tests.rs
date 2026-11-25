@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use super::*;
 use crate::remote::consent;
+use crate::remote::server::AccountWire;
 use crate::test_edge::{Edge, keep_token, paths, serve, signed_in};
 
 fn core(name: &str) -> Core {
@@ -76,7 +77,7 @@ fn keys_read_from_the_account_view() {
 #[test]
 fn other_phones_with_keys_are_listed() {
     let key = |phone: &str| json!({ "id": "k", "label": "MCP", "createdAt": 1, "lastUsedAt": null, "phoneId": phone });
-    let view: AppsView = serde_json::from_value(json!({
+    let view: AccountWire = serde_json::from_value(json!({
         "thisPhone": true,
         "phones": [
             { "id": "me", "label": "Pixel", "seenAt": 9, "thisPhone": true },
@@ -105,6 +106,41 @@ fn other_phones_with_keys_are_listed() {
                 keys: 1
             },
         ]
+    );
+}
+
+#[tokio::test]
+async fn connected_apps_read_storage_semester_and_push() {
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    let core = signed_in(&core("apps").dir, server.clone());
+    keep_token(&core, &server);
+    let view = json!({
+        "thisPhone": true, "semesterId": "AP2026", "keys": [], "phones": [],
+        "settings": { "cacheSession": true, "alwaysUseVault": true, "phoneWaitSecs": 20 },
+        "sessionSavedAt": 5, "sessionSource": "phone",
+    });
+    can(&edge, "account:view", 200, view.clone());
+    can(&edge, "devices:info", 200, json!({ "pushToken": false }));
+    let apps = core.connected_apps("f".into()).await.unwrap();
+    assert_eq!(
+        (apps.storage, apps.semester_id.as_deref(), apps.push),
+        (
+            ServerStorage::SessionOnly {
+                session: crate::remote::server::ServerSession::Saved {
+                    at: 5,
+                    by: crate::remote::server::SessionSource::Phone
+                }
+            },
+            Some("AP2026"),
+            ServerPush::NoToken
+        )
+    );
+    // A server that can't say (nothing canned): no warning, the page still loads.
+    can(&edge, "account:view", 200, view);
+    assert_eq!(
+        core.connected_apps("f".into()).await.unwrap().push,
+        ServerPush::Unknown
     );
 }
 

@@ -66,7 +66,7 @@ A few design points:
 | `session.rs` | sign-in, the OTP prompt, signing in again, sign-out |
 | `otp.rs` | the OTP prompt the app's sheet shows (`OtpListener`); a re-login the student watches waits there for the code instead of failing |
 | `pages/` | one file per feature (`attendance.rs`, `timetable.rs`, `marks.rs`, `exams.rs`, `outing.rs`, ...) with its own `#[uniffi::export] impl Core` block and ready-to-draw records (`records.rs`), the change inbox (`changes.rs`) and Gmail's OTP (`gmail.rs`) |
-| `remote/` | everything that talks to our servers: `backend.rs` (its exported calls; + `backend/`: Convex calls in `rpc.rs`, auth state machine in `auth.rs`, identity lifecycle in `identity.rs`, live watches in `live.rs`), `edge.rs` (the edge's URL and the session cookies sent to it), `route.rs` (+ `route/`), `udp.rs`, `consent.rs`, `account_token.rs`, `keys.rs` (Connected apps), `handover.rs` (+ `handover/`: a connected app's session request, from arrival to its one answer), `forwarding.rs` and `server.rs` (the Server page) |
+| `remote/` | everything that talks to our servers: `backend.rs` (its exported calls; + `backend/`: Convex calls in `rpc.rs`, auth state machine in `auth.rs`, identity lifecycle in `identity.rs`, live watches in `live.rs`), `edge.rs` (the edge's URL and the session cookies sent to it), `route.rs` (+ `route/`), `udp.rs`, `consent.rs`, `account_token.rs`, `keys.rs` (Connected apps), `handover.rs` (+ `handover/`: a connected app's session request, from arrival to its one answer), `forwarding.rs` and `server.rs` (the server account: Account, Connected apps' storage, the OTP sheet's phones, Developer) |
 | `store.rs` (+ `store/`) | the file reads and writes; `decoded.rs` (decoded copies) and `cookies.rs` (the shared cookie store) |
 | top level | `transport.rs` (Kotlin's HTTP hop), `device.rs` (this install's keys), `dev.rs` (Developer), `demo.rs`, `web.rs`, `obs.rs` (logs), `macros.rs` (`signed_in!`) |
 
@@ -150,12 +150,14 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   batches, they are fetched a few at a time on the phone.
 - **Cookie consent** (`vtop-ffi/src/remote/consent.rs`). Every path that sends the
   VTOP session (or the saved password) to our servers calls `consent::allowed`
-  first: Proxy, Server and Udp, the server OTP, Connected apps, the Server page,
+  first: Proxy, Server and Udp, the server OTP, Connected apps, saving the password,
   mail forwarding and a connected app's session request. Kotlin's
   `CookieConsent` (the `CookieGate`) shows a dialog with what
   goes where and why: Send, Cancel and "Don't ask again" per kind (route,
   account, handover; kept in `consent.json`, dropped on
-  sign-out or another student). It fails closed: no gate, an empty flow, the
+  sign-out or another student). Each kind's tick is a switch: Connection's "Ask before
+  sending your VTOP cookie" (route) and Connected apps' "Ask before handing over your
+  cookie" (handover), through `remember_cookie_consent` and `forget_cookie_consent`. It fails closed: no gate, an empty flow, the
   app not shown or a background flow (`flow(name, unattended = true)`: the
   open-app sweep and background sync) is a no, except a route send with the
   route's tick, so background runs follow the chosen route. A no on a
@@ -179,17 +181,18 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   A flow with the student on screen that needs the identity (`ask` true) shows the sheet;
   "Not now" holds for the rest of that flow. Background runs never ask. After a sign-in
   the app asks once (`RegnoAsk::FirstTime`), picking Server or UDP asks again
-  (`ForFeature`), and Settings → Connections switches it; turning it off drops the JWT
+  (`ForFeature`), and Account's "Share registration number" switches it; turning it off drops the JWT
   and refresh token here, goes back to Direct and signs this install out of the server
   (`auth:signOut` with the refresh token, so its chain is revoked and it leaves the
   forwarding address, kept here to rejoin). Offline, the token waits in
   `server_last_student.json` (`KeptSignOut`, as a switch or an offline Server sign-out
   does) and goes at the next call that reaches the server, before any new identity. The
-  account, its address and keys stay (the Server page deletes those). The demo account is
-  always Shared.
+  account, its address and keys stay (Account's "Delete server account" deletes those,
+  and sets the answer to Declined and the route to Direct, so no new account is made
+  unasked). The demo account is always Shared.
 - **Account token** (`vtop-ffi/src/remote/account_token.rs`, API.md "Account
   tokens"). A 14-day token naming the student and this install, for the
-  account calls (Connected apps, the Server page, mail forwarding), linked
+  account calls (Connected apps, Account, mail forwarding), linked
   phone or not; the student's `Account` object keeps the live token per
   install and revokes it when the install leaves the account or the
   forwarding address. It proves who the student is, not that the phone is
@@ -206,8 +209,8 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   (Developer's "Background proof on mobile data" allows that), gives up
   after "Background proof timeout" (90 s) and tries again at the next
   open, and holds the identity's turn, so a call started meanwhile waits
-  for its JWT instead of proving again. Saving the password goes with the token too: asked, the
-  Server screen's dialog is the consent; unasked, it needs a remembered
+  for its JWT instead of proving again. Saving the password goes with the token too: asked, Connected
+  apps' "Save your password on the server?" dialog is the consent; unasked, it needs a remembered
   `Account` yes. A connected app's session and the routes still send the
   session. Dropped on sign-out,
   another student, and deleting the server account or this install. Old
@@ -253,8 +256,13 @@ The edge also serves `POST /v1/app/status` (signed by the phone, with the
 registration number, no VTOP cookies): the sealed session's and password's ages,
 when VTOP last rejected the password, the forwarding address, the phone count,
 the last 10 sign-ins and each key's last 10 uses (extension or MCP, from the
-`x-vtop-client` header). Settings → Server shows these and the account's other
-records, with a delete for each (`vtop-ffi/src/remote/server.rs`). `/healthz` reports
+`x-vtop-client` header), for older apps. The app reads `account:view` instead, once, into
+`ServerAccount` and `ServerStorage` (`vtop-ffi/src/remote/server.rs`): storage for connected
+apps is off by default (`settings.cacheSession`); on, the server keeps the sessions phones hand
+over (`SessionOnly`), and with a saved password it signs in by itself (`OfflineSignIn`, with
+its `VaultOptions`). Turning it off deletes both on the server. Account shows the link and
+the phones, Connected apps the storage and `account:signIns`, the OTP sheet `mail:devices`
+and Developer `devices:info`. `/healthz` reports
 `version` and `colo`.
 
 MCP clients (Claude and others) connect to `/mcp` with OAuth (`backend/convex/

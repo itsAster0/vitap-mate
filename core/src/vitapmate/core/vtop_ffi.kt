@@ -1270,6 +1270,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_forget_cookie_consent(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remember_cookie_consent(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent(
@@ -1334,6 +1336,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_forget_server_password(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_forwarding_phones(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remove_phone(
@@ -1344,9 +1348,15 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_send_server_semester(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_server_status(
+    external fun uniffi_vtop_ffi_checksum_method_core_server_account(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_set_server_options(
+    external fun uniffi_vtop_ffi_checksum_method_core_server_device(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_server_sign_ins(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_server_storage(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_vault_options(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_sign_out_of_server(
     ): Int
@@ -1625,6 +1635,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_forget_cookie_consent(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_remember_cookie_consent(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1689,6 +1701,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_forget_server_password(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_forwarding_phones(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_remove_forwarding_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_remove_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
@@ -1699,9 +1713,15 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_send_server_semester(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_server_status(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_server_account(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_set_server_options(`ptr`: Long,`flow`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_server_device(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_server_sign_ins(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_set_server_storage(`ptr`: Long,`flow`: RustBuffer.ByValue,`enabled`: Byte,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_set_vault_options(`ptr`: Long,`flow`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_sign_out_of_server(`ptr`: Long,`flow`: RustBuffer.ByValue,`everywhere`: Byte,
     ): Long
@@ -2314,6 +2334,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 55337) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_forget_cookie_consent() and 0xFFFF) != 43611) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_remember_cookie_consent() and 0xFFFF) != 14968) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2350,7 +2373,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_handover() and 0xFFFF) != 5383) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 1093) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 52754) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 22913) {
@@ -2401,7 +2424,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_forwarding_everywhere() and 0xFFFF) != 19767) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_account() and 0xFFFF) != 61836) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_account() and 0xFFFF) != 4193) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_device() and 0xFFFF) != 48307) {
@@ -2410,28 +2433,40 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_forget_server_password() and 0xFFFF) != 59531) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_phones() and 0xFFFF) != 29953) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone() and 0xFFFF) != 48663) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 38742) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 21919) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_server_password() and 0xFFFF) != 2750) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 64941) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 38309) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 12129) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_status() and 0xFFFF) != 47612) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_account() and 0xFFFF) != 6718) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_server_options() and 0xFFFF) != 51426) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_device() and 0xFFFF) != 54275) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 48377) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_sign_ins() and 0xFFFF) != 2101) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_server_storage() and 0xFFFF) != 57584) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_vault_options() and 0xFFFF) != 40190) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 23732) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 57187) {
@@ -5427,6 +5462,11 @@ public interface CoreInterface {
     fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind>
     
     /**
+     * Asks every time again for `kind` only (the other kinds' ticks stay).
+     */
+    fun `forgetCookieConsent`(`flow`: kotlin.String, `kind`: CookieKind)
+    
+    /**
      * Remembers a yes for `kind` given in the app's own words, as "Don't ask again" in the
      * dialog would (choosing Server fetch already says the cookie goes to the server).
      */
@@ -5506,7 +5546,8 @@ public interface CoreInterface {
     fun `handover`(`flow`: kotlin.String, `event`: HandoverEvent): List<HandoverEffect>
     
     /**
-     * The account's access keys and whether this phone is linked to it.
+     * The account's access keys, whether this phone is linked to it, what the server stores
+     * for connected apps and whether it can wake this phone.
      */
     suspend fun `connectedApps`(`flow`: kotlin.String): ConnectedApps
     
@@ -5596,7 +5637,8 @@ public interface CoreInterface {
     /**
      * Deletes the account on the server: phones, keys, saved session and password, options,
      * sign-ins and the forwarding address (it belongs to the account). Not this phone's
-     * registration.
+     * registration. Sharing the registration number stops and a server route goes back to
+     * Direct, so the next call doesn't make a new account unasked.
      */
     suspend fun `deleteServerAccount`(`flow`: kotlin.String)
     
@@ -5613,12 +5655,18 @@ public interface CoreInterface {
     suspend fun `forgetServerPassword`(`flow`: kotlin.String)
     
     /**
+     * The phones on this phone's forwarding address (at most 5). An address the server no
+     * longer has is forgotten here and answers `ForwardingOff`.
+     */
+    suspend fun `forwardingPhones`(`flow`: kotlin.String): List<MailPhone>
+    
+    /**
      * Takes another phone (a [`MailPhone::id`]) off this phone's forwarding address.
      */
     suspend fun `removeForwardingPhone`(`flow`: kotlin.String, `id`: kotlin.String)
     
     /**
-     * Removes a linked phone (an id from [`ServerStatus::phones`]).
+     * Removes a linked phone (an id from [`ServerLink::Linked`]).
      */
     suspend fun `removePhone`(`flow`: kotlin.String, `id`: kotlin.String)
     
@@ -5632,8 +5680,9 @@ public interface CoreInterface {
     
     /**
      * Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
-     * while no phone answers. It needs the sign-in code too: the server keeps the password only
-     * with a forwarding address or [`GmailGrant`], and says so otherwise.
+     * while no phone answers (it turns storage on). It needs the sign-in code too: the server
+     * keeps the password only with a forwarding address or [`GmailGrant`], and says so
+     * otherwise.
      */
     suspend fun `saveServerPassword`(`flow`: kotlin.String, `gmail`: GmailGrant?)
     
@@ -5646,23 +5695,41 @@ public interface CoreInterface {
     suspend fun `sendServerSemester`(`flow`: kotlin.String)
     
     /**
-     * Everything the server keeps for this student and this phone: the account and its options,
-     * phones, keys, saved session and password, sign-ins, the forwarding address and this
-     * install's registration.
+     * The student's account on the server: whether this phone is linked and the other phones,
+     * and what the server stores for connected apps. Proves first when there is no identity.
      */
-    suspend fun `serverStatus`(`flow`: kotlin.String): ServerStatus
+    suspend fun `serverAccount`(`flow`: kotlin.String): ServerAccount
     
     /**
-     * Sets how the server serves sessions (see [`ServerOptions`]).
+     * This install as the server knows it (Developer). Never proves: with no identity it is
+     * [`ServerDevice::Unregistered`] and nothing is sent.
      */
-    suspend fun `setServerOptions`(`flow`: kotlin.String, `options`: ServerOptions)
+    suspend fun `serverDevice`(`flow`: kotlin.String): ServerDevice
+    
+    /**
+     * The account's last VTOP sign-ins (phones and the server), newest first, at most 10;
+     * none from a server that doesn't list them yet.
+     */
+    suspend fun `serverSignIns`(`flow`: kotlin.String): List<ServerSignIn>
+    
+    /**
+     * Turns the server's storage for connected apps on or off (`settings.cacheSession`). Off
+     * deletes on the server what it keeps (the session, the password and its sign-in logins)
+     * and its MCP copies; on keeps the sessions phones hand over from then on.
+     */
+    suspend fun `setServerStorage`(`flow`: kotlin.String, `enabled`: kotlin.Boolean)
+    
+    /**
+     * Sets how the server uses the saved password (see [`VaultOptions`]); storage stays as it is.
+     */
+    suspend fun `setVaultOptions`(`flow`: kotlin.String, `options`: VaultOptions)
     
     /**
      * Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
      * address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
      * (for every phone on the account with `everywhere`), then forgets the identity here. Best
      * effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
-     * later, the install listed in Server until it goes.
+     * later, the install listed on the account until it goes.
      */
     suspend fun `signOutOfServer`(`flow`: kotlin.String, `everywhere`: kotlin.Boolean)
     
@@ -7503,6 +7570,24 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Asks every time again for `kind` only (the other kinds' ticks stay).
+     */
+    @Throws(CoreException::class)override fun `forgetCookieConsent`(`flow`: kotlin.String, `kind`: CookieKind)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_forget_cookie_consent(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeCookieKind.lower(`kind`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * Remembers a yes for `kind` given in the app's own words, as "Don't ask again" in the
      * dialog would (choosing Server fetch already says the cookie goes to the server).
      */
@@ -7792,7 +7877,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * The account's access keys and whether this phone is linked to it.
+     * The account's access keys, whether this phone is linked to it, what the server stores
+     * for connected apps and whether it can wake this phone.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8221,7 +8307,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     /**
      * Deletes the account on the server: phones, keys, saved session and password, options,
      * sign-ins and the forwarding address (it belongs to the account). Not this phone's
-     * registration.
+     * registration. Sharing the registration number stops and a server route goes back to
+     * Direct, so the next call doesn't make a new account unasked.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8300,6 +8387,32 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * The phones on this phone's forwarding address (at most 5). An address the server no
+     * longer has is forgotten here and answers `ForwardingOff`.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `forwardingPhones`(`flow`: kotlin.String) : List<MailPhone> {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_forwarding_phones(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceTypeMailPhone.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * Takes another phone (a [`MailPhone::id`]) off this phone's forwarding address.
      */
     @Throws(CoreException::class)
@@ -8327,7 +8440,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Removes a linked phone (an id from [`ServerStatus::phones`]).
+     * Removes a linked phone (an id from [`ServerLink::Linked`]).
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8384,8 +8497,9 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
-     * while no phone answers. It needs the sign-in code too: the server keeps the password only
-     * with a forwarding address or [`GmailGrant`], and says so otherwise.
+     * while no phone answers (it turns storage on). It needs the sign-in code too: the server
+     * keeps the password only with a forwarding address or [`GmailGrant`], and says so
+     * otherwise.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8441,16 +8555,15 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Everything the server keeps for this student and this phone: the account and its options,
-     * phones, keys, saved session and password, sign-ins, the forwarding address and this
-     * install's registration.
+     * The student's account on the server: whether this phone is linked and the other phones,
+     * and what the server stores for connected apps. Proves first when there is no identity.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `serverStatus`(`flow`: kotlin.String) : ServerStatus {
+    override suspend fun `serverAccount`(`flow`: kotlin.String) : ServerAccount {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_server_status(
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_server_account(
                 uniffiHandle,
                 
         FfiConverterString.lower(`flow`),
@@ -8460,7 +8573,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
-        { FfiConverterTypeServerStatus.lift(it) },
+        { FfiConverterTypeServerAccount.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -8468,18 +8581,99 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Sets how the server serves sessions (see [`ServerOptions`]).
+     * This install as the server knows it (Developer). Never proves: with no identity it is
+     * [`ServerDevice::Unregistered`] and nothing is sent.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `setServerOptions`(`flow`: kotlin.String, `options`: ServerOptions) {
+    override suspend fun `serverDevice`(`flow`: kotlin.String) : ServerDevice {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_server_options(
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_server_device(
                 uniffiHandle,
                 
         FfiConverterString.lower(`flow`),
-        FfiConverterTypeServerOptions.lower(`options`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeServerDevice.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The account's last VTOP sign-ins (phones and the server), newest first, at most 10;
+     * none from a server that doesn't list them yet.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `serverSignIns`(`flow`: kotlin.String) : List<ServerSignIn> {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_server_sign_ins(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceTypeServerSignIn.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Turns the server's storage for connected apps on or off (`settings.cacheSession`). Off
+     * deletes on the server what it keeps (the session, the password and its sign-in logins)
+     * and its MCP copies; on keeps the sessions phones hand over from then on.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setServerStorage`(`flow`: kotlin.String, `enabled`: kotlin.Boolean) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_server_storage(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterBoolean.lower(`enabled`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Sets how the server uses the saved password (see [`VaultOptions`]); storage stays as it is.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setVaultOptions`(`flow`: kotlin.String, `options`: VaultOptions) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_vault_options(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeVaultOptions.lower(`options`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
@@ -8499,7 +8693,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
      * address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
      * (for every phone on the account with `everywhere`), then forgets the identity here. Best
      * effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
-     * later, the install listed in Server until it goes.
+     * later, the install listed on the account until it goes.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -13964,6 +14158,21 @@ data class ConnectedApps (
      * The other phones with keys, most keys first; the unlinked ones as one entry.
      */
     val `elsewhere`: List<KeyPhone>
+    , 
+    /**
+     * What the server stores for these apps (Session handover).
+     */
+    val `storage`: ServerStorage
+    , 
+    /**
+     * The semester they read; None is the newest.
+     */
+    val `semesterId`: kotlin.String?
+    , 
+    /**
+     * Whether the server can wake this phone for a session request.
+     */
+    val `push`: ServerPush
     
 ){
     
@@ -13983,19 +14192,28 @@ public object FfiConverterTypeConnectedApps: FfiConverterRustBuffer<ConnectedApp
             FfiConverterBoolean.read(buf),
             FfiConverterSequenceTypeAccessKey.read(buf),
             FfiConverterSequenceTypeKeyPhone.read(buf),
+            FfiConverterTypeServerStorage.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeServerPush.read(buf),
         )
     }
 
     override fun allocationSize(value: ConnectedApps) = (
             FfiConverterBoolean.allocationSize(value.`linked`) +
             FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`) +
-            FfiConverterSequenceTypeKeyPhone.allocationSize(value.`elsewhere`)
+            FfiConverterSequenceTypeKeyPhone.allocationSize(value.`elsewhere`) +
+            FfiConverterTypeServerStorage.allocationSize(value.`storage`) +
+            FfiConverterOptionalString.allocationSize(value.`semesterId`) +
+            FfiConverterTypeServerPush.allocationSize(value.`push`)
     )
 
     override fun write(value: ConnectedApps, buf: ByteBuffer) {
             FfiConverterBoolean.write(value.`linked`, buf)
             FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
             FfiConverterSequenceTypeKeyPhone.write(value.`elsewhere`, buf)
+            FfiConverterTypeServerStorage.write(value.`storage`, buf)
+            FfiConverterOptionalString.write(value.`semesterId`, buf)
+            FfiConverterTypeServerPush.write(value.`push`, buf)
     }
 }
 
@@ -18373,6 +18591,58 @@ public object FfiConverterTypeSavedAccount: FfiConverterRustBuffer<SavedAccount>
 
 
 
+/**
+ * The sealed VTOP password the server keeps to sign in by itself.
+ */
+data class SavedVault (
+    val `at`: kotlin.Long
+    , 
+    /**
+     * None: kept until VTOP rejects it or the student forgets it.
+     */
+    val `expiresAt`: kotlin.Long?
+    , 
+    /**
+     * It carries Gmail access to read the sign-in code.
+     */
+    val `gmail`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSavedVault: FfiConverterRustBuffer<SavedVault> {
+    override fun read(buf: ByteBuffer): SavedVault {
+        return SavedVault(
+            FfiConverterLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SavedVault) = (
+            FfiConverterLong.allocationSize(value.`at`) +
+            FfiConverterOptionalLong.allocationSize(value.`expiresAt`) +
+            FfiConverterBoolean.allocationSize(value.`gmail`)
+    )
+
+    override fun write(value: SavedVault, buf: ByteBuffer) {
+            FfiConverterLong.write(value.`at`, buf)
+            FfiConverterOptionalLong.write(value.`expiresAt`, buf)
+            FfiConverterBoolean.write(value.`gmail`, buf)
+    }
+}
+
+
+
 data class ScheduledPaper (
     /**
      * `<code>.theory` or `<code>.lab` (as `AttendanceCourse::key`), unique
@@ -18663,22 +18933,34 @@ public object FfiConverterTypeSemesters: FfiConverterRustBuffer<Semesters> {
 
 
 /**
- * This install as the server knows it.
+ * The student's account on the server (`account:view`).
  */
-data class ServerDevice (
-    /**
-     * The first 8 characters of its id; None while it has no identity on the server.
-     */
-    val `id`: kotlin.String?
-    , 
-    val `label`: kotlin.String
-    , 
-    val `pushToken`: kotlin.Boolean
+data class ServerAccount (
+    val `registrationNumber`: kotlin.String
     , 
     /**
-     * From the server; None when it doesn't say (before `devices:info`).
+     * When the server made the account (None from servers that don't say).
      */
-    val `registeredAt`: kotlin.Long?
+    val `createdAt`: kotlin.Long?
+    , 
+    /**
+     * The semester connected apps read; None is the newest.
+     */
+    val `semesterId`: kotlin.String?
+    , 
+    val `link`: ServerLink
+    , 
+    val `storage`: ServerStorage
+    , 
+    /**
+     * The student has a forwarding address, on this phone or another.
+     */
+    val `forwarding`: kotlin.Boolean
+    , 
+    /**
+     * When VTOP last rejected the saved password on the server.
+     */
+    val `credentialsRejectedAt`: kotlin.Long?
     
 ){
     
@@ -18692,121 +18974,37 @@ data class ServerDevice (
 /**
  * @suppress
  */
-public object FfiConverterTypeServerDevice: FfiConverterRustBuffer<ServerDevice> {
-    override fun read(buf: ByteBuffer): ServerDevice {
-        return ServerDevice(
+public object FfiConverterTypeServerAccount: FfiConverterRustBuffer<ServerAccount> {
+    override fun read(buf: ByteBuffer): ServerAccount {
+        return ServerAccount(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalLong.read(buf),
             FfiConverterOptionalString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterTypeServerLink.read(buf),
+            FfiConverterTypeServerStorage.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalLong.read(buf),
         )
     }
 
-    override fun allocationSize(value: ServerDevice) = (
-            FfiConverterOptionalString.allocationSize(value.`id`) +
-            FfiConverterString.allocationSize(value.`label`) +
-            FfiConverterBoolean.allocationSize(value.`pushToken`) +
-            FfiConverterOptionalLong.allocationSize(value.`registeredAt`)
+    override fun allocationSize(value: ServerAccount) = (
+            FfiConverterString.allocationSize(value.`registrationNumber`) +
+            FfiConverterOptionalLong.allocationSize(value.`createdAt`) +
+            FfiConverterOptionalString.allocationSize(value.`semesterId`) +
+            FfiConverterTypeServerLink.allocationSize(value.`link`) +
+            FfiConverterTypeServerStorage.allocationSize(value.`storage`) +
+            FfiConverterBoolean.allocationSize(value.`forwarding`) +
+            FfiConverterOptionalLong.allocationSize(value.`credentialsRejectedAt`)
     )
 
-    override fun write(value: ServerDevice, buf: ByteBuffer) {
-            FfiConverterOptionalString.write(value.`id`, buf)
-            FfiConverterString.write(value.`label`, buf)
-            FfiConverterBoolean.write(value.`pushToken`, buf)
-            FfiConverterOptionalLong.write(value.`registeredAt`, buf)
-    }
-}
-
-
-
-data class ServerMailbox (
-    val `address`: kotlin.String
-    , 
-    val `phones`: List<MailPhone>
-    
-){
-    
-
-    
-
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeServerMailbox: FfiConverterRustBuffer<ServerMailbox> {
-    override fun read(buf: ByteBuffer): ServerMailbox {
-        return ServerMailbox(
-            FfiConverterString.read(buf),
-            FfiConverterSequenceTypeMailPhone.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: ServerMailbox) = (
-            FfiConverterString.allocationSize(value.`address`) +
-            FfiConverterSequenceTypeMailPhone.allocationSize(value.`phones`)
-    )
-
-    override fun write(value: ServerMailbox, buf: ByteBuffer) {
-            FfiConverterString.write(value.`address`, buf)
-            FfiConverterSequenceTypeMailPhone.write(value.`phones`, buf)
-    }
-}
-
-
-
-/**
- * How the server serves sessions to connected apps (`account:setSettings`).
- */
-data class ServerOptions (
-    /**
-     * Sign in with the saved password at once, without asking a phone first.
-     */
-    val `alwaysUseVault`: kotlin.Boolean
-    , 
-    /**
-     * Otherwise, how long a phone gets to answer first: 10, 20 or 45.
-     */
-    val `phoneWaitSecs`: kotlin.UInt
-    , 
-    /**
-     * How long the saved password is kept: 86400, 172800, or None (until VTOP rejects it).
-     */
-    val `vaultTtlSecs`: kotlin.Long?
-    
-){
-    
-
-    
-
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeServerOptions: FfiConverterRustBuffer<ServerOptions> {
-    override fun read(buf: ByteBuffer): ServerOptions {
-        return ServerOptions(
-            FfiConverterBoolean.read(buf),
-            FfiConverterUInt.read(buf),
-            FfiConverterOptionalLong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: ServerOptions) = (
-            FfiConverterBoolean.allocationSize(value.`alwaysUseVault`) +
-            FfiConverterUInt.allocationSize(value.`phoneWaitSecs`) +
-            FfiConverterOptionalLong.allocationSize(value.`vaultTtlSecs`)
-    )
-
-    override fun write(value: ServerOptions, buf: ByteBuffer) {
-            FfiConverterBoolean.write(value.`alwaysUseVault`, buf)
-            FfiConverterUInt.write(value.`phoneWaitSecs`, buf)
-            FfiConverterOptionalLong.write(value.`vaultTtlSecs`, buf)
+    override fun write(value: ServerAccount, buf: ByteBuffer) {
+            FfiConverterString.write(value.`registrationNumber`, buf)
+            FfiConverterOptionalLong.write(value.`createdAt`, buf)
+            FfiConverterOptionalString.write(value.`semesterId`, buf)
+            FfiConverterTypeServerLink.write(value.`link`, buf)
+            FfiConverterTypeServerStorage.write(value.`storage`, buf)
+            FfiConverterBoolean.write(value.`forwarding`, buf)
+            FfiConverterOptionalLong.write(value.`credentialsRejectedAt`, buf)
     }
 }
 
@@ -18856,91 +19054,6 @@ public object FfiConverterTypeServerSignIn: FfiConverterRustBuffer<ServerSignIn>
             FfiConverterLong.write(value.`at`, buf)
             FfiConverterBoolean.write(value.`byServer`, buf)
             FfiConverterTypeSignInOutcome.write(value.`outcome`, buf)
-    }
-}
-
-
-
-data class ServerStatus (
-    val `account`: ServerAccount
-    , 
-    val `registrationNumber`: kotlin.String
-    , 
-    /**
-     * When the server made the account (None from servers that don't say, or no account yet).
-     */
-    val `createdAt`: kotlin.Long?
-    , 
-    /**
-     * The semester connected apps read.
-     */
-    val `semesterId`: kotlin.String?
-    , 
-    val `options`: ServerOptions
-    , 
-    /**
-     * The student has a forwarding address, on this phone or another.
-     */
-    val `forwarding`: kotlin.Boolean
-    , 
-    /**
-     * This phone's forwarding address and the phones on it.
-     */
-    val `mailbox`: ServerMailbox?
-    , 
-    val `device`: ServerDevice
-    , 
-    val `credentialsRejectedAt`: kotlin.Long?
-    
-){
-    
-
-    
-
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus> {
-    override fun read(buf: ByteBuffer): ServerStatus {
-        return ServerStatus(
-            FfiConverterTypeServerAccount.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterOptionalLong.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterTypeServerOptions.read(buf),
-            FfiConverterBoolean.read(buf),
-            FfiConverterOptionalTypeServerMailbox.read(buf),
-            FfiConverterTypeServerDevice.read(buf),
-            FfiConverterOptionalLong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: ServerStatus) = (
-            FfiConverterTypeServerAccount.allocationSize(value.`account`) +
-            FfiConverterString.allocationSize(value.`registrationNumber`) +
-            FfiConverterOptionalLong.allocationSize(value.`createdAt`) +
-            FfiConverterOptionalString.allocationSize(value.`semesterId`) +
-            FfiConverterTypeServerOptions.allocationSize(value.`options`) +
-            FfiConverterBoolean.allocationSize(value.`forwarding`) +
-            FfiConverterOptionalTypeServerMailbox.allocationSize(value.`mailbox`) +
-            FfiConverterTypeServerDevice.allocationSize(value.`device`) +
-            FfiConverterOptionalLong.allocationSize(value.`credentialsRejectedAt`)
-    )
-
-    override fun write(value: ServerStatus, buf: ByteBuffer) {
-            FfiConverterTypeServerAccount.write(value.`account`, buf)
-            FfiConverterString.write(value.`registrationNumber`, buf)
-            FfiConverterOptionalLong.write(value.`createdAt`, buf)
-            FfiConverterOptionalString.write(value.`semesterId`, buf)
-            FfiConverterTypeServerOptions.write(value.`options`, buf)
-            FfiConverterBoolean.write(value.`forwarding`, buf)
-            FfiConverterOptionalTypeServerMailbox.write(value.`mailbox`, buf)
-            FfiConverterTypeServerDevice.write(value.`device`, buf)
-            FfiConverterOptionalLong.write(value.`credentialsRejectedAt`, buf)
     }
 }
 
@@ -19372,6 +19485,61 @@ public object FfiConverterTypeTimetableDay: FfiConverterRustBuffer<TimetableDay>
             FfiConverterSequenceTypeExamPaper.write(value.`papers`, buf)
             FfiConverterInt.write(value.`classDaysLeft`, buf)
             FfiConverterOptionalTypeExamStart.write(value.`upcomingExam`, buf)
+    }
+}
+
+
+
+/**
+ * How the server uses a saved password (`account:setSettings`); only with one saved.
+ */
+data class VaultOptions (
+    /**
+     * Sign in with the saved password at once, without asking a phone first.
+     */
+    val `alwaysUseVault`: kotlin.Boolean
+    , 
+    /**
+     * Otherwise, how long a phone gets to answer first: 10, 20 or 45.
+     */
+    val `phoneWaitSecs`: kotlin.UInt
+    , 
+    /**
+     * How long the saved password is kept: 86400, 172800, or None (until VTOP rejects it).
+     */
+    val `vaultTtlSecs`: kotlin.Long?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeVaultOptions: FfiConverterRustBuffer<VaultOptions> {
+    override fun read(buf: ByteBuffer): VaultOptions {
+        return VaultOptions(
+            FfiConverterBoolean.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterOptionalLong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: VaultOptions) = (
+            FfiConverterBoolean.allocationSize(value.`alwaysUseVault`) +
+            FfiConverterUInt.allocationSize(value.`phoneWaitSecs`) +
+            FfiConverterOptionalLong.allocationSize(value.`vaultTtlSecs`)
+    )
+
+    override fun write(value: VaultOptions, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`alwaysUseVault`, buf)
+            FfiConverterUInt.write(value.`phoneWaitSecs`, buf)
+            FfiConverterOptionalLong.write(value.`vaultTtlSecs`, buf)
     }
 }
 
@@ -23260,9 +23428,9 @@ enum class LiveTopic {
      */
     SESSION_REQUESTS,
     /**
-     * `screen:view`: what the Server screen shows, its address's phones included.
+     * `account:signIns`: the account's last VTOP sign-ins.
      */
-    SERVER;
+    SIGN_INS;
 
     
 
@@ -24083,25 +24251,36 @@ public object FfiConverterTypeSealing : FfiConverterRustBuffer<Sealing>{
 
 
 /**
- * What the server shows of the account to one of its phones.
+ * This install as the server knows it.
  */
-sealed class ServerAccount {
+sealed class ServerDevice {
     
     /**
-     * This phone isn't one of the account's phones: the server shows it nothing it keeps.
+     * No identity on the server yet (never proved, or removed): nothing to show or remove.
      */
-    object Unlinked : ServerAccount()
+    data class Unregistered(
+        val `label`: kotlin.String) : ServerDevice()
+        
+    {
+        
+
+        companion object
+    }
     
-    
-    data class Linked(
-        val `session`: vitapmate.core.ServerSession, 
-        val `vault`: vitapmate.core.ServerVault, 
+    data class Registered(
         /**
-         * Newest first, at most 10.
+         * The first 8 characters of its id.
          */
-        val `signIns`: List<vitapmate.core.ServerSignIn>, 
-        val `phones`: List<vitapmate.core.LinkedPhone>, 
-        val `keys`: List<vitapmate.core.AccessKey>) : ServerAccount()
+        val `id`: kotlin.String, 
+        val `label`: kotlin.String, 
+        /**
+         * The server holds a push token, so it can wake this phone for a connected app.
+         */
+        val `pushToken`: kotlin.Boolean, 
+        /**
+         * None from a server that doesn't say.
+         */
+        val `registeredAt`: kotlin.Long?) : ServerDevice()
         
     {
         
@@ -24122,57 +24301,179 @@ sealed class ServerAccount {
 /**
  * @suppress
  */
-public object FfiConverterTypeServerAccount : FfiConverterRustBuffer<ServerAccount>{
-    override fun read(buf: ByteBuffer): ServerAccount {
+public object FfiConverterTypeServerDevice : FfiConverterRustBuffer<ServerDevice>{
+    override fun read(buf: ByteBuffer): ServerDevice {
         return when(buf.getInt()) {
-            1 -> ServerAccount.Unlinked
-            2 -> ServerAccount.Linked(
-                FfiConverterTypeServerSession.read(buf),
-                FfiConverterTypeServerVault.read(buf),
-                FfiConverterSequenceTypeServerSignIn.read(buf),
-                FfiConverterSequenceTypeLinkedPhone.read(buf),
-                FfiConverterSequenceTypeAccessKey.read(buf),
+            1 -> ServerDevice.Unregistered(
+                FfiConverterString.read(buf),
+                )
+            2 -> ServerDevice.Registered(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterBoolean.read(buf),
+                FfiConverterOptionalLong.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
     }
 
-    override fun allocationSize(value: ServerAccount): ULong = when(value) {
-        is ServerAccount.Unlinked -> {
+    override fun allocationSize(value: ServerDevice): ULong = when(value) {
+        is ServerDevice.Unregistered -> {
             // Add the size for the Int that specifies the variant plus the size needed for all fields
             (
                 4UL
+                + FfiConverterString.allocationSize(value.`label`)
             )
         }
-        is ServerAccount.Linked -> {
+        is ServerDevice.Registered -> {
             // Add the size for the Int that specifies the variant plus the size needed for all fields
             (
                 4UL
-                + FfiConverterTypeServerSession.allocationSize(value.`session`)
-                + FfiConverterTypeServerVault.allocationSize(value.`vault`)
-                + FfiConverterSequenceTypeServerSignIn.allocationSize(value.`signIns`)
-                + FfiConverterSequenceTypeLinkedPhone.allocationSize(value.`phones`)
-                + FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`)
+                + FfiConverterString.allocationSize(value.`id`)
+                + FfiConverterString.allocationSize(value.`label`)
+                + FfiConverterBoolean.allocationSize(value.`pushToken`)
+                + FfiConverterOptionalLong.allocationSize(value.`registeredAt`)
             )
         }
     }
 
-    override fun write(value: ServerAccount, buf: ByteBuffer) {
+    override fun write(value: ServerDevice, buf: ByteBuffer) {
         when(value) {
-            is ServerAccount.Unlinked -> {
+            is ServerDevice.Unregistered -> {
                 buf.putInt(1)
+                FfiConverterString.write(value.`label`, buf)
                 Unit
             }
-            is ServerAccount.Linked -> {
+            is ServerDevice.Registered -> {
                 buf.putInt(2)
-                FfiConverterTypeServerSession.write(value.`session`, buf)
-                FfiConverterTypeServerVault.write(value.`vault`, buf)
-                FfiConverterSequenceTypeServerSignIn.write(value.`signIns`, buf)
-                FfiConverterSequenceTypeLinkedPhone.write(value.`phones`, buf)
-                FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
+                FfiConverterString.write(value.`id`, buf)
+                FfiConverterString.write(value.`label`, buf)
+                FfiConverterBoolean.write(value.`pushToken`, buf)
+                FfiConverterOptionalLong.write(value.`registeredAt`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Whether this phone is one of the account's phones (asked for sessions, sees the others).
+ */
+sealed class ServerLink {
+    
+    /**
+     * Not one of them (after a reinstall or a removal): the server shows it no phones or keys.
+     */
+    object Unlinked : ServerLink()
+    
+    
+    data class Linked(
+        val `phones`: List<vitapmate.core.LinkedPhone>) : ServerLink()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerLink : FfiConverterRustBuffer<ServerLink>{
+    override fun read(buf: ByteBuffer): ServerLink {
+        return when(buf.getInt()) {
+            1 -> ServerLink.Unlinked
+            2 -> ServerLink.Linked(
+                FfiConverterSequenceTypeLinkedPhone.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ServerLink): ULong = when(value) {
+        is ServerLink.Unlinked -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is ServerLink.Linked -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceTypeLinkedPhone.allocationSize(value.`phones`)
+            )
+        }
+    }
+
+    override fun write(value: ServerLink, buf: ByteBuffer) {
+        when(value) {
+            is ServerLink.Unlinked -> {
+                buf.putInt(1)
+                Unit
+            }
+            is ServerLink.Linked -> {
+                buf.putInt(2)
+                FfiConverterSequenceTypeLinkedPhone.write(value.`phones`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Whether the server holds a push token for this phone, so a connected app's request reaches
+ * it while the app is closed.
+ */
+
+enum class ServerPush {
+    
+    TOKEN,
+    NO_TOKEN,
+    /**
+     * The server couldn't say (an older server, or the read failed): no warning.
+     */
+    UNKNOWN;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerPush: FfiConverterRustBuffer<ServerPush> {
+    override fun read(buf: ByteBuffer) = try {
+        ServerPush.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ServerPush) = 4UL
+
+    override fun write(value: ServerPush, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
     }
 }
 
@@ -24261,20 +24562,34 @@ public object FfiConverterTypeServerSession : FfiConverterRustBuffer<ServerSessi
 
 
 /**
- * The sealed VTOP password the server keeps to sign in by itself.
+ * What the server stores of the student's VTOP for connected apps (`settings.cacheSession`
+ * and what it keeps under it). Off by default: a connected app then gets a session only while
+ * a phone answers, and the server keeps no copy.
  */
-sealed class ServerVault {
+sealed class ServerStorage {
     
-    object None : ServerVault()
+    object Off : ServerStorage()
     
     
     /**
-     * `expires_at` None: kept until VTOP rejects it or the student forgets it.
+     * Sessions phones hand over are kept (sealed) for a week, for connected apps.
      */
-    data class Saved(
-        val `at`: kotlin.Long, 
-        val `expiresAt`: kotlin.Long?, 
-        val `gmail`: kotlin.Boolean) : ServerVault()
+    data class SessionOnly(
+        val `session`: vitapmate.core.ServerSession) : ServerStorage()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * A saved password too, so the server signs in when no phone answers.
+     */
+    data class OfflineSignIn(
+        val `session`: vitapmate.core.ServerSession, 
+        val `vault`: vitapmate.core.SavedVault, 
+        val `options`: vitapmate.core.VaultOptions) : ServerStorage()
         
     {
         
@@ -24295,48 +24610,63 @@ sealed class ServerVault {
 /**
  * @suppress
  */
-public object FfiConverterTypeServerVault : FfiConverterRustBuffer<ServerVault>{
-    override fun read(buf: ByteBuffer): ServerVault {
+public object FfiConverterTypeServerStorage : FfiConverterRustBuffer<ServerStorage>{
+    override fun read(buf: ByteBuffer): ServerStorage {
         return when(buf.getInt()) {
-            1 -> ServerVault.None
-            2 -> ServerVault.Saved(
-                FfiConverterLong.read(buf),
-                FfiConverterOptionalLong.read(buf),
-                FfiConverterBoolean.read(buf),
+            1 -> ServerStorage.Off
+            2 -> ServerStorage.SessionOnly(
+                FfiConverterTypeServerSession.read(buf),
+                )
+            3 -> ServerStorage.OfflineSignIn(
+                FfiConverterTypeServerSession.read(buf),
+                FfiConverterTypeSavedVault.read(buf),
+                FfiConverterTypeVaultOptions.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
     }
 
-    override fun allocationSize(value: ServerVault): ULong = when(value) {
-        is ServerVault.None -> {
+    override fun allocationSize(value: ServerStorage): ULong = when(value) {
+        is ServerStorage.Off -> {
             // Add the size for the Int that specifies the variant plus the size needed for all fields
             (
                 4UL
             )
         }
-        is ServerVault.Saved -> {
+        is ServerStorage.SessionOnly -> {
             // Add the size for the Int that specifies the variant plus the size needed for all fields
             (
                 4UL
-                + FfiConverterLong.allocationSize(value.`at`)
-                + FfiConverterOptionalLong.allocationSize(value.`expiresAt`)
-                + FfiConverterBoolean.allocationSize(value.`gmail`)
+                + FfiConverterTypeServerSession.allocationSize(value.`session`)
+            )
+        }
+        is ServerStorage.OfflineSignIn -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeServerSession.allocationSize(value.`session`)
+                + FfiConverterTypeSavedVault.allocationSize(value.`vault`)
+                + FfiConverterTypeVaultOptions.allocationSize(value.`options`)
             )
         }
     }
 
-    override fun write(value: ServerVault, buf: ByteBuffer) {
+    override fun write(value: ServerStorage, buf: ByteBuffer) {
         when(value) {
-            is ServerVault.None -> {
+            is ServerStorage.Off -> {
                 buf.putInt(1)
                 Unit
             }
-            is ServerVault.Saved -> {
+            is ServerStorage.SessionOnly -> {
                 buf.putInt(2)
-                FfiConverterLong.write(value.`at`, buf)
-                FfiConverterOptionalLong.write(value.`expiresAt`, buf)
-                FfiConverterBoolean.write(value.`gmail`, buf)
+                FfiConverterTypeServerSession.write(value.`session`, buf)
+                Unit
+            }
+            is ServerStorage.OfflineSignIn -> {
+                buf.putInt(3)
+                FfiConverterTypeServerSession.write(value.`session`, buf)
+                FfiConverterTypeSavedVault.write(value.`vault`, buf)
+                FfiConverterTypeVaultOptions.write(value.`options`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -25891,38 +26221,6 @@ public object FfiConverterOptionalTypeSemesters: FfiConverterRustBuffer<Semester
         } else {
             buf.put(1)
             FfiConverterTypeSemesters.write(value, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterOptionalTypeServerMailbox: FfiConverterRustBuffer<ServerMailbox?> {
-    override fun read(buf: ByteBuffer): ServerMailbox? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterTypeServerMailbox.read(buf)
-    }
-
-    override fun allocationSize(value: ServerMailbox?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterTypeServerMailbox.allocationSize(value)
-        }
-    }
-
-    override fun write(value: ServerMailbox?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterTypeServerMailbox.write(value, buf)
         }
     }
 }
