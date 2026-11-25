@@ -100,10 +100,12 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   config and the phone's name), so leaving one out doesn't compile.
 - **The saved password** (`store/account.rs`). `account.json` holds it sealed
   by `PasswordCipher` (Kotlin's `AccountPassword`: an AES-GCM key in the
-  Android Keystore); a plain-text file from an older version is sealed the
-  first time it is read. A copy restored on another phone, or
-  after a reinstall, doesn't open: the password is absent and the student signs
-  in again. Kotlin gets the plain text only from `saved_password`, for the
+  Android Keystore); a plain-text file from an older version is sealed once,
+  when the core opens, and kept as it is while the Keystore fails. A copy restored
+  on another phone, or after a reinstall, doesn't open (`Opening::WrongKey`): the
+  password is gone and the student signs in again. A Keystore that fails for a
+  moment (`Opening::Unavailable`) leaves the student signed in: `Core::current`
+  opens it again on the next call (`CoreError::PasswordLocked` until then). Kotlin gets the plain text only from `saved_password`, for the
   Account page. Decoded copies and the
   log pipeline stay process-wide: `obs_init` runs before the core, so Kotlin's
   start-up lines (Gmail) reach the log file.

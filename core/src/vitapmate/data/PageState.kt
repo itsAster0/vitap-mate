@@ -130,6 +130,7 @@ fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem {
             )
         }
         is CoreException.NotSignedIn -> p(ProblemKind.SignInNeeded, "Sign-In Needed", "Your saved session expired. Please sign in again.", retryable = false)
+        is CoreException.PasswordLocked -> p(ProblemKind.Unexpected, "Couldn't Open Your Password", "The phone's keystore didn't open the saved password just now. Try again in a moment.")
         is CoreException.OtpRequired -> p(ProblemKind.OtpNeeded, "Verify Your Sign-In", "We need to verify this sign-in with the OTP sent to your registered email.")
         is CoreException.OtpRejected -> p(
             ProblemKind.OtpRejected,

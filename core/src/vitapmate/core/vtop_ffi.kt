@@ -2414,7 +2414,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 17130) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 63140) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 46790) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_submit_otp() and 0xFFFF) != 18234) {
@@ -2489,10 +2489,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_shutdown() and 0xFFFF) != 36603) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_passwordcipher_seal() and 0xFFFF) != 9250) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_passwordcipher_seal() and 0xFFFF) != 36347) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_passwordcipher_open() and 0xFFFF) != 64574) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_passwordcipher_open() and 0xFFFF) != 52905) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_cookie() and 0xFFFF) != 36757) {
@@ -5338,7 +5338,8 @@ public interface CoreInterface {
     
     /**
      * The saved account's username; None without a saved password (one restored from
-     * another phone, which the student types again).
+     * another phone, which the student types again). A password the Keystore didn't open just
+     * now still counts: it is there, and opens on a later try.
      */
     fun `signedInUser`(`flow`: kotlin.String): kotlin.String?
     
@@ -8306,7 +8307,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * The saved account's username; None without a saved password (one restored from
-     * another phone, which the student types again).
+     * another phone, which the student types again). A password the Keystore didn't open just
+     * now still counts: it is there, and opens on a later try.
      */override fun `signedInUser`(`flow`: kotlin.String): kotlin.String? {
             return FfiConverterOptionalString.lift(
     callWithHandle {
@@ -9797,15 +9799,14 @@ public object FfiConverterTypeOtpListener: FfiConverter<OtpListener, Long> {
 public interface PasswordCipher {
     
     /**
-     * `plain` sealed as opaque text; None when the key can't be used (the password then isn't
-     * saved).
+     * `plain` sealed as opaque text.
      */
-    fun `seal`(`plain`: kotlin.String): kotlin.String?
+    fun `seal`(`plain`: kotlin.String): Sealing
     
     /**
-     * What [`PasswordCipher::seal`] gave back opened; None when this phone's key can't open it.
+     * What [`PasswordCipher::seal`] gave back, opened.
      */
-    fun `open`(`sealed`: kotlin.String): kotlin.String?
+    fun `open`(`sealed`: kotlin.String): Opening
     
     companion object
 }
@@ -9917,10 +9918,9 @@ open class PasswordCipherImpl: Disposable, AutoCloseable, PasswordCipher
 
     
     /**
-     * `plain` sealed as opaque text; None when the key can't be used (the password then isn't
-     * saved).
-     */override fun `seal`(`plain`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
+     * `plain` sealed as opaque text.
+     */override fun `seal`(`plain`: kotlin.String): Sealing {
+            return FfiConverterTypeSealing.lift(
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_vtop_ffi_fn_method_passwordcipher_seal(
@@ -9935,9 +9935,9 @@ open class PasswordCipherImpl: Disposable, AutoCloseable, PasswordCipher
 
     
     /**
-     * What [`PasswordCipher::seal`] gave back opened; None when this phone's key can't open it.
-     */override fun `open`(`sealed`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
+     * What [`PasswordCipher::seal`] gave back, opened.
+     */override fun `open`(`sealed`: kotlin.String): Opening {
+            return FfiConverterTypeOpening.lift(
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_vtop_ffi_fn_method_passwordcipher_open(
@@ -9976,7 +9976,7 @@ internal object uniffiCallbackInterfacePasswordCipher {
                     FfiConverterString.lift(`plain`),
                 )
             }
-            val writeReturn = { value: kotlin.String? -> uniffiOutReturn.setValue(FfiConverterOptionalString.lower(value)) }
+            val writeReturn = { value: Sealing -> uniffiOutReturn.setValue(FfiConverterTypeSealing.lower(value)) }
             uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
         }
     }
@@ -9988,7 +9988,7 @@ internal object uniffiCallbackInterfacePasswordCipher {
                     FfiConverterString.lift(`sealed`),
                 )
             }
-            val writeReturn = { value: kotlin.String? -> uniffiOutReturn.setValue(FfiConverterOptionalString.lower(value)) }
+            val writeReturn = { value: Opening -> uniffiOutReturn.setValue(FfiConverterTypeOpening.lower(value)) }
             uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
         }
     }
@@ -21565,6 +21565,16 @@ sealed class CoreException: kotlin.Exception() {
     }
     
     /**
+     * Signed in, but the phone's Keystore didn't open the saved password just now; the next
+     * call tries again.
+     */
+    class PasswordLocked(
+        ) : CoreException() {
+        override val message
+            get() = ""
+    }
+    
+    /**
      * No semester picked yet (or VTOP no longer lists the pick): the
      * student picks one from [`Core::fetch_semesters`] first.
      */
@@ -21647,14 +21657,15 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 FfiConverterString.read(buf),
                 )
             6 -> CoreException.NotSignedIn()
-            7 -> CoreException.SemesterNeeded()
-            8 -> CoreException.ConsentDenied()
-            9 -> CoreException.RegnoNotShared()
-            10 -> CoreException.ForwardingOff(
+            7 -> CoreException.PasswordLocked()
+            8 -> CoreException.SemesterNeeded()
+            9 -> CoreException.ConsentDenied()
+            10 -> CoreException.RegnoNotShared()
+            11 -> CoreException.ForwardingOff(
                 FfiConverterTypeForwardingOffKind.read(buf),
                 FfiConverterString.read(buf),
                 )
-            11 -> CoreException.Other(
+            12 -> CoreException.Other(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -21689,6 +21700,10 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 + FfiConverterString.allocationSize(value.`reason`)
             )
             is CoreException.NotSignedIn -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is CoreException.PasswordLocked -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -21749,26 +21764,30 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 buf.putInt(6)
                 Unit
             }
-            is CoreException.SemesterNeeded -> {
+            is CoreException.PasswordLocked -> {
                 buf.putInt(7)
                 Unit
             }
-            is CoreException.ConsentDenied -> {
+            is CoreException.SemesterNeeded -> {
                 buf.putInt(8)
                 Unit
             }
-            is CoreException.RegnoNotShared -> {
+            is CoreException.ConsentDenied -> {
                 buf.putInt(9)
                 Unit
             }
-            is CoreException.ForwardingOff -> {
+            is CoreException.RegnoNotShared -> {
                 buf.putInt(10)
+                Unit
+            }
+            is CoreException.ForwardingOff -> {
+                buf.putInt(11)
                 FfiConverterTypeForwardingOffKind.write(value.`kind`, buf)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
             is CoreException.Other -> {
-                buf.putInt(11)
+                buf.putInt(12)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
@@ -22337,6 +22356,103 @@ public object FfiConverterTypeLiveTopic: FfiConverterRustBuffer<LiveTopic> {
 
 
 /**
+ * [`PasswordCipher::open`]'s answer.
+ */
+sealed class Opening {
+    
+    data class Opened(
+        val `plain`: kotlin.String) : Opening()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Sealed under another key (another phone's, or one an uninstall dropped), or not sealed
+     * text at all: it never opens here, and the student types the password again.
+     */
+    object WrongKey : Opening()
+    
+    
+    /**
+     * The Keystore failed for a moment; the same text may open on the next try.
+     */
+    object Unavailable : Opening()
+    
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOpening : FfiConverterRustBuffer<Opening>{
+    override fun read(buf: ByteBuffer): Opening {
+        return when(buf.getInt()) {
+            1 -> Opening.Opened(
+                FfiConverterString.read(buf),
+                )
+            2 -> Opening.WrongKey
+            3 -> Opening.Unavailable
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: Opening): ULong = when(value) {
+        is Opening.Opened -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`plain`)
+            )
+        }
+        is Opening.WrongKey -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is Opening.Unavailable -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: Opening, buf: ByteBuffer) {
+        when(value) {
+            is Opening.Opened -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`plain`, buf)
+                Unit
+            }
+            is Opening.WrongKey -> {
+                buf.putInt(2)
+                Unit
+            }
+            is Opening.Unavailable -> {
+                buf.putInt(3)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
  * Why VTOP rejected an OTP submission.
  */
 
@@ -22786,6 +22902,85 @@ public object FfiConverterTypeScoreBand: FfiConverterRustBuffer<ScoreBand> {
 
     override fun write(value: ScoreBand, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * [`PasswordCipher::seal`]'s answer.
+ */
+sealed class Sealing {
+    
+    data class Sealed(
+        val `sealed`: kotlin.String) : Sealing()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * The key can't be used right now (the Keystore failed): nothing is written over the file.
+     */
+    object Unavailable : Sealing()
+    
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSealing : FfiConverterRustBuffer<Sealing>{
+    override fun read(buf: ByteBuffer): Sealing {
+        return when(buf.getInt()) {
+            1 -> Sealing.Sealed(
+                FfiConverterString.read(buf),
+                )
+            2 -> Sealing.Unavailable
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: Sealing): ULong = when(value) {
+        is Sealing.Sealed -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`sealed`)
+            )
+        }
+        is Sealing.Unavailable -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: Sealing, buf: ByteBuffer) {
+        when(value) {
+            is Sealing.Sealed -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`sealed`, buf)
+                Unit
+            }
+            is Sealing.Unavailable -> {
+                buf.putInt(2)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 }
 

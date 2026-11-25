@@ -49,7 +49,7 @@ use std::time::SystemTime;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::field::Empty;
-use tracing::{Instrument, Span, info, info_span};
+use tracing::{Instrument, Span, info, info_span, warn};
 use vtop_core::inputs::{Password, Username};
 use vtop_core::spec::{self, PageSpec, Query};
 use vtop_core::sync::RwLock;
@@ -64,7 +64,7 @@ pub use pages::records::{
     NextClass, Semester, Semesters, Timetable, TimetableDay, attendance_goal_split,
     project_attendance,
 };
-pub use store::account::PasswordCipher;
+pub use store::account::{Opening, PasswordCipher, Sealing};
 pub use store::cookies::SharedCookies;
 
 uniffi::setup_scaffolding!();
@@ -144,6 +144,9 @@ pub enum CoreError {
         reason: String,
     },
     NotSignedIn,
+    /// Signed in, but the phone's Keystore didn't open the saved password just now; the next
+    /// call tries again.
+    PasswordLocked,
     /// No semester picked yet (or VTOP no longer lists the pick): the
     /// student picks one from [`Core::fetch_semesters`] first.
     SemesterNeeded,
@@ -168,6 +171,7 @@ impl std::fmt::Display for CoreError {
             Self::Offline => formatter.write_str("offline"),
             Self::InvalidCredentials => formatter.write_str("invalid credentials"),
             Self::NotSignedIn => formatter.write_str("not signed in"),
+            Self::PasswordLocked => formatter.write_str("the saved password didn't open"),
             Self::SemesterNeeded => formatter.write_str("no semester picked"),
             Self::ConsentDenied => {
                 formatter.write_str("Not sent: your VTOP cookie stays on the phone.")
@@ -196,6 +200,7 @@ impl CoreError {
             Self::OtpRequired { .. } => "OtpRequired",
             Self::OtpRejected { .. } => "OtpRejected",
             Self::NotSignedIn => "NotSignedIn",
+            Self::PasswordLocked => "PasswordLocked",
             Self::SemesterNeeded => "SemesterNeeded",
             Self::ConsentDenied => "ConsentDenied",
             Self::RegnoNotShared => "RegnoNotShared",
@@ -422,6 +427,15 @@ impl Session {
 
 type Slot = RwLock<Session>;
 
+/// Who [`Core`] is signed in as.
+enum Signed {
+    Out,
+    /// An account is saved but the Keystore didn't open its password when the core opened:
+    /// [`Core::current`] opens it again, so a Keystore hiccup doesn't sign the student out.
+    Locked,
+    In(Arc<Slot>),
+}
+
 /// What the app hands [`Core::new`]: its HTTP stack, cookie store, sockets, consent prompt,
 /// Developer config and this phone's name. One record, so the app can't leave a piece out.
 #[derive(uniffi::Record)]
@@ -477,6 +491,10 @@ struct Shared {
     cipher: Option<Arc<dyn PasswordCipher>>,
     /// The OTP prompt and the calls waiting on it.
     otp: Arc<otp::Board>,
+    /// Held over every read-modify-write of [`ACCOUNT`].
+    account_file: Mutex<()>,
+    /// The password last sealed or opened ([`store::account`]).
+    sealed: store::account::Sealed,
     /// The server account proofs are held to, and its roots, in place of VTOP's.
     #[cfg(all(test, feature = "tlsn"))]
     proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
@@ -513,7 +531,7 @@ pub struct Core {
     dir: PathBuf,
     /// The change inbox, which Android may clear (see [`Core::at`]).
     cache: PathBuf,
-    slot: Mutex<Option<Arc<Slot>>>,
+    slot: Mutex<Signed>,
     shared: Arc<Shared>,
 }
 
@@ -589,7 +607,7 @@ impl Core {
         let core = Self {
             dir: PathBuf::from(data_dir),
             cache: PathBuf::from(cache_dir),
-            slot: Mutex::new(None),
+            slot: Mutex::new(Signed::Out),
             shared: Arc::new(shared),
         };
         traced_sync("new", &flow, || {
@@ -597,19 +615,34 @@ impl Core {
             fs::create_dir_all(&core.cache)?;
             remote::route::load(&core);
             remote::consent::load(&core);
-            // No password (another phone's, or key gone): signed out.
-            let Some(account) = core.read_account().and_then(store::account::Saved::usable) else {
-                return Ok(());
-            };
-            let session = Session::new(account, &core.shared)?;
-            let saved = core
-                .read::<PersistedVtopSession>(SESSION)
-                .filter(|saved| dev::reusable(&core.shared, saved));
-            core.restore(&session, saved);
-            core.install(Some(Arc::new(RwLock::new(session))));
+            core.upgrade_account();
+            let signed = core.restore_saved()?;
+            *core.slot.lock().unwrap_or_else(PoisonError::into_inner) = signed;
             Ok(())
         })?;
         Ok(Arc::new(core))
+    }
+
+    /// The saved account's session, restored; no password (another phone's, or the key is
+    /// gone): signed out.
+    fn restore_saved(&self) -> Result<Signed, CoreError> {
+        let Some(saved) = self.read_account() else {
+            return Ok(Signed::Out);
+        };
+        let account = match saved.password {
+            store::account::SavedPassword::Locked => return Ok(Signed::Locked),
+            store::account::SavedPassword::Gone => return Ok(Signed::Out),
+            store::account::SavedPassword::Open(_) => saved.usable(),
+        };
+        let Some(account) = account else {
+            return Ok(Signed::Out);
+        };
+        let session = Session::new(account, &self.shared)?;
+        let saved = self
+            .read::<PersistedVtopSession>(SESSION)
+            .filter(|saved| dev::reusable(&self.shared, saved));
+        self.restore(&session, saved);
+        Ok(Signed::In(Arc::new(RwLock::new(session))))
     }
 
     /// A core on `dir` (its cache folder too), signed out, with no platform.
@@ -625,21 +658,36 @@ impl Core {
         Self {
             cache: dir.clone(),
             dir,
-            slot: Mutex::new(None),
+            slot: Mutex::new(Signed::Out),
             shared: Arc::new(shared),
         }
     }
 
     fn install(&self, slot: Option<Arc<Slot>>) {
-        *self.slot.lock().unwrap_or_else(PoisonError::into_inner) = slot;
+        *self.slot.lock().unwrap_or_else(PoisonError::into_inner) =
+            slot.map_or(Signed::Out, Signed::In);
         // The last session's prompt (and the calls waiting on it) end with it.
         self.shared.otp.close_all();
         self.shared.identity_may_have_changed();
     }
 
+    /// The signed-in session. A password the Keystore didn't open at start is opened again here.
     fn current(&self) -> Result<Arc<Slot>, CoreError> {
-        let slot = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
-        slot.clone().ok_or(CoreError::NotSignedIn)
+        let mut signed = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
+        if matches!(*signed, Signed::Locked) {
+            *signed = self.restore_saved().unwrap_or_else(|error| {
+                warn!(%error, "saved account not restored");
+                Signed::Out
+            });
+            if let Signed::In(_) = *signed {
+                info!("saved password opened on a later try");
+            }
+        }
+        match &*signed {
+            Signed::In(slot) => Ok(slot.clone()),
+            Signed::Locked => Err(CoreError::PasswordLocked),
+            Signed::Out => Err(CoreError::NotSignedIn),
+        }
     }
 
     /// Whether `slot` is still the signed-in one (not signed out meanwhile).

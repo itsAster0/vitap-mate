@@ -9,6 +9,7 @@ use vtop_core::sync::RwLock;
 use vtop_core::types::PersistedVtopSession;
 
 use crate::remote::route;
+use crate::store::account::SavedPassword;
 use crate::{
     ACCOUNT, Account, Core, CoreError, OtpRejection, OtpVia, SESSION, STUDENT_FILES, SavedAccount,
     Session, SignIn, Slot, demo, obs, traced, traced_sync, unix_now,
@@ -17,12 +18,13 @@ use crate::{
 #[uniffi::export]
 impl Core {
     /// The saved account's username; None without a saved password (one restored from
-    /// another phone, which the student types again).
+    /// another phone, which the student types again). A password the Keystore didn't open just
+    /// now still counts: it is there, and opens on a later try.
     pub fn signed_in_user(&self, flow: String) -> Option<String> {
         traced_sync("signed_in_user", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
-            .filter(|saved| saved.password.is_some())
+            .filter(|saved| !matches!(saved.password, SavedPassword::Gone))
             .map(|saved| saved.username)
     }
 
@@ -50,7 +52,7 @@ impl Core {
         traced_sync("saved_password", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
-            .and_then(|saved| saved.password)
+            .and_then(|saved| saved.password().map(str::to_owned))
     }
 
     pub async fn sign_in(
@@ -435,7 +437,7 @@ impl Core {
     pub(crate) fn keep_accepted_password(&self, account: &Account) {
         if let Some(saved) = self.read_account()
             && saved.username == account.username
-            && (saved.password.as_ref() != Some(&account.password) || saved.rejected)
+            && (saved.password() != Some(account.password.as_str()) || saved.rejected)
         {
             info!("password accepted before the otp: saved");
             self.write_account(account);

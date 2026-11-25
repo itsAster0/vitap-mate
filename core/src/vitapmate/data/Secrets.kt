@@ -2,6 +2,7 @@ package vitapmate.data
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.io.File
@@ -9,11 +10,14 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicLong
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import vitapmate.core.Opening
 import vitapmate.core.PasswordCipher
+import vitapmate.core.Sealing
 import vitapmate.observability.Log
 
 private val atomicWriteSeq = AtomicLong()
@@ -70,12 +74,13 @@ object Secrets {
     }
 
     /** What [seal] gave back opened; null when [name]'s key can't open it (another phone's). */
-    fun open(name: String, sealed: ByteArray): ByteArray? = runCatching {
-        Cipher.getInstance(CIPHER).run {
-            init(Cipher.DECRYPT_MODE, key(name), GCMParameterSpec(128, sealed, 0, IV))
-            doFinal(sealed, IV, sealed.size - IV)
-        }
-    }.getOrNull()
+    fun open(name: String, sealed: ByteArray): ByteArray? = runCatching { openOrThrow(name, sealed) }.getOrNull()
+
+    /** [open], throwing what the Keystore threw, so a caller can tell another key from a failure. */
+    fun openOrThrow(name: String, sealed: ByteArray): ByteArray = Cipher.getInstance(CIPHER).run {
+        init(Cipher.DECRYPT_MODE, key(name), GCMParameterSpec(128, sealed, 0, IV))
+        doFinal(sealed, IV, sealed.size - IV)
+    }
 
     private fun file(context: Context, name: String) = File(context.filesDir, "$name.sealed")
 
@@ -93,18 +98,41 @@ object Secrets {
 
 /**
  * Rust's saved VTOP password (`account.json`), sealed under its own Keystore key and Base64'd
- * for the JSON. Restored onto another phone (or after a reinstall, which drops the
- * key) it doesn't open, and Rust asks for the password again. A failure must not reach Rust (it
- * would abort), so it is logged by class name only, never with the password or the sealed text.
+ * for the JSON. Restored onto another phone (or after a reinstall, which drops the key) it
+ * doesn't open ([Opening.WrongKey]), and Rust asks for the password again; a Keystore that fails
+ * for a moment is [Opening.Unavailable], and Rust keeps the password and tries again. A failure
+ * must not reach Rust (it would abort), so it is logged by class name only, never with the
+ * password or the sealed text.
  */
 object AccountPassword : PasswordCipher {
     private const val KEY = "account.password"
+    private const val IV = 12
 
-    override fun seal(plain: String): String? = runCatching { Base64.encodeToString(Secrets.seal(KEY, plain.encodeToByteArray()), Base64.NO_WRAP) }
-        .onFailure { Log.warn("secrets", "password not sealed: ${it::class.simpleName}") }
-        .getOrNull()
+    override fun seal(plain: String): Sealing = try {
+        Sealing.Sealed(Base64.encodeToString(Secrets.seal(KEY, plain.encodeToByteArray()), Base64.NO_WRAP))
+    } catch (e: Exception) {
+        Log.warn("secrets", "password not sealed: ${e::class.simpleName}")
+        Sealing.Unavailable
+    }
 
-    override fun open(sealed: String): String? = runCatching { Base64.decode(sealed, Base64.NO_WRAP) }.getOrNull()
-        ?.let { Secrets.open(KEY, it) }
-        ?.decodeToString()
+    override fun open(sealed: String): Opening {
+        val bytes = try {
+            Base64.decode(sealed, Base64.NO_WRAP)
+        } catch (_: IllegalArgumentException) {
+            return Opening.WrongKey
+        }
+        if (bytes.size <= IV) return Opening.WrongKey
+        return try {
+            Opening.Opened(Secrets.openOrThrow(KEY, bytes).decodeToString())
+        } catch (e: Exception) {
+            // Another key's text (the key was replaced by a restore or reinstall) never opens;
+            // some Keystores wrap that in a ProviderException.
+            if (generateSequence<Throwable>(e) { it.cause }.any { it is BadPaddingException || it is KeyPermanentlyInvalidatedException }) {
+                Opening.WrongKey
+            } else {
+                Log.warn("secrets", "password not opened: ${e::class.simpleName}")
+                Opening.Unavailable
+            }
+        }
+    }
 }
