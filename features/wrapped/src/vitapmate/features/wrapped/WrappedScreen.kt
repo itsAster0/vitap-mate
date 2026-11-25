@@ -105,6 +105,18 @@ private const val DESIGN_HEIGHT = 640f
 /** What the story draws from: the report, the class days still without campus times, the first name. */
 private class Loaded(val report: WrappedReport?, val missing: List<Int>, val name: String?)
 
+/** How far opening got; the story draws over any of these once there is a report. */
+private sealed interface Phase {
+    /** The cache being read and what's missing fetched. */
+    data object Loading : Phase
+
+    /** Nothing more to fetch: the story, or "Nothing to wrap yet" without a report. */
+    data object Done : Phase
+
+    /** Fetching or reading failed; shown only while there is no report. */
+    class Failed(val problem: Problem) : Phase
+}
+
 /**
  * Wrapped for the selected semester (flow `wrapped.open`, log src `ui.wrapped`): the cached
  * report at once, then what's missing is fetched one page at a time and the report read again.
@@ -118,15 +130,15 @@ internal fun WrappedScreen() {
     val semester = SemesterChoice.selected
     var attempt by remember { mutableIntStateOf(0) }
     var loaded by remember(semester) { mutableStateOf<Loaded?>(null) }
-    var loading by remember(semester, attempt) { mutableStateOf(true) }
-    var problem by remember(semester, attempt) { mutableStateOf<Problem?>(null) }
+    var phase by remember(semester, attempt) { mutableStateOf<Phase>(Phase.Loading) }
     LaunchedEffect(semester, attempt) {
         if (semester == null) {
-            loading = false
+            phase = Phase.Done
             return@LaunchedEffect
         }
         if (semester !in Settings.wrappedSeen) Settings.wrappedSeen += semester
         flow("wrapped.open") { f ->
+            var problem: Problem? = null
             /** Reads the cache again; a failure (a Rust panic) keeps the story on screen, else shows Unexpected. */
             suspend fun reread(): Boolean = try {
                 loaded = read(f)
@@ -138,12 +150,13 @@ internal fun WrappedScreen() {
                 if (loaded?.report == null) problem = problemOf(e, f)
                 false
             }
-            if (!reread()) return@flow
-            problem = fetchMissing(f, semester, loaded?.report)
-            reread()
-            Log.info("ui.wrapped", "open", f, mapOf("report" to "${loaded?.report != null}", "missing_days" to "${loaded?.missing?.size}", "problem" to "${problem?.kind}"))
+            if (reread()) {
+                problem = fetchMissing(f, semester, loaded?.report)
+                reread()
+                Log.info("ui.wrapped", "open", f, mapOf("report" to "${loaded?.report != null}", "missing_days" to "${loaded?.missing?.size}", "problem" to "${problem?.kind}"))
+            }
+            phase = problem?.let(Phase::Failed) ?: Phase.Done
         }
-        loading = false
     }
     // Campus times: the worker's run for this semester; when it ends, the report is read again.
     val work by remember(semester) { semester?.let { BiometricFetch.state(context, it) } ?: flowOf(null) }.collectAsState(null)
@@ -160,7 +173,8 @@ internal fun WrappedScreen() {
                     throw e
                 } catch (e: Throwable) {
                     Log.warn("ui.wrapped", "reload failed", f, mapOf("error" to (e::class.simpleName ?: "Throwable"), "kept" to "${loaded?.report != null}"))
-                    if (loaded?.report == null) problem = problemOf(e, f)
+                    // While opening still runs, its own outcome follows.
+                    if (loaded?.report == null && phase != Phase.Loading) phase = Phase.Failed(problemOf(e, f))
                 }
             }
         }
@@ -188,15 +202,15 @@ internal fun WrappedScreen() {
             }
             Story(report, semester, loaded?.name, campus)
         }
-        loading -> Box(Modifier.fillMaxSize().background(Ink.Accent.tone().subtle), Alignment.Center) {
+        phase == Phase.Loading -> Box(Modifier.fillMaxSize().background(Ink.Accent.tone().subtle), Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 LoadingIndicator(Modifier.size(64.dp))
                 Text("Putting your semester together…", style = MaterialTheme.typography.titleMediumEmphasized, color = Ink.Accent.tone().onSubtle)
             }
         }
         else -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.systemBars), Alignment.Center) {
-            val p = problem
-            if (p != null) ProblemView(p, { attempt++ })
+            val p = phase
+            if (p is Phase.Failed) ProblemView(p.problem, { attempt++ })
             else EmptyView(
                 Lucide.Sparkles,
                 "Nothing to wrap yet",
