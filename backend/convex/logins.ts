@@ -103,8 +103,7 @@ export const open = internalMutation({
     const at = now();
     // Answered, failed or timed out since the caller looked, or started already: signing in
     // now would only mail the student an OTP nobody waits for.
-    if (!request.pending(at) || request.vaultStarted) return null;
-    request.vaultStarted = true;
+    if (!request.startServer(at)) return null;
     await putRequest(ctx, row, request);
     const loginId = await ctx.db.insert("logins", {
       accountId: row.accountId,

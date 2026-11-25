@@ -149,7 +149,7 @@ describe("live queries", () => {
 
   it("expires pairings, OAuth requests and session requests server-side so live queries re-run", async () => {
     const t = await setup();
-    const { as, key } = await withKey(t);
+    const { as, ext, key } = await withKey(t);
     vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
     // 1. Extension pairing row deleted at PAIR_TTL_SECS.
     const codeHash = await sha256Hex("ABCDE12345");
@@ -180,6 +180,7 @@ describe("live queries", () => {
     expect((await t.run((ctx) => ctx.db.query("sessionRequests").first()))?.expired).toBe(true);
     expect(await as.query(api.sessions.pending, {})).toEqual([]);
     expect((await t.fetch(`/v1/session/requests/${started.requestId}`, { headers: { authorization: `Bearer ${key}` } })).status).toBe(410);
+    expect(await ext.query(api.extension.request, { requestId: started.requestId })).toEqual({ status: "not_found" });
 
     vi.advanceTimersByTime((PAIR_TTL_SECS - REQUEST_TIMEOUT_SECS) * 1000);
     await t.finishInProgressScheduledFunctions();
@@ -249,14 +250,14 @@ describe("live queries", () => {
     expect(await ext.query(api.extension.request, { requestId: "r-legacy" })).toEqual({
       status: "error",
       code: "credentials_rejected",
-      error: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate.",
+      error: "VTOP rejected the saved password. Sign in again in VITAP Mate.",
       expiresAt: (nowSec + 120) * 1000,
     });
     const legacyHttp = await t.fetch("/v1/session/requests/r-legacy", { headers: { authorization: `Bearer ${key}` } });
     expect(await legacyHttp.json()).toEqual({
       status: "error",
       code: "credentials_rejected",
-      error: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate.",
+      error: "VTOP rejected the saved password. Sign in again in VITAP Mate.",
     });
     expect(await as.query(api.app.loginResult, { requestId: "r-legacy" })).toEqual({
       status: "error",

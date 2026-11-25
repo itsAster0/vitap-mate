@@ -412,97 +412,184 @@ export function plan(settings: AccountSettings, hasVault: boolean): Plan {
   return settings.alwaysUseVault ? { kind: "vault_first" } : { kind: "phone_first", waitSecs: settings.phoneWaitSecs };
 }
 
-export type RequestStatus = "pending" | "success" | "error";
+export type PendingStage =
+  /** Request opened, neither phone nor server started yet. */
+  | { kind: "starting"; phoneError: RequestError | null }
+  /** Waiting on the phone; `vaultDueAt` is set when the server will take over. */
+  | { kind: "phone"; vaultDueAt: number | null }
+  /** Server is signing in with saved credentials; `phoneAsked` is true when the phone was also asked. */
+  | { kind: "server"; phoneAsked: boolean; phoneError: RequestError | null };
 
-/** One session request of an account. */
-export class RequestRecord {
-  status: RequestStatus = "pending";
-  /** The `Cookie` header, once answered. */
-  cookies: string | null = null;
-  /** Its CSRF token, when the server signed in (the app needs it). */
-  csrfToken: string | null = null;
-  errorCode: string | null = null;
-  error: string | null = null;
+export type RequestPhase =
+  | { kind: "pending"; stage: PendingStage }
+  | { kind: "expired" }
+  | { kind: "success"; cookies: string; csrfToken: string | null; source: string }
+  | { kind: "error"; error: RequestError };
+
+/** Flat stored `sessionRequests` fields, kept compatible with existing rows without a migration. */
+export type StoredRequestFields = {
+  status: "pending" | "success" | "error";
+  cookies: string | null;
+  csrfToken: string | null;
+  errorCode?: string | null;
+  error: string | null;
   createdAt: number;
   expiresAt: number;
-  /** When a sign-in with saved credentials is due (phone first). */
-  vaultDueAt: number | null = null;
-  vaultStarted = false;
-  phoneAsked = false;
-  /** Why the phone could not be asked, kept to end the request with if the
-   * sign-in fails too. */
-  phoneErrorCode: string | null = null;
-  phoneError: string | null = null;
-  /** Who made the session, once answered: `phone` or `server`. */
-  source: string | null = null;
+  vaultDueAt: number | null;
+  vaultStarted: boolean;
+  phoneAsked: boolean;
+  phoneErrorCode?: string | null;
+  phoneError: string | null;
+  source: string | null;
+  phones: string[];
+  expired?: boolean;
+};
+
+/** One session request of an account. Its phase is one discriminated union so callers cannot
+ * observe impossible combinations of stored fields. */
+export class RequestRecord {
+  phase: RequestPhase;
+  createdAt: number;
+  expiresAt: number;
   /** The installs this request may ask: the key's phone. */
-  phones: string[] = [];
+  phones: string[];
 
   constructor(
     readonly id: string,
     now: number,
+    expiresAt: number = now + REQUEST_TIMEOUT_SECS,
+    phones: string[] = [],
+    phase: RequestPhase = { kind: "pending", stage: { kind: "starting", phoneError: null } },
   ) {
     this.createdAt = now;
-    this.expiresAt = now + REQUEST_TIMEOUT_SECS;
+    this.expiresAt = expiresAt;
+    this.phones = phones;
+    this.phase = phase;
+  }
+
+  /** Effective phase at `now`: pending past `expiresAt` reads as `expired`. */
+  phaseAt(now: number): RequestPhase {
+    if (this.phase.kind === "pending" && now >= this.expiresAt) return { kind: "expired" };
+    return this.phase;
   }
 
   pending(now: number): boolean {
-    return this.status === "pending" && now < this.expiresAt;
+    return this.phaseAt(now).kind === "pending";
+  }
+
+  /** Whether a pending request has asked its phone (including after server takeover). */
+  phoneAsked(): boolean {
+    if (this.phase.kind !== "pending") return false;
+    const { stage } = this.phase;
+    return stage.kind === "phone" || (stage.kind === "server" && stage.phoneAsked);
+  }
+
+  /** Whether `deviceId` should see this request in `sessions:pending` at `now`. */
+  waitingOnPhone(now: number, deviceId: string): boolean {
+    const phase = this.phaseAt(now);
+    if (phase.kind !== "pending") return false;
+    const asked = phase.stage.kind === "phone" || (phase.stage.kind === "server" && phase.stage.phoneAsked);
+    return asked && this.phones.includes(deviceId);
+  }
+
+  /** Marks that at least one phone was asked for this request. */
+  markPhoneAsked(): void {
+    if (this.phase.kind !== "pending") return;
+    switch (this.phase.stage.kind) {
+      case "starting":
+        this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: null } };
+        break;
+      case "server":
+        this.phase = { kind: "pending", stage: { kind: "server", phoneAsked: true, phoneError: null } };
+        break;
+      case "phone":
+        break;
+    }
+  }
+
+  /** Schedules server takeover at `dueAt` while waiting on the phone. */
+  scheduleServer(dueAt: number): void {
+    if (this.phase.kind === "pending" && this.phase.stage.kind === "phone") {
+      this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: dueAt } };
+    }
+  }
+
+  /** Clears a scheduled server takeover when saved credentials are no longer usable. */
+  clearVaultDue(): void {
+    if (this.phase.kind === "pending" && this.phase.stage.kind === "phone") {
+      this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: null } };
+    }
+  }
+
+  /** Starts the server sign-in if the request is still pending and not already on the server. */
+  startServer(now: number): boolean {
+    const phase = this.phaseAt(now);
+    if (phase.kind !== "pending" || phase.stage.kind === "server") return false;
+    this.phase = {
+      kind: "pending",
+      stage: {
+        kind: "server",
+        phoneAsked: phase.stage.kind === "phone",
+        phoneError: phase.stage.kind === "starting" ? phase.stage.phoneError : null,
+      },
+    };
+    return true;
+  }
+
+  /** Records why the phone could not be asked, kept to end the request if the server fails too. */
+  setPhoneError(error: RequestError): void {
+    if (this.phase.kind !== "pending" || this.phase.stage.kind === "phone") return;
+    this.phase = { kind: "pending", stage: { ...this.phase.stage, phoneError: error } };
+  }
+
+  /** Stored phone-ask failure while pending without a phone. */
+  phoneFailure(): RequestError | null {
+    if (this.phase.kind !== "pending" || this.phase.stage.kind === "phone") return null;
+    return this.phase.stage.phoneError;
+  }
+
+  /** Failure code and message when the request failed, else null. */
+  failure(): RequestError | null {
+    return this.phase.kind === "error" ? this.phase.error : null;
+  }
+
+  /** Marks a pending request expired at or past `expiresAt`. */
+  expire(now: number): boolean {
+    if (this.phase.kind !== "pending" || now < this.expiresAt) return false;
+    this.phase = { kind: "expired" };
+    return true;
   }
 
   /** Answers the request; `source` is who made the session. */
   succeed(cookies: string, source: string, csrfToken: string | null = null): void {
-    this.status = "success";
-    this.cookies = cookies;
-    this.csrfToken = csrfToken;
-    this.errorCode = null;
-    this.error = null;
-    this.source = source;
+    this.phase = { kind: "success", cookies, csrfToken, source };
   }
 
   fail(error: RequestError): void {
-    this.status = "error";
-    this.errorCode = error.code;
-    this.error = error.message;
-  }
-
-  setPhoneError(error: RequestError): void {
-    this.phoneErrorCode = error.code;
-    this.phoneError = error.message;
-  }
-
-  /** Failure code and message, reading both structured rows and legacy `"code: message"` rows. */
-  failure(): RequestError {
-    const raw = this.error ?? "";
-    if (this.errorCode !== null) return { code: this.errorCode, message: raw };
-    return { code: errorCode(raw), message: raw };
-  }
-
-  /** Stored phone-ask failure, reading both structured and legacy rows. */
-  phoneFailure(): RequestError | null {
-    if (this.phoneError === null) return null;
-    if (this.phoneErrorCode !== null) return { code: this.phoneErrorCode, message: this.phoneError };
-    return parseRequestError(this.phoneError);
+    this.phase = { kind: "error", error };
   }
 
   /** Who is working on a pending request, for clients to say what they
    * wait for: the server signing in, the phone, or neither yet. */
   stage(): "server" | "phone" | "starting" {
-    if (this.vaultStarted) return "server";
-    return this.phoneAsked ? "phone" : "starting";
+    return this.phase.kind === "pending" ? this.phase.stage.kind : "starting";
   }
 
   /** The pending reply's progress fields. `serverDueAt` is when the server
    * takes over from a phone that has not answered. */
-  private progress() {
-    const due = this.vaultDueAt !== null && !this.vaultStarted ? rfc3339(this.vaultDueAt) : null;
-    return { status: "pending", stage: this.stage(), serverDueAt: due };
+  private progress(stage: PendingStage) {
+    const due = stage.kind === "phone" && stage.vaultDueAt !== null ? rfc3339(stage.vaultDueAt) : null;
+    return { status: "pending", stage: stage.kind, serverDueAt: due };
   }
 
   /** The pending reply of `POST /v1/session`. */
   startedView() {
+    const progress =
+      this.phase.kind === "pending"
+        ? this.progress(this.phase.stage)
+        : { status: "pending", stage: "starting" as const, serverDueAt: null };
     return {
-      ...this.progress(),
+      ...progress,
       requestId: this.id,
       pollAfterMs: POLL_AFTER_MS,
       expiresAt: rfc3339(this.expiresAt),
@@ -511,21 +598,153 @@ export class RequestRecord {
 
   /** The reply of a poll, and its status code. */
   pollView(now: number): { status: number; body: unknown } {
-    if (now >= this.expiresAt && this.status === "pending") {
-      return { status: 410, body: errorBody("request_expired", "The session request expired.") };
-    }
-    switch (this.status) {
+    const phase = this.phaseAt(now);
+    switch (phase.kind) {
+      case "expired":
+        return { status: 410, body: errorBody("request_expired", "The session request expired.") };
       case "pending":
-        return { status: 202, body: this.progress() };
+        return { status: 202, body: this.progress(phase.stage) };
       case "success":
-        return { status: 200, body: ready(this.cookies ?? "", sourceView(this.source, null, false)) };
-      case "error": {
-        const { code, message } = this.failure();
+        return { status: 200, body: ready(phase.cookies, sourceView(phase.source, null, false)) };
+      case "error":
         // A poll that worked, about a request that failed: 200, with the
         // error fields as every error reply has them.
-        return { status: 200, body: { status: "error", ...errorBody(code, message) } };
-      }
+        return { status: 200, body: { status: "error", ...errorBody(phase.error.code, phase.error.message) } };
     }
+  }
+}
+
+function parseStoredError(code: string | null | undefined, message: string | null): RequestError {
+  if (code != null) return { code, message: message ?? "" };
+  return parseRequestError(message ?? "");
+}
+
+function parseStoredPhoneError(code: string | null | undefined, message: string | null): RequestError | null {
+  if (message === null) return null;
+  if (code != null) return { code, message };
+  return parseRequestError(message);
+}
+
+/** Parses a stored `sessionRequests` row into a `RequestRecord` with one discriminated `phase`. */
+export function fromRequestFields(id: string, f: StoredRequestFields): RequestRecord {
+  let phase: RequestPhase;
+  switch (f.status) {
+    case "success":
+      phase = {
+        kind: "success",
+        cookies: f.cookies ?? "",
+        csrfToken: f.csrfToken,
+        source: f.source ?? "unknown",
+      };
+      break;
+    case "error":
+      phase = { kind: "error", error: parseStoredError(f.errorCode, f.error) };
+      break;
+    case "pending":
+      if (f.expired) {
+        phase = { kind: "expired" };
+      } else if (f.vaultStarted) {
+        phase = {
+          kind: "pending",
+          stage: {
+            kind: "server",
+            phoneAsked: f.phoneAsked,
+            phoneError: parseStoredPhoneError(f.phoneErrorCode, f.phoneError),
+          },
+        };
+      } else if (f.phoneAsked) {
+        phase = {
+          kind: "pending",
+          stage: { kind: "phone", vaultDueAt: f.vaultDueAt },
+        };
+      } else {
+        phase = {
+          kind: "pending",
+          stage: {
+            kind: "starting",
+            phoneError: parseStoredPhoneError(f.phoneErrorCode, f.phoneError),
+          },
+        };
+      }
+      break;
+  }
+  return new RequestRecord(id, f.createdAt, f.expiresAt, f.phones, phase);
+}
+
+/** Projects `RequestRecord` back onto the flat `sessionRequests` storage columns. */
+export function toRequestFields(r: RequestRecord): StoredRequestFields {
+  const base = {
+    createdAt: r.createdAt,
+    expiresAt: r.expiresAt,
+    phones: r.phones,
+  };
+  switch (r.phase.kind) {
+    case "pending": {
+      const { stage } = r.phase;
+      return {
+        ...base,
+        status: "pending",
+        cookies: null,
+        csrfToken: null,
+        errorCode: null,
+        error: null,
+        vaultDueAt: stage.kind === "phone" ? stage.vaultDueAt : null,
+        vaultStarted: stage.kind === "server",
+        phoneAsked: stage.kind === "phone" || (stage.kind === "server" && stage.phoneAsked),
+        phoneErrorCode: stage.kind === "phone" ? null : (stage.phoneError?.code ?? null),
+        phoneError: stage.kind === "phone" ? null : (stage.phoneError?.message ?? null),
+        source: null,
+        expired: undefined,
+      };
+    }
+    case "expired":
+      return {
+        ...base,
+        status: "pending",
+        cookies: null,
+        csrfToken: null,
+        errorCode: null,
+        error: null,
+        vaultDueAt: null,
+        vaultStarted: false,
+        phoneAsked: false,
+        phoneErrorCode: null,
+        phoneError: null,
+        source: null,
+        expired: true,
+      };
+    case "success":
+      return {
+        ...base,
+        status: "success",
+        cookies: r.phase.cookies,
+        csrfToken: r.phase.csrfToken,
+        errorCode: null,
+        error: null,
+        vaultDueAt: null,
+        vaultStarted: false,
+        phoneAsked: false,
+        phoneErrorCode: null,
+        phoneError: null,
+        source: r.phase.source,
+        expired: undefined,
+      };
+    case "error":
+      return {
+        ...base,
+        status: "error",
+        cookies: null,
+        csrfToken: null,
+        errorCode: r.phase.error.code,
+        error: r.phase.error.message,
+        vaultDueAt: null,
+        vaultStarted: false,
+        phoneAsked: false,
+        phoneErrorCode: null,
+        phoneError: null,
+        source: null,
+        expired: undefined,
+      };
   }
 }
 

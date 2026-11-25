@@ -83,8 +83,7 @@ export function friendlyLoginError(
   if ([502, 503, 504].includes(status)) {
     return "The sign-in service is temporarily unavailable. Please try again shortly.";
   }
-  // The edge's request errors read `code: what to do`.
-  return parsed.error?.replace(/^[a-z_]+:\s*/, "") || "Could not connect right now. Please try again.";
+  return parsed.error || "Could not connect right now. Please try again.";
 }
 
 export async function fetchWithTimeout(

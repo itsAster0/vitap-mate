@@ -55,7 +55,8 @@ describe("waitForRequest", () => {
 
   it("rejects with typed LoginError kinds and messages", async () => {
     for (const [view, kind, message] of [
-      [{ status: "error", code: "x", error: "phone_timeout: Open the app.", expiresAt: 0 }, "failed", "Open the app."],
+      [{ status: "error", code: "phone_timeout", error: "Open the app.", expiresAt: 0 }, "failed", "Open the app."],
+      [{ status: "error", code: "login_failed", error: "note: keep colon", expiresAt: 0 }, "failed", "note: keep colon"],
       [{ status: "key_unknown" }, "key_unknown", UNKNOWN_KEY_MESSAGE],
       [{ status: "not_found" }, "expired", /did not answer/],
     ] as [RequestView, LoginErrorKind, string | RegExp][]) {

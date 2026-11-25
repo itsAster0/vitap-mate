@@ -11,9 +11,13 @@ import {
   type PhoneRecord,
   REQUEST_TIMEOUT_SECS,
   RequestRecord,
+  type RequestPhase,
   SESSION_CACHE_SECS,
+  type StoredRequestFields,
   defaultSettings,
   errorCode,
+  fromFields,
+  fromRequestFields,
   fromHeader,
   isAccountId,
   keyId,
@@ -28,10 +32,10 @@ import {
   plan,
   rfc3339,
   semesterId,
-  toHeader,
-  validCookies,
-  fromFields,
   toFields,
+  toHeader,
+  toRequestFields,
+  validCookies,
 } from "./accountState";
 import { sha256Hex } from "./crypto";
 import { sha256HexSync } from "./sha256";
@@ -279,23 +283,24 @@ describe("session requests", () => {
     expect(r.pending(NOW)).toBe(true);
     expect(r.pollView(NOW).status).toBe(202);
     expect(r.pollView(NOW).body).toMatchObject({ stage: "starting" });
-    r.phoneAsked = true;
-    r.vaultDueAt = NOW + 10;
+    r.markPhoneAsked();
+    r.scheduleServer(NOW + 10);
     expect(r.pollView(NOW).body).toMatchObject({ stage: "phone" });
     expect(r.startedView().serverDueAt).toBe(rfc3339(NOW + 10));
-    r.vaultStarted = true;
+    expect(r.startServer(NOW)).toBe(true);
+    expect(r.startServer(NOW)).toBe(false);
     expect(r.pollView(NOW).body).toMatchObject({ stage: "server", serverDueAt: null });
     expect(r.pollView(NOW + REQUEST_TIMEOUT_SECS).status).toBe(410);
     r.fail(PHONE_UNREACHABLE);
-    expect(r.errorCode).toBe("phone_unreachable");
-    expect(r.error).toBe(PHONE_UNREACHABLE.message);
+    expect(r.phase).toEqual({ kind: "error", error: PHONE_UNREACHABLE });
+    expect(r.failure()).toEqual(PHONE_UNREACHABLE);
     expect(r.pollView(NOW)).toEqual({
       status: 200,
       body: { status: "error", code: "phone_unreachable", error: PHONE_UNREACHABLE.message },
     });
     r.succeed("JSESSIONID=a", "phone");
-    expect(r.errorCode).toBeNull();
-    expect(r.error).toBeNull();
+    expect(r.phase).toEqual({ kind: "success", cookies: "JSESSIONID=a", csrfToken: null, source: "phone" });
+    expect(r.failure()).toBeNull();
     const body = r.pollView(NOW + 1000).body as { status: string; session: { cookies: string }; cookies: { name: string }[] };
     expect(body.status).toBe("ready");
     expect(body.session.cookies).toBe("JSESSIONID=a");
@@ -303,22 +308,104 @@ describe("session requests", () => {
     expect(r.startedView().pollAfterMs).toBe(POLL_AFTER_MS);
   });
 
-  it("reads both structured and legacy packed error rows identically", () => {
-    const legacy = new RequestRecord("old", NOW);
-    legacy.status = "error";
-    legacy.errorCode = null;
-    legacy.error = "forwarding_required: Set up OTP email forwarding.";
-    legacy.phoneErrorCode = null;
-    legacy.phoneError = "phone_unreachable: Open VITAP Mate.";
+  it("reads both structured and legacy packed error rows cleanly via parseRequestError", () => {
+    const baseRow: StoredRequestFields = {
+      status: "error",
+      cookies: null,
+      csrfToken: null,
+      errorCode: null,
+      error: "forwarding_required: Set up OTP email forwarding.",
+      createdAt: NOW,
+      expiresAt: NOW + REQUEST_TIMEOUT_SECS,
+      vaultDueAt: null,
+      vaultStarted: false,
+      phoneAsked: false,
+      phoneErrorCode: null,
+      phoneError: null,
+      source: null,
+      phones: [],
+    };
+    const legacy = fromRequestFields("old", baseRow);
     expect(legacy.failure()).toEqual({
       code: "forwarding_required",
-      message: "forwarding_required: Set up OTP email forwarding.",
+      message: "Set up OTP email forwarding.",
     });
     expect(legacy.pollView(NOW)).toEqual({
       status: 200,
-      body: { status: "error", code: "forwarding_required", error: "forwarding_required: Set up OTP email forwarding." },
+      body: { status: "error", code: "forwarding_required", error: "Set up OTP email forwarding." },
     });
-    expect(legacy.phoneFailure()).toEqual({ code: "phone_unreachable", message: "Open VITAP Mate." });
+    // Non-snake-case legacy messages keep their full text under login_failed.
+    const plainLegacy = fromRequestFields("old-plain", { ...baseRow, error: "Error: VTOP returned 500" });
+    expect(plainLegacy.failure()).toEqual({ code: "login_failed", message: "Error: VTOP returned 500" });
+    // Legacy packed phoneError on a pending row parses cleanly too.
+    const pendingLegacy = fromRequestFields("old-pending", {
+      ...baseRow,
+      status: "pending",
+      error: null,
+      phoneError: "phone_unreachable: Open VITAP Mate.",
+    });
+    expect(pendingLegacy.phoneFailure()).toEqual({ code: "phone_unreachable", message: "Open VITAP Mate." });
+  });
+
+  it("round-trips every RequestPhase through StoredRequestFields and normalizes conflicting rows", () => {
+    const phases: RequestPhase[] = [
+      { kind: "pending", stage: { kind: "starting", phoneError: null } },
+      { kind: "pending", stage: { kind: "starting", phoneError: PHONE_UNREACHABLE } },
+      { kind: "pending", stage: { kind: "phone", vaultDueAt: null } },
+      { kind: "pending", stage: { kind: "phone", vaultDueAt: NOW + 20 } },
+      { kind: "pending", stage: { kind: "server", phoneAsked: false, phoneError: null } },
+      { kind: "pending", stage: { kind: "server", phoneAsked: true, phoneError: null } },
+      { kind: "pending", stage: { kind: "server", phoneAsked: false, phoneError: PHONE_UNREACHABLE } },
+      { kind: "expired" },
+      { kind: "success", cookies: "JSESSIONID=x", csrfToken: "tok", source: "server" },
+      { kind: "error", error: { code: "credentials_rejected", message: "Bad password." } },
+    ];
+    for (const phase of phases) {
+      const original = new RequestRecord("r", NOW, NOW + REQUEST_TIMEOUT_SECS, ["dev-1"], phase);
+      const roundTripped = fromRequestFields(original.id, toRequestFields(original));
+      expect(roundTripped.phase).toEqual(phase);
+      expect(roundTripped.phones).toEqual(["dev-1"]);
+    }
+    // Conflicting stored combinations normalize to one valid phase at the read boundary.
+    const wonOverExpired = fromRequestFields("win", {
+      status: "success",
+      cookies: "a=b",
+      csrfToken: null,
+      errorCode: "ignored",
+      error: "ignored",
+      createdAt: NOW,
+      expiresAt: NOW + 10,
+      vaultDueAt: NOW + 5,
+      vaultStarted: true,
+      phoneAsked: true,
+      phoneError: "ignored",
+      source: "phone",
+      phones: [],
+      expired: true,
+    });
+    expect(wonOverExpired.phase).toEqual({ kind: "success", cookies: "a=b", csrfToken: null, source: "phone" });
+    expect(wonOverExpired.failure()).toBeNull();
+    expect(wonOverExpired.phoneFailure()).toBeNull();
+
+    const expiredPending = fromRequestFields("exp", {
+      status: "pending",
+      cookies: "stale",
+      csrfToken: null,
+      error: "stale",
+      createdAt: NOW,
+      expiresAt: NOW + 10,
+      vaultDueAt: NOW + 5,
+      vaultStarted: false,
+      phoneAsked: true,
+      phoneError: null,
+      source: null,
+      phones: ["dev-1"],
+      expired: true,
+    });
+    expect(expiredPending.phase).toEqual({ kind: "expired" });
+    expect(expiredPending.pending(NOW)).toBe(false);
+    expect(expiredPending.waitingOnPhone(NOW, "dev-1")).toBe(false);
+    expect(expiredPending.pollView(NOW).status).toBe(410);
   });
 
   it("write RFC 3339 dates", () => {

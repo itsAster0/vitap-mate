@@ -142,9 +142,7 @@ export function waitForRequest(
           case "ready":
             return finish(null, view);
           case "error":
-            return finish(
-              new LoginError("failed", view.error.replace(/^[a-z_]+:\s*/, "") || "The sign-in failed. Try again."),
-            );
+            return finish(new LoginError("failed", view.error || "The sign-in failed. Try again."));
           case "key_unknown":
             return finish(new LoginError("key_unknown", UNKNOWN_KEY_MESSAGE));
           case "not_found":

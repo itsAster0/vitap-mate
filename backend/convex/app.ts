@@ -81,17 +81,18 @@ async function loginAnswer(ctx: QueryCtx, accountId: Id<"accounts">, requestId: 
   const row = await requestRow(ctx, requestId);
   const account = await ctx.db.get(accountId);
   if (!row || !account || row.accountId !== accountId) return { status: "error", code: "request_not_found", error: "Unknown sign-in." };
-  const request = requestOf(row);
-  switch (request.status) {
+  const phase = requestOf(row).phaseAt(now());
+  switch (phase.kind) {
     case "success":
-      return signedIn(account.regno, request.cookies ?? "", request.csrfToken);
+      return signedIn(account.regno, phase.cookies, phase.csrfToken);
     case "error": {
-      const { code, message } = request.failure();
+      const { code, message } = phase.error;
       if (code === "credentials_rejected") return { status: "error", code: "invalid_credentials", error: "VTOP rejected the saved password." };
       return { status: "error", code: "server_login_failed", error: message || "The server could not sign in." };
     }
-    default:
-      if (request.pending(now())) return { status: "pending", requestId };
+    case "pending":
+      return { status: "pending", requestId };
+    case "expired":
       return { status: "error", code: "vtop_timeout", error: "The server did not sign in in time." };
   }
 }

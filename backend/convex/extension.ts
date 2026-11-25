@@ -67,19 +67,20 @@ export const request = query({
     if (!row || row.accountId !== found.account._id) return { status: "not_found" as const };
     const r = requestOf(row);
     const expiresAt = r.expiresAt * 1000;
-    switch (r.status) {
+    const phase = r.phaseAt(now());
+    switch (phase.kind) {
       case "success":
-        return { status: "ready" as const, from: r.source ?? "unknown", expiresAt };
-      case "error": {
-        const { code, message } = r.failure();
-        return { status: "error" as const, code, error: message, expiresAt };
-      }
+        return { status: "ready" as const, from: phase.source, expiresAt };
+      case "error":
+        return { status: "error" as const, code: phase.error.code, error: phase.error.message, expiresAt };
+      case "expired":
+        return { status: "not_found" as const };
       case "pending":
         return {
           status: "pending" as const,
-          stage: r.stage(),
-          serverDueAt: r.vaultDueAt !== null && !r.vaultStarted ? r.vaultDueAt * 1000 : null,
-          login: r.vaultStarted ? await loginStep(ctx, row) : null,
+          stage: phase.stage.kind,
+          serverDueAt: phase.stage.kind === "phone" && phase.stage.vaultDueAt !== null ? phase.stage.vaultDueAt * 1000 : null,
+          login: phase.stage.kind === "server" ? await loginStep(ctx, row) : null,
           expiresAt,
         };
     }

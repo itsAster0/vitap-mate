@@ -32,7 +32,7 @@ describe("bridge helpers", () => {
     expect(friendlyLoginError(429, "")).toContain("Too many");
     expect(friendlyLoginError(503, '{"code":"engine_unavailable"}')).toContain("temporarily unavailable");
     expect(
-      friendlyLoginError(200, '{"status":"error","code":"forwarding_required","error":"forwarding_required: Set up OTP email forwarding."}'),
+      friendlyLoginError(200, '{"status":"error","code":"forwarding_required","error":"Set up OTP email forwarding."}'),
     ).toBe("Set up OTP email forwarding.");
     expect(friendlyLoginError(200, "not json")).toContain("Could not connect");
     expect(friendlyLoginError(0, "", new DOMException("Aborted", "AbortError"))).toContain("took too long");
@@ -147,13 +147,16 @@ describe("friendly errors for the session API", () => {
     expect(friendlyLoginError(429, '{"code":"rate_limited"}')).toContain("Too many");
   });
 
-  it("drops the code prefix from rejected phone answers", () => {
+  it("passes clean server error messages through untouched", () => {
     const reply = JSON.stringify({
       status: "error",
       code: "phone_session_invalid",
-      error: "phone_session_invalid: VTOP rejected your phone's session.",
+      error: "VTOP rejected your phone's session.",
     });
     expect(friendlyLoginError(200, reply)).toBe("VTOP rejected your phone's session.");
+    expect(friendlyLoginError(200, JSON.stringify({ status: "error", code: "login_failed", error: "note: keep colon" }))).toBe(
+      "note: keep colon",
+    );
   });
 });
 

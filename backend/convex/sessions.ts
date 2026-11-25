@@ -200,8 +200,9 @@ export const ask = internalMutation({
     let asked = true;
     if (failure === null) {
       if (serverAfter !== undefined) {
-        request.vaultDueAt = at + serverAfter;
-        await ctx.scheduler.runAt(request.vaultDueAt * 1000, internal.sessions.serverDue, { requestId });
+        const dueAt = at + serverAfter;
+        request.scheduleServer(dueAt);
+        await ctx.scheduler.runAt(dueAt * 1000, internal.sessions.serverDue, { requestId });
       }
     } else {
       asked = false;
@@ -234,7 +235,9 @@ export const state = internalQuery({
   args: { requestId: v.string() },
   handler: async (ctx, { requestId }) => {
     const row = await requestRow(ctx, requestId);
-    return row && { ...row, startedView: requestOf(row).startedView(), pending: requestOf(row).pending(now()) };
+    if (!row) return null;
+    const request = requestOf(row);
+    return { startedView: request.startedView(), pending: request.pending(now()) };
   },
 });
 
@@ -287,7 +290,10 @@ export const dueState = internalQuery({
     if (!row) return null;
     const request = requestOf(row);
     const at = now();
-    if (!request.pending(at) || request.vaultStarted || request.vaultDueAt === null || at < request.vaultDueAt) return null;
+    const phase = request.phaseAt(at);
+    if (phase.kind !== "pending" || phase.stage.kind !== "phone" || phase.stage.vaultDueAt === null || at < phase.stage.vaultDueAt) {
+      return null;
+    }
     const account = await ctx.db.get(row.accountId);
     if (!account) return null;
     return { regno: account.regno, vault: (await recordOf(ctx, account)).usableVault(at) };
@@ -298,18 +304,23 @@ export const clearDue = internalMutation({
   args: { requestId: v.string() },
   handler: async (ctx, { requestId }) => {
     const row = await requestRow(ctx, requestId);
-    if (row) await ctx.db.patch(row._id, { vaultDueAt: null });
+    if (!row) return;
+    const request = requestOf(row);
+    request.clearVaultDue();
+    await putRequest(ctx, row, request);
   },
 });
 
 /** Marks a pending request expired at `expiresAt` so subscribed live queries (`app:loginResult`,
- * `sessions:pending`) re-run without altering HTTP `410 request_expired` poll semantics. */
+ * `sessions:pending`, `extension:request`) re-run without altering HTTP `410 request_expired` poll semantics. */
 export const expireRequest = internalMutation({
   args: { requestId: v.string() },
   handler: async (ctx, { requestId }) => {
     const row = await requestRow(ctx, requestId);
-    if (!row || row.status !== "pending" || row.expired || now() < row.expiresAt) return;
-    await ctx.db.patch(row._id, { expired: true });
+    if (!row) return;
+    const request = requestOf(row);
+    if (!request.expire(now())) return;
+    await putRequest(ctx, row, request);
   },
 });
 
@@ -331,7 +342,7 @@ export const pending = query({
       .collect();
     return rows
       .map(requestOf)
-      .filter((r) => r.pending(at) && r.phoneAsked && r.phones.includes(me.deviceId))
+      .filter((r) => r.waitingOnPhone(at, me.deviceId))
       .map((r) => ({
         requestId: r.id,
         expiresAt: r.expiresAt * 1000,
@@ -547,7 +558,7 @@ export async function loginDone(ctx: MutationCtx, regno: string, requestId: stri
     }
   }
   if (fallback && request?.pending(at)) {
-    if (!request.phoneAsked) {
+    if (!request.phoneAsked()) {
       const failure = await askPhone(ctx, doc, request, at);
       if (failure !== null) request.fail(fallback.error ?? failure);
     } else {
