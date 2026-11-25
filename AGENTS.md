@@ -21,8 +21,9 @@ engine use.
 - Renaming a spec's name, args or file (`rust/vtop-proto/tests/spec_contract.txt`
   only grows at its end).
 - Sending the VTOP session to our servers without `consent::allowed`.
-- Release lanes: pushing a `v*` tag, `fastlane android deploy_internal`,
-  `promote_all_testing`, `promote_production` or `rollout` upload to Play.
+- Release lanes: pushing a `v*` tag, `fastlane android upload_internal`,
+  `promote_testing`, `promote_production` or `widen_rollout` upload to Play
+  (`status` only reads).
 
 Agents never open PRs or issues, push, or deploy unless asked.
 
@@ -220,9 +221,10 @@ the AAB. To release:
 3. Push the tag `v<versionName>`. `android-release.yml` builds the signed AAB
    (64-bit and 32-bit) and uploads it to the internal track.
 4. Promote in the Play Console, or with `bundle exec fastlane android
-   promote_all_testing` (friends, alpha, beta). Production is its own lane:
+   promote_testing` (friends, alpha, beta). Production is its own lane:
    `promote_production` sends the beta build to production as a staged rollout
-   (`rollout:0.2` by default) and `rollout rollout:0.5` (or `1`) widens it.
+   (`rollout:0.2` by default) and `widen_rollout rollout:0.5` (or `1`) widens it.
+   `status` shows the release on each track.
 
 How hard the app asks to update is the release's in-app update priority, set
 per versionCode in `UPDATE_PRIORITIES` in `fastlane/Fastfile` (add a line in the
@@ -231,7 +233,7 @@ dialog on start, 4 Play's full-screen update (can be closed), 5 the app's own
 blocking screen (`app/src/vitapmate/PlayUpdate.kt`). Promotions reuse it.
 
 From a laptop, with the keystore and `keystore/play-service-account.json` in
-place: `bundle install`, then `bundle exec fastlane android deploy_internal`.
+place: `bundle install`, then `bundle exec fastlane android upload_internal`.
 
 ## Version control
 

@@ -196,7 +196,7 @@ aab=build/vitapmate-release.aab
 cp build/tasks/_app_bundleAndroid/gradle-project-release.aab "$aab"
 # jarsigner exits 0 on an unsigned bundle too, so look for the verdict.
 jarsigner -verify "$aab" | grep -q '^jar verified' || { echo "$aab is not signed" >&2; exit 1; }
-echo "$aab (Play: bundle exec fastlane android deploy_internal)"
+echo "$aab (Play: bundle exec fastlane android upload_internal)"
 '''
 
 [tasks.notes]

@@ -15,29 +15,45 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ## Android
 
-### android deploy_internal
+### android upload_internal
 
 ```sh
-[bundle exec] fastlane android deploy_internal
+[bundle exec] fastlane android upload_internal
 ```
 
 Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt
 
-### android promote_all_testing
+### android promote_testing
 
 ```sh
-[bundle exec] fastlane android promote_all_testing
+[bundle exec] fastlane android promote_testing
 ```
 
 Promote the latest internal build to the closed (friends), alpha and beta tracks
 
-### android deploy_testing
+### android promote_production
 
 ```sh
-[bundle exec] fastlane android deploy_testing
+[bundle exec] fastlane android promote_production
 ```
 
-Build, upload to internal, then promote through the testing tracks
+Promote the beta build to production as a staged rollout (rollout:0.2 by default)
+
+### android widen_rollout
+
+```sh
+[bundle exec] fastlane android widen_rollout
+```
+
+Widen production's staged rollout (rollout:0.5), or rollout:1 for everyone
+
+### android status
+
+```sh
+[bundle exec] fastlane android status
+```
+
+Show the release on each track (version and code); uploads nothing
 
 ----
 
