@@ -81,7 +81,7 @@ describe("server sign-ins", () => {
     expect(calls.filter((c) => c.path === "/engine/login").at(-1)!.body).toEqual({ account: REGNO, sealedState: "st", otp: "654321" });
     expect(await as.query(api.app.loginResult, { requestId })).toEqual({ status: "ok", session: SESSION });
     expect(await t.run((ctx) => ctx.db.query("logins").collect())).toEqual([]);
-    const status = await as.query(api.app.status, { flow: "f" });
+    const status = await as.query(api.app.status, {});
     expect(status.signIns[0]).toMatchObject({ by: "server", ok: true });
     expect(status.sessionSource).toBe("server");
   });
@@ -103,7 +103,7 @@ describe("server sign-ins", () => {
     await as.mutation(api.app.sessionClear, { flow: "f" });
     engine((path) => (path === "/engine/login" ? Response.json({ status: "invalid_credentials" }) : undefined));
     expect(await codeOf(as.action(api.app.login, { flow: "f" }))).toBe("invalid_credentials");
-    expect((await as.query(api.app.status, { flow: "f" })).vaultSavedAt).toBeNull();
+    expect((await as.query(api.app.status, {})).vaultSavedAt).toBeNull();
   });
 
   it("end when the OTP mail never comes", async () => {
@@ -118,7 +118,7 @@ describe("server sign-ins", () => {
     advance(1);
     await t.mutation(internal.sweeps.fiveMinutes, {});
     expect(await t.run((ctx) => ctx.db.query("logins").collect())).toEqual([]);
-    const { signIns } = await as.query(api.app.status, { flow: "f" });
+    const { signIns } = await as.query(api.app.status, {});
     expect(signIns[0]).toMatchObject({ by: "server", ok: false, reason: "the OTP mail did not arrive" });
   });
 

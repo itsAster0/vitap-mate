@@ -29,7 +29,7 @@ describe("the account", () => {
     await expect(as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: "yes" } as never })).rejects.toThrow();
     await as.mutation(api.account.setSemester, { flow: "f", semesterId: " AP2026275 " });
     expect(await codeOf(as.mutation(api.account.setSemester, { flow: "f", semesterId: "bad id" }))).toBe("bad_request");
-    const view = await as.query(api.account.view, { flow: "f" });
+    const view = await as.query(api.account.view, {});
     expect(view).toMatchObject({ settings: { alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 }, semesterId: "AP2026275", forwarding: false });
     // The same semester again (every new JWT sends it) writes nothing.
     const before = await t.run(async (ctx) => (await ctx.db.query("accounts").first())!.updatedAt);
@@ -52,26 +52,26 @@ describe("the account", () => {
       });
       await ctx.db.insert("signIns", { accountId: id, at, by: "server", ok: true, reason: null });
     });
-    expect((await as.query(api.app.status, { flow: "f" })).signIns).toHaveLength(1);
-    expect(await as.query(api.account.signIns, { flow: "f" })).toHaveLength(1);
-    expect((await as.query(api.account.view, { flow: "f" })).savedCredentials).toBe(true);
+    expect((await as.query(api.app.status, {})).signIns).toHaveLength(1);
+    expect(await as.query(api.account.signIns, {})).toHaveLength(1);
+    expect((await as.query(api.account.view, {})).savedCredentials).toBe(true);
     await as.mutation(api.account.forgetCredentials, { flow: "f" });
-    expect((await as.query(api.account.view, { flow: "f" })).savedCredentials).toBe(false);
+    expect((await as.query(api.account.view, {})).savedCredentials).toBe(false);
     await as.mutation(api.account.clearSignIns, { flow: "f" });
-    expect((await as.query(api.app.status, { flow: "f" })).signIns).toEqual([]);
-    expect(await as.query(api.account.signIns, { flow: "f" })).toEqual([]);
+    expect((await as.query(api.app.status, {})).signIns).toEqual([]);
+    expect(await as.query(api.account.signIns, {})).toEqual([]);
   });
 
   it("saves credentials only when the server can read the OTP, and turns cacheSession on", async () => {
     const t = await setup();
     const { as } = await prove(t, await phone(1));
-    expect((await as.query(api.account.view, { flow: "f" })).settings.cacheSession).toBe(false);
+    expect((await as.query(api.account.view, {})).settings.cacheSession).toBe(false);
     const calls = engine((path) => (path === "/engine/seal" ? Response.json({ sealedVault: "sv" }) : undefined));
     const password = { username: "22bce0001", password: "pw" };
     // No forwarding address and no Gmail access: nothing is sealed, cacheSession stays false.
     expect(await as.action(api.account.saveCredentials, { flow: "f", credentials: password })).toEqual({ savedCredentials: false, forwarding: false });
     expect(calls).toHaveLength(0);
-    expect((await as.query(api.account.view, { flow: "f" })).settings.cacheSession).toBe(false);
+    expect((await as.query(api.account.view, {})).settings.cacheSession).toBe(false);
     const gmail = { refreshToken: "rt", clientId: "cid", clientSecret: null, deleteAfterReading: false };
     expect(await as.action(api.account.saveCredentials, { flow: "f", label: "Pixel", credentials: { ...password, gmail, otp: "gmail" } })).toEqual({
       savedCredentials: true,
@@ -79,7 +79,7 @@ describe("the account", () => {
     });
     expect(calls[0].body).toEqual({ account: REGNO, username: "22bce0001", password: "pw", gmail: { refreshToken: "rt", clientId: "cid", deleteAfterReading: false }, otp: "gmail" });
     expect(calls[0].headers.get("x-vtop-flow")).toBe("f");
-    const view = await as.query(api.account.view, { flow: "f" });
+    const view = await as.query(api.account.view, {});
     expect(view).toMatchObject({
       savedCredentials: true,
       vaultGmail: true,
@@ -92,7 +92,7 @@ describe("the account", () => {
     expect(view.phones[0].label).toBe("Pixel");
     // Older apps calling setSettings without cacheSession preserve cacheSession: true.
     await as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 } });
-    expect(await as.query(api.account.view, { flow: "f" })).toMatchObject({
+    expect(await as.query(api.account.view, {})).toMatchObject({
       settings: { cacheSession: true, alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 },
       vaultExpiresAt: T0 + 86_400,
     });
@@ -158,7 +158,7 @@ describe("the account", () => {
     const demo = await t.action(api.auth.token, await p.signed("auth:token", { demo: true, device: p.device }));
     const as = t.withIdentity({ subject: p.deviceId, regno: demo.regno, acct: demo.account, demo: true });
     expect(await codeOf(as.action(api.account.saveCredentials, { flow: "f", credentials: { username: "u", password: "p" } }))).toBe("demo_unavailable");
-    expect(await as.query(api.account.signIns, { flow: "f" })).toEqual([]);
+    expect(await as.query(api.account.signIns, {})).toEqual([]);
   });
 
   it("keeps the latest ten sign-ins, newest first", async () => {
@@ -168,7 +168,7 @@ describe("the account", () => {
       const id = account as Id<"accounts">;
       for (let n = 0; n < 12; n++) await recordSignIn(ctx, id, { at: 100 + n, by: n % 2 ? "phone" : "server", ok: n !== 5, reason: n === 5 ? "x" : null });
     });
-    const { signIns } = await as.query(api.app.status, { flow: "f" });
+    const { signIns } = await as.query(api.app.status, {});
     expect(signIns.map((s) => s.at)).toEqual([111, 110, 109, 108, 107, 106, 105, 104, 103, 102]);
     expect(signIns.find((s) => s.at === 105)).toEqual({ at: 105, by: "phone", ok: false, reason: "x" });
     expect(await t.run((ctx) => ctx.db.query("signIns").collect())).toHaveLength(10);
@@ -182,8 +182,8 @@ describe("the account", () => {
       proved.push({ p, tokens: await prove(t, p) });
       advance(10);
     }
-    expect(await codeOf(proved[0].tokens.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
-    const view = await proved[5].tokens.as.query(api.account.view, { flow: "f" });
+    expect(await codeOf(proved[0].tokens.as.query(api.account.view, {}))).toBe("device_removed");
+    const view = await proved[5].tokens.as.query(api.account.view, {});
     expect(view.phoneCount).toBe(5);
     expect(view.phones.filter((p) => p.thisPhone)).toHaveLength(1);
     const first = (await t.run((ctx) => ctx.db.query("devices").collect())).find((d) => d.deviceId === proved[0].p.deviceId);
@@ -197,11 +197,11 @@ describe("the account", () => {
     const ta = await prove(t, await phone(1));
     advance(10);
     const tb = await prove(t, await phone(2));
-    const other = (await tb.as.query(api.account.view, { flow: "f" })).phones.find((p) => !p.thisPhone)!;
+    const other = (await tb.as.query(api.account.view, {})).phones.find((p) => !p.thisPhone)!;
     expect(await codeOf(tb.as.mutation(api.account.removeDevice, { flow: "f", id: "nope" }))).toBe("phone_not_found");
     await tb.as.mutation(api.account.removeDevice, { flow: "f", id: other.id });
-    expect(await codeOf(ta.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
-    expect((await tb.as.query(api.account.view, { flow: "f" })).phoneCount).toBe(1);
+    expect(await codeOf(ta.as.query(api.account.view, {}))).toBe("device_removed");
+    expect((await tb.as.query(api.account.view, {})).phoneCount).toBe(1);
   });
 
   it("moves another phone's keys to this one and leaves that phone signed in", async () => {
@@ -212,10 +212,10 @@ describe("the account", () => {
     await ta.as.action(api.keys.create, { flow: "f" });
     advance(10);
     const tb = await prove(t, b);
-    const old = (await tb.as.query(api.account.view, { flow: "f" })).phones.find((p) => !p.thisPhone)!;
+    const old = (await tb.as.query(api.account.view, {})).phones.find((p) => !p.thisPhone)!;
     expect(await codeOf(tb.as.mutation(api.keys.move, { flow: "f", from: "nope" }))).toBe("phone_not_found");
     expect(await tb.as.mutation(api.keys.move, { flow: "f", from: old.id })).toEqual({ moved: 1 });
-    const after = await ta.as.query(api.account.view, { flow: "f" });
+    const after = await ta.as.query(api.account.view, {});
     expect(after.phones).toHaveLength(2);
     const mine = after.phones.find((p) => !p.thisPhone)!.id;
     expect(after.keys.map((k) => k.phoneId)).toEqual([mine]);
@@ -237,12 +237,12 @@ describe("the account", () => {
     });
     expect(Object.values(left).every((n) => n === 0)).toBe(true);
     expect((await t.fetch("/v1/whoami", { headers: { authorization: `Bearer ${made.key}` } })).status).toBe(401);
-    expect(await codeOf(as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(as.query(api.account.view, {}))).toBe("device_removed");
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken })))).toBe("refresh_invalid");
     // Proving again starts a new account.
     advance(10);
     const again = await prove(t, p);
-    expect((await again.as.query(api.account.view, { flow: "f" })).registrationNumber).toBe(REGNO);
+    expect((await again.as.query(api.account.view, {})).registrationNumber).toBe(REGNO);
   });
 });
 
@@ -255,7 +255,7 @@ describe("the install", () => {
     const ext = t.withIdentity({ subject: await sha256Hex(made.key), kind: "key" });
     // Registered without an FCM token: field is absent (not "") and reads as off everywhere.
     expect((await t.run((ctx) => ctx.db.query("devices").first()))?.fcmToken).toBeUndefined();
-    expect((await as.query(api.devices.info, { flow: "f" })).pushToken).toBe(false);
+    expect((await as.query(api.devices.info, {})).pushToken).toBe(false);
     expect((await as.query(api.screen.view, {})).device.pushToken).toBe(false);
     expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(false);
     expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBeNull();
@@ -263,7 +263,7 @@ describe("the install", () => {
     expect(await codeOf(as.mutation(api.devices.update, { flow: "f" }))).toBe("bad_request");
     expect(await codeOf(as.mutation(api.devices.update, { flow: "f", sealKey: "x" }))).toBe("bad_request");
     await as.mutation(api.devices.update, { flow: "f", fcmToken: "fcm", label: " Pixel 9 " });
-    expect(await as.query(api.devices.info, { flow: "f" })).toEqual({
+    expect(await as.query(api.devices.info, {})).toEqual({
       deviceId: p.deviceId,
       label: "Pixel 9",
       platform: "android",
@@ -278,7 +278,7 @@ describe("the install", () => {
     expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBe("fcm");
     await t.mutation(internal.push.clearToken, { deviceId: p.deviceId, token: "fcm" });
     expect((await t.run((ctx) => ctx.db.query("devices").first()))?.fcmToken).toBeUndefined();
-    expect((await as.query(api.devices.info, { flow: "f" })).pushToken).toBe(false);
+    expect((await as.query(api.devices.info, {})).pushToken).toBe(false);
     expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(false);
     expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBeNull();
 
@@ -287,7 +287,7 @@ describe("the install", () => {
       const row = (await ctx.db.query("devices").first())!;
       await ctx.db.patch(row._id, { fcmToken: "" });
     });
-    expect((await as.query(api.devices.info, { flow: "f" })).pushToken).toBe(false);
+    expect((await as.query(api.devices.info, {})).pushToken).toBe(false);
     expect((await as.query(api.screen.view, {})).device.pushToken).toBe(false);
     expect((await ext.query(api.extension.key, {}))?.phone?.notifications).toBe(false);
     expect(await t.query(internal.push.tokenOf, { deviceId: p.deviceId })).toBeNull();
@@ -436,7 +436,7 @@ describe("sweeps", () => {
     expect((await row()).sweepAt).toBe(at + 7 * 86_400);
     advance(7 * 86_400);
     await t.mutation(internal.sweeps.quarter, {});
-    expect((await as.query(api.app.status, { flow: "f" })).sessionSavedAt).toBeNull();
+    expect((await as.query(api.app.status, {})).sessionSavedAt).toBeNull();
     expect((await row()).sealedSession).toBeNull();
     expect((await row()).sweepAt).toBeUndefined();
     advance(180 * 86_400);

@@ -157,7 +157,7 @@ export const leave = mutation({
 
 /** The installs the address forwards to, for the app's device list. */
 export const devices = query({
-  args: { flow: v.optional(v.string()), id: v.string() },
+  args: { id: v.string() },
   handler: async (ctx, { id }) => {
     const me = await caller(ctx);
     if (me.demo) return unknownMailbox();
@@ -204,7 +204,7 @@ export const removeDevice = mutation({
  * forwarding confirmation (a day, until an OTP comes) and when the latest OTP was sent. Live: a
  * phone waiting for its code watches this. */
 export const inbox = query({
-  args: { flow: v.optional(v.string()), id: v.string() },
+  args: { id: v.string() },
   handler: async (ctx, { id }) => {
     const me = await caller(ctx);
     if (me.demo) return unknownMailbox();

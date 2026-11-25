@@ -265,7 +265,7 @@ describe("access keys", () => {
 
     // Late answer when storage is off is discarded (writes neither cookies nor sealedSession nor signIns).
     const started2 = await json(await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } }));
-    const signInsBefore = await as.query(api.account.signIns, { flow: "f" });
+    const signInsBefore = await as.query(api.account.signIns, {});
     vi.advanceTimersByTime(REQUEST_TIMEOUT_SECS * 1000);
     await t.finishInProgressScheduledFunctions();
     const lateAns = await as.action(api.sessions.answer, {
@@ -278,7 +278,7 @@ describe("access keys", () => {
       (await ctx.db.query("sessionRequests").collect()).find((r) => r.requestId === started2.requestId),
     );
     expect(lateRow?.cookies).toBeNull();
-    expect(await as.query(api.account.signIns, { flow: "f" })).toEqual(signInsBefore);
+    expect(await as.query(api.account.signIns, {})).toEqual(signInsBefore);
 
     // With storage on, phone answers ARE cached and served with cacheable: true.
     await as.mutation(api.account.setSettings, {
@@ -359,7 +359,7 @@ describe("access keys", () => {
     expect(login.headers.get("x-vtop-regno")).toBe(REGNO);
     const polled = await json(await t.fetch(`/v1/session/requests/${started.requestId}`, { headers: { authorization: `Bearer ${made.key}` } }));
     expect(polled).toMatchObject({ status: "ready", source: { from: "server" } });
-    const status = await as.query(api.app.status, { flow: "f" });
+    const status = await as.query(api.app.status, {});
     expect(status.signIns[0]).toMatchObject({ by: "server", ok: true });
     expect(status.sessionSource).toBe("server");
     // A rejected password drops the vault and is recorded.
@@ -367,7 +367,7 @@ describe("access keys", () => {
     engine((path) => (path === "/engine/login" ? Response.json({ status: "invalid_credentials" }) : undefined));
     await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
     await drain(t);
-    const after = await as.query(api.app.status, { flow: "f" });
+    const after = await as.query(api.app.status, {});
     expect(after.vaultSavedAt).toBeNull();
     expect(after.signIns[0]).toMatchObject({ by: "server", ok: false, reason: "VTOP rejected the saved password" });
     expect(after.signIns).toHaveLength(2);
@@ -442,7 +442,7 @@ describe("OAuth for MCP clients", () => {
     expect(await json(bad)).toMatchObject({ error: "invalid_grant" });
     // The code is gone after any try.
     expect(await json(await form(verifier))).toMatchObject({ error: "invalid_grant" });
-    const views = await as.query(api.account.view, { flow: "f" });
+    const views = await as.query(api.account.view, {});
     expect(views.keys[0].label).toBe("Claude");
   });
 
@@ -464,14 +464,14 @@ describe("OAuth for MCP clients", () => {
     // Approving an MCP OAuth code forces outings off even when requested on, and a second use fails.
     const usedCode = await open();
     await as.action(api.keys.create, { flow: "f", pairCode: usedCode, outings: true });
-    const view = await as.query(api.account.view, { flow: "f" });
+    const view = await as.query(api.account.view, {});
     expect(view.keys[0].outings).toBe(false);
     expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: usedCode }))).toBe("pair_expired");
     // An expired OAuth code fails with pair_expired instead of minting an extension pairing.
     const expiredCode = await open();
     advance(601);
     expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: expiredCode }))).toBe("pair_expired");
-    expect((await as.query(api.account.view, { flow: "f" })).keys).toHaveLength(1);
+    expect((await as.query(api.account.view, {})).keys).toHaveLength(1);
     expect(await t.run((ctx) => ctx.db.query("pairings").collect())).toEqual([]);
   });
 

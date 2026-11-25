@@ -28,7 +28,7 @@ const signedIn = (regno: string, cookies: string, csrfToken: string | null): Log
 
 /** What the server keeps and its recent activity. */
 export const status = query({
-  args: { flow: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const me = await caller(ctx);
     if (!me.account) {
@@ -106,7 +106,7 @@ export const loginRequest = internalQuery({
 
 /** A server sign-in `app:login` left pending, live: it waits for VTOP's OTP mail. */
 export const loginResult = query({
-  args: { flow: v.optional(v.string()), requestId: v.string() },
+  args: { requestId: v.string() },
   handler: async (ctx, { requestId }): Promise<LoginAnswer> => {
     const me = await caller(ctx);
     if (!me.account) return { status: "error", code: "demo_unavailable", error: "The demo account can't do this." };

@@ -20,7 +20,7 @@ import { log, now } from "./lib/util";
  * savedCredentials, vaultSavedAt, vaultGmail, credentialsRejectedAt, forwarding, phoneLinked,
  * phoneCount, thisPhone, phones[], keys[]`. Live. */
 export const view = query({
-  args: { flow: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const me = await caller(ctx);
     const at = now();
@@ -36,7 +36,7 @@ export const view = query({
 
 /** The account's recent VTOP sign-ins (at most 10, newest first). Live. */
 export const signIns = query({
-  args: { flow: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const me = await caller(ctx);
     if (!me.account) return [];

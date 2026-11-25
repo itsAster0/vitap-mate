@@ -32,7 +32,7 @@ export const update = mutation({
 
 /** The install as the backend keeps it: no keys or token, only whether it has a push token. */
 export const info = query({
-  args: { flow: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const { device } = await caller(ctx);
     return {

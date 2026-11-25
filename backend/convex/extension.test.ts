@@ -55,7 +55,7 @@ describe("key JWTs", () => {
   it("never act as a phone, and a phone's JWT reads nothing here", async () => {
     const t = await setup();
     const { ext, as } = await withKey(t);
-    expect(await codeOf(ext.query(api.app.status, { flow: "f" }))).toBe("unauthenticated");
+    expect(await codeOf(ext.query(api.app.status, {}))).toBe("unauthenticated");
     expect(await codeOf(ext.action(api.keys.create, { flow: "f" }))).toBe("unauthenticated");
     expect(await as.query(api.extension.key, {})).toBeNull();
     expect(await as.query(api.extension.request, { requestId: "x" })).toEqual({ status: "key_unknown" });

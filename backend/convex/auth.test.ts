@@ -93,7 +93,7 @@ describe("tokens", () => {
     expect(tokens.refreshToken).toMatch(/^vrt_[A-Za-z0-9_-]{43}$/);
     const payload = JSON.parse(atob(tokens.jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))) as Record<string, unknown>;
     expect(payload).toMatchObject({ sub: p.deviceId, regno: REGNO, acct: tokens.account, aud: "vmate", iss: "https://vmate.test" });
-    const view = await tokens.as.query(api.account.view, { flow: "f" });
+    const view = await tokens.as.query(api.account.view, {});
     expect(view).toMatchObject({ registrationNumber: REGNO, thisPhone: true, phoneCount: 1 });
     const rows = await t.run(async (ctx) => ({
       devices: await ctx.db.query("devices").collect(),
@@ -139,7 +139,7 @@ describe("tokens", () => {
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: first.refreshToken })))).toBe("refresh_reused");
     // The newest token went with the chain, and the live 24-hour JWT stops working at once.
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: third.refreshToken })))).toBe("refresh_invalid");
-    expect(await codeOf(first.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(first.as.query(api.account.view, {}))).toBe("device_removed");
     expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(0);
   });
 
@@ -194,16 +194,16 @@ describe("tokens", () => {
     const tb = await prove(t, b);
     expect(await tb.as.mutation(api.mail.register, { flow: "f" })).toEqual(box);
     // Both phones keep working JWTs, independent refresh chains, and mailbox membership.
-    expect((await ta.as.query(api.account.view, { flow: "f" })).phoneCount).toBe(2);
-    expect((await tb.as.query(api.account.view, { flow: "f" })).phoneCount).toBe(2);
+    expect((await ta.as.query(api.account.view, {})).phoneCount).toBe(2);
+    expect((await tb.as.query(api.account.view, {})).phoneCount).toBe(2);
     expect((await ta.as.query(api.screen.view, { mailbox: box.id })).mailbox).toMatchObject({ devices: expect.any(Array) });
     expect((await tb.as.query(api.screen.view, { mailbox: box.id })).mailbox).toMatchObject({ devices: expect.any(Array) });
     const ta2 = await t.action(api.auth.token, await a.signed("auth:token", { refreshToken: ta.refreshToken }));
     const tb2 = await t.action(api.auth.token, await b.signed("auth:token", { refreshToken: tb.refreshToken }));
     expect(ta2.regno).toBe(REGNO);
     expect(tb2.regno).toBe(REGNO);
-    expect((await ta.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(2);
-    expect((await tb.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(2);
+    expect((await ta.as.query(api.mail.devices, { id: box.id })).devices).toHaveLength(2);
+    expect((await tb.as.query(api.mail.devices, { id: box.id })).devices).toHaveLength(2);
   });
 
   it("caps the proofs the engine runs, not the tickets fresh device keys ask for", async () => {
@@ -241,7 +241,7 @@ describe("tokens", () => {
     advance(10);
     const tb = await prove(t, b);
     await ta.as.mutation(api.auth.signOut, { flow: "f", everywhere: true });
-    expect(await codeOf(tb.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(tb.as.query(api.account.view, {}))).toBe("device_removed");
   });
 
   it("signing out deletes this install's chain, or every phone's", async () => {
@@ -265,10 +265,10 @@ describe("tokens", () => {
     const ta = await prove(t, a);
     advance(10);
     const tb = await prove(t, b);
-    const view = await ta.as.query(api.account.view, { flow: "f" });
+    const view = await ta.as.query(api.account.view, {});
     const other = view.phones.find((ph) => !ph.thisPhone)!;
     await ta.as.mutation(api.account.removeDevice, { flow: "f", id: other.id });
-    expect(await codeOf(tb.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(tb.as.query(api.account.view, {}))).toBe("device_removed");
     expect(await codeOf(t.action(api.auth.token, await b.signed("auth:token", { refreshToken: tb.refreshToken })))).toBe("refresh_invalid");
   });
 
@@ -277,7 +277,7 @@ describe("tokens", () => {
     const p = await phone(1);
     const tokens = await prove(t, p);
     await tokens.as.mutation(api.devices.remove, { flow: "f" });
-    expect(await codeOf(tokens.as.query(api.devices.info, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(tokens.as.query(api.devices.info, {}))).toBe("device_removed");
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: tokens.refreshToken })))).toBe("refresh_invalid");
   });
 
@@ -327,8 +327,8 @@ describe("tokens", () => {
     const tokens = await t.action(api.auth.token, await p.signed("auth:token", { demo: true, device: p.device }));
     expect(tokens).toMatchObject({ regno: "DEMO2026", account: "demo" });
     const as = t.withIdentity({ subject: p.deviceId, regno: "DEMO2026", acct: "demo", demo: true });
-    expect((await as.query(api.account.view, { flow: "f" })).registrationNumber).toBe("DEMO2026");
-    expect((await as.query(api.app.status, { flow: "f" })).signIns).toEqual([]);
+    expect((await as.query(api.account.view, {})).registrationNumber).toBe("DEMO2026");
+    expect((await as.query(api.app.status, {})).signIns).toEqual([]);
     expect(await codeOf(as.mutation(api.mail.register, { flow: "f" }))).toBe("demo_unavailable");
     expect(await codeOf(as.mutation(api.account.setSemester, { flow: "f", semesterId: "AP1" }))).toBe("demo_unavailable");
     expect(await codeOf(as.action(api.keys.create, { flow: "f" }))).toBe("demo_unavailable");
@@ -337,13 +337,13 @@ describe("tokens", () => {
     expect(refreshed.regno).toBe("DEMO2026");
     // Signing out ends the demo's 24-hour JWT at once too.
     await as.mutation(api.auth.signOut, { flow: "f" });
-    expect(await codeOf(as.query(api.devices.info, { flow: "f" }))).toBe("device_removed");
+    expect(await codeOf(as.query(api.devices.info, {}))).toBe("device_removed");
     expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: refreshed.refreshToken })))).toBe("refresh_invalid");
   });
 
   it("no JWT, no access", async () => {
     const t = await setup();
-    expect(await codeOf(t.query(api.devices.info, { flow: "f" }))).toBe("unauthenticated");
+    expect(await codeOf(t.query(api.devices.info, {}))).toBe("unauthenticated");
   });
 
   it("rate limits demo grants per install and globally, and refresh rotations per install", async () => {

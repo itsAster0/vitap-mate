@@ -29,7 +29,7 @@ describe("addresses", () => {
     advance(10);
     const tb = await prove(t, b);
     expect(await tb.as.mutation(api.mail.register, { flow: "f" })).toEqual(box);
-    const { devices } = await ta.as.query(api.mail.devices, { flow: "f", id: box.id });
+    const { devices } = await ta.as.query(api.mail.devices, { id: box.id });
     expect(devices.map((d) => [d.deviceId, d.thisDevice])).toEqual([
       [a.deviceId, true],
       [b.deviceId, false],
@@ -49,11 +49,11 @@ describe("addresses", () => {
     await t.action(api.auth.token, await a.signed("auth:token", { refreshToken: ta.refreshToken }));
     const tb = await prove(t, b);
     expect(await tb.as.mutation(api.mail.register, { flow: "f" })).toEqual(box);
-    const { devices } = await ta.as.query(api.mail.devices, { flow: "f", id: box.id });
+    const { devices } = await ta.as.query(api.mail.devices, { id: box.id });
     expect(devices.map((d) => d.deviceId).sort()).toEqual([a.deviceId, b.deviceId].sort());
     expect((await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "555555" })).status).toBe(200);
-    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).sealed).toBeTruthy();
-    expect((await tb.as.query(api.mail.inbox, { flow: "f", id: box.id })).sealed).toBeTruthy();
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).sealed).toBeTruthy();
+    expect((await tb.as.query(api.mail.inbox, { id: box.id })).sealed).toBeTruthy();
   });
 
   it("leave keeps the address; remove deletes it when last; others can be taken off", async () => {
@@ -68,7 +68,7 @@ describe("addresses", () => {
     expect(await codeOf(ta.as.mutation(api.mail.removeDevice, { flow: "f", id: box.id, removeDevice: a.deviceId }))).toBe("bad_request");
     expect(await codeOf(ta.as.mutation(api.mail.removeDevice, { flow: "f", id: box.id, removeDevice: "f".repeat(32) }))).toBe("unknown_device");
     await ta.as.mutation(api.mail.removeDevice, { flow: "f", id: box.id, removeDevice: b.deviceId });
-    expect(await codeOf(tb.as.query(api.mail.inbox, { flow: "f", id: box.id }))).toBe("mailbox_not_found");
+    expect(await codeOf(tb.as.query(api.mail.inbox, { id: box.id }))).toBe("mailbox_not_found");
     await ta.as.mutation(api.mail.leave, { flow: "f", id: box.id });
     // Still the student's, with no install on it: the next phone joins it.
     expect((await tb.as.mutation(api.mail.register, { flow: "f" })).id).toBe(box.id);
@@ -95,7 +95,7 @@ describe("addresses", () => {
     const sixth = await phone(6);
     const proved6 = await prove(t, sixth);
     await proved6.as.mutation(api.mail.register, { flow: "f" });
-    const { devices } = await proved6.as.query(api.mail.devices, { flow: "f", id: boxId });
+    const { devices } = await proved6.as.query(api.mail.devices, { id: boxId });
     expect(devices).toHaveLength(5);
     expect(devices.map((d) => d.deviceId)).not.toContain(phones[1].p.deviceId);
     expect(devices.map((d) => d.deviceId)).toContain(sixth.deviceId);
@@ -120,12 +120,12 @@ describe("mail in", () => {
       [a, ta.as],
       [b, tb.as],
     ] as const) {
-      const inbox = await as.query(api.mail.inbox, { flow: "f", id: box.id });
+      const inbox = await as.query(api.mail.inbox, { id: box.id });
       expect(JSON.parse(await text(p.sealSecret, box.id, inbox.sealed))).toEqual({ kind: "otp", code: "401295", sentAt: Math.floor(sentMs / 1000) });
       expect(inbox.lastOtpAt).toBe(Math.floor(sentMs / 1000));
     }
     advance(301);
-    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).sealed).toBeNull();
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).sealed).toBeNull();
     // Then the boxes themselves go, without waiting for the 15-minute sweep.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
@@ -139,7 +139,7 @@ describe("mail in", () => {
     const box = await ta.as.mutation(api.mail.register, { flow: "f" });
     const confirm = { code: "123456789", link: "https://mail-settings.google.com/mail/vf-abc", requester: "s@gmail.com" };
     expect((await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: null, gmailConfirm: confirm })).status).toBe(200);
-    const first = await ta.as.query(api.mail.inbox, { flow: "f", id: box.id });
+    const first = await ta.as.query(api.mail.inbox, { id: box.id });
     expect(first.sealed).toBeNull();
     expect(JSON.parse(await text(a.sealSecret, box.id, first.confirmation))).toMatchObject({ kind: "gmail_confirm", ...confirm });
     advance(60);
@@ -151,10 +151,10 @@ describe("mail in", () => {
       (await ctx.db.query("otpInbox").collect()).filter((r) => r.deviceId === b.deviceId && r.kind === "gmail_confirm"),
     );
     expect(bConfirmRows).toHaveLength(1);
-    const joined = await tb.as.query(api.mail.inbox, { flow: "f", id: box.id });
+    const joined = await tb.as.query(api.mail.inbox, { id: box.id });
     expect(JSON.parse(await text(b.sealSecret, box.id, joined.confirmation)).code).toBe("123456789");
     await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "111111" });
-    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).confirmation).toBeNull();
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmation).toBeNull();
   });
 
   it("takes mail for an old address waiting for its student, and keeps the newest OTP", async () => {
@@ -174,7 +174,7 @@ describe("mail in", () => {
     await mail(t, { addressId: box.id, receivedAt: newer, otp: "222222" });
     // A queued retry of an older mail comes in after the newer one.
     await mail(t, { addressId: box.id, receivedAt: newer - 60_000, otp: "111111" });
-    const inbox = await ta.as.query(api.mail.inbox, { flow: "f", id: box.id });
+    const inbox = await ta.as.query(api.mail.inbox, { id: box.id });
     expect(JSON.parse(await text(a.sealSecret, box.id, inbox.sealed)).code).toBe("222222");
   });
 
@@ -203,17 +203,17 @@ describe("mail in", () => {
       await ctx.db.insert("mailboxDevices", { ...row, _id: undefined, _creationTime: undefined, deviceId: b.deviceId } as never);
     });
     for (const call of [
-      () => tb.as.query(api.mail.devices, { flow: "f", id: box.id }),
-      () => tb.as.query(api.mail.inbox, { flow: "f", id: box.id }),
+      () => tb.as.query(api.mail.devices, { id: box.id }),
+      () => tb.as.query(api.mail.inbox, { id: box.id }),
       () => tb.as.mutation(api.mail.remove, { flow: "f", id: box.id, everywhere: true }),
       () => tb.as.mutation(api.mail.removeDevice, { flow: "f", id: box.id, removeDevice: a.deviceId }),
     ]) {
       expect(await codeOf(call())).toBe("mailbox_not_found");
     }
     expect((await tb.as.query(api.screen.view, { mailbox: box.id })).mailbox).toEqual({ gone: true });
-    expect((await ta.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(2);
+    expect((await ta.as.query(api.mail.devices, { id: box.id })).devices).toHaveLength(2);
     expect(await t.mutation(internal.migrate.dropStrayMembers, {})).toBe(1);
-    expect((await ta.as.query(api.mail.devices, { flow: "f", id: box.id })).devices).toHaveLength(1);
+    expect((await ta.as.query(api.mail.devices, { id: box.id })).devices).toHaveLength(1);
   });
 
   it("drops a box sealed to a phone that changed student before delivery", async () => {
@@ -304,7 +304,7 @@ describe("mail in", () => {
     const tb = await prove(t, b);
     const box = await ta.as.mutation(api.mail.register, { flow: "f" });
     await tb.as.mutation(api.mail.register, { flow: "f" });
-    const other = (await ta.as.query(api.account.view, { flow: "f" })).phones.find((ph) => !ph.thisPhone)!;
+    const other = (await ta.as.query(api.account.view, {})).phones.find((ph) => !ph.thisPhone)!;
     await ta.as.mutation(api.account.removeDevice, { flow: "f", id: other.id });
     await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "333333" });
     const boxes = await t.run((ctx) => ctx.db.query("otpInbox").collect());
@@ -331,10 +331,10 @@ describe("mail in", () => {
     vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
     const confirm = { code: "123456789", link: "https://mail-settings.google.com/mail/vf-abc", requester: "s@gmail.com" };
     expect((await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: null, gmailConfirm: confirm })).status).toBe(200);
-    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).confirmation).not.toBeNull();
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmation).not.toBeNull();
     vi.advanceTimersByTime(CONFIRMATION_TTL_SECS * 1000);
     await t.finishInProgressScheduledFunctions();
-    expect((await ta.as.query(api.mail.inbox, { flow: "f", id: box.id })).confirmation).toBeNull();
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmation).toBeNull();
     const row = await t.run((ctx) => ctx.db.query("mailboxes").first());
     expect(row?.confirmation).toBeNull();
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
