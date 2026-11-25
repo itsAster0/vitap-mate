@@ -40,6 +40,7 @@ import vitapmate.data.CalendarRefresh
 import vitapmate.data.ExamDayRefresh
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
+import vitapmate.data.TimetableViewMode
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry

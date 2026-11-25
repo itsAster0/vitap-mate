@@ -63,6 +63,9 @@ object Settings {
     /** Failures of work the student didn't ask for (auto refresh, the sweep) show as toasts too; off, they only log. */
     var showBackgroundErrors by flag("settings_show_background_errors", false)
 
+    /** The timetable's view; the Flutter app's key and values (anything else, like the removed "daily" view, opens the agenda). */
+    var timetableView by choice("settings_timetable_view_mode", TimetableViewMode.Agenda, TimetableViewMode.entries)
+
     /** Light, dark, or as the phone is set. */
     var themeMode by choice("settings_theme_mode", ThemeMode.System, ThemeMode.entries)
 
@@ -229,7 +232,7 @@ object Settings {
 
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
-        mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
+        mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "timetableView" to timetableView.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
             mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncHealth is SyncHealth.Paused), "notifyOff" to notifyOff.keys.map { it.name.lowercase() }.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
@@ -267,6 +270,8 @@ val SYNC_HOURS = listOf(3, 6, 12, 24)
 const val SYNC_HOURS_DEFAULT = 3
 
 enum class ThemeMode { System, Light, Dark }
+
+enum class TimetableViewMode { Agenda, Weekly }
 
 /** Where the OTP prompt reads VTOP's code from. */
 enum class OtpSource { Forwarding, Gmail }
