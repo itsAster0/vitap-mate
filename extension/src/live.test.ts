@@ -86,6 +86,14 @@ describe("waitForRequest", () => {
     const cancelled = waitForRequest(fakeClient().client, "r", abort.signal, () => {});
     abort.abort();
     await expect(cancelled).rejects.toThrow(CANCELLED);
+
+    // Already-aborted signal rejects at once without subscribing.
+    const preAborted = new AbortController();
+    preAborted.abort();
+    const onUpdate = vi.fn();
+    const unusedClient = { onUpdate, close: async () => {} } as unknown as LiveClient;
+    await expect(waitForRequest(unusedClient, "r", preAborted.signal, () => {})).rejects.toThrow(CANCELLED);
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });
 

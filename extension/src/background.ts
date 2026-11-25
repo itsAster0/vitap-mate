@@ -239,18 +239,22 @@ export function createBackground(deps: BackgroundDeps = {}) {
     const headers = { Authorization: `Bearer ${key}` };
 
     await report(tabId, "Asking VITAP Mate for a session…", { phase: "request" });
+    throwIfCancelled(signal);
     let response: Response;
     try {
       response = await fetchWithTimeout(
         `${base}/v1/session`,
-        { method: "POST", headers },
+        { method: "POST", headers, signal },
         START_TIMEOUT_MS,
       );
     } catch (err) {
+      throwIfCancelled(signal);
       throw new Error(friendlyLoginError(0, "", err));
     }
+    throwIfCancelled(signal);
 
     let outcome = await readSessionOutcome(response);
+    throwIfCancelled(signal);
     if (outcome.kind === "pending") {
       const requestId = outcome.requestId;
       if (!requestId) throw new Error("The sign-in service sent an unexpected reply.");
@@ -302,12 +306,14 @@ export function createBackground(deps: BackgroundDeps = {}) {
       try {
         ready = await fetchWithTimeout(
           `${base}/v1/session/requests/${encodeURIComponent(requestId)}`,
-          { method: "GET", headers },
+          { method: "GET", headers, signal },
           STATUS_TIMEOUT_MS,
         );
       } catch (err) {
+        throwIfCancelled(signal);
         throw new Error(friendlyLoginError(0, "", err));
       }
+      throwIfCancelled(signal);
       outcome = await readSessionOutcome(ready);
     }
 
@@ -499,6 +505,17 @@ export function createBackground(deps: BackgroundDeps = {}) {
     showUpdate(release);
   }
 
+  function openActionPopup(windowId?: number) {
+    const openPopup = chrome.action?.openPopup;
+    if (typeof openPopup !== "function") return;
+    const call = (opts?: chrome.action.OpenPopupOptions) =>
+      Promise.resolve().then(() => (opts ? openPopup(opts) : openPopup()));
+    const attempt = windowId !== undefined ? call({ windowId }).catch(() => call()) : call();
+    attempt.catch((err) => {
+      console.warn("Unable to open the popup", err);
+    });
+  }
+
   function handleMessage(
     message: unknown,
     sender: chrome.runtime.MessageSender,
@@ -507,10 +524,9 @@ export function createBackground(deps: BackgroundDeps = {}) {
     if (!isBackgroundMessage(message)) return;
 
     if (message.type === "OPEN_EXTENSION_PANEL") {
-      // Opens the toolbar popup (Chrome 127+); older Chrome ignores it.
-      chrome.action.openPopup({ windowId: sender.tab?.windowId }).catch((err) => {
-        console.warn("Unable to open the popup", err);
-      });
+      // Opens the toolbar popup when supported (Chrome 127+ takes { windowId }; Firefox takes no
+      // arguments and older Chrome lacks openPopup altogether).
+      openActionPopup(sender.tab?.windowId);
       return;
     }
 
@@ -554,14 +570,18 @@ export function createBackground(deps: BackgroundDeps = {}) {
       })
       .catch(async (err) => {
         const text = err instanceof Error ? err.message : "Unknown login error";
+        const cancelled = text === CANCELLED;
         try {
           const tabId = sender.tab?.id ?? (await getActiveTabId());
-          await sendToTab(tabId, { type: "VTOP_MATE_ERROR", text });
+          await sendToTab(
+            tabId,
+            cancelled ? { type: "VTOP_MATE_HIDE_LOADING" } : { type: "VTOP_MATE_ERROR", text },
+          );
         } catch {
-          // Best-effort error overlay on the active tab.
+          // Best-effort badge update on the active tab.
         }
 
-        if (text !== CANCELLED) console.error(err);
+        if (!cancelled) console.error(err);
 
         sendResponse({ ok: false, error: text });
       });

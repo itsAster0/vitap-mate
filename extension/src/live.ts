@@ -123,6 +123,7 @@ export function waitForRequest(
   onProgress: (view: Extract<RequestView, { status: "pending" }>) => void,
   firstAnswerMs = FIRST_ANSWER_MS,
 ): Promise<Extract<RequestView, { status: "ready" }>> {
+  if (signal.aborted) return Promise.reject(new Error(CANCELLED));
   return new Promise((resolve, reject) => {
     let expiry: ReturnType<typeof setTimeout> | undefined;
     const silent = setTimeout(() => finish(new Error(UNREACHABLE_MESSAGE)), firstAnswerMs);

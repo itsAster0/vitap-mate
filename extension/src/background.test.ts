@@ -459,4 +459,60 @@ describe("background login flow", () => {
     expect(bg.getState().log.at(-1)?.text).toBe("Cancelled");
     expect(env.notifications.find((n) => n.id === "failed")).toBeUndefined();
   });
+
+  it("aborts POST /v1/session on CANCEL_LOGIN and hides the tab badge instead of showing an error", async () => {
+    const env = installMockChrome({ local: { token: ACCESS_KEY } });
+    const started = deferred<AbortSignal>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        started.resolve(init!.signal!);
+        return new Promise<Response>((_res, rej) => {
+          init?.signal?.addEventListener("abort", () => rej(new DOMException("Aborted", "AbortError")), {
+            once: true,
+          });
+        });
+      }),
+    );
+
+    const bg = createBackground();
+    const reply = deferred<unknown>();
+    bg.handleMessage({ type: "LOGIN_WITH_TOKEN", source: "content" }, { tab: { id: 8 } as chrome.tabs.Tab }, (res) => {
+      reply.resolve(res);
+    });
+
+    const signal = await started.promise;
+    bg.handleMessage({ type: "CANCEL_LOGIN" }, {}, () => {});
+
+    expect(signal.aborted).toBe(true);
+    await expect(reply.promise).resolves.toEqual({ ok: false, error: "Sign-in cancelled." });
+    expect(env.tabMessages.at(-1)).toEqual({ tabId: 8, message: { type: "VTOP_MATE_HIDE_LOADING" } });
+    expect(env.tabMessages.some((m) => m.message.type === "VTOP_MATE_ERROR")).toBe(false);
+  });
+
+  it("handles OPEN_EXTENSION_PANEL safely when openPopup is missing or rejects options", async () => {
+    const env = installMockChrome();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const bg = createBackground();
+
+    // Missing openPopup (Chrome < 127): does not throw.
+    (env.mockChrome.action as { openPopup?: unknown }).openPopup = undefined;
+    expect(() =>
+      bg.handleMessage({ type: "OPEN_EXTENSION_PANEL" }, { tab: { id: 1, windowId: 2 } as chrome.tabs.Tab }, () => {}),
+    ).not.toThrow();
+
+    // Sync throw on options object (Firefox): falls back to no-arg openPopup().
+    const openPopup = vi.fn((opts?: { windowId?: number }) => {
+      if (opts !== undefined) throw new TypeError("Unexpected options");
+      return Promise.resolve();
+    });
+    env.mockChrome.action.openPopup = openPopup;
+    expect(() =>
+      bg.handleMessage({ type: "OPEN_EXTENSION_PANEL" }, { tab: { id: 1, windowId: 2 } as chrome.tabs.Tab }, () => {}),
+    ).not.toThrow();
+    await vi.waitFor(() => expect(openPopup).toHaveBeenCalledTimes(2));
+    expect(openPopup).toHaveBeenNthCalledWith(1, { windowId: 2 });
+    expect(openPopup).toHaveBeenNthCalledWith(2);
+    expect(warn).not.toHaveBeenCalled();
+  });
 });
