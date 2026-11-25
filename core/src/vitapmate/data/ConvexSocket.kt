@@ -96,8 +96,8 @@ class SocketProofNetwork internal constructor(
                 throw TransportException.Timeout("upgrade")
             }
         return when {
-            answer.code == SWITCHING -> ProofOpened(ProofSocketOver(socket, inbox), answer.code.toUShort(), ByteArray(0))
-            answer.code != 0 -> ProofOpened(null, answer.code.toUShort(), answer.body)
+            answer.code == SWITCHING -> ProofOpened.Open(ProofSocketOver(socket, inbox))
+            answer.code != 0 -> ProofOpened.Refused(answer.code.toUShort(), answer.body)
             failure in UNREACHABLE -> throw TransportException.Connect(failure)
             else -> throw TransportException.Other(failure)
         }

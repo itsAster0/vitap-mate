@@ -80,8 +80,7 @@ impl ProofNetwork for FakeNetwork {
         let ticket = url.split_once("/proof?ticket=").map(|(_, t)| t.to_string());
         if ticket.as_deref() != Some(CHALLENGE) {
             let body = json!({ "code": "challenge_invalid", "error": "Start again." });
-            return Ok(ProofOpened {
-                socket: None,
+            return Ok(ProofOpened::Refused {
                 status: 404,
                 body: body.to_string().into_bytes(),
             });
@@ -116,10 +115,8 @@ impl ProofNetwork for FakeNetwork {
             tx: tx.into(),
             last: Some(last_rx).into(),
         };
-        Ok(ProofOpened {
-            socket: Some(Arc::new(socket)),
-            status: 101,
-            body: Vec::new(),
+        Ok(ProofOpened::Open {
+            socket: Arc::new(socket),
         })
     }
 }

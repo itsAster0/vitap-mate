@@ -17,7 +17,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +30,7 @@ import vitapmate.core.ConvexSocket
 import vitapmate.core.ConvexSocketListener
 import vitapmate.core.Header
 import vitapmate.core.ProofFrame
+import vitapmate.core.ProofOpened
 import vitapmate.core.NoHandle
 
 class WebSocketTest {
@@ -223,7 +224,7 @@ class WebSocketTest {
         val opened = proof()
         val head = handshake()
         assertTrue("X-Test: 1" in head)
-        val socket = assertNotNull(opened.await().socket)
+        val socket = assertIs<ProofOpened.Open>(opened.await()).socket
         socket.send(byteArrayOf(1, 2))
         val sent = readFrame(input)
         assertEquals(OP_BINARY, sent.opcode)
@@ -241,8 +242,8 @@ class WebSocketTest {
         val opened = proof()
         handshake { "HTTP/1.1 403 Forbidden\r\nContent-Length: 5\r\n\r\nnope!" }
         val answer = opened.await()
-        assertNull(answer.socket)
-        assertEquals(403.toUShort(), answer.status)
-        assertEquals("nope!", answer.body.decodeToString())
+        val refused = assertIs<ProofOpened.Refused>(answer)
+        assertEquals(403.toUShort(), refused.status)
+        assertEquals("nope!", refused.body.decodeToString())
     }
 }

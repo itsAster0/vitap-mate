@@ -40,19 +40,93 @@ const VTOP_SLACK_SECS: i64 = 3;
 /// With no challenge to go by, the caller's time is the phone's clock, which may be off.
 const CLOCK_SKEW_SECS: i64 = 60;
 
-/// Gmail's "confirm forwarding" mail: the code to type in Gmail, or the link to open.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+/// Gmail's "confirm forwarding" mail.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct GmailConfirmation {
-    pub code: Option<String>,
-    pub link: Option<String>,
+    pub confirm_by: ConfirmBy,
     /// The Gmail address asking to forward.
     pub requester: Option<String>,
     /// Unix seconds.
     pub sent_at: i64,
     /// Whether `requester` is an address on the student's saved VTOP profile; None without a
     /// requester or a saved profile. Anyone who knows the address can make Gmail send one.
-    #[serde(skip)]
     pub requester_known: Option<bool>,
+}
+
+/// What the confirmation mail offers: the code to type in Gmail, the link to open, or both.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ConfirmBy {
+    Code {
+        code: String,
+    },
+    /// Gmail's confirm link, already checked by [`gmail_link`].
+    Link {
+        link: String,
+    },
+    CodeAndLink {
+        code: String,
+        link: String,
+    },
+    /// Neither came through: the student confirms in Gmail itself.
+    Neither,
+}
+
+impl ConfirmBy {
+    /// From the mail's (or the file's) code and link; a link that isn't Gmail's is dropped.
+    fn parse(code: Option<String>, link: Option<&str>) -> Self {
+        let code = code.filter(|code| !code.is_empty());
+        match (code, link.and_then(gmail_link)) {
+            (Some(code), Some(link)) => Self::CodeAndLink { code, link },
+            (Some(code), None) => Self::Code { code },
+            (None, Some(link)) => Self::Link { link },
+            (None, None) => Self::Neither,
+        }
+    }
+
+    fn code(&self) -> Option<&str> {
+        match self {
+            Self::Code { code } | Self::CodeAndLink { code, .. } => Some(code),
+            Self::Link { .. } | Self::Neither => None,
+        }
+    }
+
+    fn link(&self) -> Option<&str> {
+        match self {
+            Self::Link { link } | Self::CodeAndLink { link, .. } => Some(link),
+            Self::Code { .. } | Self::Neither => None,
+        }
+    }
+}
+
+/// A [`GmailConfirmation`] in `forwarding.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct StoredConfirmation {
+    code: Option<String>,
+    link: Option<String>,
+    requester: Option<String>,
+    sent_at: i64,
+}
+
+impl From<StoredConfirmation> for GmailConfirmation {
+    fn from(stored: StoredConfirmation) -> Self {
+        Self {
+            confirm_by: ConfirmBy::parse(stored.code, stored.link.as_deref()),
+            requester: stored.requester,
+            sent_at: stored.sent_at,
+            requester_known: None,
+        }
+    }
+}
+
+impl From<&GmailConfirmation> for StoredConfirmation {
+    fn from(confirmation: &GmailConfirmation) -> Self {
+        Self {
+            code: confirmation.confirm_by.code().map(str::to_owned),
+            link: confirmation.confirm_by.link().map(str::to_owned),
+            requester: confirmation.requester.clone(),
+            sent_at: confirmation.sent_at,
+        }
+    }
 }
 
 /// An address to leave: where it lives and its id.
@@ -190,8 +264,7 @@ impl Setup {
             // Gmail forwards VTOP's mail or the student marks setup done.
             Self::Waiting { last_mail_at, .. } => Self::Waiting {
                 confirmation: Some(GmailConfirmation {
-                    code: code.clone(),
-                    link: link.as_deref().and_then(gmail_link),
+                    confirm_by: ConfirmBy::parse(code.clone(), link.as_deref()),
                     requester: requester.clone(),
                     sent_at: *sent_at,
                     requester_known: None,
@@ -343,7 +416,7 @@ impl MailboxState {
             ready,
             last_mail_at,
             last_otp_at,
-            confirmation,
+            confirmation: confirmation.as_ref().map(StoredConfirmation::from),
         })
     }
 }
@@ -370,7 +443,7 @@ struct Stored {
     #[serde(default)]
     last_otp_at: Option<i64>,
     #[serde(default)]
-    confirmation: Option<GmailConfirmation>,
+    confirmation: Option<StoredConfirmation>,
 }
 
 impl TryFrom<Stored> for MailboxState {
@@ -393,7 +466,7 @@ impl TryFrom<Stored> for MailboxState {
             }
         } else {
             Setup::Waiting {
-                confirmation: stored.confirmation,
+                confirmation: stored.confirmation.map(GmailConfirmation::from),
                 last_mail_at: stored.last_mail_at,
             }
         };

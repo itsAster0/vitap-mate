@@ -105,7 +105,12 @@ async fn sets_up_checks_fetches_and_turns_off() {
     let checked = core.check_forwarding("f".into()).await.unwrap();
     assert_eq!(state(&checked), "waiting");
     let confirm = confirmation(&checked).unwrap();
-    assert_eq!(confirm.code.as_deref(), Some("981234567"));
+    assert_eq!(
+        confirm.confirm_by,
+        ConfirmBy::Code {
+            code: "981234567".into()
+        }
+    );
     assert_eq!(last_mail_at(&checked), Some(1_700_000_000));
     assert_eq!(last_otp_at(&checked), None);
     // Not an OTP.
@@ -212,7 +217,7 @@ async fn check_shows_the_confirmation_the_edge_kept() {
     let checked = core.check_forwarding("f".into()).await.unwrap();
     assert_eq!(state(&checked), "waiting");
     assert_eq!(
-        confirmation(&checked).unwrap().code.as_deref(),
+        confirmation(&checked).unwrap().confirm_by.code(),
         Some("981234567")
     );
     assert_eq!(last_otp_at(&checked), None);
@@ -844,7 +849,13 @@ fn setup_moves_only_forward() {
     else {
         panic!("{waiting:?}");
     };
-    assert_eq!(shown.link, None);
+    assert_eq!(
+        shown.confirm_by,
+        ConfirmBy::Code {
+            code: "981234567".into()
+        },
+        "not Gmail's link"
+    );
     // Nothing reached the address: not done yet.
     assert_eq!(Setup::NEW.mark_done(), Setup::NEW);
     let done = waiting.clone().mark_done();
@@ -968,4 +979,46 @@ async fn a_phone_removed_on_the_server_forgets_its_address() {
     );
     assert!(core.saved_mailbox().is_none());
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_kept_confirmation_keeps_its_format_and_drops_a_foreign_link() {
+    let file = json!({
+        "server": "s", "id": "i", "address": "a@b", "joined": true, "ready": false,
+        "last_mail_at": 10, "last_otp_at": null,
+        "confirmation": {
+            "code": "981234567",
+            "link": "https://mail-settings.google.com/mail/vf-abc",
+            "requester": "me@vitapstudent.ac.in",
+            "sent_at": 10,
+        },
+    });
+    let state = parse(file.clone()).unwrap();
+    let MailboxState::Joined {
+        setup: Setup::Waiting {
+            confirmation: Some(kept),
+            ..
+        },
+        ..
+    } = &state
+    else {
+        panic!("{state:?}");
+    };
+    assert!(matches!(kept.confirm_by, ConfirmBy::CodeAndLink { .. }));
+    assert_eq!(serde_json::to_value(state.stored().unwrap()).unwrap(), file);
+    // A link that isn't Gmail's, from a file an older app wrote, is dropped once read.
+    let mut foreign = file;
+    foreign["confirmation"]["link"] = json!("https://evil.example/mail/vf-x");
+    foreign["confirmation"]["code"] = json!(null);
+    let MailboxState::Joined {
+        setup: Setup::Waiting {
+            confirmation: Some(kept),
+            ..
+        },
+        ..
+    } = parse(foreign).unwrap()
+    else {
+        panic!("not waiting");
+    };
+    assert_eq!(kept.confirm_by, ConfirmBy::Neither);
 }

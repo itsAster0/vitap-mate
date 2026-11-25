@@ -40,13 +40,17 @@ pub enum ProofFrame {
     Text { text: String },
 }
 
-/// What opening the socket gave: the socket, or the server's refusal before the upgrade (its
-/// status and `{ code, error }` body).
-#[derive(uniffi::Record)]
-pub struct ProofOpened {
-    pub socket: Option<Arc<dyn ProofSocket>>,
-    pub status: u16,
-    pub body: Vec<u8>,
+/// What opening the socket gave.
+#[derive(uniffi::Enum)]
+pub enum ProofOpened {
+    Open {
+        socket: Arc<dyn ProofSocket>,
+    },
+    /// The server refused before the upgrade: its status and `{ code, error }` body.
+    Refused {
+        status: u16,
+        body: Vec<u8>,
+    },
 }
 
 /// Kotlin: WebSockets to the server for account proofs, on the app's network.
@@ -293,9 +297,12 @@ impl Core {
                 }
                 TransportError::Other { reason } => failed(reason),
             })?;
-            let Some(socket) = opened.socket else {
-                info!(status = opened.status, route = "proof", "proof refused");
-                return Err(refusal(&opened.body));
+            let socket = match opened {
+                ProofOpened::Open { socket } => socket,
+                ProofOpened::Refused { status, body } => {
+                    info!(status, route = "proof", "proof refused");
+                    return Err(refusal(&body));
+                }
             };
             Ok((ticket, Shut(socket)))
         };

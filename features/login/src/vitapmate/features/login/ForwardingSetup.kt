@@ -51,6 +51,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import com.composables.icons.lucide.RefreshCw
 import vitapmate.core.Forwarding
+import vitapmate.core.ConfirmBy
 import vitapmate.core.ForwardingReadiness
 import vitapmate.core.GmailConfirmation
 import vitapmate.ui.AppTheme
@@ -135,15 +136,24 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             else -> "Gmail's confirmation arrived. Confirm only if you just added this address in Gmail."
         }
         Callout(Lucide.MailCheck, if (unknown) tones.warning else tones.success, said) {
-            confirm.code?.let { code ->
+            val code = @Composable { code: String ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(code, Modifier.weight(1f).testTag("forwarding.confirm_code"), style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace))
                     IconButton({ copy(context, "Gmail confirmation code", code) }) { Icon(Lucide.Copy, "Copy the code") }
                 }
             }
-            confirm.link?.let { link ->
+            val link = @Composable { link: String ->
                 val uri = LocalUriHandler.current
                 Button({ uri.openUri(link) }, Modifier.testTag("forwarding.confirm_link"), prefix = Lucide.ExternalLink) { Text("Confirm in Gmail") }
+            }
+            when (val by = confirm.confirmBy) {
+                is ConfirmBy.Code -> code(by.code)
+                is ConfirmBy.Link -> link(by.link)
+                is ConfirmBy.CodeAndLink -> {
+                    code(by.code)
+                    link(by.link)
+                }
+                ConfirmBy.Neither -> {}
             }
         }
     }

@@ -2484,7 +2484,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_otplistener_on_challenge() and 0xFFFF) != 26219) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_proofnetwork_open() and 0xFFFF) != 59287) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_proofnetwork_open() and 0xFFFF) != 58287) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_proofsocket_send() and 0xFFFF) != 47696) {
@@ -15357,12 +15357,10 @@ public object FfiConverterTypeGeneralOutingTimes: FfiConverterRustBuffer<General
 
 
 /**
- * Gmail's "confirm forwarding" mail: the code to type in Gmail, or the link to open.
+ * Gmail's "confirm forwarding" mail.
  */
 data class GmailConfirmation (
-    val `code`: kotlin.String?
-    , 
-    val `link`: kotlin.String?
+    val `confirmBy`: ConfirmBy
     , 
     /**
      * The Gmail address asking to forward.
@@ -15395,8 +15393,7 @@ data class GmailConfirmation (
 public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailConfirmation> {
     override fun read(buf: ByteBuffer): GmailConfirmation {
         return GmailConfirmation(
-            FfiConverterOptionalString.read(buf),
-            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeConfirmBy.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterOptionalBoolean.read(buf),
@@ -15404,16 +15401,14 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
     }
 
     override fun allocationSize(value: GmailConfirmation) = (
-            FfiConverterOptionalString.allocationSize(value.`code`) +
-            FfiConverterOptionalString.allocationSize(value.`link`) +
+            FfiConverterTypeConfirmBy.allocationSize(value.`confirmBy`) +
             FfiConverterOptionalString.allocationSize(value.`requester`) +
             FfiConverterLong.allocationSize(value.`sentAt`) +
             FfiConverterOptionalBoolean.allocationSize(value.`requesterKnown`)
     )
 
     override fun write(value: GmailConfirmation, buf: ByteBuffer) {
-            FfiConverterOptionalString.write(value.`code`, buf)
-            FfiConverterOptionalString.write(value.`link`, buf)
+            FfiConverterTypeConfirmBy.write(value.`confirmBy`, buf)
             FfiConverterOptionalString.write(value.`requester`, buf)
             FfiConverterLong.write(value.`sentAt`, buf)
             FfiConverterOptionalBoolean.write(value.`requesterKnown`, buf)
@@ -18074,63 +18069,6 @@ public object FfiConverterTypeProfile: FfiConverterRustBuffer<Profile> {
             FfiConverterSequenceTypeDetailSection.write(value.`details`, buf)
             FfiConverterOptionalTypeMentor.write(value.`mentor`, buf)
             FfiConverterLong.write(value.`updatedAt`, buf)
-    }
-}
-
-
-
-/**
- * What opening the socket gave: the socket, or the server's refusal before the upgrade (its
- * status and `{ code, error }` body).
- */
-data class ProofOpened (
-    val `socket`: ProofSocket?
-    , 
-    val `status`: kotlin.UShort
-    , 
-    val `body`: kotlin.ByteArray
-    
-): Disposable{
-    
-
-    
-
-    
-    @Suppress("UNNECESSARY_SAFE_CALL") // codegen is much simpler if we unconditionally emit safe calls here
-    override fun destroy() {
-        
-    Disposable.destroy(
-        this.`socket`,
-        this.`status`,
-        this.`body`
-    )
-    }
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeProofOpened: FfiConverterRustBuffer<ProofOpened> {
-    override fun read(buf: ByteBuffer): ProofOpened {
-        return ProofOpened(
-            FfiConverterOptionalTypeProofSocket.read(buf),
-            FfiConverterUShort.read(buf),
-            FfiConverterByteArray.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: ProofOpened) = (
-            FfiConverterOptionalTypeProofSocket.allocationSize(value.`socket`) +
-            FfiConverterUShort.allocationSize(value.`status`) +
-            FfiConverterByteArray.allocationSize(value.`body`)
-    )
-
-    override fun write(value: ProofOpened, buf: ByteBuffer) {
-            FfiConverterOptionalTypeProofSocket.write(value.`socket`, buf)
-            FfiConverterUShort.write(value.`status`, buf)
-            FfiConverterByteArray.write(value.`body`, buf)
     }
 }
 
@@ -21788,6 +21726,140 @@ public object FfiConverterTypeClassStatus: FfiConverterRustBuffer<ClassStatus> {
 
 
 
+/**
+ * What the confirmation mail offers: the code to type in Gmail, the link to open, or both.
+ */
+sealed class ConfirmBy {
+    
+    data class Code(
+        val `code`: kotlin.String) : ConfirmBy()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Gmail's confirm link, already checked by [`gmail_link`].
+     */
+    data class Link(
+        val `link`: kotlin.String) : ConfirmBy()
+        
+    {
+        
+
+        companion object
+    }
+    
+    data class CodeAndLink(
+        val `code`: kotlin.String, 
+        val `link`: kotlin.String) : ConfirmBy()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * Neither came through: the student confirms in Gmail itself.
+     */
+    object Neither : ConfirmBy()
+    
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeConfirmBy : FfiConverterRustBuffer<ConfirmBy>{
+    override fun read(buf: ByteBuffer): ConfirmBy {
+        return when(buf.getInt()) {
+            1 -> ConfirmBy.Code(
+                FfiConverterString.read(buf),
+                )
+            2 -> ConfirmBy.Link(
+                FfiConverterString.read(buf),
+                )
+            3 -> ConfirmBy.CodeAndLink(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                )
+            4 -> ConfirmBy.Neither
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ConfirmBy): ULong = when(value) {
+        is ConfirmBy.Code -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`code`)
+            )
+        }
+        is ConfirmBy.Link -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`link`)
+            )
+        }
+        is ConfirmBy.CodeAndLink -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`code`)
+                + FfiConverterString.allocationSize(value.`link`)
+            )
+        }
+        is ConfirmBy.Neither -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: ConfirmBy, buf: ByteBuffer) {
+        when(value) {
+            is ConfirmBy.Code -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`code`, buf)
+                Unit
+            }
+            is ConfirmBy.Link -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`link`, buf)
+                Unit
+            }
+            is ConfirmBy.CodeAndLink -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`code`, buf)
+                FfiConverterString.write(value.`link`, buf)
+                Unit
+            }
+            is ConfirmBy.Neither -> {
+                buf.putInt(4)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
 
 enum class ContactKind {
     
@@ -23150,6 +23222,120 @@ public object FfiConverterTypeProofFrame : FfiConverterRustBuffer<ProofFrame>{
 
 
 
+/**
+ * What opening the socket gave.
+ */
+sealed class ProofOpened: Disposable  {
+    
+    data class Open(
+        val `socket`: vitapmate.core.ProofSocket) : ProofOpened()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * The server refused before the upgrade: its status and `{ code, error }` body.
+     */
+    data class Refused(
+        val `status`: kotlin.UShort, 
+        val `body`: kotlin.ByteArray) : ProofOpened()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+    @Suppress("UNNECESSARY_SAFE_CALL") // codegen is much simpler if we unconditionally emit safe calls here
+    override fun destroy() {
+        when(this) {
+            is ProofOpened.Open -> {
+                
+    Disposable.destroy(
+        this.`socket`
+    )
+                
+            }
+            is ProofOpened.Refused -> {
+                
+    Disposable.destroy(
+        this.`status`,
+        this.`body`
+    )
+                
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeProofOpened : FfiConverterRustBuffer<ProofOpened>{
+    override fun read(buf: ByteBuffer): ProofOpened {
+        return when(buf.getInt()) {
+            1 -> ProofOpened.Open(
+                FfiConverterTypeProofSocket.read(buf),
+                )
+            2 -> ProofOpened.Refused(
+                FfiConverterUShort.read(buf),
+                FfiConverterByteArray.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ProofOpened): ULong = when(value) {
+        is ProofOpened.Open -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeProofSocket.allocationSize(value.`socket`)
+            )
+        }
+        is ProofOpened.Refused -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUShort.allocationSize(value.`status`)
+                + FfiConverterByteArray.allocationSize(value.`body`)
+            )
+        }
+    }
+
+    override fun write(value: ProofOpened, buf: ByteBuffer) {
+        when(value) {
+            is ProofOpened.Open -> {
+                buf.putInt(1)
+                FfiConverterTypeProofSocket.write(value.`socket`, buf)
+                Unit
+            }
+            is ProofOpened.Refused -> {
+                buf.putInt(2)
+                FfiConverterUShort.write(value.`status`, buf)
+                FfiConverterByteArray.write(value.`body`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
 
 enum class PunchKind {
     
@@ -24184,38 +24370,6 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
         } else {
             buf.put(1)
             FfiConverterString.write(value, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterOptionalTypeProofSocket: FfiConverterRustBuffer<ProofSocket?> {
-    override fun read(buf: ByteBuffer): ProofSocket? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterTypeProofSocket.read(buf)
-    }
-
-    override fun allocationSize(value: ProofSocket?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterTypeProofSocket.allocationSize(value)
-        }
-    }
-
-    override fun write(value: ProofSocket?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterTypeProofSocket.write(value, buf)
         }
     }
 }
