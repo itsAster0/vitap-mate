@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Settings
+import vitapmate.data.attempt
 import vitapmate.features.timetable.istDay
 import vitapmate.features.timetable.istMinute
 import vitapmate.features.timetable.meeting
@@ -41,7 +42,7 @@ class ClassTile : TileService() {
                     Log.info("classmode", "tile", f, mapOf("on" to "$on"))
                     if (on && !ClassMode.granted(app)) allow() else ClassMode.refresh(app, "classmode.tile")
                 }
-                val next = runCatching { withContext(Dispatchers.IO) { next(f) } }
+                val next = attempt { withContext(Dispatchers.IO) { next(f) } }
                     .onFailure { Log.warn("classmode", "tile: timetable unavailable: ${it::class.simpleName}", f) }.getOrNull()
                 val tile = qsTile ?: return@flow
                 tile.label = "In class"

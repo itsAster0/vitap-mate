@@ -56,8 +56,11 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import vitapmate.core.Core
 import vitapmate.data.AppCore
 import vitapmate.data.askedOtp
+import vitapmate.data.coreFlow
+import vitapmate.data.orNull
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -188,7 +191,7 @@ internal fun VtopScreen() {
     browser.desktop = desktop
 
     LaunchedEffect(Unit) {
-        user = withContext(Dispatchers.IO) { runCatching { AppCore.await().signedInUser("") }.getOrNull() }
+        user = orNull { coreFlow("vtop.user", Core::signedInUser) }
         recent = VtopRecent.read(context, user)
     }
     LaunchedEffect(Unit) { dispatch(VtopWebEvent.Open) }

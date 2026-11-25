@@ -27,6 +27,7 @@ import vitapmate.core.ScheduledPaper
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.Settings
+import vitapmate.data.attempt
 import vitapmate.features.timetable.istDay
 import vitapmate.features.timetable.istMinute
 import vitapmate.features.timetable.istSecond
@@ -169,7 +170,7 @@ object LiveUpdates {
 
     /** [read] on the cache, off the main thread; null (logged) when it fails. */
     private suspend fun <T> cached(f: String, what: String, read: (Core) -> T): T? =
-        runCatching { withContext(Dispatchers.IO) { read(AppCore.await()) } }.onFailure { Log.warn("live", "$what unavailable: ${it::class.simpleName}", f) }.getOrNull()
+        attempt { withContext(Dispatchers.IO) { read(AppCore.await()) } }.onFailure { Log.warn("live", "$what unavailable: ${it::class.simpleName}", f) }.getOrNull()
 
     /** An exam [paper] of [exam], from [start] to [end] in minutes from today's midnight in India. */
     private class Paper(val exam: String, val paper: ScheduledPaper, val start: Int, val end: Int)

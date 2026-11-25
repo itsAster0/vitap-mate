@@ -103,7 +103,7 @@ object AppCore {
      */
     fun keepForwarding(then: suspend () -> Unit = {}) {
         AppScope.launch {
-            runCatching { flow("forwarding.keep") { f -> withContext(Dispatchers.IO) { await().keepForwarding(f) } } }
+            attempt { flow("forwarding.keep") { f -> withContext(Dispatchers.IO) { await().keepForwarding(f) } } }
                 .onFailure { Log.warn("forwarding", "keep failed: ${it::class.simpleName}") }
             then()
         }
@@ -123,10 +123,10 @@ object AppCore {
         val context = app ?: return
         if (proving?.isActive == true) return
         proving = AppScope.launch {
-            runCatching { flow("account.regno_ask") { f -> withContext(Dispatchers.IO) { await().askRegnoSharing(f, RegnoAsk.FIRST_TIME) } } }
+            attempt { flow("account.regno_ask") { f -> withContext(Dispatchers.IO) { await().askRegnoSharing(f, RegnoAsk.FIRST_TIME) } } }
                 .onFailure { Log.info("account", "regno sheet not shown: ${it::class.simpleName}") }
             if (!proofNetworkOk(context)) return@launch
-            runCatching {
+            attempt {
                 flow("account.prove_background", unattended = true) { f ->
                     val ms = Settings.tunable(Tunable.ProofTimeout) * 1000
                     withContext(Dispatchers.IO) { await().proveInBackground(f, ms.toUInt()) }
@@ -150,7 +150,7 @@ object AppCore {
      */
     fun leaveOldForwarding() {
         AppScope.launch {
-            runCatching { flow("forwarding.leave", unattended = true) { f -> withContext(Dispatchers.IO) { await().leaveOldForwarding(f) } } }
+            attempt { flow("forwarding.leave", unattended = true) { f -> withContext(Dispatchers.IO) { await().leaveOldForwarding(f) } } }
                 .onFailure { Log.warn("forwarding", "leave failed: ${it::class.simpleName}") }
         }
     }

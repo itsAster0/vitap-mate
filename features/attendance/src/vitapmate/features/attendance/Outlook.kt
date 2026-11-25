@@ -33,13 +33,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.floor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
 import vitapmate.data.AppCore
+import vitapmate.data.attempt
 import vitapmate.observability.flow
 import vitapmate.ui.Space
 import vitapmate.ui.Tone
@@ -54,8 +54,7 @@ import vitapmate.ui.nums
 internal fun rememberOutlook(key: Any?): Map<String, AttendancePlan> {
     val outlook by produceState(emptyMap(), key) {
         value = withContext(Dispatchers.IO) {
-            runCatching { flow("attendance.outlook") { id -> AppCore.await().attendanceOutlook(id) } }
-                .onFailure { if (it is CancellationException) throw it }.getOrDefault(emptyList())
+            attempt { flow("attendance.outlook") { id -> AppCore.await().attendanceOutlook(id) } }.getOrDefault(emptyList())
         }.associate { it.key to it.plan }
     }
     return outlook

@@ -140,7 +140,8 @@ object VtopSync {
             return@flow Result(Outcome.Rejected, fetched.get(), failed.get())
         } catch (_: Stop) {
             // The half-done sign-in waiting on that code would answer the next fetch with it.
-            runCatching { withContext(Dispatchers.IO) { core.cancelOtp(f) } }
+            // Nothing pending (or signed out meanwhile) is fine: the flow logged it.
+            attempt { withContext(Dispatchers.IO) { core.cancelOtp(f) } }
             Log.info("sync", "stopped at the otp", f, mapOf("fetched" to "$fetched", "failed" to "$failed"))
             return@flow Result(Outcome.StoppedAtOtp, fetched.get(), failed.get())
         }

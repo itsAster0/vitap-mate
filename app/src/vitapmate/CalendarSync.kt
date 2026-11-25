@@ -43,6 +43,7 @@ import vitapmate.data.DAY_MS
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.SyncEvent
+import vitapmate.data.attempt
 import vitapmate.features.timetable.istDay
 import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
@@ -85,7 +86,7 @@ object CalendarSync {
                         Settings.calendarSync = false
                         return@withLock Log.warn("calendar", "permission revoked, turned off", f)
                     }
-                    val wanted = runCatching { events(AppCore.await(), f, istDay(System.currentTimeMillis())) }
+                    val wanted = attempt { events(AppCore.await(), f, istDay(System.currentTimeMillis())) }
                         .onFailure { Log.warn("calendar", "cache unavailable: ${it::class.simpleName}", f) }.getOrNull() ?: return@withLock
                     val cr = app.contentResolver
                     val cal = calendarId(cr) ?: create(cr)

@@ -27,6 +27,7 @@ import vitapmate.data.AppScope
 import vitapmate.data.Foreground
 import vitapmate.data.Live
 import vitapmate.data.Settings
+import vitapmate.data.attempt
 import vitapmate.data.coreFlow
 import vitapmate.data.Tunable
 import vitapmate.data.problemOf
@@ -174,11 +175,11 @@ object Push {
         flow("push.follow") { f ->
             var wait = FOLLOW_RETRY_MS
             while (true) {
-                while (!runCatching { withContext(Dispatchers.IO) { AppCore.await().hasServerIdentity(f) } }.getOrDefault(false)) delay(IDENTITY_CHECK_MS)
+                while (!attempt { withContext(Dispatchers.IO) { AppCore.await().hasServerIdentity(f) } }.getOrDefault(false)) delay(IDENTITY_CHECK_MS)
                 var followed = false
                 Live.changes(LiveTopic.SESSION_REQUESTS).collect {
                     followed = true
-                    val pending = runCatching { coreFlow("push.pending") { c, id -> c.pendingSessionRequests(id) } }.getOrDefault(emptyList())
+                    val pending = attempt { coreFlow("push.pending") { c, id -> c.pendingSessionRequests(id) } }.getOrDefault(emptyList())
                     for (request in pending) handleRequest(context, request.requestId, request.expiresAt)
                 }
                 wait = if (followed) FOLLOW_RETRY_MS else (wait * 2).coerceAtMost(FOLLOW_RETRY_MAX_MS)
@@ -248,7 +249,7 @@ object Push {
     internal fun send(token: String) {
         AppScope.launch {
             flow("push.token") { f ->
-                val result = runCatching { withContext(Dispatchers.IO) { AppCore.await().setPushToken(f, token) } }
+                val result = attempt { withContext(Dispatchers.IO) { AppCore.await().setPushToken(f, token) } }
                 Log.info("push", "token", f, mapOf("sent" to "${result.isSuccess}"))
             }
         }

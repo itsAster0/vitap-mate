@@ -46,6 +46,7 @@ import kotlin.reflect.KClass
 import vitapmate.core.Core
 import vitapmate.data.AppCore
 import vitapmate.data.Settings
+import vitapmate.data.attempt
 import vitapmate.data.coreFlow
 import vitapmate.observability.Log
 
@@ -92,7 +93,7 @@ object Widgets {
     suspend fun <T> cached(context: Context, name: String, block: suspend (Core, String) -> T): T? {
         Settings.load(context.applicationContext)
         AppCore.start(context)
-        return runCatching { coreFlow("widget.$name", block) }
+        return attempt { coreFlow("widget.$name", block) }
             .onFailure { Log.warn("widget", "$name unavailable: ${it::class.simpleName}") }.getOrNull()
     }
 }
