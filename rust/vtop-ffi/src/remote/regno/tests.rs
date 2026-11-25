@@ -5,9 +5,9 @@ use std::sync::{Arc, Mutex};
 use serde_json::{Value, json};
 
 use super::*;
-use crate::remote::backend::Kind;
+use crate::remote::backend::{KEPT_SIGN_OUT, KeptSignOut, Kind};
 use crate::remote::consent::tests::{TestGate, install};
-use crate::test_edge::{Edge, keep_token, paths, serve, signed_in};
+use crate::test_edge::{Edge, REFRESH, keep_token, paths, serve, signed_in};
 
 const REGNO: &str = "22BCE0001";
 
@@ -102,13 +102,13 @@ fn answers_move_the_state() {
             Unasked,
             NotNow,
             Declined,
-            vec![save(StoredAnswer::Declined), Effect::ForgetIdentity],
+            vec![save(StoredAnswer::Declined), Effect::SignOut],
         ),
         (
             Shared,
             NotNow,
             Declined,
-            vec![save(StoredAnswer::Declined), Effect::ForgetIdentity],
+            vec![save(StoredAnswer::Declined), Effect::SignOut],
         ),
         (Unasked, Dismissed, Unasked, vec![]),
         (Declined, Dismissed, Declined, vec![]),
@@ -211,11 +211,15 @@ async fn a_feature_asks_once_per_flow_and_goes_on_after_share() {
         "Not now dropped the identity"
     );
     // Opened again: asked, Share, and the call goes on (a refresh token stands in for the
-    // proof, which needs the fake VTOP).
+    // proof, which needs the fake VTOP), once the identity Not now set aside is signed out.
     keep_token(&core, &server);
+    can(&edge, "auth:signOut", Value::Null);
     assert!(view(&core, "again", true).await.is_ok());
     assert_eq!(gate.regno_asks.load(Ordering::SeqCst), 2);
-    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
+    assert_eq!(
+        paths(&edge),
+        ["auth:token", "auth:signOut", "auth:token", "account:view"]
+    );
     assert_eq!(core.regno_sharing("s".into()).await, RegnoSharing::Shared);
     // Shared: no more sheets.
     assert!(view(&core, "later", true).await.is_ok());
@@ -293,28 +297,110 @@ async fn an_old_forwarding_address_counts_as_shared() {
     assert_eq!(core.regno_sharing("s".into()).await, RegnoSharing::Shared);
 }
 
+fn can(edge: &Arc<Mutex<Edge>>, path: &str, body: Value) {
+    let mut edge = edge.lock().unwrap();
+    edge.canned
+        .entry(path.into())
+        .or_default()
+        .push_back((200, body));
+}
+
+/// A forwarding address this install is on.
+fn joined(core: &Core, server: &str) {
+    let stored = json!({
+        "server": server, "id": "k3f9x2ab7q", "address": "otp+k3f9x2ab7q@vmate.aster0.dev",
+        "joined": true, "ready": true,
+    });
+    fs::write(core.at(forwarding::FILE), stored.to_string()).unwrap();
+}
+
+fn forwarding_joined(core: &Core) -> Option<bool> {
+    let text = fs::read_to_string(core.at(forwarding::FILE)).ok()?;
+    serde_json::from_str::<Value>(&text).ok()?["joined"].as_bool()
+}
+
+fn body(edge: &Arc<Mutex<Edge>>, index: usize) -> Value {
+    edge.lock().unwrap().requests[index].body.clone()
+}
+
 #[tokio::test]
-async fn stopping_drops_the_identity_and_the_server_route() {
+async fn stopping_signs_out_of_the_server_and_drops_the_server_route() {
     let (core, edge, server) = setup("stop").await;
     keep_token(&core, &server);
+    joined(&core, &server);
     install(&core, false, false);
     core.set_route("r".into(), Route::Server).unwrap();
+    can(&edge, "auth:signOut", Value::Null);
     let to = core
         .set_regno_sharing("stop".into(), RegnoAnswer::NotNow)
         .await;
     assert_eq!(to, Ok(RegnoSharing::Declined));
     assert!(core.device().refresh.is_none(), "refresh token dropped");
     assert_eq!(core.route_status("r".into()).chosen, Route::Direct);
+    // This install's refresh chain is revoked on the server; the address stays, to rejoin.
+    assert_eq!(paths(&edge), ["auth:token", "auth:signOut"]);
+    assert_eq!(body(&edge, 0), json!({ "refreshToken": REFRESH }));
+    assert_eq!(body(&edge, 1), json!({ "everywhere": false }));
+    assert!(!core.at(KEPT_SIGN_OUT).exists());
+    assert_eq!(forwarding_joined(&core), Some(false));
     assert!(matches!(
         view(&core, "quiet", false).await,
         Err(CoreError::RegnoNotShared)
     ));
-    assert!(paths(&edge).is_empty());
+    assert_eq!(paths(&edge).len(), 2);
     // And back on.
     let to = core
         .set_regno_sharing("on".into(), RegnoAnswer::Share)
         .await;
     assert_eq!(to, Ok(RegnoSharing::Shared));
+}
+
+#[tokio::test]
+async fn stopping_offline_signs_out_at_the_next_connection() {
+    let (core, edge, server) = setup("stop-offline").await;
+    keep_token(&core, &server);
+    edge.lock().unwrap().offline = true;
+    let to = core
+        .set_regno_sharing("stop".into(), RegnoAnswer::NotNow)
+        .await;
+    assert_eq!(to, Ok(RegnoSharing::Declined));
+    // Dropped here at once; the revoke waits with the refresh token.
+    assert!(core.device().refresh.is_none());
+    let kept = core.read::<KeptSignOut>(KEPT_SIGN_OUT).unwrap();
+    assert_eq!(kept.refresh.token, REFRESH);
+    assert!(!kept.everywhere);
+    assert!(paths(&edge).is_empty());
+    edge.lock().unwrap().offline = false;
+    can(&edge, "auth:signOut", Value::Null);
+    core.leave_old_forwarding("open".into()).await.unwrap();
+    assert_eq!(paths(&edge), ["auth:token", "auth:signOut"]);
+    assert_eq!(body(&edge, 0), json!({ "refreshToken": REFRESH }));
+    assert!(!core.at(KEPT_SIGN_OUT).exists());
+}
+
+#[tokio::test]
+async fn sharing_again_signs_out_first_and_never_proves_offline() {
+    let (core, edge, server) = setup("again").await;
+    keep_token(&core, &server);
+    edge.lock().unwrap().offline = true;
+    core.set_regno_sharing("stop".into(), RegnoAnswer::NotNow)
+        .await
+        .unwrap();
+    core.set_regno_sharing("on".into(), RegnoAnswer::Share)
+        .await
+        .unwrap();
+    // A new identity now would be taken by the revoke sent after it: none while it waits.
+    assert_eq!(
+        view(&core, "use", true).await.map(drop),
+        Err(CoreError::Offline)
+    );
+    assert!(core.at(KEPT_SIGN_OUT).exists());
+    // Back online: the revoke goes before the proof.
+    edge.lock().unwrap().offline = false;
+    can(&edge, "auth:signOut", Value::Null);
+    let _proof_fails_in_tests = view(&core, "use", true).await;
+    assert_eq!(paths(&edge)[..2], ["auth:token", "auth:signOut"]);
+    assert!(!core.at(KEPT_SIGN_OUT).exists());
 }
 
 #[tokio::test]

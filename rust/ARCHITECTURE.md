@@ -172,8 +172,13 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   "Not now" holds for the rest of that flow. Background runs never ask. After a sign-in
   the app asks once (`RegnoAsk::FirstTime`), picking Server or UDP asks again
   (`ForFeature`), and Settings → Connections switches it; turning it off drops the JWT
-  and refresh token here and goes back to Direct, but leaves the server's records (the
-  Server page deletes those). The demo account is always Shared.
+  and refresh token here, goes back to Direct and signs this install out of the server
+  (`auth:signOut` with the refresh token, so its chain is revoked and it leaves the
+  forwarding address, kept here to rejoin). Offline, the token waits in
+  `server_last_student.json` (`KeptSignOut`, as a switch or an offline Server sign-out
+  does) and goes at the next call that reaches the server, before any new identity. The
+  account, its address and keys stay (the Server page deletes those). The demo account is
+  always Shared.
 - **Account token** (`vtop-ffi/src/remote/account_token.rs`, API.md "Account
   tokens"). A 14-day token naming the student and this install, for the
   account calls (Connected apps, the Server page, mail forwarding), linked

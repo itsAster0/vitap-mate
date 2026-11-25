@@ -47,6 +47,8 @@ pub(crate) struct Edge {
     pub(crate) auth: Option<String>,
     /// JWTs issued so far.
     pub(crate) issued: u32,
+    /// Unreachable: every call fails as a closed socket does, and none is recorded.
+    pub(crate) offline: bool,
 }
 
 pub(crate) const ID: &str = "k3f9x2ab7q";
@@ -91,6 +93,9 @@ impl Backend for Fake {
         mut args: Value,
     ) -> BoxFuture<'a, Result<Value, CallError>> {
         let mut edge = self.0.lock().unwrap();
+        if edge.offline {
+            return Box::pin(async { Err(CallError::Closed) });
+        }
         let flow = args
             .as_object_mut()
             .and_then(|args| args.remove("flow"))

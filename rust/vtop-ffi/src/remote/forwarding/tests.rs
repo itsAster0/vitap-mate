@@ -1022,3 +1022,27 @@ fn a_kept_confirmation_keeps_its_format_and_drops_a_foreign_link() {
     };
     assert_eq!(kept.confirm_by, ConfirmBy::Neither);
 }
+
+#[test]
+fn signed_out_of_the_server_the_address_waits_to_rejoin() {
+    let mailbox = Mailbox {
+        server: "https://s".into(),
+        id: ID.into(),
+        address: format!("otp+{ID}@vmate.aster0.dev"),
+    };
+    let setup = Setup::Active {
+        last_mail_at: Some(1),
+        last_otp_at: Some(2),
+    };
+    let joined = MailboxState::Joined {
+        mailbox: mailbox.clone(),
+        setup: setup.clone(),
+    };
+    let waiting = MailboxState::NeedsRejoin {
+        mailbox,
+        kept: setup,
+    };
+    assert_eq!(joined.unjoined(), waiting);
+    assert_eq!(waiting.clone().unjoined(), waiting);
+    assert_eq!(MailboxState::Off.unjoined(), MailboxState::Off);
+}

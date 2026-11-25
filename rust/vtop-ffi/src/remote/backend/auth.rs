@@ -11,7 +11,7 @@
 
 use tracing::info;
 
-use super::{RENEW_AHEAD_MS, Refresh};
+use super::{KeptSignOut, RENEW_AHEAD_MS, Refresh};
 use crate::device::EdgeError;
 use crate::remote::server_code::ServerCode;
 
@@ -103,8 +103,8 @@ pub(crate) enum Effect {
     ResetUdpJwt,
     /// Save or clear the refresh token in `device.json`.
     SaveRefresh(Option<Refresh>),
-    /// Keep the last student's refresh token aside in `server_last_student.json`.
-    SetAsideRefresh(Refresh),
+    /// Keep a refresh token aside to sign out with later (`server_last_student.json`).
+    KeepSignOut(KeptSignOut),
     /// Remove the legacy v2 account token file (`account_token.json`).
     ForgetV2Token,
     /// Remove `forwarding.json` because the server removed this install.
@@ -119,7 +119,7 @@ impl std::fmt::Debug for Effect {
             Self::ResetUdpJwt => formatter.write_str("ResetUdpJwt"),
             Self::SaveRefresh(Some(_)) => formatter.write_str("SaveRefresh(Some(<redacted>))"),
             Self::SaveRefresh(None) => formatter.write_str("SaveRefresh(None)"),
-            Self::SetAsideRefresh(_) => formatter.write_str("SetAsideRefresh(<redacted>)"),
+            Self::KeepSignOut(_) => formatter.write_str("KeepSignOut(<redacted>)"),
             Self::ForgetV2Token => formatter.write_str("ForgetV2Token"),
             Self::ForgetForwarding => formatter.write_str("ForgetForwarding"),
         }
@@ -183,7 +183,7 @@ impl AuthMachine {
     }
 
     /// The JWT currently set on the socket, if any (for restoring socket auth after a
-    /// temporary switch such as `sign_out_last_student`).
+    /// temporary switch such as `send_kept_sign_out`).
     pub(crate) fn socket_jwt(&self) -> Option<String> {
         match &self.phase {
             Phase::Ready(jwt) => Some(jwt.token.clone()),
@@ -410,16 +410,24 @@ impl AuthMachine {
         effects
     }
 
-    /// Sets the current refresh token aside for deferred sign-out (`server_last_student.json`)
-    /// and clears this install's active identity.
-    pub(crate) fn on_set_aside(&mut self, current_refresh: Option<Refresh>) -> Vec<Effect> {
+    /// Sets the current refresh token aside for deferred sign-out (`server_last_student.json`,
+    /// of every phone on the account with `everywhere`) and clears this install's active
+    /// identity.
+    pub(crate) fn on_set_aside(
+        &mut self,
+        current_refresh: Option<Refresh>,
+        everywhere: bool,
+    ) -> Vec<Effect> {
         let mut effects = Vec::new();
         if let Some(refresh) = current_refresh {
-            effects.push(Effect::SetAsideRefresh(refresh));
+            effects.push(Effect::KeepSignOut(KeptSignOut {
+                refresh,
+                everywhere,
+            }));
         }
         self.clear_identity(
             "set_aside",
-            "student_switched_or_offline_signout",
+            "student_switched_or_signed_out",
             false,
             &mut effects,
         );

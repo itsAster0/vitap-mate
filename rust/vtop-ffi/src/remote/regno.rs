@@ -2,7 +2,8 @@
 //! server identity (the account proof, its JWT and refresh token, and everything that goes
 //! with it: Connected apps, mail forwarding, push, the server routes) names the student, so
 //! none is taken until they said Share: [`Core::regno_allowed`] is the one check, made where
-//! the JWT is got (`backend.rs`, `take_identity`). Separate from cookie consent
+//! the JWT is got (`backend.rs`, `take_identity`). Stopping signs this install out of the
+//! server: a kept refresh token is sent only to revoke itself. Separate from cookie consent
 //! (`consent.rs`), which is about the VTOP session.
 //!
 //! The answers are kept per student in [`FILE`], which a sign-out (or another student) empties
@@ -81,8 +82,11 @@ impl From<StoredAnswer> for RegnoSharing {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Effect {
     Save(StoredAnswer),
-    /// Drop the JWT and the refresh token: no identity is used from now on.
-    ForgetIdentity,
+    /// Sign this install out of the server: the JWT and the refresh token go here at once (no
+    /// identity is used from now on), the refresh token kept aside to revoke its chain on the
+    /// server, now or at the next call that reaches it. The student's account, address and keys
+    /// stay; this install rejoins the address when they share again.
+    SignOut,
 }
 
 /// The file for an install from before the question: each student it already holds a server
@@ -117,7 +121,7 @@ fn next(from: RegnoSharing, answer: RegnoAnswer) -> (RegnoSharing, Vec<Effect>) 
         // Whatever it was: an identity held without a Share (none should be) goes too.
         RegnoAnswer::NotNow => (
             RegnoSharing::Declined,
-            vec![Effect::Save(StoredAnswer::Declined), Effect::ForgetIdentity],
+            vec![Effect::Save(StoredAnswer::Declined), Effect::SignOut],
         ),
         RegnoAnswer::Dismissed => (from, Vec::new()),
     }
@@ -221,7 +225,10 @@ impl Core {
                     stored.answers.insert(regno.to_ascii_uppercase(), answer);
                     self.write_plain(FILE, &stored);
                 }
-                Effect::ForgetIdentity => self.forget_identity(),
+                Effect::SignOut => {
+                    self.set_aside_sign_out(false);
+                    self.unjoin_forwarding();
+                }
             }
         }
     }
@@ -371,8 +378,10 @@ impl Core {
     }
 
     /// Settings' switch: Share, or NotNow to stop. Stopping drops this install's JWT and
-    /// refresh token, so nothing goes as the student from then on; the server keeps what it
-    /// has until they delete it on the Server page. A server route chosen goes back to Direct.
+    /// refresh token, so nothing goes as the student from then on, and signs this install out
+    /// of the server with the refresh token (`auth:signOut`): at once, or kept for the next
+    /// call that reaches the server. The account, its address and keys stay until the student
+    /// deletes them on the Server page. A server route chosen goes back to Direct.
     pub async fn set_regno_sharing(
         &self,
         flow: String,
@@ -384,6 +393,8 @@ impl Core {
             let to = self.apply_regno_answer(&flow, &regno, from, answer);
             if to != RegnoSharing::Shared {
                 self.leave_server_routes(&flow);
+                // Kept for later when it isn't sent: logged there.
+                self.send_kept_sign_out(&flow).await;
             }
             Ok(to)
         })

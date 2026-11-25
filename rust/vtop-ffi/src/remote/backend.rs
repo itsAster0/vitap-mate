@@ -604,8 +604,32 @@ struct Issued {
 /// it for a minute before it starts (keeping the socket alive, sending nothing).
 const PROOF_BUDGET: Duration = Duration::from_secs(150);
 
-/// The last student's refresh token, set aside at a switch ([`Core::set_aside_identity`]).
-pub(crate) const LAST_STUDENT: &str = "server_last_student.json";
+/// A refresh token set aside to sign out with ([`KeptSignOut`]). The name is from when only a
+/// switch to another student kept one.
+pub(crate) const KEPT_SIGN_OUT: &str = "server_last_student.json";
+
+/// [`KEPT_SIGN_OUT`] on disk: a refresh token set aside at a switch to another student, a server
+/// sign-out sent offline or the registration number no longer shared, kept until the server
+/// signed this install out with it ([`Core::send_kept_sign_out`]). Older versions wrote the
+/// [`Refresh`] alone, which reads as `everywhere: false`; `kept_sign_out_format_roundtrips` pins
+/// it. No `Debug`: it holds the token.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct KeptSignOut {
+    #[serde(flatten)]
+    pub(crate) refresh: Refresh,
+    /// The other phones on the account come off it too (Server's "Sign out everywhere").
+    #[serde(default)]
+    pub(crate) everywhere: bool,
+}
+
+/// What [`Core::send_kept_sign_out`] left behind.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum KeptAfter {
+    /// Nothing kept: sent, refused as signed out already, or for another server.
+    Nothing,
+    /// Still kept for the next call, for `regno`; `offline` when the server wasn't reached.
+    Kept { regno: String, offline: bool },
+}
 
 /// Whether a sign-out failed because there is nothing left to sign out of.
 pub(crate) fn signed_out_already(error: &EdgeError) -> bool {
@@ -972,7 +996,7 @@ impl Core {
                 }
                 Effect::ResetUdpJwt => crate::remote::udp::forget_jwt_sent(&self.shared),
                 Effect::SaveRefresh(refresh) => self.keep_refresh(refresh),
-                Effect::SetAsideRefresh(refresh) => self.write(LAST_STUDENT, &refresh),
+                Effect::KeepSignOut(kept) => self.write(KEPT_SIGN_OUT, &kept),
                 Effect::ForgetV2Token => self.forget_account_token(),
                 Effect::ForgetForwarding => self.forget_any_forwarding(),
             }
@@ -1113,6 +1137,19 @@ impl Core {
                 }
                 Step::FetchToken(grant) => grant,
             };
+            // A sign-out kept aside goes first: sent after a new identity of the same student,
+            // it would take that identity's refresh tokens with it (the server signs the whole
+            // install out). While the server can't be reached, no new identity either; any
+            // other failure doesn't hold the student up.
+            if let KeptAfter::Kept {
+                regno: kept,
+                offline: true,
+            } = self.send_kept_sign_out_in_turn(flow).await
+                && regno.as_deref() == Some(kept.as_str())
+            {
+                info!(action, "a kept sign-out waits for the server: not proving");
+                return Err(CoreError::Offline);
+            }
             let source = grant.kind();
             let payload = match grant {
                 Grant::Demo => json!({ "demo": true, "device": self.device_info() }),
@@ -1233,29 +1270,55 @@ impl Core {
     }
 
     /// Another student signed in over the last one: the last one's refresh token is kept aside
-    /// for [`Core::sign_out_last_student`], and this install has no identity until the new
+    /// for [`Core::send_kept_sign_out`], and this install has no identity until the new
     /// student's.
     pub(crate) fn set_aside_identity(&self) {
+        self.set_aside_sign_out(false);
+    }
+
+    /// Drops the identity here at once and keeps its refresh token aside, so
+    /// [`Core::send_kept_sign_out`] signs this install out of the server with it (of every phone
+    /// on the account with `everywhere`), now or on a later call while the server can't be
+    /// reached.
+    pub(crate) fn set_aside_sign_out(&self, everywhere: bool) {
         let current = self.device().refresh;
-        let effects = self.shared.backend_state().auth.on_set_aside(current);
+        let effects = self
+            .shared
+            .backend_state()
+            .auth
+            .on_set_aside(current, everywhere);
         self.run_effects(effects);
     }
 
-    /// Signs this install out of the last student's account with their refresh token, kept
-    /// aside at a switch, so it stops getting their OTPs and session requests before the new
-    /// student ever proves. Tried again on the next call while the server can't be reached.
-    pub(crate) async fn sign_out_last_student(&self, flow: &str) {
-        let Some(last) = self.read::<Refresh>(LAST_STUDENT) else {
-            return;
+    /// Signs this install out of the server with the refresh token kept aside
+    /// ([`KEPT_SIGN_OUT`]), so it stops getting that student's OTPs and session requests and
+    /// the server drops its refresh tokens. Tried again on the next call while the server can't
+    /// be reached.
+    pub(crate) async fn send_kept_sign_out(&self, flow: &str) -> KeptAfter {
+        let _turn = self.shared.identity_turn.lock().await;
+        self.send_kept_sign_out_in_turn(flow).await
+    }
+
+    /// [`Self::send_kept_sign_out`] with the identity's turn held. The socket goes with the kept
+    /// token's JWT for this one call: no other identity can be taken meanwhile, and the current
+    /// student's JWT (if any) is restored afterwards.
+    async fn send_kept_sign_out_in_turn(&self, flow: &str) -> KeptAfter {
+        let Some(kept) = self.read::<KeptSignOut>(KEPT_SIGN_OUT) else {
+            return KeptAfter::Nothing;
         };
+        let KeptSignOut {
+            refresh: last,
+            everywhere,
+        } = kept;
         if auth::normalize_server(&last.server) != auth::normalize_server(&self.forwarding_server())
         {
-            self.remove_file(LAST_STUDENT);
-            return;
+            self.remove_file(KEPT_SIGN_OUT);
+            return KeptAfter::Nothing;
         }
-        // The socket goes with their JWT for this one call: no other identity can be taken
-        // meanwhile, and the current student's JWT (if any) is restored afterwards.
-        let _turn = self.shared.identity_turn.lock().await;
+        let kept = |offline: bool| KeptAfter::Kept {
+            regno: last.regno.to_ascii_uppercase(),
+            offline,
+        };
         let body = json!({ "refreshToken": last.token });
         let issued = match self
             .signed_call(flow, Kind::Action, "auth:token", &body)
@@ -1263,30 +1326,33 @@ impl Core {
         {
             Ok(issued) => issued,
             Err(error) if signed_out_already(&error) => {
-                info!(code = error.code(), "last student already signed out here");
-                self.remove_file(LAST_STUDENT);
-                return;
+                info!(code = error.code(), "kept sign-out: signed out already");
+                self.remove_file(KEPT_SIGN_OUT);
+                return KeptAfter::Nothing;
             }
             Err(error) => {
-                info!(code = error.code(), "last student not signed out yet");
-                return;
+                info!(code = error.code(), "kept sign-out not sent yet");
+                return kept(matches!(error, EdgeError::Offline));
             }
         };
         // Persist the rotated refresh token before calling `auth:signOut`, so an offline failure
         // retries with the newest token instead of reusing the replaced one.
         if let Some(rotated) = issued.get("refreshToken").and_then(Value::as_str) {
             self.write(
-                LAST_STUDENT,
-                &Refresh {
-                    server: last.server,
-                    token: rotated.to_owned(),
-                    regno: last.regno,
+                KEPT_SIGN_OUT,
+                &KeptSignOut {
+                    refresh: Refresh {
+                        server: last.server.clone(),
+                        token: rotated.to_owned(),
+                        regno: last.regno.clone(),
+                    },
+                    everywhere,
                 },
             );
         }
         let (Some(jwt), Ok(backend)) = (issued.get("jwt").and_then(Value::as_str), self.backend())
         else {
-            return;
+            return kept(false);
         };
         backend.set_auth(Some(jwt.to_owned()));
         let signed_out = self
@@ -1294,19 +1360,21 @@ impl Core {
                 flow,
                 Kind::Mutation,
                 "auth:signOut",
-                json!({ "everywhere": false }),
+                json!({ "everywhere": everywhere }),
             )
             .await;
         let restore = self.shared.backend_state().auth.socket_jwt();
         backend.set_auth(restore);
         match signed_out {
             Ok(_) => {
-                info!("signed out of the last student's account");
-                self.remove_file(LAST_STUDENT);
+                info!(everywhere, "kept sign-out sent");
+                self.remove_file(KEPT_SIGN_OUT);
+                KeptAfter::Nothing
             }
             Err(error) => {
-                let code = edge_error("auth:signOut", error).code().to_owned();
-                info!(code, "last student not signed out yet");
+                let error = edge_error("auth:signOut", error);
+                info!(code = error.code(), "kept sign-out not sent yet");
+                kept(matches!(error, EdgeError::Offline))
             }
         }
     }

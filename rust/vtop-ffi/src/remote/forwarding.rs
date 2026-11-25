@@ -316,9 +316,10 @@ impl Setup {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum MailboxState {
     Off,
-    /// Kept from the v2 edge: this install isn't on the address as backend v3 knows it, so
-    /// nothing is forwarded to it until [`Core::keep_forwarding`] proves the student and rejoins.
-    /// `kept` is the setup it goes back to.
+    /// Kept from the v2 edge, or from before the student stopped sharing their registration
+    /// number (which signs this install out of the server): this install isn't on the address
+    /// as the server knows it, so nothing is forwarded to it until [`Core::keep_forwarding`]
+    /// proves the student and rejoins. `kept` is the setup it goes back to.
     NeedsRejoin {
         mailbox: Mailbox,
         kept: Setup,
@@ -360,6 +361,18 @@ impl MailboxState {
             Self::Joined { mailbox, setup } if mailbox.id == id => Self::Joined {
                 mailbox,
                 setup: next(setup),
+            },
+            other => other,
+        }
+    }
+
+    /// Off the address on the server (signed out of it there), keeping the address and its
+    /// setup to rejoin.
+    fn unjoined(self) -> Self {
+        match self {
+            Self::Joined { mailbox, setup } => Self::NeedsRejoin {
+                mailbox,
+                kept: setup,
             },
             other => other,
         }
@@ -684,7 +697,7 @@ impl Core {
     /// join. Best effort: an address not left yet stays queued for the next call.
     pub async fn leave_old_forwarding(&self, flow: String) -> Result<(), CoreError> {
         traced("leave_old_forwarding", &flow, async {
-            self.sign_out_last_student(&flow).await;
+            self.send_kept_sign_out(&flow).await;
             self.leave_with_identity(&flow).await;
             Ok(())
         })
@@ -1112,6 +1125,15 @@ impl Core {
     }
 
     /// Forgets this phone's address, whichever it is: the server deleted it with the account.
+    /// This install is signed out of the server, the student's account and address staying:
+    /// the address is kept to rejoin once they share their registration number again.
+    pub(crate) fn unjoin_forwarding(&self) {
+        let state = self.update_mailbox(MailboxState::unjoined);
+        if matches!(state, MailboxState::NeedsRejoin { .. }) {
+            info!("forwarding kept to rejoin");
+        }
+    }
+
     pub(crate) fn forget_any_forwarding(&self) {
         if let Some(id) = self.mailbox_state().id() {
             self.forget_forwarding(id);

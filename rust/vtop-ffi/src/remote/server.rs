@@ -402,7 +402,8 @@ impl Core {
     /// Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
     /// address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
     /// (for every phone on the account with `everywhere`), then forgets the identity here. Best
-    /// effort: offline, an address stays queued and the install stays listed in Server.
+    /// effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
+    /// later, the install listed in Server until it goes.
     pub async fn sign_out_of_server(
         &self,
         flow: String,
@@ -436,15 +437,15 @@ impl Core {
                     info!(code = error.code(), "already signed out of the server");
                     self.forget_identity();
                 }
-                // Offline: the refresh token is kept aside, and the next leave_old_forwarding
-                // signs this install out with it, so it stops getting this student's OTPs and
-                // session requests.
+                // Offline: the refresh token is kept aside with `everywhere`, and the next
+                // leave_old_forwarding (or identity) signs this install out with it, so it stops
+                // getting this student's OTPs and session requests.
                 Err(error) => {
                     info!(
                         code = error.code(),
-                        "server sign-out not sent: kept for later"
+                        everywhere, "server sign-out not sent: kept for later"
                     );
-                    self.set_aside_identity();
+                    self.set_aside_sign_out(everywhere);
                 }
             }
             Ok(())

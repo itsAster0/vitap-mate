@@ -298,14 +298,44 @@ async fn a_sign_out_the_server_missed_is_sent_later() {
     core.sign_out_of_server("f".into(), false).await.unwrap();
     // Not signed out on the server: the token waits, not lost.
     assert!(core.device().refresh.is_none());
-    assert!(core.read::<Refresh>(LAST_STUDENT).is_some());
+    assert!(core.read::<KeptSignOut>(KEPT_SIGN_OUT).is_some());
     can(&edge, "auth:signOut", 200, json!(null));
-    core.sign_out_last_student("f").await;
-    assert!(core.read::<Refresh>(LAST_STUDENT).is_none());
+    core.send_kept_sign_out("f").await;
+    assert!(core.read::<KeptSignOut>(KEPT_SIGN_OUT).is_none());
     assert_eq!(
         paths(&edge).last().map(String::as_str),
         Some("auth:signOut")
     );
+}
+
+#[test]
+fn kept_sign_out_format_roundtrips() {
+    // An older version's file: the refresh token alone.
+    let old = json!({ "server": "https://s", "token": "vrt_1", "regno": "22BCE0001" });
+    let kept: KeptSignOut = serde_json::from_value(old).unwrap();
+    assert_eq!(kept.refresh.token, "vrt_1");
+    assert!(!kept.everywhere);
+    let text = json!({
+        "server": "https://s", "token": "vrt_1", "regno": "22BCE0001", "everywhere": true,
+    });
+    let kept: KeptSignOut = serde_json::from_value(text.clone()).unwrap();
+    assert!(kept.everywhere);
+    assert_eq!(serde_json::to_value(&kept).unwrap(), text);
+}
+
+#[tokio::test]
+async fn sign_out_everywhere_sent_offline_stays_everywhere() {
+    let (core, edge, server) = setup("signout-everywhere").await;
+    keep_token(&core, &server);
+    edge.lock().unwrap().offline = true;
+    core.sign_out_of_server("f".into(), true).await.unwrap();
+    assert!(core.device().refresh.is_none());
+    assert!(core.read::<KeptSignOut>(KEPT_SIGN_OUT).unwrap().everywhere);
+    edge.lock().unwrap().offline = false;
+    can(&edge, "auth:signOut", 200, json!(null));
+    assert_eq!(core.send_kept_sign_out("f").await, KeptAfter::Nothing);
+    assert_eq!(paths(&edge), ["auth:token", "auth:signOut"]);
+    assert_eq!(body(&edge, 1), json!({ "everywhere": true }));
 }
 
 #[tokio::test]
@@ -315,13 +345,13 @@ async fn a_switch_signs_out_of_the_last_students_account() {
     core.set_aside_identity();
     assert!(core.device().refresh.is_none());
     can(&edge, "auth:signOut", 200, json!(null));
-    core.sign_out_last_student("f").await;
+    core.send_kept_sign_out("f").await;
     assert_eq!(paths(&edge), ["auth:token", "auth:signOut"]);
     assert_eq!(body(&edge, 0), json!({ "refreshToken": REFRESH }));
     // Done once: nothing kept, and the socket goes without their JWT.
-    assert!(core.read::<Refresh>(LAST_STUDENT).is_none());
+    assert!(core.read::<KeptSignOut>(KEPT_SIGN_OUT).is_none());
     assert!(edge.lock().unwrap().auth.is_none());
-    core.sign_out_last_student("f").await;
+    core.send_kept_sign_out("f").await;
     assert_eq!(paths(&edge).len(), 2);
 }
 
@@ -369,7 +399,7 @@ async fn a_refresh_failing_for_another_reason_keeps_the_token_and_never_proves()
 }
 
 #[tokio::test]
-async fn sign_out_last_student_persists_rotated_token_and_restores_current_jwt() {
+async fn send_kept_sign_out_persists_rotated_token_and_restores_current_jwt() {
     let (core, edge, server) = setup("signout-restore").await;
     // Current student holds a live JWT on the socket.
     keep_token(&core, &server);
@@ -380,7 +410,7 @@ async fn sign_out_last_student_persists_rotated_token_and_restores_current_jwt()
 
     // Last student's refresh token is waiting to sign out; auth:signOut fails once, then succeeds.
     core.write(
-        LAST_STUDENT,
+        KEPT_SIGN_OUT,
         &Refresh {
             server: server.clone(),
             token: "vrt_last_old".into(),
@@ -388,16 +418,16 @@ async fn sign_out_last_student_persists_rotated_token_and_restores_current_jwt()
         },
     );
     can(&edge, "auth:signOut", 503, json!({ "code": "unavailable" }));
-    core.sign_out_last_student("f-so1").await;
-    // The rotated refresh token from auth:token was saved back to LAST_STUDENT, and the current
+    core.send_kept_sign_out("f-so1").await;
+    // The rotated refresh token from auth:token was saved back to KEPT_SIGN_OUT, and the current
     // student's JWT is still on the socket.
-    let kept_last = core.read::<Refresh>(LAST_STUDENT).unwrap();
-    assert_eq!(kept_last.token, "vrt_2");
+    let kept_last = core.read::<KeptSignOut>(KEPT_SIGN_OUT).unwrap();
+    assert_eq!(kept_last.refresh.token, "vrt_2");
     assert_eq!(edge.lock().unwrap().auth, current_jwt);
 
     can(&edge, "auth:signOut", 200, json!(null));
-    core.sign_out_last_student("f-so2").await;
-    assert!(core.read::<Refresh>(LAST_STUDENT).is_none());
+    core.send_kept_sign_out("f-so2").await;
+    assert!(core.read::<KeptSignOut>(KEPT_SIGN_OUT).is_none());
     assert_eq!(edge.lock().unwrap().auth, current_jwt);
 }
 

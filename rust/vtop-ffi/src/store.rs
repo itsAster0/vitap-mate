@@ -254,7 +254,7 @@ fn decode<T: DeserializeOwned>(file: &str, bytes: &[u8]) -> Option<T> {
 mod tests {
     use std::fs;
 
-    use crate::remote::backend::{LAST_STUDENT, Refresh};
+    use crate::remote::backend::{KEPT_SIGN_OUT, Refresh};
     use crate::{Core, PAGES};
 
     #[tokio::test]
@@ -268,15 +268,15 @@ mod tests {
         core.write_plain(&page, &serde_json::json!({ "records": [] }));
         // Set aside on another server: dropped without a call.
         core.write_plain(
-            LAST_STUDENT,
+            KEPT_SIGN_OUT,
             &Refresh {
                 server: "https://elsewhere.invalid".into(),
                 token: "t".into(),
                 regno: "22BCE0002".into(),
             },
         );
-        core.sign_out_last_student("f").await;
-        assert!(!core.at(LAST_STUDENT).exists());
+        core.send_kept_sign_out("f").await;
+        assert!(!core.at(KEPT_SIGN_OUT).exists());
         assert!(core.at(&page).exists());
         assert!(core.read_kept::<serde_json::Value>(&page).is_some());
     }
