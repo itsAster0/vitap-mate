@@ -10,6 +10,7 @@ use vtop_core::types::AttendanceData;
 
 use super::*;
 use crate::pages::{changes, records};
+use crate::remote::handover::HandoverAsk;
 use crate::remote::{account_token, consent, edge, forwarding, route};
 use crate::store::cookies;
 
@@ -455,8 +456,17 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     // without checking the session with VTOP, which would wipe the challenge.
     let _gate = consent::tests::yes(&core);
     assert_eq!(
-        core.session_cookies("f", consent::CookieKind::Account, "Test", true)
-            .await,
+        core.handover_cookies(
+            "f",
+            HandoverAsk {
+                request_id: "r1".into(),
+                asker: None,
+                asked_at: None,
+                expires_at: None,
+                server: "vmate.aster0.dev".into(),
+            },
+        )
+        .await,
         Err(CoreError::OtpRequired {
             reason: "Additional verification is required.".into(),
             issued_at: Some(7),

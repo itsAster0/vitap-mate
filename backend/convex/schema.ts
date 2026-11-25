@@ -29,6 +29,15 @@ export const loginPhase = v.union(
   v.object({ kind: v.literal("checking_otp"), sealedState: v.string(), nextOtp: nullable(v.string()) }),
 );
 
+/** The key that asked for a session, and from where (the phone's approve sheet). */
+export const requestAsker = v.object({
+  keyLabel: v.string(),
+  via: v.union(v.literal("extension"), v.literal("mcp")),
+  /** The extension's address and whether the key used it before; null for an AI app (its
+   * requests come through our engine) or when unknown. */
+  ip: v.union(v.object({ address: v.string(), seen: v.boolean() }), v.null()),
+});
+
 export default defineSchema({
   /** One student, by registration number (one row per `regno`). */
   accounts: defineTable({
@@ -129,6 +138,9 @@ export default defineSchema({
     outings: v.boolean(),
     /** Its latest uses, newest first, at most 10. */
     uses: v.array(v.object({ at: v.number(), via: v.union(v.literal("extension"), v.literal("mcp")) })),
+    /** The extension's latest addresses, newest first, at most `MAX_KEY_IPS`: a request from one
+     * not listed shows as a new IP on the phone. */
+    ips: v.optional(v.array(v.string())),
   })
     .index("by_keyHash", ["keyHash"])
     .index("by_account", ["accountId"]),
@@ -164,6 +176,8 @@ export default defineSchema({
     phones: v.array(v.string()),
     /** Set by the scheduled expiry mutation so subscribed live queries re-run at `expiresAt`. */
     expired: v.optional(v.boolean()),
+    /** Who asked (lib/accountState.ts `RequestAsker`); absent on rows from before it and on `app:login`'s. */
+    asker: v.optional(requestAsker),
   })
     .index("by_requestId", ["requestId"])
     .index("by_account", ["accountId"])

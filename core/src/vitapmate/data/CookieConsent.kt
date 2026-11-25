@@ -9,6 +9,8 @@ import vitapmate.core.CookieAnswer
 import vitapmate.core.CookieGate
 import vitapmate.core.CookieKind
 import vitapmate.core.CookiePayload
+import vitapmate.core.HandoverAsk
+import vitapmate.core.HandoverStatus
 import vitapmate.core.RegnoAnswer
 import vitapmate.observability.Log
 import vitapmate.observability.Unattended
@@ -58,6 +60,10 @@ object CookieConsent : CookieGate {
 
     override suspend fun askRegno(flow: String): RegnoAnswer = RegnoConsent.ask(flow)
 
+    override suspend fun askHandover(flow: String, ask: HandoverAsk): Boolean = HandoverConsent.ask(flow, ask)
+
+    override fun handoverStatus(flow: String, requestId: String, status: HandoverStatus) = HandoverConsent.status(flow, requestId, status)
+
     /** The student's answer (or Cancel); the dialog goes. */
     fun answer(request: Request, answer: CookieAnswer) {
         synchronized(this) { pendingState.value = pendingState.value - request }
@@ -66,9 +72,10 @@ object CookieConsent : CookieGate {
         }
     }
 
-    /** The app left the screen: every open dialog is Cancel, and the registration number's sheet goes. */
+    /** The app left the screen: every open dialog is Cancel, and the registration number's and a connected app's sheets go. */
     internal fun left() {
         synchronized(this) { pendingState.value }.forEach { answer(it, no) }
         RegnoConsent.left()
+        HandoverConsent.left()
     }
 }

@@ -50,6 +50,9 @@ pub(crate) struct TestGate {
     /// The registration-number sheet's answers (Dismissed once they run out) and its asks.
     pub(crate) regno_answers: Mutex<VecDeque<RegnoAnswer>>,
     pub(crate) regno_asks: AtomicU32,
+    /// What the approve sheet was asked (answered like `ask`), and the statuses it heard.
+    pub(crate) handover_asks: Mutex<Vec<HandoverAsk>>,
+    pub(crate) statuses: Mutex<Vec<HandoverStatus>>,
 }
 
 impl TestGate {
@@ -85,6 +88,17 @@ impl CookieGate for TestGate {
         let next = self.regno_answers.lock().unwrap().pop_front();
         Ok(next.unwrap_or(RegnoAnswer::Dismissed))
     }
+    async fn ask_handover(&self, _flow: String, ask: HandoverAsk) -> Result<bool, CoreError> {
+        self.asks.fetch_add(1, Ordering::SeqCst);
+        self.handover_asks.lock().unwrap().push(ask);
+        let next = self.answers.lock().unwrap().pop_front();
+        Ok(next.map_or(!self.deny, |answer| {
+            matches!(answer, CookieAnswer::Allow { .. })
+        }))
+    }
+    fn handover_status(&self, _flow: String, _request_id: String, status: HandoverStatus) {
+        self.statuses.lock().unwrap().push(status);
+    }
 }
 
 /// Gives `core` a fresh gate (and no remembered kinds).
@@ -97,6 +111,8 @@ pub(crate) fn install(core: &Core, attended: bool, deny: bool) -> Arc<TestGate> 
         asks: AtomicU32::new(0),
         regno_answers: Mutex::default(),
         regno_asks: AtomicU32::new(0),
+        handover_asks: Mutex::default(),
+        statuses: Mutex::default(),
     });
     *core.shared.consent() = State {
         gate: Some(gate.clone()),
@@ -421,6 +437,10 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
         async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
             Ok(RegnoAnswer::Dismissed)
         }
+        async fn ask_handover(&self, _flow: String, _ask: HandoverAsk) -> Result<bool, CoreError> {
+            Ok(false)
+        }
+        fn handover_status(&self, _flow: String, _request_id: String, _status: HandoverStatus) {}
     }
 
     let core = fresh();

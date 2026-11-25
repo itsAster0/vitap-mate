@@ -22,6 +22,7 @@ import {
   isAccountId,
   keyId,
   keyLabel,
+  keyIp,
   keyUse,
   keysToMove,
   leastRecent,
@@ -308,6 +309,14 @@ describe("accounts", () => {
     for (let n = 2; n < 14; n++) k = { ...k, ...keyUse(k, NOW + 60 * n, "extension")! };
     expect(k.uses).toHaveLength(MAX_KEY_USES);
     expect(k.uses[0].at).toBe(NOW + 60 * 13);
+  });
+
+  it("keep a key's last two addresses, newest first, and say when one is new", () => {
+    expect(keyIp([], "1.1.1.1")).toEqual({ seen: false, ips: ["1.1.1.1"] });
+    expect(keyIp(["1.1.1.1"], "1.1.1.1")).toEqual({ seen: true, ips: null });
+    expect(keyIp(["1.1.1.1"], "2.2.2.2")).toEqual({ seen: false, ips: ["2.2.2.2", "1.1.1.1"] });
+    expect(keyIp(["2.2.2.2", "1.1.1.1"], "1.1.1.1")).toEqual({ seen: true, ips: ["1.1.1.1", "2.2.2.2"] });
+    expect(keyIp(["2.2.2.2", "1.1.1.1"], "3.3.3.3")).toEqual({ seen: false, ips: ["3.3.3.3", "2.2.2.2"] });
   });
 
   it("make room by the phone seen least recently", () => {

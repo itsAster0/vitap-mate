@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             BackgroundSync.registerDebugTrigger(applicationContext)
             Push.start()
+            Push.watchHandovers(applicationContext)
             PlayUpdate.check(this)
         }
         // The splash leaves as soon as the first frame is drawn (nothing holds it): a quick fade
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
                     App()
                     CookieConsentDialog()
                     RegnoSheet()
+                    HandoverSheet()
                 }
             }
         }

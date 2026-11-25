@@ -707,6 +707,12 @@ internal interface UniffiCallbackInterfaceCookieGateMethod1 : com.sun.jna.Callba
 internal interface UniffiCallbackInterfaceCookieGateMethod2 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
+internal interface UniffiCallbackInterfaceCookieGateMethod3 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`ask`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteI8,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+}
+internal interface UniffiCallbackInterfaceCookieGateMethod4 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`status`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
 internal interface UniffiCallbackInterfaceUdpNetworkMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: LongByReference,uniffiCallStatus: UniffiRustCallStatus,)
 }
@@ -897,13 +903,15 @@ internal open class UniffiVTableCallbackInterfaceLiveListener(
     }
 
 }
-@Structure.FieldOrder("uniffiFree", "uniffiClone", "attended", "ask", "askRegno")
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "attended", "ask", "askRegno", "askHandover", "handoverStatus")
 internal open class UniffiVTableCallbackInterfaceCookieGate(
     @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
     @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
     @JvmField internal var `attended`: UniffiCallbackInterfaceCookieGateMethod0? = null,
     @JvmField internal var `ask`: UniffiCallbackInterfaceCookieGateMethod1? = null,
     @JvmField internal var `askRegno`: UniffiCallbackInterfaceCookieGateMethod2? = null,
+    @JvmField internal var `askHandover`: UniffiCallbackInterfaceCookieGateMethod3? = null,
+    @JvmField internal var `handoverStatus`: UniffiCallbackInterfaceCookieGateMethod4? = null,
 ) : Structure() {
     class UniffiByValue(
         `uniffiFree`: UniffiCallbackInterfaceFree? = null,
@@ -911,7 +919,9 @@ internal open class UniffiVTableCallbackInterfaceCookieGate(
         `attended`: UniffiCallbackInterfaceCookieGateMethod0? = null,
         `ask`: UniffiCallbackInterfaceCookieGateMethod1? = null,
         `askRegno`: UniffiCallbackInterfaceCookieGateMethod2? = null,
-    ): UniffiVTableCallbackInterfaceCookieGate(`uniffiFree`,`uniffiClone`,`attended`,`ask`,`askRegno`,), Structure.ByValue
+        `askHandover`: UniffiCallbackInterfaceCookieGateMethod3? = null,
+        `handoverStatus`: UniffiCallbackInterfaceCookieGateMethod4? = null,
+    ): UniffiVTableCallbackInterfaceCookieGate(`uniffiFree`,`uniffiClone`,`attended`,`ask`,`askRegno`,`askHandover`,`handoverStatus`,), Structure.ByValue
 
    internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceCookieGate) {
         `uniffiFree` = other.`uniffiFree`
@@ -919,6 +929,8 @@ internal open class UniffiVTableCallbackInterfaceCookieGate(
         `attended` = other.`attended`
         `ask` = other.`ask`
         `askRegno` = other.`askRegno`
+        `askHandover` = other.`askHandover`
+        `handoverStatus` = other.`handoverStatus`
     }
 
 }
@@ -1418,6 +1430,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_cookiegate_ask_regno(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_cookiegate_ask_handover(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_cookiegate_handover_status(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_udpnetwork_open(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_udpnetwork_resolve(
@@ -1833,6 +1849,10 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_cookiegate_ask_regno(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_cookiegate_ask_handover(`ptr`: Long,`flow`: RustBuffer.ByValue,`ask`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_cookiegate_handover_status(`ptr`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`status`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_vtop_ffi_fn_clone_udpnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_vtop_ffi_fn_free_udpnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -2554,6 +2574,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask_regno() and 0xFFFF) != 25024) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask_handover() and 0xFFFF) != 58444) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_handover_status() and 0xFFFF) != 58763) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_open() and 0xFFFF) != 17439) {
@@ -4583,6 +4609,18 @@ public interface CookieGate {
      */
     suspend fun `askRegno`(`flow`: kotlin.String): RegnoAnswer
     
+    /**
+     * Shows the approve sheet for a connected app's request ([`CookieKind::Handover`]): true
+     * for Approve. It has no "don't ask again" (that is Connected apps' setting); a timeout or
+     * the app leaving the screen is no.
+     */
+    suspend fun `askHandover`(`flow`: kotlin.String, `ask`: HandoverAsk): kotlin.Boolean
+    
+    /**
+     * How an approved request's answer is going (its notification, and the sheet's result).
+     */
+    fun `handoverStatus`(`flow`: kotlin.String, `requestId`: kotlin.String, `status`: HandoverStatus)
+    
     companion object
 }
 
@@ -4764,6 +4802,52 @@ open class CookieGateImpl: Disposable, AutoCloseable, CookieGate
     }
 
     
+    /**
+     * Shows the approve sheet for a connected app's request ([`CookieKind::Handover`]): true
+     * for Approve. It has no "don't ask again" (that is Connected apps' setting); a timeout or
+     * the app leaving the screen is no.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `askHandover`(`flow`: kotlin.String, `ask`: HandoverAsk) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_cookiegate_ask_handover(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeHandoverAsk.lower(`ask`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * How an approved request's answer is going (its notification, and the sheet's result).
+     */override fun `handoverStatus`(`flow`: kotlin.String, `requestId`: kotlin.String, `status`: HandoverStatus)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_cookiegate_handover_status(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`requestId`),
+        FfiConverterTypeHandoverStatus.lower(`status`),_status)
+}
+    }
+    
+    
+
+    
 
     
 
@@ -4865,6 +4949,55 @@ internal object uniffiCallbackInterfaceCookieGate {
             )
         }
     }
+    internal object `askHandover`: UniffiCallbackInterfaceCookieGateMethod3 {
+        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`ask`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteI8,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+            val uniffiObj = FfiConverterTypeCookieGate.handleMap.get(uniffiHandle)
+            val makeCall = suspend { ->
+                uniffiObj.`askHandover`(
+                    FfiConverterString.lift(`flow`),
+                    FfiConverterTypeHandoverAsk.lift(`ask`),
+                )
+            }
+            val uniffiHandleSuccess = { returnValue: kotlin.Boolean ->
+                val uniffiResult = UniffiForeignFutureResultI8.UniffiByValue(
+                    FfiConverterBoolean.lower(returnValue),
+                    UniffiRustCallStatus.ByValue()
+                )
+                uniffiResult.write()
+                uniffiFutureCallback.callback(uniffiCallbackData, uniffiResult)
+            }
+            val uniffiHandleError = { callStatus: UniffiRustCallStatus.ByValue ->
+                uniffiFutureCallback.callback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureResultI8.UniffiByValue(
+                        0.toByte(),
+                        callStatus,
+                    ),
+                )
+            }
+            uniffiTraitInterfaceCallAsyncWithError(
+                makeCall,
+                uniffiHandleSuccess,
+                uniffiHandleError,
+                { e: CoreException -> FfiConverterTypeCoreError.lower(e) },
+                uniffiOutDroppedCallback
+            )
+        }
+    }
+    internal object `handoverStatus`: UniffiCallbackInterfaceCookieGateMethod4 {
+        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`status`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeCookieGate.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`handoverStatus`(
+                    FfiConverterString.lift(`flow`),
+                    FfiConverterString.lift(`requestId`),
+                    FfiConverterTypeHandoverStatus.lift(`status`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
 
     internal object uniffiFree: UniffiCallbackInterfaceFree {
         override fun callback(handle: Long) {
@@ -4884,6 +5017,8 @@ internal object uniffiCallbackInterfaceCookieGate {
         `attended`,
         `ask`,
         `askRegno`,
+        `askHandover`,
+        `handoverStatus`,
     )
 
     // Registers the foreign callback with the Rust side.
@@ -12946,6 +13081,47 @@ public object FfiConverterTypeAddress: FfiConverterRustBuffer<Address> {
 
 
 
+data class AskerIp (
+    val `address`: kotlin.String
+    , 
+    /**
+     * The key used this address before (one of its last two).
+     */
+    val `seen`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAskerIp: FfiConverterRustBuffer<AskerIp> {
+    override fun read(buf: ByteBuffer): AskerIp {
+        return AskerIp(
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AskerIp) = (
+            FfiConverterString.allocationSize(value.`address`) +
+            FfiConverterBoolean.allocationSize(value.`seen`)
+    )
+
+    override fun write(value: AskerIp, buf: ByteBuffer) {
+            FfiConverterString.write(value.`address`, buf)
+            FfiConverterBoolean.write(value.`seen`, buf)
+    }
+}
+
+
+
 data class Assessment (
     val `title`: kotlin.String
     , 
@@ -16483,6 +16659,129 @@ public object FfiConverterTypeGrades: FfiConverterRustBuffer<Grades> {
 
 
 /**
+ * What the approve sheet asks about: a connected app's request for this phone's session.
+ */
+data class HandoverAsk (
+    val `requestId`: kotlin.String
+    , 
+    /**
+     * None when the server no longer lists the request or didn't say.
+     */
+    val `asker`: HandoverAsker?
+    , 
+    /**
+     * Unix ms; None when the server didn't say.
+     */
+    val `askedAt`: kotlin.Long?
+    , 
+    /**
+     * Unix ms; None when the server no longer lists the request.
+     */
+    val `expiresAt`: kotlin.Long?
+    , 
+    /**
+     * The host the session goes through ("vmate.aster0.dev").
+     */
+    val `server`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHandoverAsk: FfiConverterRustBuffer<HandoverAsk> {
+    override fun read(buf: ByteBuffer): HandoverAsk {
+        return HandoverAsk(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalTypeHandoverAsker.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: HandoverAsk) = (
+            FfiConverterString.allocationSize(value.`requestId`) +
+            FfiConverterOptionalTypeHandoverAsker.allocationSize(value.`asker`) +
+            FfiConverterOptionalLong.allocationSize(value.`askedAt`) +
+            FfiConverterOptionalLong.allocationSize(value.`expiresAt`) +
+            FfiConverterString.allocationSize(value.`server`)
+    )
+
+    override fun write(value: HandoverAsk, buf: ByteBuffer) {
+            FfiConverterString.write(value.`requestId`, buf)
+            FfiConverterOptionalTypeHandoverAsker.write(value.`asker`, buf)
+            FfiConverterOptionalLong.write(value.`askedAt`, buf)
+            FfiConverterOptionalLong.write(value.`expiresAt`, buf)
+            FfiConverterString.write(value.`server`, buf)
+    }
+}
+
+
+
+/**
+ * The key that asked for a session, and from where: the approve sheet and the notification
+ * show it. The server's `asker` (`sessions:pending`) or the push's `keyLabel`, `keyVia`, `ip`
+ * and `ipSeen`.
+ */
+data class HandoverAsker (
+    /**
+     * The key's name ("Chrome on MacBook", "Claude").
+     */
+    val `keyLabel`: kotlin.String
+    , 
+    val `via`: KeyKind
+    , 
+    /**
+     * The extension's address; None for an AI app (its requests come through our engine) or
+     * when the server didn't see one.
+     */
+    val `ip`: AskerIp?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHandoverAsker: FfiConverterRustBuffer<HandoverAsker> {
+    override fun read(buf: ByteBuffer): HandoverAsker {
+        return HandoverAsker(
+            FfiConverterString.read(buf),
+            FfiConverterTypeKeyKind.read(buf),
+            FfiConverterOptionalTypeAskerIp.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: HandoverAsker) = (
+            FfiConverterString.allocationSize(value.`keyLabel`) +
+            FfiConverterTypeKeyKind.allocationSize(value.`via`) +
+            FfiConverterOptionalTypeAskerIp.allocationSize(value.`ip`)
+    )
+
+    override fun write(value: HandoverAsker, buf: ByteBuffer) {
+            FfiConverterString.write(value.`keyLabel`, buf)
+            FfiConverterTypeKeyKind.write(value.`via`, buf)
+            FfiConverterOptionalTypeAskerIp.write(value.`ip`, buf)
+    }
+}
+
+
+
+/**
  * One header; a name can repeat (`Set-Cookie`).
  */
 data class Header (
@@ -19066,6 +19365,11 @@ data class SessionRequest (
     val `requestId`: kotlin.String
     , 
     /**
+     * Unix ms; None from a server before it said.
+     */
+    val `askedAt`: kotlin.Long?
+    , 
+    /**
      * Unix ms.
      */
     val `expiresAt`: kotlin.Long
@@ -19074,6 +19378,11 @@ data class SessionRequest (
      * Whether the app also asks for the saved password.
      */
     val `wantCredentials`: kotlin.Boolean
+    , 
+    /**
+     * Who asked; None for a request the server kept no asker for.
+     */
+    val `asker`: HandoverAsker?
     
 ){
     
@@ -19091,21 +19400,27 @@ public object FfiConverterTypeSessionRequest: FfiConverterRustBuffer<SessionRequ
     override fun read(buf: ByteBuffer): SessionRequest {
         return SessionRequest(
             FfiConverterString.read(buf),
+            FfiConverterOptionalLong.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalTypeHandoverAsker.read(buf),
         )
     }
 
     override fun allocationSize(value: SessionRequest) = (
             FfiConverterString.allocationSize(value.`requestId`) +
+            FfiConverterOptionalLong.allocationSize(value.`askedAt`) +
             FfiConverterLong.allocationSize(value.`expiresAt`) +
-            FfiConverterBoolean.allocationSize(value.`wantCredentials`)
+            FfiConverterBoolean.allocationSize(value.`wantCredentials`) +
+            FfiConverterOptionalTypeHandoverAsker.allocationSize(value.`asker`)
     )
 
     override fun write(value: SessionRequest, buf: ByteBuffer) {
             FfiConverterString.write(value.`requestId`, buf)
+            FfiConverterOptionalLong.write(value.`askedAt`, buf)
             FfiConverterLong.write(value.`expiresAt`, buf)
             FfiConverterBoolean.write(value.`wantCredentials`, buf)
+            FfiConverterOptionalTypeHandoverAsker.write(value.`asker`, buf)
     }
 }
 
@@ -22897,12 +23212,13 @@ sealed class HandoverEffect {
     
     /**
      * Post the request's notification (its tap brings [`HandoverEvent::Tapped`]); it times out at
-     * `expires_at` (unix ms).
+     * `expires_at` (unix ms) and names `asker` when known.
      */
     data class Notify(
         val `requestId`: kotlin.String, 
         val `notificationId`: kotlin.Int, 
-        val `expiresAt`: kotlin.Long) : HandoverEffect()
+        val `expiresAt`: kotlin.Long, 
+        val `asker`: vitapmate.core.HandoverAsker?) : HandoverEffect()
         
     {
         
@@ -22955,6 +23271,7 @@ public object FfiConverterTypeHandoverEffect : FfiConverterRustBuffer<HandoverEf
                 FfiConverterString.read(buf),
                 FfiConverterInt.read(buf),
                 FfiConverterLong.read(buf),
+                FfiConverterOptionalTypeHandoverAsker.read(buf),
                 )
             2 -> HandoverEffect.Cancel(
                 FfiConverterInt.read(buf),
@@ -22975,6 +23292,7 @@ public object FfiConverterTypeHandoverEffect : FfiConverterRustBuffer<HandoverEf
                 + FfiConverterString.allocationSize(value.`requestId`)
                 + FfiConverterInt.allocationSize(value.`notificationId`)
                 + FfiConverterLong.allocationSize(value.`expiresAt`)
+                + FfiConverterOptionalTypeHandoverAsker.allocationSize(value.`asker`)
             )
         }
         is HandoverEffect.Cancel -> {
@@ -23001,6 +23319,7 @@ public object FfiConverterTypeHandoverEffect : FfiConverterRustBuffer<HandoverEf
                 FfiConverterString.write(value.`requestId`, buf)
                 FfiConverterInt.write(value.`notificationId`, buf)
                 FfiConverterLong.write(value.`expiresAt`, buf)
+                FfiConverterOptionalTypeHandoverAsker.write(value.`asker`, buf)
                 Unit
             }
             is HandoverEffect.Cancel -> {
@@ -23046,7 +23365,8 @@ sealed class HandoverEvent {
     data class Listed(
         val `requestId`: kotlin.String, 
         val `expiresAt`: kotlin.Long, 
-        val `foreground`: kotlin.Boolean) : HandoverEvent()
+        val `foreground`: kotlin.Boolean, 
+        val `asker`: vitapmate.core.HandoverAsker?) : HandoverEvent()
         
     {
         
@@ -23097,6 +23417,7 @@ public object FfiConverterTypeHandoverEvent : FfiConverterRustBuffer<HandoverEve
                 FfiConverterString.read(buf),
                 FfiConverterLong.read(buf),
                 FfiConverterBoolean.read(buf),
+                FfiConverterOptionalTypeHandoverAsker.read(buf),
                 )
             3 -> HandoverEvent.Tapped(
                 FfiConverterString.read(buf),
@@ -23123,6 +23444,7 @@ public object FfiConverterTypeHandoverEvent : FfiConverterRustBuffer<HandoverEve
                 + FfiConverterString.allocationSize(value.`requestId`)
                 + FfiConverterLong.allocationSize(value.`expiresAt`)
                 + FfiConverterBoolean.allocationSize(value.`foreground`)
+                + FfiConverterOptionalTypeHandoverAsker.allocationSize(value.`asker`)
             )
         }
         is HandoverEvent.Tapped -> {
@@ -23154,6 +23476,7 @@ public object FfiConverterTypeHandoverEvent : FfiConverterRustBuffer<HandoverEve
                 FfiConverterString.write(value.`requestId`, buf)
                 FfiConverterLong.write(value.`expiresAt`, buf)
                 FfiConverterBoolean.write(value.`foreground`, buf)
+                FfiConverterOptionalTypeHandoverAsker.write(value.`asker`, buf)
                 Unit
             }
             is HandoverEvent.Tapped -> {
@@ -23164,6 +23487,116 @@ public object FfiConverterTypeHandoverEvent : FfiConverterRustBuffer<HandoverEve
             }
             is HandoverEvent.Shown -> {
                 buf.putInt(4)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * How an approved answer is going, for its notification and the sheet.
+ */
+sealed class HandoverStatus {
+    
+    /**
+     * The student said yes (or ticked "don't ask again" in Connected apps): checking the VTOP
+     * session, signing in again if it expired, and sending it.
+     */
+    data class Fetching(
+        val `asker`: vitapmate.core.HandoverAsker?) : HandoverStatus()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * The server took the session.
+     */
+    object Sent : HandoverStatus()
+    
+    
+    /**
+     * It couldn't be sent; `reason` is for the student.
+     */
+    data class Failed(
+        val `reason`: kotlin.String) : HandoverStatus()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHandoverStatus : FfiConverterRustBuffer<HandoverStatus>{
+    override fun read(buf: ByteBuffer): HandoverStatus {
+        return when(buf.getInt()) {
+            1 -> HandoverStatus.Fetching(
+                FfiConverterOptionalTypeHandoverAsker.read(buf),
+                )
+            2 -> HandoverStatus.Sent
+            3 -> HandoverStatus.Failed(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: HandoverStatus): ULong = when(value) {
+        is HandoverStatus.Fetching -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterOptionalTypeHandoverAsker.allocationSize(value.`asker`)
+            )
+        }
+        is HandoverStatus.Sent -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is HandoverStatus.Failed -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`reason`)
+            )
+        }
+    }
+
+    override fun write(value: HandoverStatus, buf: ByteBuffer) {
+        when(value) {
+            is HandoverStatus.Fetching -> {
+                buf.putInt(1)
+                FfiConverterOptionalTypeHandoverAsker.write(value.`asker`, buf)
+                Unit
+            }
+            is HandoverStatus.Sent -> {
+                buf.putInt(2)
+                Unit
+            }
+            is HandoverStatus.Failed -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -25399,6 +25832,38 @@ public object FfiConverterOptionalTypeAcademicCalendar: FfiConverterRustBuffer<A
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeAskerIp: FfiConverterRustBuffer<AskerIp?> {
+    override fun read(buf: ByteBuffer): AskerIp? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeAskerIp.read(buf)
+    }
+
+    override fun allocationSize(value: AskerIp?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeAskerIp.allocationSize(value)
+        }
+    }
+
+    override fun write(value: AskerIp?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeAskerIp.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeAttendance: FfiConverterRustBuffer<Attendance?> {
     override fun read(buf: ByteBuffer): Attendance? {
         if (buf.get().toInt() == 0) {
@@ -25933,6 +26398,38 @@ public object FfiConverterOptionalTypeGrades: FfiConverterRustBuffer<Grades?> {
         } else {
             buf.put(1)
             FfiConverterTypeGrades.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeHandoverAsker: FfiConverterRustBuffer<HandoverAsker?> {
+    override fun read(buf: ByteBuffer): HandoverAsker? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeHandoverAsker.read(buf)
+    }
+
+    override fun allocationSize(value: HandoverAsker?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeHandoverAsker.allocationSize(value)
+        }
+    }
+
+    override fun write(value: HandoverAsker?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeHandoverAsker.write(value, buf)
         }
     }
 }

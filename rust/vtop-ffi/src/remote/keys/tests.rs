@@ -296,7 +296,7 @@ async fn handover_unattended_answers_with_error_not_cookies() {
     consent::tests::signed_in(&core);
     // In the pocket, even with "don't ask again" ticked.
     let gate = consent::tests::install(&core, false, false);
-    consent::tests::remember(&core, CookieKind::Handover);
+    consent::tests::remember(&core, consent::CookieKind::Handover);
     let answered = core.answer_session_request("f", "r1").await;
     assert_eq!(answered, Err(CoreError::ConsentDenied));
     assert_eq!(gate.asks(), 0);
@@ -315,6 +315,41 @@ async fn handover_unattended_answers_with_error_not_cookies() {
 }
 
 #[tokio::test]
+async fn the_sheet_shows_who_asked_and_a_no_sends_no_status() {
+    let core = core("handover-sheet");
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let server = serve(edge.clone()).await;
+    fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
+    keep_token(&core, &server);
+    can(
+        &edge,
+        "sessions:pending",
+        200,
+        json!([{
+            "requestId": "r1",
+            "askedAt": 1_000_i64,
+            "expiresAt": 121_000_i64,
+            "wantCredentials": false,
+            "asker": { "keyLabel": "Chrome on MacBook", "via": "extension", "ip": { "address": "203.0.113.7", "seen": true } },
+        }]),
+    );
+    can(&edge, "sessions:answer", 200, json!({ "ok": true }));
+    consent::tests::signed_in(&core);
+    let gate = consent::tests::no(&core);
+    let answered = core.answer_session_request("f", "r1").await;
+    assert_eq!(answered, Err(CoreError::ConsentDenied));
+    let asks = gate.handover_asks.lock().unwrap().clone();
+    assert_eq!(asks.len(), 1);
+    assert_eq!(asks[0].asked_at, Some(1_000));
+    assert_eq!(asks[0].expires_at, Some(121_000));
+    assert_eq!(
+        asks[0].asker.as_ref().map(|a| a.key_label.as_str()),
+        Some("Chrome on MacBook")
+    );
+    assert!(gate.statuses.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn session_requests_get_cookies_or_why_not() {
     let core = core("answer");
     let edge = Arc::new(Mutex::new(Edge::default()));
@@ -322,9 +357,10 @@ async fn session_requests_get_cookies_or_why_not() {
     fs::write(core.at(crate::remote::edge::SERVER_FILE), &server).unwrap();
     keep_token(&core, &server);
     can(&edge, "sessions:answer", 200, json!({ "ok": true }));
-    core.answer_with("f-a", "r1", Ok("JSESSIONID=c".into()))
-        .await
-        .unwrap();
+    let delivered = core
+        .answer_with("f-a", "r1", Ok("JSESSIONID=c".into()))
+        .await;
+    assert_eq!(delivered, Ok(Delivered::Taken));
     // Signed out (no session in this core): the server hears why, the caller gets the error.
     can(&edge, "sessions:answer", 200, json!({ "ok": true }));
     let signed_out = core.answer_session_request("f-b", "r2").await;
@@ -362,16 +398,44 @@ async fn pending_session_requests_come_from_the_server() {
     );
     assert!(edge.lock().unwrap().requests.is_empty());
     keep_token(&core, &server);
-    let pending =
-        json!([{ "requestId": "r1", "expiresAt": 1_700_000_000_000_i64, "wantCredentials": true }]);
+    // A request from before the server kept who asked, and one from the extension.
+    let pending = json!([
+        { "requestId": "r1", "expiresAt": 1_700_000_000_000_i64, "wantCredentials": true },
+        {
+            "requestId": "r2",
+            "askedAt": 1_699_999_990_000_i64,
+            "expiresAt": 1_700_000_000_000_i64,
+            "wantCredentials": false,
+            "pushSent": true,
+            "asker": { "keyLabel": "Chrome on MacBook", "via": "extension", "ip": { "address": "203.0.113.7", "seen": false } },
+        },
+    ]);
     can(&edge, "sessions:pending", 200, pending);
     let requests = core.pending_session_requests("f-p".into()).await.unwrap();
     assert_eq!(
         requests,
-        [SessionRequest {
-            request_id: "r1".into(),
-            expires_at: 1_700_000_000_000,
-            want_credentials: true,
-        }]
+        [
+            SessionRequest {
+                request_id: "r1".into(),
+                asked_at: None,
+                expires_at: 1_700_000_000_000,
+                want_credentials: true,
+                asker: None,
+            },
+            SessionRequest {
+                request_id: "r2".into(),
+                asked_at: Some(1_699_999_990_000),
+                expires_at: 1_700_000_000_000,
+                want_credentials: false,
+                asker: Some(HandoverAsker {
+                    key_label: "Chrome on MacBook".into(),
+                    via: KeyKind::Browser,
+                    ip: Some(AskerIp {
+                        address: "203.0.113.7".into(),
+                        seen: false,
+                    }),
+                }),
+            },
+        ]
     );
 }

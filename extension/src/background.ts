@@ -45,6 +45,10 @@ import {
   type Settings,
 } from "./state";
 
+/** Under "Waiting for your phone": opening the app shows its approve sheet at once, while the
+ * push that would wake it can take a while. */
+export const PHONE_HINT = "Open VITAP Mate on your phone to approve. The notification can take a minute.";
+
 export type { LastLogin, LoginPhase, LoginState, PageMessage, StateMessage };
 
 const VTOP_CONTENT_URL = "https://vtop.vitap.ac.in/vtop/content";
@@ -161,6 +165,7 @@ export function createBackground(deps: BackgroundDeps = {}) {
         pageMessage: {
           type: "VTOP_MATE_LOADING",
           text,
+          hint: next.phase === "phone" ? PHONE_HINT : undefined,
           serverDueAt: next.phase === "phone" ? next.serverDueAt : undefined,
           tone: "active",
         },

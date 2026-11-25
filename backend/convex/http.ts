@@ -81,13 +81,13 @@ for (const spec of [
   }),
   ...corsRoutes("POST", { path: "/v1/session" }, async (ctx, req) => {
     const keyHash = await keyHashOf(req);
-    const started = keyHash && (await ctx.runMutation(internal.sessions.start, { keyHash, via: keyVia(req) }));
+    const started = keyHash && (await ctx.runMutation(internal.sessions.start, { keyHash, via: keyVia(req), ip: clientIp(req) }));
     if (!started) return keyUnknown();
     if (started.limited) return error(429, "rate_limited", "Too many requests for this account.", { headers: { "retry-after": "60" } });
     const cached = await cachedCookies(ctx, started.accountId, started.regno, started.cached);
     console.log(`[regno=${started.regno}] account: a key asked for a session (${cached ? "cached" : "new request"})`);
     if (cached) return Response.json(ready(cached.cookies, started.source), { headers: NO_STORE });
-    const opened = await ctx.runMutation(internal.sessions.open, { accountId: started.accountId, keyHash, requestId: crypto.randomUUID() });
+    const opened = await ctx.runMutation(internal.sessions.open, { accountId: started.accountId, keyHash, requestId: crypto.randomUUID(), asker: started.asker });
     if (opened.opened) await begin(ctx, opened.requestId, opened.opened);
     const state = await ctx.runQuery(internal.sessions.state, { requestId: opened.requestId });
     return Response.json(state?.startedView ?? opened.joined, { status: 202, headers: { "retry-after": "2", ...NO_STORE } });

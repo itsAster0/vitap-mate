@@ -205,6 +205,24 @@ export function fromHeader(header: string): CookieEditorCookie[] {
 
 export type KeyVia = "extension" | "mcp";
 export type KeyUse = { at: number; via: KeyVia };
+export const MAX_KEY_IPS = 2;
+
+/** The key that asked for a session, and from where, as the phone's approve sheet shows it. */
+export type RequestAsker = {
+  keyLabel: string;
+  via: KeyVia;
+  /** The extension's address and whether the key used it before; null for an AI app (its
+   * requests come through our engine, so the address would be ours) or when unknown. */
+  ip: { address: string; seen: boolean } | null;
+};
+
+/** A key's call from `ip`: whether it used that address before, and its addresses with `ip`
+ * first (null when that changes nothing). */
+export function keyIp(ips: readonly string[], ip: string): { seen: boolean; ips: string[] | null } {
+  const seen = ips.includes(ip);
+  const next = [ip, ...ips.filter((known) => known !== ip)].slice(0, MAX_KEY_IPS);
+  return { seen, ips: ips[0] === ip ? null : next };
+}
 export const MAX_KEY_USES = 10;
 
 /** An access key as the account sees it. */
@@ -545,6 +563,7 @@ export type StoredRequestFields = {
   source: string | null;
   phones: string[];
   expired?: boolean;
+  asker?: RequestAsker;
 };
 
 /** One session request of an account. Its phase is one discriminated union so callers cannot
@@ -555,6 +574,8 @@ export class RequestRecord {
   expiresAt: number;
   /** The installs this request may ask: the key's phone. */
   phones: string[];
+  /** Who asked; null for `app:login` and rows from before it was kept. */
+  asker: RequestAsker | null = null;
 
   constructor(
     readonly id: string,
@@ -797,7 +818,9 @@ export function fromRequestFields(id: string, f: StoredRequestFields): RequestRe
       }
       break;
   }
-  return new RequestRecord(id, f.createdAt, f.expiresAt, f.phones, phase);
+  const record = new RequestRecord(id, f.createdAt, f.expiresAt, f.phones, phase);
+  record.asker = f.asker ?? null;
+  return record;
 }
 
 /** Projects `RequestRecord` back onto the flat `sessionRequests` storage columns. */
@@ -806,6 +829,7 @@ export function toRequestFields(r: RequestRecord): StoredRequestFields {
     createdAt: r.createdAt,
     expiresAt: r.expiresAt,
     phones: r.phones,
+    asker: r.asker ?? undefined,
   };
   switch (r.phase.kind) {
     case "pending": {

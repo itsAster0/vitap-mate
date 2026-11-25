@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createBackground, createSerialQueue } from "./background";
+import { PHONE_HINT, createBackground, createSerialQueue } from "./background";
 import type { LiveClient, RequestView } from "./live";
 import type { PageMessage, StateMessage } from "./messages";
 import { LOGIN_STATE_KEY, type LoginState } from "./state";
@@ -414,6 +414,8 @@ describe("background login flow", () => {
     );
     expect(phoneMsg).toBeDefined();
     expect(phoneMsg?.message.type === "VTOP_MATE_LOADING" && phoneMsg.message.serverDueAt).toBeUndefined();
+    // It says to open the app, which asks at once; the push can be slow.
+    expect(phoneMsg?.message.type === "VTOP_MATE_LOADING" && phoneMsg.message.hint).toBe(PHONE_HINT);
     expect(env.cookieValues()).toEqual({ JSESSIONID: "p-1" });
   });
 

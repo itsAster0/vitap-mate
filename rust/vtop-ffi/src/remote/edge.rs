@@ -4,7 +4,8 @@ use std::fs;
 
 use vtop_core::{VtopClient, VtopError};
 
-use crate::remote::consent::{self, CookieKind};
+use crate::remote::consent;
+use crate::remote::handover::{HandoverAsk, HandoverStatus};
 use crate::{Core, CoreError};
 
 /// Optional one-line server URL (e.g. `http://127.0.0.1:3210` for a local Convex behind
@@ -30,32 +31,35 @@ impl Core {
             .unwrap_or_else(|| DEFAULT_SERVER.to_string())
     }
 
-    /// The signed-in VTOP session's cookies, after VTOP confirmed it (signing in again when it
-    /// had expired), so a connected app gets it. Only once the student allowed it
-    /// for `action` ([`consent::allowed`], before any VTOP hit); else `ConsentDenied`.
-    pub(crate) async fn session_cookies(
+    /// The signed-in VTOP session's cookies for a connected app's request, after VTOP confirmed
+    /// it (signing in again when it had expired). Only once the student approved it on the sheet
+    /// ([`consent::allowed_handover`], before any VTOP hit; else `ConsentDenied`); then the app
+    /// hears [`HandoverStatus::Fetching`].
+    pub(crate) async fn handover_cookies(
         &self,
         flow: &str,
-        kind: CookieKind,
-        action: &str,
-        ask: bool,
+        ask: HandoverAsk,
     ) -> Result<Option<String>, CoreError> {
         self.current()?;
-        let server = consent::host(&self.forwarding_server());
-        if !consent::allowed(
-            &self.shared,
-            flow,
-            kind,
-            consent::CookiePayload::Cookie,
-            action,
-            &server,
-            ask,
-        )
-        .await
-        {
+        let (request_id, asker) = (ask.request_id.clone(), ask.asker.clone());
+        if !consent::allowed_handover(&self.shared, flow, ask).await {
             return Err(CoreError::ConsentDenied);
         }
-        #[expect(clippy::disallowed_methods, reason = "consent::allowed said yes above")]
+        consent::handover_status(
+            &self.shared,
+            flow,
+            &request_id,
+            HandoverStatus::Fetching { asker },
+        );
+        self.checked_cookies().await
+    }
+
+    /// The session's cookies after VTOP confirmed it; only after a consent check said yes.
+    async fn checked_cookies(&self) -> Result<Option<String>, CoreError> {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the callers' consent check said yes"
+        )]
         let cookies = |client: &VtopClient| client.export_persisted_session(0).cookies;
         signed_in!(self, |client| async {
             client.verify_session().await.map(|_| cookies(client))

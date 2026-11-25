@@ -15,6 +15,8 @@ use futures::future::{Either, select};
 use tracing::info;
 use vtop_core::sync::sleep;
 
+use crate::remote::consent;
+use crate::remote::keys::KeyKind;
 use crate::{Core, CoreError, Shared, traced, traced_sync};
 pub(crate) use board::Board;
 use board::{Start, Wake};
@@ -23,6 +25,52 @@ use board::{Start, Wake};
 const TIMEOUT: &str = "The phone took too long to sign in to VTOP.";
 /// Below this an FCM time is in seconds, not ms.
 const SECONDS_BELOW: i64 = 10_000_000_000;
+
+/// The key that asked for a session, and from where: the approve sheet and the notification
+/// show it. The server's `asker` (`sessions:pending`) or the push's `keyLabel`, `keyVia`, `ip`
+/// and `ipSeen`.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct HandoverAsker {
+    /// The key's name ("Chrome on MacBook", "Claude").
+    pub key_label: String,
+    pub via: KeyKind,
+    /// The extension's address; None for an AI app (its requests come through our engine) or
+    /// when the server didn't see one.
+    pub ip: Option<AskerIp>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct AskerIp {
+    pub address: String,
+    /// The key used this address before (one of its last two).
+    pub seen: bool,
+}
+
+/// What the approve sheet asks about: a connected app's request for this phone's session.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct HandoverAsk {
+    pub request_id: String,
+    /// None when the server no longer lists the request or didn't say.
+    pub asker: Option<HandoverAsker>,
+    /// Unix ms; None when the server didn't say.
+    pub asked_at: Option<i64>,
+    /// Unix ms; None when the server no longer lists the request.
+    pub expires_at: Option<i64>,
+    /// The host the session goes through ("vmate.aster0.dev").
+    pub server: String,
+}
+
+/// How an approved answer is going, for its notification and the sheet.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum HandoverStatus {
+    /// The student said yes (or ticked "don't ask again" in Connected apps): checking the VTOP
+    /// session, signing in again if it expired, and sending it.
+    Fetching { asker: Option<HandoverAsker> },
+    /// The server took the session.
+    Sent,
+    /// It couldn't be sent; `reason` is for the student.
+    Failed { reason: String },
+}
 
 /// What reached the phone about connected apps' session requests.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
@@ -37,6 +85,7 @@ pub enum HandoverEvent {
         request_id: String,
         expires_at: i64,
         foreground: bool,
+        asker: Option<HandoverAsker>,
     },
     /// Its notification was tapped; the expiry the notification kept, if any (unix ms).
     Tapped {
@@ -51,11 +100,12 @@ pub enum HandoverEvent {
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum HandoverEffect {
     /// Post the request's notification (its tap brings [`HandoverEvent::Tapped`]); it times out at
-    /// `expires_at` (unix ms).
+    /// `expires_at` (unix ms) and names `asker` when known.
     Notify {
         request_id: String,
         notification_id: i32,
         expires_at: i64,
+        asker: Option<HandoverAsker>,
     },
     /// Take a notification down.
     Cancel { notification_id: i32 },
@@ -71,9 +121,10 @@ impl Core {
         traced_sync("handover", &flow, || {
             let now = unix_ms();
             let mut board = self.shared.handover();
-            let (kind, effects) = match event {
+            let (kind, asker, effects) = match event {
                 HandoverEvent::Pushed { data, foreground } => (
                     "pushed",
+                    push_asker(&data),
                     match data.get("requestId").filter(|id| !id.trim().is_empty()) {
                         Some(id) => board.arrived(id, push_expiry(&data), wake(foreground), now),
                         None => Vec::new(),
@@ -83,8 +134,10 @@ impl Core {
                     request_id,
                     expires_at,
                     foreground,
+                    asker,
                 } => (
                     "listed",
+                    asker,
                     board.arrived(&request_id, Some(expires_at), wake(foreground), now),
                 ),
                 HandoverEvent::Tapped {
@@ -92,10 +145,28 @@ impl Core {
                     expires_at,
                 } => (
                     "tapped",
+                    None,
                     board.arrived(&request_id, expires_at, Wake::Tapped, now),
                 ),
-                HandoverEvent::Shown => ("shown", board.shown(now)),
+                HandoverEvent::Shown => ("shown", None, board.shown(now)),
             };
+            // One event is about one request, so its asker names the one notification it posts.
+            let effects: Vec<HandoverEffect> = (effects.into_iter())
+                .map(|effect| match effect {
+                    HandoverEffect::Notify {
+                        request_id,
+                        notification_id,
+                        expires_at,
+                        asker: None,
+                    } => HandoverEffect::Notify {
+                        request_id,
+                        notification_id,
+                        expires_at,
+                        asker: asker.clone(),
+                    },
+                    effect => effect,
+                })
+                .collect();
             let count =
                 |want: fn(&HandoverEffect) -> bool| effects.iter().filter(|e| want(e)).count();
             info!(
@@ -155,7 +226,18 @@ impl Core {
                     let timeout = Err(CoreError::Other {
                         reason: TIMEOUT.into(),
                     });
-                    self.answer_with(&flow, &request_id, timeout).await
+                    // An approved answer's notification stops spinning.
+                    consent::handover_status(
+                        &self.shared,
+                        &flow,
+                        &request_id,
+                        HandoverStatus::Failed {
+                            reason: TIMEOUT.into(),
+                        },
+                    );
+                    self.answer_with(&flow, &request_id, timeout)
+                        .await
+                        .map(|_| ())
                 }
             };
             held.finished = true;
@@ -204,6 +286,30 @@ fn push_expiry(data: &HashMap<String, String>) -> Option<i64> {
         Some(if raw < SECONDS_BELOW { raw * 1000 } else { raw })
     };
     time("expiresAt").or_else(|| Some(time("at")? + board::TTL_MS))
+}
+
+/// Who asked, from FCM's `data` (strings only): `keyLabel` and `keyVia`, then `ip` and `ipSeen`.
+/// None without a label.
+fn push_asker(data: &HashMap<String, String>) -> Option<HandoverAsker> {
+    let key_label = data
+        .get("keyLabel")
+        .map(|label| label.trim())
+        .filter(|label| !label.is_empty())?;
+    let via = match data.get("keyVia").map(String::as_str) {
+        Some("mcp") => KeyKind::Mcp,
+        _ => KeyKind::Browser,
+    };
+    let ip = (data.get("ip").map(|ip| ip.trim()))
+        .filter(|ip| !ip.is_empty())
+        .map(|address| AskerIp {
+            address: address.into(),
+            seen: data.get("ipSeen").is_some_and(|seen| seen == "1"),
+        });
+    Some(HandoverAsker {
+        key_label: key_label.into(),
+        via,
+        ip,
+    })
 }
 
 fn unix_ms() -> i64 {

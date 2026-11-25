@@ -174,14 +174,21 @@ describe("access keys", () => {
       if (path === "/engine/seal") return Response.json({ sealedVault: "should-not-seal" });
     });
     vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
-    const started = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
+    const started = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}`, "x-forwarded-for": "203.0.113.7" } });
     expect(started.status).toBe(202);
     expect(started.headers.get("cache-control")).toBe("no-store");
     const pending = await json(started);
     expect(pending).toMatchObject({ status: "pending", stage: "phone", pushSent: true });
-    // The phone sees the request live with wantCredentials: false and pushSent: true.
+    // The phone sees the request live with wantCredentials: false, pushSent: true and who asked from where.
     expect(await as.query(api.sessions.pending, { flow: "f" })).toEqual([
-      { requestId: pending.requestId, wantCredentials: false, pushSent: true, expiresAt: expect.any(Number) },
+      {
+        requestId: pending.requestId,
+        wantCredentials: false,
+        pushSent: true,
+        askedAt: expect.any(Number),
+        expiresAt: expect.any(Number),
+        asker: { keyLabel: expect.any(String), via: "extension", ip: { address: "203.0.113.7", seen: false } },
+      },
     ]);
     // Piggybacked credentials are ignored and /engine/session is called with seal: false.
     const answered = await as.action(api.sessions.answer, {

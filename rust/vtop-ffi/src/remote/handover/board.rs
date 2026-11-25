@@ -117,6 +117,7 @@ impl Board {
                     request_id: id.into(),
                     notification_id: notification_id(id),
                     expires_at: expiry,
+                    asker: None,
                 });
             }
         }

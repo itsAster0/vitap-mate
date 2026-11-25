@@ -21,8 +21,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import vitapmate.core.HandoverAsker
 import vitapmate.core.HandoverEffect
 import vitapmate.core.HandoverEvent
+import vitapmate.core.HandoverStatus
+import vitapmate.core.KeyKind
+import vitapmate.data.HandoverConsent
 import vitapmate.core.LiveTopic
 import vitapmate.data.AppCore
 import vitapmate.data.orNull
@@ -96,7 +101,7 @@ object Push {
         flow("push.session_request") { f ->
             val effects = attempt { withContext(Dispatchers.IO) { AppCore.await().handover(f, event) } }.getOrDefault(emptyList())
             for (effect in effects) when (effect) {
-                is HandoverEffect.Notify -> asked(app, effect.requestId, effect.notificationId, effect.expiresAt)
+                is HandoverEffect.Notify -> asked(app, effect.requestId, effect.notificationId, effect.expiresAt, effect.asker)
                 is HandoverEffect.Cancel -> NotificationManagerCompat.from(app).cancel(effect.notificationId)
                 is HandoverEffect.Answer -> AppScope.launch { answer(effect.requestId, effect.attempt) }
             }
@@ -123,6 +128,10 @@ object Push {
     private const val ASKED = "connected_apps"
     private const val REJECTED = "account"
     private const val ASKED_TIMEOUT_MS = 60_000L
+    private const val SENT_TIMEOUT_MS = 10_000L
+    /** Sending notifications' ids, apart from the requests' own (Rust's board) and the account's. */
+    private const val SENDING_BASE = 0x5000_0000
+    private const val SENDING_MASK = 0x0fff_ffff
     private const val FOLLOW_RETRY_MS = 30_000L
     private const val FOLLOW_RETRY_MAX_MS = 5 * 60_000L
 
@@ -147,7 +156,7 @@ object Push {
                 Live.changes(LiveTopic.SESSION_REQUESTS).collect {
                     followed = true
                     val pending = attempt { coreFlow("push.pending") { c, id -> c.pendingSessionRequests(id) } }.getOrDefault(emptyList())
-                    for (request in pending) handover(context, HandoverEvent.Listed(request.requestId, request.expiresAt, Foreground.shown))
+                    for (request in pending) handover(context, HandoverEvent.Listed(request.requestId, request.expiresAt, Foreground.shown, request.asker))
                 }
                 wait = if (followed) FOLLOW_RETRY_MS else (wait * 2).coerceAtMost(FOLLOW_RETRY_MAX_MS)
                 delay(wait)
@@ -182,14 +191,70 @@ object Push {
         NotificationManagerCompat.from(context).notify(REJECTED.hashCode(), n)
     }
 
+    private val watching = AtomicBoolean(false)
+
+    /**
+     * Each approved answer's progress ([HandoverConsent.statuses]) as one notification per
+     * request: sending, then signed in or why not. Statuses of requests not approved on this
+     * phone are ignored. Once per process.
+     */
+    fun watchHandovers(context: Context) {
+        if (!watching.compareAndSet(false, true)) return
+        val app = context.applicationContext
+        AppScope.launch {
+            val approved = mutableMapOf<String, HandoverAsker?>()
+            HandoverConsent.statuses.collect { (requestId, status) ->
+                if (status is HandoverStatus.Fetching) approved[requestId] = status.asker
+                if (requestId !in approved) return@collect
+                val who = approved[requestId]?.keyLabel ?: "A connected app"
+                if (status !is HandoverStatus.Fetching) approved.remove(requestId)
+                sending(app, requestId, who, status)
+            }
+        }
+    }
+
+    private fun sending(context: Context, requestId: String, who: String, status: HandoverStatus) {
+        if (!canNotify(context)) return
+        connectedAppsChannel(context)
+        val id = SENDING_BASE or (requestId.hashCode() and SENDING_MASK)
+        val open = PendingIntent.getActivity(
+            context, id,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = NotificationCompat.Builder(context, ASKED)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(open)
+            .setOnlyAlertOnce(true)
+        when (status) {
+            is HandoverStatus.Fetching -> n.setContentTitle("Signing in $who")
+                .setContentText("Getting your VTOP session and sending it")
+                .setOngoing(true)
+                .setSilent(true)
+                .setProgress(0, 0, true)
+                .setTimeoutAfter(ASKED_TIMEOUT_MS * 2)
+            is HandoverStatus.Sent -> n.setContentTitle("$who is signed in")
+                .setContentText("Your phone sent it a VTOP session")
+                .setSilent(true)
+                .setAutoCancel(true)
+                .setTimeoutAfter(SENT_TIMEOUT_MS)
+            is HandoverStatus.Failed -> n.setContentTitle("Couldn't sign in $who")
+                .setContentText(status.reason)
+                .setAutoCancel(true)
+        }
+        NotificationManagerCompat.from(context).notify(id, n.build())
+    }
+
     internal fun canNotify(context: Context) =
         Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     /** A session request while the app is away: tapping opens the app, which asks ([HandoverEvent.Tapped]). */
-    private fun asked(context: Context, requestId: String, notificationId: Int, expiresAtMs: Long) {
+    private fun connectedAppsChannel(context: Context) = context.getSystemService(NotificationManager::class.java)
+        .createNotificationChannel(NotificationChannel(ASKED, "Connected apps", NotificationManager.IMPORTANCE_HIGH).apply { description = "When a browser extension or AI app asks for your VTOP session" })
+
+    private fun asked(context: Context, requestId: String, notificationId: Int, expiresAtMs: Long, asker: HandoverAsker?) {
         if (!canNotify(context)) return
-        context.getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(NotificationChannel(ASKED, "Connected apps", NotificationManager.IMPORTANCE_HIGH).apply { description = "When a browser extension or AI app asks for your VTOP session" })
+        connectedAppsChannel(context)
         val open = PendingIntent.getActivity(
             context, notificationId,
             Intent(context, MainActivity::class.java).putExtra(MainActivity.OPEN, MainActivity.OPEN_SESSION_REQUEST)
@@ -201,8 +266,14 @@ object Push {
         val timeoutMs = (expiresAtMs - System.currentTimeMillis()).coerceIn(1_000L, ASKED_TIMEOUT_MS)
         val n = NotificationCompat.Builder(context, ASKED)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("An app wants your VTOP data")
-            .setContentText("Tap to allow")
+            .setContentTitle(asker?.let { "${it.keyLabel} wants to sign in" } ?: "An app wants your VTOP data")
+            .setContentText(
+                when {
+                    asker?.ip != null -> "From ${asker.ip!!.address}${if (asker.ip!!.seen) "" else " (new IP)"} · tap to review"
+                    asker?.via == KeyKind.MCP -> "An AI app · tap to review"
+                    else -> "Tap to review"
+                },
+            )
             .setContentIntent(open)
             .setTimeoutAfter(timeoutMs)
             .setAutoCancel(true)

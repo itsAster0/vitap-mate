@@ -17,10 +17,12 @@ import {
   type AccountRecord,
   type KeyVia,
   type Plan,
+  type RequestAsker,
   type RequestError,
   RequestRecord,
   SCRUB_REQUEST_SECS,
   type SignInRecord,
+  keyIp,
   keyUse,
   parseRequestError,
   phonesForKey,
@@ -44,6 +46,7 @@ import {
 import { fail } from "./lib/errors";
 import { actionCaller, caller, deviceFcmToken, recordOf } from "./lib/identity";
 import { notify } from "./lib/notify";
+import { requestAsker } from "./schema";
 import { askPhone, insertRequest, pendingRequest, putRequest, requestOf, requestRow } from "./lib/requests";
 import { accountId, log, logError, logWarn, now } from "./lib/util";
 import { startLogin } from "./logins";
@@ -120,11 +123,11 @@ export const keyHolder = internalQuery({
   handler: async (ctx, { keyHash }) => (await keyAccount(ctx, keyHash))?.account._id ?? null,
 });
 
-/** Counts a session call (`limited` past `sessionCall`) and records the key's use, then says what
- * the cache holds. Null for no such key. */
+/** Counts a session call (`limited` past `sessionCall`) and records the key's use (and the
+ * extension's address, `ip`), then says what the cache holds and who asked. Null for no such key. */
 export const start = internalMutation({
-  args: { keyHash: v.string(), via: v.union(v.literal("extension"), v.literal("mcp")) },
-  handler: async (ctx, { keyHash, via }) => {
+  args: { keyHash: v.string(), via: v.union(v.literal("extension"), v.literal("mcp")), ip: v.union(v.string(), v.null()) },
+  handler: async (ctx, { keyHash, via, ip }) => {
     const found = await keyAccount(ctx, keyHash);
     if (!found) return null;
     const { key, account } = found;
@@ -132,8 +135,12 @@ export const start = internalMutation({
     const doc = await recordOf(ctx, account);
     const at = now();
     const use = keyUse(keyOf(key), at, via as KeyVia);
-    if (use) await ctx.db.patch(key._id, use);
-    return { limited: false as const, accountId: account._id, regno: doc.id, cached: doc.cachedSession(at), source: doc.cachedSource() };
+    // An AI app's calls come through our engine, so only the extension's address is its own.
+    const address = via === "extension" ? ip : null;
+    const known = address === null ? null : keyIp(key.ips ?? [], address);
+    if (use || known?.ips) await ctx.db.patch(key._id, { ...use, ...(known?.ips ? { ips: known.ips } : {}) });
+    const asker: RequestAsker = { keyLabel: key.label, via, ip: address === null || known === null ? null : { address, seen: known.seen } };
+    return { limited: false as const, accountId: account._id, regno: doc.id, cached: doc.cachedSession(at), source: doc.cachedSource(), asker };
   },
 });
 
@@ -193,8 +200,8 @@ export async function cachedCookies(
  * `app:login` asks none). Recorded before any network call, so a session call that comes in
  * meanwhile joins it instead of starting another. */
 export const open = internalMutation({
-  args: { accountId: v.id("accounts"), keyHash: v.union(v.string(), v.null()), requestId: v.string() },
-  handler: async (ctx, { accountId: id, keyHash, requestId }) => {
+  args: { accountId: v.id("accounts"), keyHash: v.union(v.string(), v.null()), requestId: v.string(), asker: v.optional(requestAsker) },
+  handler: async (ctx, { accountId: id, keyHash, requestId, asker }) => {
     const at = now();
     const joined = await pendingRequest(ctx, id, at);
     if (joined) return { joined: joined.request.startedView(), requestId: joined.request.id };
@@ -202,6 +209,7 @@ export const open = internalMutation({
     if (!account) return fail("not_linked", "This account no longer exists.");
     const doc = await recordOf(ctx, account);
     const request = new RequestRecord(requestId, at);
+    request.asker = asker ?? null;
     if (keyHash !== null) {
       const key = await ctx.db
         .query("accessKeys")
@@ -389,9 +397,11 @@ export const pending = query({
       .filter((r) => r.waitingOnPhone(at, me.deviceId))
       .map((r) => ({
         requestId: r.id,
+        askedAt: r.createdAt * 1000,
         expiresAt: r.expiresAt * 1000,
         wantCredentials: doc.wantCredentials(at),
         pushSent: r.pushSent(),
+        asker: r.asker,
       }));
   },
 });

@@ -21,6 +21,7 @@ fn notify(id: &str, expires_at: i64) -> HandoverEffect {
         request_id: id.into(),
         notification_id: notification_id(id),
         expires_at,
+        asker: None,
     }
 }
 
@@ -285,12 +286,6 @@ fn notification_ids_are_java_s_string_hash_in_their_own_range() {
 
 #[test]
 fn fcm_expiry_takes_seconds_or_ms_and_falls_back_to_at() {
-    let data = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect()
-    };
     assert_eq!(
         push_expiry(&data(&[("expiresAt", "1700000120000")])),
         Some(1_700_000_120_000)
@@ -308,6 +303,54 @@ fn fcm_expiry_takes_seconds_or_ms_and_falls_back_to_at() {
 }
 
 #[test]
+fn a_push_names_who_asked_in_its_notification() {
+    let core = core("asker");
+    let push = data(&[
+        ("requestId", "req-a"),
+        ("expiresAt", "4102444800000"),
+        ("keyLabel", "Chrome on MacBook"),
+        ("keyVia", "extension"),
+        ("ip", "203.0.113.7"),
+        ("ipSeen", "1"),
+    ]);
+    let effects = core.handover(
+        "f".into(),
+        HandoverEvent::Pushed {
+            data: push,
+            foreground: false,
+        },
+    );
+    let asker = HandoverAsker {
+        key_label: "Chrome on MacBook".into(),
+        via: KeyKind::Browser,
+        ip: Some(AskerIp {
+            address: "203.0.113.7".into(),
+            seen: true,
+        }),
+    };
+    assert_eq!(
+        effects,
+        [HandoverEffect::Notify {
+            request_id: "req-a".into(),
+            notification_id: notification_id("req-a"),
+            expires_at: 4_102_444_800_000,
+            asker: Some(asker),
+        }]
+    );
+    // An AI app's push has no address; one without a label names nobody.
+    let mcp = push_asker(&data(&[("keyLabel", "Claude"), ("keyVia", "mcp")]));
+    assert_eq!(
+        mcp,
+        Some(HandoverAsker {
+            key_label: "Claude".into(),
+            via: KeyKind::Mcp,
+            ip: None,
+        })
+    );
+    assert_eq!(push_asker(&data(&[("ip", "203.0.113.7")])), None);
+}
+
+#[test]
 fn a_push_without_a_request_id_does_nothing() {
     let core = core("no-id");
     let data = HashMap::from([("requestId".to_string(), " ".to_string())]);
@@ -317,6 +360,12 @@ fn a_push_without_a_request_id_does_nothing() {
     };
     assert_eq!(core.handover("f".into(), event), []);
     assert_eq!(core.shared.handover().len(), 0);
+}
+
+fn data(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+    (pairs.iter())
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 fn core(name: &str) -> Core {
@@ -419,6 +468,11 @@ impl CookieGate for Unanswered {
     async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
         Ok(RegnoAnswer::Dismissed)
     }
+    async fn ask_handover(&self, _flow: String, _ask: HandoverAsk) -> Result<bool, CoreError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        std::future::pending().await
+    }
+    fn handover_status(&self, _flow: String, _request_id: String, _status: HandoverStatus) {}
 }
 
 #[tokio::test]

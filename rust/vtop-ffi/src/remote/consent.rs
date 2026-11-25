@@ -16,6 +16,7 @@ use futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
+use crate::remote::handover::{HandoverAsk, HandoverStatus};
 use crate::remote::regno::RegnoAnswer;
 use crate::{Core, CoreError, Shared, store, traced_sync, unix_now};
 
@@ -143,6 +144,12 @@ pub trait CookieGate: Send + Sync {
     /// Shows the "Share your registration number?" sheet ([`crate::remote::regno`]). A timeout
     /// or the app leaving the screen is [`RegnoAnswer::Dismissed`].
     async fn ask_regno(&self, flow: String) -> Result<RegnoAnswer, CoreError>;
+    /// Shows the approve sheet for a connected app's request ([`CookieKind::Handover`]): true
+    /// for Approve. It has no "don't ask again" (that is Connected apps' setting); a timeout or
+    /// the app leaving the screen is no.
+    async fn ask_handover(&self, flow: String, ask: HandoverAsk) -> Result<bool, CoreError>;
+    /// How an approved request's answer is going (its notification, and the sheet's result).
+    fn handover_status(&self, flow: String, request_id: String, status: HandoverStatus);
 }
 
 /// [`FILE`] on disk: `{"remembered":["route","account","handover"]}`. The kinds' names are
@@ -346,6 +353,47 @@ async fn decide(
             let _ = tx.send(waiter_decision);
         }
         return decision;
+    }
+}
+
+/// Whether the session may go to a connected app for `ask`: only with the student on screen,
+/// then a remembered yes for [`CookieKind::Handover`] or Approve on the sheet. Logs the decision
+/// like [`allowed`], never the session.
+pub(crate) async fn allowed_handover(shared: &Shared, flow: &str, ask: HandoverAsk) -> bool {
+    use ConsentDecision::{Denied, Sent};
+    let kind = CookieKind::Handover;
+    let gate = match &shared.consent().gate {
+        Some(gate) if !flow.is_empty() => Some(gate.clone()),
+        _ => None,
+    };
+    let decision = match gate {
+        None => Denied(DeniedWhy::NoGate),
+        Some(gate) if !gate.attended(flow.to_string()) => Denied(DeniedWhy::Unattended),
+        Some(_) if shared.consent().remembered.contains(&kind) => Sent(SentWhy::Remembered),
+        Some(gate) => match gate.ask_handover(flow.to_string(), ask).await {
+            Ok(true) => Sent(SentWhy::Asked),
+            Ok(false) => Denied(DeniedWhy::Asked),
+            Err(_) => Denied(DeniedWhy::Error),
+        },
+    };
+    info!(
+        kind = kind.as_str(),
+        decision = decision.as_str(),
+        "cookie consent"
+    );
+    decision.is_sent()
+}
+
+/// Tells the app how request `request_id`'s answer is going; nothing without a gate.
+pub(crate) fn handover_status(
+    shared: &Shared,
+    flow: &str,
+    request_id: &str,
+    status: HandoverStatus,
+) {
+    let gate = shared.consent().gate.clone();
+    if let Some(gate) = gate {
+        gate.handover_status(flow.to_string(), request_id.to_string(), status);
     }
 }
 

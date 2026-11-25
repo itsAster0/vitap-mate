@@ -50,7 +50,14 @@ export async function askPhone(ctx: MutationCtx, doc: AccountRecord, request: Re
   let asked = false;
   let pushSent = false;
   for (const device of request.phones) {
-    const fields = { requestId: request.id, wantCredentials: doc.wantCredentials(at) ? "1" : "0" };
+    // Who asked, for the notification's text; FCM data is strings only.
+    const asker = request.asker;
+    const fields = {
+      requestId: request.id,
+      wantCredentials: doc.wantCredentials(at) ? "1" : "0",
+      ...(asker ? { keyLabel: asker.keyLabel, keyVia: asker.via } : {}),
+      ...(asker?.ip ? { ip: asker.ip.address, ipSeen: asker.ip.seen ? "1" : "0" } : {}),
+    };
     const sent = await notify(ctx, device, "vtop_cookie_request", fields);
     if (sent !== "missing") asked = true;
     if (sent === "pushed") pushSent = true;

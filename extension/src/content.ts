@@ -23,6 +23,7 @@ function isPageMessage(value: unknown): value is PageMessage {
     case "VTOP_MATE_LOADING":
       return (
         typeof value.text === "string" &&
+        (value.hint === undefined || typeof value.hint === "string") &&
         (value.serverDueAt === undefined || typeof value.serverDueAt === "number") &&
         (value.tone === undefined || value.tone === "active" || value.tone === "ok")
       );
@@ -98,14 +99,19 @@ const BADGE_CSS = `
 .t { font-weight: 700; font-size: 13.5px; }
 .s { font-size: 12px; opacity: .85; margin-top: 1px; }
 .s:empty { display: none; }
+.p { display: inline-block; margin-top: 7px; padding: 3px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 600;
+  background: color-mix(in srgb, currentColor 12%, transparent); }
+.p:empty { display: none; }
 button { all: unset; cursor: pointer; width: 30px; height: 30px; border-radius: 99px; display: grid; place-items: center; opacity: .75; flex: none; }
 button:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
 button:focus-visible { outline: 2px solid currentColor; }
 `;
 
-let badge: { root: HTMLElement; title: HTMLElement; sub: HTMLElement; glyph: HTMLElement } | undefined;
+let badge: { root: HTMLElement; title: HTMLElement; sub: HTMLElement; pill: HTMLElement; glyph: HTMLElement } | undefined;
 let tone: Tone = "active";
 let serverDueAt: number | undefined;
+/** The line under an active title (what to do now), from the background. */
+let hint: string | undefined;
 let hideTimer: number | undefined;
 let countdown: number | undefined;
 /** The sign-in this tab started is a "sign in again" one, for its last words. */
@@ -119,7 +125,7 @@ function ensureBadge() {
   shadow.innerHTML = `<style>${BADGE_CSS}</style>
 <div class="badge hidden" role="status" aria-live="polite">
   <div class="cookie"><svg class="shape" viewBox="0 0 100 100" aria-hidden="true"><path d="${cookiePath(7)}"/></svg><span class="glyph"></span></div>
-  <div class="txt"><div class="t"></div><div class="s"></div></div>
+  <div class="txt"><div class="t"></div><div class="s"></div><div class="p"></div></div>
   <button type="button" aria-label="Close">${svg(GLYPHS.x, 16)}</button>
 </div>`;
   const root = shadow.querySelector<HTMLElement>(".badge")!;
@@ -133,15 +139,17 @@ function ensureBadge() {
     root,
     title: shadow.querySelector<HTMLElement>(".t")!,
     sub: shadow.querySelector<HTMLElement>(".s")!,
+    pill: shadow.querySelector<HTMLElement>(".p")!,
     glyph: shadow.querySelector<HTMLElement>(".glyph")!,
   };
   return badge;
 }
 
-function subText() {
+/** The countdown to the server signing in, while the phone is asked. */
+function pillText() {
   if (tone !== "active" || serverDueAt === undefined) return "";
   const left = Math.ceil((serverDueAt - Date.now()) / 1000);
-  return left > 0 ? `Server takes over in ${left} s` : "";
+  return left > 0 ? `The server takes over in ${left} s` : "";
 }
 
 function showBadge(text: string, next: Tone, sub = "") {
@@ -155,10 +163,11 @@ function showBadge(text: string, next: Tone, sub = "") {
   tone = next;
   b.root.className = `badge ${next}`;
   b.title.textContent = text.replace(/…$/, "");
-  b.sub.textContent = sub || subText();
+  b.sub.textContent = sub || (next === "active" ? (hint ?? "") : "");
+  b.pill.textContent = pillText();
   window.clearInterval(countdown);
   if (next === "active" && serverDueAt !== undefined) {
-    countdown = window.setInterval(() => (b.sub.textContent = subText()), 1000);
+    countdown = window.setInterval(() => (b.pill.textContent = pillText()), 1000);
   }
 }
 
@@ -399,6 +408,7 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
 
   if (message.type === "VTOP_MATE_LOADING") {
     serverDueAt = message.serverDueAt;
+    hint = message.hint;
     if (message.tone === "ok") {
       serverDueAt = undefined;
       if (resigning) showBadge("Signed in again", "ok", "VTOP had signed you out");

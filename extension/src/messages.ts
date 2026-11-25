@@ -26,7 +26,7 @@ export type StateMessage = { type: "VTOP_MATE_STATE"; state: LoginState };
 
 /** Sent from the background worker to the VTOP tab. */
 export type PageMessage =
-  | { type: "VTOP_MATE_LOADING"; text: string; serverDueAt?: number; tone?: "active" | "ok" }
+  | { type: "VTOP_MATE_LOADING"; text: string; hint?: string; serverDueAt?: number; tone?: "active" | "ok" }
   | { type: "VTOP_MATE_ERROR"; text: string }
   | { type: "VTOP_MATE_HIDE_LOADING" };
 
@@ -90,6 +90,7 @@ export function isPageMessage(value: unknown): value is PageMessage {
     case "VTOP_MATE_LOADING":
       return (
         typeof value.text === "string" &&
+        (value.hint === undefined || typeof value.hint === "string") &&
         (value.serverDueAt === undefined || typeof value.serverDueAt === "number") &&
         (value.tone === undefined || value.tone === "active" || value.tone === "ok")
       );

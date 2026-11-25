@@ -10,7 +10,8 @@ use tracing::info;
 
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
-use crate::remote::consent::CookieKind;
+use crate::remote::consent;
+use crate::remote::handover::{AskerIp, HandoverAsk, HandoverAsker, HandoverStatus};
 use crate::remote::server::{PhoneWire, ServerStorage, unexpected};
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, dev, traced};
@@ -30,14 +31,71 @@ pub enum KeyKind {
 }
 
 /// A connected app's request for this phone's VTOP session, waiting for an answer.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, uniffi::Record)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SessionRequest {
     pub request_id: String,
+    /// Unix ms; None from a server before it said.
+    pub asked_at: Option<i64>,
     /// Unix ms.
     pub expires_at: i64,
     /// Whether the app also asks for the saved password.
     pub want_credentials: bool,
+    /// Who asked; None for a request the server kept no asker for.
+    pub asker: Option<HandoverAsker>,
+}
+
+/// `sessions:pending`'s item as sent.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionRequestWire {
+    request_id: String,
+    asked_at: Option<i64>,
+    expires_at: i64,
+    want_credentials: bool,
+    asker: Option<AskerWire>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AskerWire {
+    key_label: String,
+    via: ViaWire,
+    ip: Option<AskerIpWire>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ViaWire {
+    Extension,
+    Mcp,
+}
+
+#[derive(Deserialize)]
+struct AskerIpWire {
+    address: String,
+    seen: bool,
+}
+
+impl From<SessionRequestWire> for SessionRequest {
+    fn from(wire: SessionRequestWire) -> Self {
+        Self {
+            request_id: wire.request_id,
+            asked_at: wire.asked_at,
+            expires_at: wire.expires_at,
+            want_credentials: wire.want_credentials,
+            asker: wire.asker.map(|asker| HandoverAsker {
+                key_label: asker.key_label,
+                via: match asker.via {
+                    ViaWire::Extension => KeyKind::Browser,
+                    ViaWire::Mcp => KeyKind::Mcp,
+                },
+                ip: (asker.ip).map(|ip| AskerIp {
+                    address: ip.address,
+                    seen: ip.seen,
+                }),
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -428,11 +486,15 @@ impl Core {
                 .await;
             let requests = match answer {
                 Err(error) if error.is(&ServerCode::Unauthenticated) => Vec::new(),
-                answer => serde_json::from_value(answer.map_err(refused)?).map_err(|_| {
-                    CoreError::Other {
-                        reason: "The server sent an unexpected answer.".into(),
-                    }
-                })?,
+                answer => {
+                    serde_json::from_value::<Vec<SessionRequestWire>>(answer.map_err(refused)?)
+                        .map_err(|_| CoreError::Other {
+                            reason: "The server sent an unexpected answer.".into(),
+                        })?
+                        .into_iter()
+                        .map(SessionRequest::from)
+                        .collect()
+                }
             };
             info!(count = requests.len(), "session requests");
             Ok(requests)
@@ -444,19 +506,58 @@ impl Core {
 impl Core {
     /// The answer to a `vtop_cookie_request` ([`Core::answer_handover`]): this phone's live VTOP
     /// session, signing in again when it had expired, or why it can't. Only with the student on
-    /// screen saying yes: from the background it is always the error. A failure is sent too,
-    /// then returned.
+    /// screen approving it on the sheet (or a remembered yes): from the background it is always
+    /// the error. Once approved, the app hears how it goes ([`HandoverStatus`]). A failure is
+    /// sent too, then returned.
     pub(crate) async fn answer_session_request(
         &self,
         flow: &str,
         request_id: &str,
     ) -> Result<(), CoreError> {
-        let action = "Give a connected app your VTOP session";
-        let session = self
-            .session_cookies(flow, CookieKind::Handover, action, true)
-            .await
-            .and_then(|cookies| cookies.ok_or(CoreError::NotSignedIn));
-        self.answer_with(flow, request_id, session).await
+        let mut approved = false;
+        let session = match self.current() {
+            Err(error) => Err(error),
+            Ok(_) => {
+                let ask = self.handover_ask(flow, request_id).await;
+                let session = (self.handover_cookies(flow, ask).await)
+                    .and_then(|cookies| cookies.ok_or(CoreError::NotSignedIn));
+                approved = session != Err(CoreError::ConsentDenied);
+                session
+            }
+        };
+        let delivered = self.answer_with(flow, request_id, session).await;
+        if approved {
+            let status = match &delivered {
+                Ok(Delivered::Taken) => HandoverStatus::Sent,
+                Ok(Delivered::Late) => HandoverStatus::Failed {
+                    reason: "The app had stopped waiting.".into(),
+                },
+                Err(error) => HandoverStatus::Failed {
+                    reason: why_not(error),
+                },
+            };
+            consent::handover_status(&self.shared, flow, request_id, status);
+        }
+        delivered.map(|_| ())
+    }
+
+    /// What the approve sheet shows for `request_id`: who asked and when, as the server lists
+    /// it. A request it no longer lists (or a failed read) is asked about without them.
+    async fn handover_ask(&self, flow: &str, request_id: &str) -> HandoverAsk {
+        let listed = match self.pending_session_requests(flow.to_string()).await {
+            Ok(requests) => requests.into_iter().find(|r| r.request_id == request_id),
+            Err(error) => {
+                info!(%error, "session request details unavailable");
+                None
+            }
+        };
+        HandoverAsk {
+            request_id: request_id.into(),
+            asker: listed.as_ref().and_then(|r| r.asker.clone()),
+            asked_at: listed.as_ref().and_then(|r| r.asked_at),
+            expires_at: listed.as_ref().map(|r| r.expires_at),
+            server: consent::host(&self.forwarding_server()),
+        }
     }
 
     async fn pair_app_with(&self, flow: &str, code: &str) -> Result<Option<PairApp>, CoreError> {
@@ -513,28 +614,16 @@ impl Core {
         flow: &str,
         request_id: &str,
         session: Result<String, CoreError>,
-    ) -> Result<(), CoreError> {
+    ) -> Result<Delivered, CoreError> {
         let (body, failed) = match session {
             Ok(cookies) => (
                 json!({ "requestId": request_id, "cookies": cookie_list(&cookies) }),
                 None,
             ),
-            Err(error) => {
-                let reason = match &error {
-                    CoreError::NotSignedIn => "The phone is signed out of VTOP.".to_string(),
-                    CoreError::Offline => "The phone is offline.".to_string(),
-                    CoreError::OtpRequired { .. } => "The phone needs an OTP to sign in.".into(),
-                    CoreError::InvalidCredentials => "VTOP rejected the phone's password.".into(),
-                    CoreError::ConsentDenied | CoreError::RegnoNotShared => {
-                        "The student hasn't allowed it on the phone.".into()
-                    }
-                    error => format!("The phone couldn't get a session: {error}"),
-                };
-                (
-                    json!({ "requestId": request_id, "error": reason }),
-                    Some(error),
-                )
-            }
+            Err(error) => (
+                json!({ "requestId": request_id, "error": why_not(&error) }),
+                Some(error),
+            ),
         };
         let path = "sessions:answer";
         // With a session to send, an install with no identity yet (updated from v2 without a
@@ -553,15 +642,40 @@ impl Core {
         } else {
             self.device_call(flow, Kind::Action, path, body).await
         };
-        info!(
-            sent = failed.is_none(),
-            late = answer.as_ref().ok().and_then(|a| a["late"].as_bool()),
-            "session request answered"
-        );
+        let late = answer.as_ref().ok().and_then(|a| a["late"].as_bool());
+        info!(sent = failed.is_none(), late, "session request answered");
         match (failed, answer) {
             (Some(error), _) => Err(error),
-            (None, answer) => answer.map(|_| ()).map_err(refused),
+            (None, answer) => answer.map_err(refused).map(|_| {
+                if late == Some(true) {
+                    Delivered::Late
+                } else {
+                    Delivered::Taken
+                }
+            }),
         }
+    }
+}
+
+/// Whether the server took a session answer in time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Delivered {
+    Taken,
+    /// The request had ended (answered, timed out or expired) before it arrived.
+    Late,
+}
+
+/// Why a session request got no session, for the server and the app's notification.
+fn why_not(error: &CoreError) -> String {
+    match error {
+        CoreError::NotSignedIn => "The phone is signed out of VTOP.".to_string(),
+        CoreError::Offline => "The phone is offline.".to_string(),
+        CoreError::OtpRequired { .. } => "The phone needs an OTP to sign in.".into(),
+        CoreError::InvalidCredentials => "VTOP rejected the phone's password.".into(),
+        CoreError::ConsentDenied | CoreError::RegnoNotShared => {
+            "The student hasn't allowed it on the phone.".into()
+        }
+        error => format!("The phone couldn't get a session: {error}"),
     }
 }
 
