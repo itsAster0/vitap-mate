@@ -5,6 +5,10 @@
       "cookies": "JSESSIONID=abc; SERVERID=s1"
     },
     {
+      "cookies": "JSESSIONID=abc; SERVERID=s1",
+      "seal": false
+    },
+    {
       "sealedSession": "sealed-session",
       "account": "23ABC4567"
     }
@@ -16,6 +20,12 @@
       "cookies": "JSESSIONID=abc",
       "csrfToken": "csrf",
       "sealedSession": "sealed-session",
+      "ownerHash": "owner-hash"
+    },
+    {
+      "status": "valid",
+      "registrationNumber": "23ABC4567",
+      "cookies": "JSESSIONID=abc",
       "ownerHash": "owner-hash"
     },
     {
@@ -195,6 +205,13 @@
         }
       ],
       "dictionary": "dictionary-id"
+    }
+  ],
+  "McpEvict": [
+    {
+      "keyHashes": [
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      ]
     }
   ]
 }

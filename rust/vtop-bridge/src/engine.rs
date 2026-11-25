@@ -25,8 +25,8 @@ use serde_json::json;
 use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
-    GmailGrant, LoginOutcome, OtpMethod, SealVault, SealedVault, SessionCheck, SessionChecked,
-    SessionStatus,
+    GmailGrant, LoginOutcome, McpEvict, OtpMethod, SealVault, SealedVault, SessionCheck,
+    SessionChecked, SessionStatus,
 };
 use vtop_shared::mailbox::owner_hash;
 use vtop_shared::tokens;
@@ -161,16 +161,17 @@ pub async fn session(
             ));
         }
     };
+    let seal = check.seal.unwrap_or(true);
     let outcome = match state.verifier.registration_number(&session).await {
         Ok(owner) if expected.as_ref().is_none_or(|expected| *expected == owner) => {
             let owner = account_id(&owner);
             SessionChecked {
                 status: SessionStatus::Valid,
-                sealed_session: Some(
+                sealed_session: seal.then(|| {
                     state
                         .accounts_sealer()
-                        .seal_json(&accounts_aad(&owner), &session),
-                ),
+                        .seal_json(&accounts_aad(&owner), &session)
+                }),
                 owner_hash: Some(owner_hash(&state.config.vault_key, &owner)),
                 csrf_token: session.csrf_token.clone(),
                 cookies: Some(session.cookies),
@@ -530,6 +531,21 @@ fn signed_in(
             }
         }
     }
+}
+
+/// Evicts cached MCP sessions and key-check entries for the given SHA-256 hex key hashes.
+pub async fn mcp_evict(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Result<Json<McpEvict>, JsonRejection>,
+) -> Result<Response, ApiError> {
+    require_secret(&state, &headers)?;
+    let Json(body) = body.map_err(|_| bad_request("Invalid JSON body."))?;
+    let evicted = match &state.mcp_evictor {
+        Some(evictor) => evictor.evict(&body.key_hashes).await,
+        None => 0,
+    };
+    Ok(Json(json!({ "evicted": evicted })).into_response())
 }
 
 /// Convex: the owner hash of a regno the verifier (`vtop-verifier`) proved, `{registrationNumber}`

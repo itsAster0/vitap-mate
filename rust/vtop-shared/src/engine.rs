@@ -37,6 +37,9 @@ pub const MAIL_OWNER: &str = "/internal/mail-otp/owner";
 /// tlsn session both ways; the engine's last message is one text frame, a
 /// [`ProofVerdict`], which the edge keeps from the phone.
 pub const PROOF_VERIFY: &str = "/engine/proof";
+/// Engine: evicts the MCP server's in-memory session and key caches for the
+/// given SHA-256 hex key hashes.
+pub const MCP_EVICT: &str = "/engine/mcp/evict";
 /// Edge: the outcome of a [`LOGIN`].
 pub const LOGIN_DONE: &str = "/internal/accounts/login-done";
 /// Edge: waits for the next forwarded OTP of a student, sealed to a key.
@@ -56,6 +59,17 @@ pub struct SessionCheck {
     /// The account a sealed session belongs to (its seal is bound to it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<String>,
+    /// Whether to seal and return `sealedSession`; omitted defaults to `true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seal: Option<bool>,
+}
+
+/// Request body of [`MCP_EVICT`]: SHA-256 hex hashes of access keys whose RAM
+/// cache entries should be dropped immediately.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpEvict {
+    pub key_hashes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -397,12 +411,13 @@ mod tests {
         round_trips::<OtpAwaited>(&samples, "OtpAwaited");
         round_trips::<PageFetch>(&samples, "PageFetch");
         round_trips::<PageBatch>(&samples, "PageBatch");
+        round_trips::<McpEvict>(&samples, "McpEvict");
         let names = samples
             .as_object()
             .unwrap()
             .keys()
             .filter(|k| *k != "comment");
-        assert_eq!(names.count(), 10);
+        assert_eq!(names.count(), 11);
     }
 
     #[test]

@@ -53,9 +53,40 @@ impl KeyCache {
         }
         Ok(valid)
     }
+
+    fn evict_hashes(&self, key_hashes: &[String]) -> usize {
+        let mut known = self
+            .known
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut removed = 0;
+        for hash in key_hashes {
+            if known.remove(hash).is_some() {
+                removed += 1;
+            }
+        }
+        removed
+    }
 }
 
-fn hex_sha256(value: &str) -> String {
+/// Handle for evicting cached MCP sessions and key-check entries by SHA-256 hex key hash.
+#[derive(Clone)]
+pub struct McpEvictor {
+    keys: Arc<KeyCache>,
+    sessions: Option<Arc<bridge::CachedSessions>>,
+}
+
+impl McpEvictor {
+    pub async fn evict(&self, key_hashes: &[String]) -> usize {
+        let mut removed = self.keys.evict_hashes(key_hashes);
+        if let Some(sessions) = &self.sessions {
+            removed += sessions.evict_hashes(key_hashes).await;
+        }
+        removed
+    }
+}
+
+pub(crate) fn hex_sha256(value: &str) -> String {
     use sha2::{Digest, Sha256};
     Sha256::digest(value.as_bytes())
         .iter()
@@ -130,11 +161,32 @@ pub fn router_with_cache(source: Arc<dyn SessionSource>, key_ttl: Duration) -> R
 /// Only `/mcp` (and `/mcp/<key>`), for a service that has its own health
 /// route: the engine serves the tools itself this way.
 pub fn mcp_router(source: Arc<dyn SessionSource>, key_ttl: Duration) -> Router {
+    mcp_router_inner(source, None, key_ttl).0
+}
+
+/// Like [`mcp_router`], returning an [`McpEvictor`] wired to both the session
+/// RAM cache and the key-check cache.
+pub fn mcp_router_with_evictor(
+    sessions: Arc<bridge::CachedSessions>,
+    key_ttl: Duration,
+) -> (Router, McpEvictor) {
+    mcp_router_inner(sessions.clone(), Some(sessions), key_ttl)
+}
+
+fn mcp_router_inner(
+    source: Arc<dyn SessionSource>,
+    sessions: Option<Arc<bridge::CachedSessions>>,
+    key_ttl: Duration,
+) -> (Router, McpEvictor) {
     let cache = Arc::new(KeyCache {
         source: source.clone(),
         ttl: key_ttl,
         known: Mutex::new(HashMap::new()),
     });
+    let evictor = McpEvictor {
+        keys: cache.clone(),
+        sessions,
+    };
     // Stateless: nothing lives in memory between requests, so Railway's
     // app sleeping loses nothing. The bearer key guards the endpoint, so
     // the Host allow-list (meant for localhost servers) is off.
@@ -148,8 +200,9 @@ pub fn mcp_router(source: Arc<dyn SessionSource>, key_ttl: Duration) -> Router {
         Arc::new(NeverSessionManager::default()),
         mcp_config,
     );
-    Router::new()
+    let router = Router::new()
         .nest_service("/mcp", mcp)
         // Only `/mcp`: other paths of a service that merges this stay 404.
-        .route_layer(middleware::from_fn_with_state(cache, require_bearer))
+        .route_layer(middleware::from_fn_with_state(cache, require_bearer));
+    (router, evictor)
 }

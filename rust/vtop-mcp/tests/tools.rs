@@ -200,7 +200,7 @@ async fn expired_request_is_phone_timeout() {
         .mount(&server)
         .await;
     let error = client(&server).session(KEY).await.unwrap_err();
-    assert!(error.starts_with("phone_timeout"), "{error}");
+    assert_eq!(error, vtop_mcp::bridge::PHONE_TIMEOUT_ERROR);
 }
 
 #[tokio::test]

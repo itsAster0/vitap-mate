@@ -35,26 +35,29 @@ async fn main() {
     // caller's own key; the edge sends `/mcp` on to this service.
     // Sessions are kept a few minutes, so a run of tool calls asks the edge
     // (and VTOP, to check it) once.
-    let sessions = vtop_mcp::bridge::CachedSessions::new(
+    let sessions = Arc::new(vtop_mcp::bridge::CachedSessions::new(
         Arc::new(vtop_mcp::bridge::BridgeClient::new(
             https(),
             config.edge_url.clone(),
         )),
         Duration::from_secs(300),
-    );
-    let mcp = vtop_mcp::mcp_router(Arc::new(sessions), Duration::from_secs(300));
-    let state = Arc::new(AppState::new(
-        config,
-        Parts {
-            forwarded_login: Arc::new(CoreLogin {
-                config: vtop_core::VtopConfig::default(),
-            }),
-            verifier: Arc::new(CoreVerifier {
-                config: vtop_core::VtopConfig::default(),
-            }),
-            gmail: Arc::new(GoogleOAuthRefresher::new(https(), DEFAULT_TOKEN_URL.into())),
-        },
     ));
+    let (mcp, mcp_evictor) = vtop_mcp::mcp_router_with_evictor(sessions, Duration::from_secs(300));
+    let state = Arc::new(
+        AppState::new(
+            config,
+            Parts {
+                forwarded_login: Arc::new(CoreLogin {
+                    config: vtop_core::VtopConfig::default(),
+                }),
+                verifier: Arc::new(CoreVerifier {
+                    config: vtop_core::VtopConfig::default(),
+                }),
+                gmail: Arc::new(GoogleOAuthRefresher::new(https(), DEFAULT_TOKEN_URL.into())),
+            },
+        )
+        .with_mcp_evictor(mcp_evictor),
+    );
     tracing::info!("starting vtop-engine on {listen}");
 
     // Hosts without IPv6 (some containers) refuse `[::]`; take IPv4 there.

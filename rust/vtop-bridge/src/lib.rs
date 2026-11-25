@@ -50,6 +50,8 @@ pub struct AppState {
     pub gmail: Arc<dyn GmailRefresher>,
     /// The VTOP that phone sign-ins and fetches go to.
     pub vtop: vtop_core::VtopConfig,
+    /// Evicts in-memory MCP session and key caches when storage changes or keys are revoked.
+    pub mcp_evictor: Option<vtop_mcp::McpEvictor>,
     sealer: Sealer,
 }
 
@@ -61,6 +63,7 @@ impl AppState {
             forwarded_login: parts.forwarded_login,
             gmail: parts.gmail,
             vtop: vtop_core::VtopConfig::default(),
+            mcp_evictor: None,
             config,
         }
     }
@@ -68,6 +71,12 @@ impl AppState {
     /// Sends phone sign-ins and fetches to another VTOP (a mock, in tests).
     pub fn with_vtop(mut self, vtop: vtop_core::VtopConfig) -> Self {
         self.vtop = vtop;
+        self
+    }
+
+    /// Wires the MCP cache evictor so `POST /engine/mcp/evict` drops cached sessions and keys.
+    pub fn with_mcp_evictor(mut self, evictor: vtop_mcp::McpEvictor) -> Self {
+        self.mcp_evictor = Some(evictor);
         self
     }
 
@@ -84,6 +93,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
+        .route(vtop_shared::engine::MCP_EVICT, post(engine::mcp_evict))
         .route(engine::OWNER_HASH, post(engine::owner_hash_of))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::FETCH_BATCH, post(fetch::fetch_batch))

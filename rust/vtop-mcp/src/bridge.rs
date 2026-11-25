@@ -29,14 +29,15 @@ pub trait SessionSource: Send + Sync {
 }
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(20);
-/// How long a tool waits for a pending request: up to 45 s for the phone,
-/// then a vault login that may wait 45 s for the OTP mail. The bridge gives
-/// up at 120 s.
-const PENDING_WAIT: Duration = Duration::from_secs(110);
+/// Cap phone waits under Convex's 32 s `/mcp` proxy timeout so the client gets
+/// an actionable tool error instead of a generic 504.
+pub const PENDING_WAIT: Duration = Duration::from_secs(25);
+pub const PHONE_TIMEOUT_ERROR: &str = "Your phone didn't answer in time. Open VITAP Mate on your phone and retry, or turn on Store on server in Connected apps for offline access.";
 
 pub struct BridgeClient {
     http: reqwest::Client,
     base_url: String,
+    pending_wait: Duration,
 }
 
 fn error_text(body: &Value, fallback: &str) -> String {
@@ -67,7 +68,13 @@ impl BridgeClient {
         Self {
             http,
             base_url: base_url.trim_end_matches('/').to_string(),
+            pending_wait: PENDING_WAIT,
         }
+    }
+
+    pub fn with_pending_wait(mut self, pending_wait: Duration) -> Self {
+        self.pending_wait = pending_wait;
+        self
     }
 
     /// Sends a request with the key. A connection error, or a 502/503
@@ -79,6 +86,17 @@ impl BridgeClient {
         path: &str,
         key: &str,
     ) -> Result<(StatusCode, Value), String> {
+        self.call_with_timeout(method, path, key, CALL_TIMEOUT)
+            .await
+    }
+
+    async fn call_with_timeout(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        key: &str,
+        timeout: Duration,
+    ) -> Result<(StatusCode, Value), String> {
         let mut attempt = 0;
         loop {
             attempt += 1;
@@ -88,7 +106,7 @@ impl BridgeClient {
                 .bearer_auth(key)
                 // So the account shows this key was used by an AI agent.
                 .header("x-vtop-client", "mcp")
-                .timeout(CALL_TIMEOUT)
+                .timeout(timeout)
                 .send()
                 .await;
             let response = match sent {
@@ -133,6 +151,7 @@ impl SessionSource for BridgeClient {
     }
 
     async fn session(&self, key: &str) -> Result<SessionState, String> {
+        let deadline = Instant::now() + self.pending_wait;
         let (status, body) = self.call(reqwest::Method::POST, "/v1/session", key).await?;
         match status {
             StatusCode::OK => return session_of(&body),
@@ -150,11 +169,32 @@ impl SessionSource for BridgeClient {
                 .unwrap_or(1500)
                 .clamp(10, 5000),
         );
-        let deadline = Instant::now() + PENDING_WAIT;
         loop {
-            tokio::time::sleep(poll_after).await;
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(PHONE_TIMEOUT_ERROR.to_string());
+            }
+            tokio::time::sleep(poll_after.min(remaining)).await;
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(PHONE_TIMEOUT_ERROR.to_string());
+            }
             let path = format!("/v1/session/requests/{request_id}");
-            let (status, body) = self.call(reqwest::Method::GET, &path, key).await?;
+            let (status, body) = match self
+                .call_with_timeout(
+                    reqwest::Method::GET,
+                    &path,
+                    key,
+                    remaining.min(CALL_TIMEOUT),
+                )
+                .await
+            {
+                Ok(reply) => reply,
+                Err(_) if Instant::now() >= deadline => {
+                    return Err(PHONE_TIMEOUT_ERROR.to_string());
+                }
+                Err(err) => return Err(err),
+            };
             match status {
                 StatusCode::ACCEPTED => {}
                 StatusCode::OK if body.get("status").and_then(Value::as_str) == Some("ready") => {
@@ -162,12 +202,9 @@ impl SessionSource for BridgeClient {
                 }
                 StatusCode::OK => return Err(error_text(&body, "the session request failed")),
                 StatusCode::GONE => {
-                    return Err("phone_timeout: The phone did not answer in time.".to_string());
+                    return Err(PHONE_TIMEOUT_ERROR.to_string());
                 }
                 other => return Err(error_text(&body, other.as_str())),
-            }
-            if Instant::now() >= deadline {
-                return Err("phone_timeout: The phone did not answer in time.".to_string());
             }
         }
     }
@@ -184,10 +221,12 @@ impl SessionSource for BridgeClient {
     }
 }
 
-/// Keeps each key's session for `ttl`, so tools called one after another
+/// Keeps each key's session in RAM for `ttl`, so tools called one after another
 /// skip the trip to the edge (and the edge's VTOP check of its cached
-/// session). When VTOP rejects a kept session, the tools call `expire`,
-/// which drops it here too and fetches a fresh one.
+/// session). Keyed by SHA-256 hex of the access key so the backend can evict
+/// entries when storage settings change or a key is revoked. When VTOP rejects
+/// a kept session, the tools call `expire`, which drops it here too and fetches
+/// a fresh one.
 pub struct CachedSessions {
     inner: std::sync::Arc<dyn SessionSource>,
     ttl: Duration,
@@ -202,6 +241,18 @@ impl CachedSessions {
             kept: Default::default(),
         }
     }
+
+    /// Drops cached sessions for the given SHA-256 hex key hashes.
+    pub async fn evict_hashes(&self, key_hashes: &[String]) -> usize {
+        let mut kept = self.kept.lock().await;
+        let mut removed = 0;
+        for hash in key_hashes {
+            if kept.remove(hash).is_some() {
+                removed += 1;
+            }
+        }
+        removed
+    }
 }
 
 #[async_trait]
@@ -211,10 +262,11 @@ impl SessionSource for CachedSessions {
     }
 
     async fn session(&self, key: &str) -> Result<SessionState, String> {
+        let hash = crate::hex_sha256(key);
         {
             let mut kept = self.kept.lock().await;
             kept.retain(|_, (at, _)| at.elapsed() < self.ttl);
-            if let Some((_, session)) = kept.get(key) {
+            if let Some((_, session)) = kept.get(&hash) {
                 return Ok(session.clone());
             }
         }
@@ -224,13 +276,13 @@ impl SessionSource for CachedSessions {
             self.kept
                 .lock()
                 .await
-                .insert(key.to_string(), (Instant::now(), session.clone()));
+                .insert(hash, (Instant::now(), session.clone()));
         }
         Ok(session)
     }
 
     async fn expire(&self, key: &str) -> Result<(), String> {
-        self.kept.lock().await.remove(key);
+        self.kept.lock().await.remove(&crate::hex_sha256(key));
         self.inner.expire(key).await
     }
 }
@@ -291,5 +343,75 @@ mod tests {
         cached.session("a").await.unwrap();
         cached.session("a").await.unwrap();
         assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn evicts_by_key_hash_without_touching_other_keys() {
+        let inner = Arc::new(Counting::default());
+        let cached = CachedSessions::new(inner.clone(), Duration::from_secs(300));
+        let a1 = cached.session("vtm_a").await.unwrap();
+        let b1 = cached.session("vtm_b").await.unwrap();
+        assert_eq!(cached.session("vtm_a").await.unwrap(), a1);
+        assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
+
+        let removed = cached.evict_hashes(&[crate::hex_sha256("vtm_a")]).await;
+        assert_eq!(removed, 1);
+        assert_eq!(cached.session("vtm_b").await.unwrap(), b1);
+        assert_ne!(cached.session("vtm_a").await.unwrap(), a1);
+        assert_eq!(inner.sessions.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn pending_wait_caps_below_convex_timeout_with_clear_tool_error() {
+        assert!(PENDING_WAIT < Duration::from_secs(32));
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/v1/session"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(202)
+                    .set_body_json(serde_json::json!({"requestId": "req-1", "pollAfterMs": 10})),
+            )
+            .mount(&server)
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/v1/session/requests/req-1"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(202)
+                    .set_body_json(serde_json::json!({"status": "pending", "stage": "phone"})),
+            )
+            .mount(&server)
+            .await;
+
+        let http = vtop_core::client::https_client(&[]).build().unwrap();
+        let client =
+            BridgeClient::new(http, server.uri()).with_pending_wait(Duration::from_millis(35));
+        let err = client.session("vtm_k").await.unwrap_err();
+        assert_eq!(err, PHONE_TIMEOUT_ERROR);
+    }
+
+    #[tokio::test]
+    async fn expired_request_returns_clear_tool_error() {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/v1/session"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(202)
+                    .set_body_json(serde_json::json!({"requestId": "req-gone", "pollAfterMs": 10})),
+            )
+            .mount(&server)
+            .await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/v1/session/requests/req-gone"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(410)
+                    .set_body_json(serde_json::json!({"code": "request_expired"})),
+            )
+            .mount(&server)
+            .await;
+
+        let http = vtop_core::client::https_client(&[]).build().unwrap();
+        let client = BridgeClient::new(http, server.uri());
+        let err = client.session("vtm_k").await.unwrap_err();
+        assert_eq!(err, PHONE_TIMEOUT_ERROR);
     }
 }

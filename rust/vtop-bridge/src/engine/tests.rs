@@ -74,6 +74,7 @@ async fn every_route_needs_the_shared_secret() {
         vtop_shared::engine::SESSION,
         vtop_shared::engine::SEAL,
         vtop_shared::engine::LOGIN,
+        vtop_shared::engine::MCP_EVICT,
         vtop_shared::engine::MAIL_OWNER,
     ] {
         let (status, _) = post(&app, uri, "wrong", json!({})).await;
@@ -120,6 +121,128 @@ async fn fresh_cookies_name_their_owner_and_come_back_sealed() {
     .await;
     assert_eq!(body["status"], "expired");
     assert!(body.get("cookies").is_none());
+}
+
+#[tokio::test]
+async fn session_check_omits_sealed_session_when_seal_is_false() {
+    let (app, state) = engine_app(FakeLogin::default());
+    let (status, body) = post(
+        &app,
+        vtop_shared::engine::SESSION,
+        RELAY,
+        json!({"cookies": "REG=23abc4567", "seal": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "valid");
+    assert_eq!(body["registrationNumber"], "23ABC4567");
+    assert_eq!(body["cookies"], "REG=23abc4567");
+    assert_eq!(
+        body["ownerHash"],
+        owner_hash(&state.config.vault_key, "23ABC4567")
+    );
+    assert!(body.get("sealedSession").is_none());
+
+    // Explicit `seal: true` still returns `sealedSession`.
+    let (status, body) = post(
+        &app,
+        vtop_shared::engine::SESSION,
+        RELAY,
+        json!({"cookies": "REG=23abc4567", "seal": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["sealedSession"].is_string());
+}
+
+#[tokio::test]
+async fn mcp_evict_route_requires_internal_token_and_drops_cached_sessions() {
+    use async_trait::async_trait;
+    use std::sync::atomic::AtomicUsize;
+    use std::time::Duration;
+    use vtop_mcp::bridge::{CachedSessions, Identity, SessionSource};
+
+    #[derive(Default)]
+    struct StubSource {
+        sessions: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SessionSource for StubSource {
+        async fn whoami(&self, _key: &str) -> Result<Option<Identity>, String> {
+            Ok(Some(Identity {
+                registration_number: REG.into(),
+                key_label: None,
+                semester_id: None,
+                outings: false,
+            }))
+        }
+        async fn session(&self, key: &str) -> Result<SessionState, String> {
+            let n = self.sessions.fetch_add(1, Ordering::SeqCst);
+            Ok(cookies_session(&format!("{key}-{n}")))
+        }
+        async fn expire(&self, _key: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    let inner = Arc::new(StubSource::default());
+    let sessions = Arc::new(CachedSessions::new(inner.clone(), Duration::from_secs(300)));
+    let (_mcp, evictor) =
+        vtop_mcp::mcp_router_with_evictor(sessions.clone(), Duration::from_secs(300));
+    let config = Config::from_lookup(|name| match name {
+        "VAULT_KEY" => Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()),
+        "CONVEX_URL" => Some("https://edge.example".into()),
+        "INTERNAL_TOKEN" => Some(RELAY.into()),
+        "GATEWAY_TOKEN" => Some(GATEWAY.into()),
+        "OTP_WAIT_SECS" => Some("2".into()),
+        "PORT" => Some("8080".into()),
+        _ => None,
+    })
+    .unwrap();
+    let state = Arc::new(
+        AppState::new(
+            config,
+            Parts {
+                forwarded_login: Arc::new(FakeLogin::default()),
+                verifier: Arc::new(FakeVerifier),
+                gmail: Arc::new(FakeRefresher::default()),
+            },
+        )
+        .with_mcp_evictor(evictor),
+    );
+    let app = crate::router(state);
+
+    // Populate the RAM cache for two keys.
+    let s1 = sessions.session("vtm_key1").await.unwrap();
+    let s2 = sessions.session("vtm_key2").await.unwrap();
+    assert_eq!(sessions.session("vtm_key1").await.unwrap(), s1);
+    assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
+
+    // Gateway token is rejected.
+    let (status, _) = post(
+        &app,
+        vtop_shared::engine::MCP_EVICT,
+        GATEWAY,
+        json!({"keyHashes": [tokens::hash("vtm_key1")]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // Internal token evicts only the named key hash.
+    let (status, body) = post(
+        &app,
+        vtop_shared::engine::MCP_EVICT,
+        RELAY,
+        json!({"keyHashes": [tokens::hash("vtm_key1")]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["evicted"], 1);
+
+    assert_eq!(sessions.session("vtm_key2").await.unwrap(), s2);
+    assert_ne!(sessions.session("vtm_key1").await.unwrap(), s1);
+    assert_eq!(inner.sessions.load(Ordering::SeqCst), 3);
 }
 
 /// Convex asks for a proved regno's owner hash: the same hash the session check gives, so the
