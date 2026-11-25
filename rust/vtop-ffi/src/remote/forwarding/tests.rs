@@ -367,7 +367,7 @@ async fn sign_out_leaves_the_address_on_the_edge() {
     keep_token(&core, &url);
     core.set_up_forwarding("f".into()).await.unwrap();
 
-    core.sign_out("f-out".into());
+    core.sign_out_here("f-out");
     assert!(!dir.join(FILE).exists());
     assert!(dir.join(LEAVE_FILE).exists());
     // A server refusing it for now (or offline): still queued.
@@ -415,7 +415,7 @@ async fn forwarding_core(name: &str) -> (Core, Arc<Mutex<Edge>>, std::path::Path
 #[tokio::test]
 async fn a_queued_leave_waits_for_the_next_identity() {
     let (core, edge, dir, url) = forwarding_core("later").await;
-    core.sign_out("f-out".into());
+    core.sign_out_here("f-out");
     core.forget_identity();
     core.leave_old_forwarding("f".into()).await.unwrap();
     assert!(dir.join(LEAVE_FILE).exists());
@@ -453,8 +453,30 @@ async fn signing_out_of_the_server_leaves_first_then_forgets() {
     assert!(!dir.join(FILE).exists());
     assert!(core.device().refresh.is_none());
     // The local sign-out then has nothing left to queue.
-    core.sign_out("f-out".into());
+    core.sign_out_here("f-out");
     assert!(!dir.join(LEAVE_FILE).exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn sign_out_ends_signed_out_here_when_the_server_fails() {
+    let (core, edge, dir, _url) = forwarding_core("signout-all").await;
+    edge.lock().unwrap().canned.insert(
+        "auth:signOut".into(),
+        [(
+            500,
+            json!({ "code": "server_error", "error": "Try again." }),
+        )]
+        .into(),
+    );
+    core.sign_out("f-all".into(), false).await;
+    assert!(core.signed_in_user("f".into()).is_none());
+    assert!(!dir.join(FILE).exists());
+    // The address went first, while the identity lasted; the server sign-out was tried.
+    let sent = paths(&edge);
+    let leave = sent.iter().position(|p| p == "mail:leave").unwrap();
+    let out = sent.iter().position(|p| p == "auth:signOut").unwrap();
+    assert!(leave < out);
     let _ = fs::remove_dir_all(&dir);
 }
 

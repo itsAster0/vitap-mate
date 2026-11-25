@@ -644,7 +644,7 @@ async fn weekend_cancel_and_pass() {
     );
 
     // Signing out drops the cached lists.
-    core.sign_out("f".into());
+    core.sign_out_here("f");
     assert!(!dir.join(PAGES).exists());
     let _ = fs::remove_dir_all(&dir);
 }

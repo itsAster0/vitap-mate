@@ -44,7 +44,7 @@ mod tests {
             expires_at: 0,
         };
         core.write_plain(FILE, &saved);
-        core.sign_out("f".into());
+        core.sign_out_here("f");
         assert!(!core.at(FILE).exists());
     }
 }

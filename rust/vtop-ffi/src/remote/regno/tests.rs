@@ -320,7 +320,7 @@ async fn a_fresh_sign_in_after_a_sign_out_is_asked_again() {
     let (core, _edge, server) = setup("out").await;
     keep_token(&core, &server);
     core.run_regno_effects(REGNO, vec![Effect::Save(StoredAnswer::Shared)]);
-    core.sign_out("out".into());
+    core.sign_out_here("out");
     // The refresh token stays to leave the old address, but it is no answer.
     assert!(core.device().refresh.is_some());
     assert_eq!(core.read::<Stored>(FILE), Some(Stored::default()));

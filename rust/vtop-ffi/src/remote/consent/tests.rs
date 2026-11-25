@@ -289,7 +289,7 @@ fn another_student_forgets_remembered_kinds() {
     // Signing out forgets them too.
     gate.answers.lock().unwrap().push_back(YES_REMEMBER);
     assert!(check(&core, "f2", CookieKind::Route, true));
-    core.sign_out("f".into());
+    core.sign_out_here("f");
     assert!(core.cookie_consent_remembered("f".into()).is_empty());
     let _ = fs::remove_dir_all(&core.dir);
 }

@@ -40,7 +40,7 @@ async fn calls_log_ms_and_outcome_without_secrets() {
         .sign_in("f-sign".into(), " ".into(), "hunter2-secret".into())
         .await;
     assert_eq!(signed_in, Err(CoreError::InvalidCredentials));
-    core.sign_out("f-out".into());
+    core.sign_out_here("f-out");
     assert_eq!(core.signed_in_user("f-user".into()), None);
     // Signing out forgets the semester pick and every cached page.
     assert!(!dir.join(PAGES).exists() && !dir.join(SELECTED).exists());
@@ -419,7 +419,7 @@ async fn another_student_signing_in_drops_the_last_ones_pages() {
     assert!(dir.join(forwarding::FILE).exists());
 
     // Signing out forgets the forwarding address too (the next sign-in can join it again).
-    core.sign_out("f".into());
+    core.sign_out_here("f");
     assert!(!dir.join(forwarding::FILE).exists() && !dir.join(PAGES).exists());
     let _ = fs::remove_dir_all(&dir);
 }
@@ -500,7 +500,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     assert_eq!((state.otp_issued_at, state.cookies.as_str()), (None, ""));
     drop(session);
 
-    core.sign_out("f".into());
+    core.sign_out_here("f");
     assert_eq!(
         core.cancel_otp("f".into()).await,
         Err(CoreError::NotSignedIn)
@@ -571,7 +571,7 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
         core.read::<PersistedVtopSession>(SESSION).unwrap().cookies,
         None
     );
-    core.sign_out("f".into());
+    core.sign_out_here("f");
     assert_eq!(memory.cookie(vtop), None);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -788,7 +788,7 @@ fn sign_out_forgets_the_connection_choice() {
     core.set_route("route-set".into(), route::Route::Server)
         .unwrap();
     assert!(dir.join(route::FILE).exists());
-    core.sign_out("route-out".into());
+    core.sign_out_here("route-out");
     assert!(!dir.join(route::FILE).exists());
     assert_eq!(
         core.route_status("route-status".into()).chosen,
@@ -827,7 +827,7 @@ fn sign_out_leaves_only_the_phone_files() {
     }
     // Not Core::new: its log setup is global (see calls_log_ms_and_outcome_without_secrets).
     let core = Core::for_test(&dir);
-    core.sign_out("sign-out".into());
+    core.sign_out_here("sign-out");
     let mut left: Vec<String> = fs::read_dir(&dir)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -976,7 +976,7 @@ fn kept_pages_go_with_clears_and_sign_out() {
     fs::write(&page, attendance_json("AP1", 1, "30")).unwrap();
     assert!(first_course(&core).is_some());
     assert!(core.cached_semesters("f".into()).is_some());
-    core.sign_out("f".into());
+    core.sign_out_here("f");
     assert_eq!(first_course(&core), None);
     assert!(core.cached_semesters("f".into()).is_none());
     assert_eq!(

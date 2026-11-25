@@ -7,7 +7,7 @@ import org.json.JSONObject
 /**
  * Recently opened VTOP pages, newest first, for one account (the Flutter app's
  * `VtopRecentPages`: same key, same JSON, 6 kept); another account's list reads as empty. Sign-out
- * removes the key.
+ * and another student signing in remove the key.
  */
 internal object VtopRecent {
     const val KEY = "settings_vtop_recent_pages"
@@ -32,5 +32,10 @@ internal object VtopRecent {
         return pages
     }
 
+    fun forget(context: Context) = prefs(context).edit().remove(KEY).apply()
+
     private fun prefs(context: Context) = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 }
+
+/** Forgets the recently opened VTOP pages: the student signed out or another one signed in. */
+fun forgetRecentVtopPages(context: Context) = VtopRecent.forget(context)

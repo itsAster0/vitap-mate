@@ -1676,8 +1676,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_sign_in(`ptr`: Long,`flow`: RustBuffer.ByValue,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_sign_out(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_sign_out(`ptr`: Long,`flow`: RustBuffer.ByValue,`everywhere`: Byte,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_signed_in_user(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_submit_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
@@ -2376,7 +2376,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_in() and 0xFFFF) != 30202) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 7796) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 17130) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 63140) {
@@ -5287,10 +5287,13 @@ public interface CoreInterface {
     suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): SignIn
     
     /**
-     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address, and queues the
-     * address to be left on the edge (a sign-in can join it again there). Logs stay.
+     * Signs out, in the one order that leaves nothing behind: off the server while the identity
+     * lasts ([`Core::sign_out_of_server`], for every phone on the account with `everywhere`),
+     * then everything on this phone ([`Core::sign_out_here`]), then off the forwarding
+     * addresses left behind ([`Core::leave_old_forwarding`]). Each server step is best effort
+     * and queued for later when offline, so this always ends signed out here.
      */
-    fun `signOut`(`flow`: kotlin.String)
+    suspend fun `signOut`(`flow`: kotlin.String, `everywhere`: kotlin.Boolean)
     
     /**
      * The saved account's username; None without a saved password (one restored from
@@ -8205,20 +8208,33 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address, and queues the
-     * address to be left on the edge (a sign-in can join it again there). Logs stay.
-     */override fun `signOut`(`flow`: kotlin.String)
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_sign_out(
-        it,
+     * Signs out, in the one order that leaves nothing behind: off the server while the identity
+     * lasts ([`Core::sign_out_of_server`], for every phone on the account with `everywhere`),
+     * then everything on this phone ([`Core::sign_out_here`]), then off the forwarding
+     * addresses left behind ([`Core::leave_old_forwarding`]). Each server step is best effort
+     * and queued for later when offline, so this always ends signed out here.
+     */
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `signOut`(`flow`: kotlin.String, `everywhere`: kotlin.Boolean) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_sign_out(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterBoolean.lower(`everywhere`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
         
-        FfiConverterString.lower(`flow`),_status)
-}
+        // Error FFI converter
+        UniffiNullRustCallStatusErrorHandler,
+    )
     }
-    
-    
 
     
     /**

@@ -214,16 +214,41 @@ impl Core {
         .await
     }
 
+    /// Signs out, in the one order that leaves nothing behind: off the server while the identity
+    /// lasts ([`Core::sign_out_of_server`], for every phone on the account with `everywhere`),
+    /// then everything on this phone ([`Core::sign_out_here`]), then off the forwarding
+    /// addresses left behind ([`Core::leave_old_forwarding`]). Each server step is best effort
+    /// and queued for later when offline, so this always ends signed out here.
+    pub async fn sign_out(&self, flow: String, everywhere: bool) {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "traced already logs the error, and each step is best effort"
+        )]
+        let _ = traced("sign_out", &flow, async {
+            if let Err(error) = self.sign_out_of_server(flow.clone(), everywhere).await {
+                info!(error = error.kind(), "server sign-out not done");
+            }
+            self.sign_out_here(&flow);
+            if let Err(error) = self.leave_old_forwarding(flow.clone()).await {
+                info!(error = error.kind(), "old addresses not left yet");
+            }
+            Ok(())
+        })
+        .await;
+    }
+}
+
+impl Core {
     /// Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address, and queues the
     /// address to be left on the edge (a sign-in can join it again there). Logs stay.
-    pub fn sign_out(&self, flow: String) {
+    pub(crate) fn sign_out_here(&self, flow: &str) {
         #[expect(
             clippy::let_underscore_must_use,
             reason = "traced_sync already logs the error"
         )]
-        let _ = traced_sync("sign_out", &flow, || {
+        let _ = traced_sync("sign_out_here", flow, || {
             self.install(None);
-            // Left on the edge by `leave_old_forwarding`, which the app calls next.
+            // Left on the edge by `leave_old_forwarding`, which `sign_out` calls next.
             self.queue_leave();
             self.shared.cookies.sign_out();
             self.forget(&[&STUDENT_FILES[..], &[ACCOUNT, SESSION, route::FILE]].concat());
@@ -232,9 +257,7 @@ impl Core {
             Ok(())
         });
     }
-}
 
-impl Core {
     /// The client has no OTP challenge left to take a code for (the app restarted, or a call
     /// dropped it): signs in afresh. Ok when VTOP lets it in without a code; when VTOP mails a
     /// new one, `OtpRejected` saying so, so the prompt stays open and auto-fill takes the new

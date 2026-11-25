@@ -56,12 +56,8 @@ import kotlinx.coroutines.launch
 import vitapmate.core.Core
 import vitapmate.core.Route as VtopRoute
 import vitapmate.data.AccountState
-import vitapmate.data.AppCore
 import vitapmate.data.Downloads
 import vitapmate.data.Foreground
-import vitapmate.data.Gmail
-import vitapmate.data.OtpPrompt
-import vitapmate.data.PageFetches
 import vitapmate.data.Settings
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
@@ -71,10 +67,8 @@ import vitapmate.features.docs.MessTimingsSheet
 import vitapmate.features.docs.messTimingsSummary
 import vitapmate.features.login.OtpAutofillSheet
 import vitapmate.observability.Log
-import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
-import vitapmate.ui.AvatarPhoto
 import vitapmate.ui.DownloadFolderDialog
 import vitapmate.ui.StatusChip
 import vitapmate.ui.neutralTone
@@ -310,28 +304,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             "Sign out",
             {
                 confirmSignOut = false
-                scope.launch {
-                    // Off the server first (its forwarding address, this install), while the identity lasts.
-                    runCatching { coreFlow("sign_out") { c, f -> runCatching { c.signOutOfServer(f, false) }; c.signOut(f) } }
-                        .onFailure { Log.error("ui.settings", "sign out failed: $it") }
-                    // Off the student's forwarding address too, or this phone keeps getting their OTPs.
-                    AppCore.leaveOldForwarding()
-                    // Their Gmail grant and the sync built on it go too.
-                    flow("gmail.disconnect") { Gmail.disconnect(it) }
-                    Settings.forgetStudent()
-                    BackgroundSync.apply(context)
-                    // A collapsed OTP prompt and running page fetches belong to the session
-                    // just dropped: not over the login screen, not into the next account.
-                    OtpPrompt.cancel()
-                    PageFetches.cancelAll()
-                    // The photo belongs to this account.
-                    AvatarPhoto.remove()
-                    // The VTOP web view's cookies are this session's.
-                    runCatching { android.webkit.CookieManager.getInstance().removeAllCookies(null) }
-                    // Its recently opened VTOP pages too (the Flutter key).
-                    context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).edit().remove("settings_vtop_recent_pages").apply()
-                    onSignedOut()
-                }
+                AccountTeardown.signOut(context, onSignedOut)
             },
             icon = Lucide.LogOut,
             danger = true,

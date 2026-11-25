@@ -64,9 +64,7 @@ import vitapmate.core.CoreException
 import vitapmate.core.SignIn
 import vitapmate.data.AccountState
 import vitapmate.data.AppCore
-import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
-import vitapmate.data.PageFetches
 import vitapmate.data.PauseReason
 import vitapmate.data.SavedPasswords
 import vitapmate.data.SemesterChoice
@@ -77,7 +75,6 @@ import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppTheme
-import vitapmate.ui.AvatarPhoto
 import vitapmate.ui.PasswordField
 import vitapmate.ui.StatusChip
 import vitapmate.ui.heroCookie
@@ -152,16 +149,11 @@ fun AccountScreen() {
                     Settings.syncHealth = Settings.syncHealth.resumedIf { it == PauseReason.PasswordRejected }
                     savedPassword = password
                     if (other) {
-                        PageFetches.cancelAll()
-                        AvatarPhoto.remove()
+                        AccountTeardown.forgetStudent(context, flowId)
                         flow("account.semesters") { SemesterChoice.readCache(it) }
                         // The last student's Mailbox would keep sending this phone their OTPs.
                         AppCore.leaveOldForwarding()
                         AppCore.proveInBackground()
-                        // Their Gmail grant and the sync built on it aren't this student's.
-                        Gmail.disconnect(flowId)
-                        Settings.forgetStudent()
-                        BackgroundSync.apply(context)
                     }
                     accountVersion++
                     haptics.confirm()
