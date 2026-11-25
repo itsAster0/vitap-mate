@@ -76,6 +76,7 @@ object AppCore {
                     proof = SocketProofNetwork(),
                     cookieGate = CookieConsent,
                     cipher = AccountPassword,
+                    otp = OtpPrompt,
                     dev = DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt(), debuggable),
                     deviceLabel = if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}",
                 )

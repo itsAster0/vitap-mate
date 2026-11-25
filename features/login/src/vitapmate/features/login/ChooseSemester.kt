@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CalendarRange
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
-import vitapmate.data.OtpPrompt
 import vitapmate.data.SemesterChoice
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -67,11 +66,6 @@ fun ChooseSemester() {
             Log.info("ui.semesters", "choose open", f, mapOf("cached" to "${SemesterChoice.semesters?.items?.size ?: 0}"))
         }
         SemesterChoice.refresh("choose")
-    }
-    // The OTP a refresh asked for was entered: load the list again.
-    val otpAtStart = rememberSaveable { OtpPrompt.generation }
-    LaunchedEffect(OtpPrompt.generation) {
-        if (OtpPrompt.generation != otpAtStart) SemesterChoice.refresh("otp")
     }
 
     Box(Modifier.fillMaxSize().background(scheme.background).systemBarsPadding().testTag("semester.choose.screen"), Alignment.TopCenter) {

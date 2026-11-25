@@ -28,6 +28,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -146,8 +147,9 @@ fun AccountButton(feature: Feature?, onClick: () -> Unit) {
     val haptics = rememberHaptics()
     var menu by remember { mutableStateOf(false) }
     val pdf = feature?.pdf
+    val otp by OtpPrompt.challenge.collectAsState()
     val dot = when {
-        OtpPrompt.message != null -> tones.accentTone.base
+        otp != null -> tones.accentTone.base
         Activity.offline || Activity.recent.firstOrNull()?.problem != null -> tones.warning.base
         else -> null
     }

@@ -5,7 +5,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -19,16 +18,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.CoreException
+import vitapmate.core.OtpChallenge
+import vitapmate.core.OtpListener
 import vitapmate.core.Route
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -114,9 +117,8 @@ class PageHandle<T> internal constructor(
             null
         } catch (e: CancellationException) {
             on(PageEvent.FetchCancelled(run.flow), "cancelled", flow)
-            // This screen went away: stop. Only the run was cancelled (sign-out): the state says so.
-            currentCoroutineContext().ensureActive()
-            null
+            // Only the run was cancelled (sign-out): the state says so. This screen went away: stop.
+            if (currentCoroutineContext().isActive) null else throw e
         } catch (_: Dropped) {
             // Waited off screen past Tunable.QueueDrop: the cached copy stays, no problem.
             on(PageEvent.FetchDropped(run.flow), "dropped", flow)
@@ -145,11 +147,13 @@ class PageHandle<T> internal constructor(
         }
     }
 
-    /** One fetch of the page, with what follows from it once (however many handles wait for it). */
-    private suspend fun download(flow: String, retried: Boolean = false): T {
+    /**
+     * One fetch of the page, with what follows from it once (however many handles wait for it).
+     * A re-login that wants the OTP waits for it in Rust (the prompt opens), then goes on.
+     */
+    private suspend fun download(flow: String): T {
         val start = System.nanoTime()
-        val otpRound = OtpPrompt.generation
-        val otpAsks = OtpPrompt.asks
+        val prompts = OtpPrompt.mark()
         return attempt {
             var udp = false
             val fresh = Activity.track("Refreshing ${id.replace('_', ' ')}", flow) {
@@ -159,18 +163,15 @@ class PageHandle<T> internal constructor(
                 }
             }
             val ms = (System.nanoTime() - start) / 1_000_000
-            PageFetches.fetched(flow, ms, udp)
-            StaleSweep.afterFetch(ms)
+            // A fetch that waited for the student's code says nothing about the link.
+            if (!OtpPrompt.openedSince(prompts)) {
+                PageFetches.fetched(flow, ms, udp)
+                StaleSweep.afterFetch(ms)
+            }
             // A fetch caches the semester list when there was none.
             if (SemesterChoice.semesters == null) SemesterChoice.readCache(flow)
-            OtpPrompt.signedIn(otpAsks, flow)
             fresh
         }.getOrElse { e ->
-            // A code was accepted while this fetch ran: VTOP is signed in now, so fetch again
-            // instead of asking for another code.
-            if (OtpPrompt.generation != otpRound) {
-                if (e is CoreException.OtpRequired && !retried) return download(flow, retried = true)
-            } else askedOtp(e)
             // No pick (any more): SemesterChoice.selected turns null and the app shows the picker.
             if (e is CoreException.SemesterNeeded) SemesterChoice.readCache(flow)
             throw e
@@ -264,10 +265,11 @@ private fun waitingFor(pages: List<String>) = when (pages.size) {
  * The page [id] (also its log src `ui.<id>` and flows `<id>.open` / `<id>.refresh`): the cached
  * copy first (read off the main thread), then a fetch when nothing is saved; with Auto Refresh on
  * ([Settings.autoRefresh]) also when the page was not fetched yet in this screen's saved state,
- * when the data is older than [Tunable.PageMaxAge] (6 h; on open or when the app comes back), and after the OTP prompt
- * is answered. [item] tells apart pages of one [id] (a course's history: its key). Fetches outlive
- * the screen ([PageFetches]): one shown again while its fetch runs or waits joins it. They share a
- * few lanes, this page first while it is on screen; queued a moment, the state says which page it
+ * and when the data is older than [Tunable.PageMaxAge] (6 h; on open or when the app comes back).
+ * A fetch whose re-login wants the OTP waits for it ([OtpPrompt]) and then goes on. [item] tells
+ * apart pages of one [id] (a course's history: its key). Fetches outlive the screen
+ * ([PageFetches]): one shown again while its fetch runs or waits joins it. They share a few
+ * lanes, this page first while it is on screen; queued a moment, the state says which page it
  * waits for. An automatic fetch left waiting off screen too long is dropped (the cache stays).
  * The lambdas get the flow id to pass as the first argument of the `Core` call, e.g.
  * `rememberPage("attendance", { c, f -> c.cachedAttendance(f) }, { c, f -> c.fetchAttendance(f) }, { it.updatedAt }) { it.courses.size }`.
@@ -293,7 +295,6 @@ fun <T> rememberPage(
     // Which semester this screen fetched, saved by value: a key alone can come back restored for
     // another semester when the tab returns to the screen.
     var fetchedFor by rememberSaveable(id) { mutableStateOf<String?>(null) }
-    val otpAtStart = remember { OtpPrompt.generation }
     val resumesAtStart = remember { Foreground.resumes }
     // One effect, in turn: the cache, the fetch on open, then a fetch each time the app comes
     // back with old data. None of them overlaps another (and fetches wait for the cache).
@@ -324,9 +325,6 @@ fun <T> rememberPage(
             refreshTrigger(PageWake.Resume, autoRefresh = Settings.autoRefresh, stale = page.isStale())?.let { page.refresh(it, user = false) }
         }
     }
-    LaunchedEffect(page, OtpPrompt.generation) {
-        if (OtpPrompt.generation != otpAtStart) page.refresh(refreshTrigger(PageWake.Otp) ?: return@LaunchedEffect)
-    }
     DisposableEffect(page) {
         PageFetches.shown(id, true)
         onDispose {
@@ -337,8 +335,8 @@ fun <T> rememberPage(
     return page
 }
 
-/** What wakes a page's refresh effect: the screen opened, the OTP prompt was answered, the app came back. */
-internal enum class PageWake { Open, Otp, Resume }
+/** What wakes a page's refresh effect: the screen opened, or the app came back. */
+internal enum class PageWake { Open, Resume }
 
 /**
  * Why [rememberPage] fetches on [wake], or null for no fetch. [ready]: something is shown;
@@ -353,7 +351,6 @@ internal fun refreshTrigger(
     fetched: Boolean = true,
     stale: Boolean = false,
 ): String? = when (wake) {
-    PageWake.Otp -> "otp"
     PageWake.Resume -> "resume".takeIf { autoRefresh && stale }
     PageWake.Open -> when {
         !ready -> "open" // nothing to show: always fetch
@@ -367,60 +364,58 @@ internal fun refreshTrigger(
 }
 
 /**
- * Set when a fetch's re-login wants the security OTP. The login feature shows the prompt while
- * [message] is set, submits the code, then calls [done] (open pages fetch again) or [cancel].
+ * The OTP prompt Rust opens when a sign-in the student watches wants the emailed code (Rust's
+ * `otp.rs`): the calls wait there for its outcome, so nothing here retries. The login feature's
+ * sheet shows [challenge] while it is set; a code accepted anywhere (the sheet, auto-fill,
+ * another route) closes it from Rust, and [cancel] closes it for the student. Told on Rust's
+ * threads, read anywhere.
  */
-object OtpPrompt {
-    var message by mutableStateOf<String?>(null)
-        private set
-    var generation by mutableIntStateOf(0)
-        private set
+object OtpPrompt : OtpListener {
+    private val shown = MutableStateFlow<OtpChallenge?>(null)
 
-    /** Monotonic id per distinct prompt open, so consecutive prompts with the same message don't collide. */
-    var challengeId by mutableIntStateOf(0)
-        private set
+    /** The challenge the sheet shows; null while none is open. */
+    val challenge: StateFlow<OtpChallenge?> = shown.asStateFlow()
 
-    /** Times the prompt was asked for, so a fetch can tell it opened before the fetch began. */
-    var asks = 0
-        private set
+    /** Rust's prompt, the one the student closed (hidden at once, before Rust hears), and the newest id seen. */
+    private var told: OtpChallenge? = null
+    private var dismissed: ULong? = null
+    private var newest: ULong = 0u
 
-    fun ask(message: String) {
-        asks++
-        if (this.message == null) challengeId++
-        this.message = message
+    override fun onChallenge(challenge: OtpChallenge?) = synchronized(this) {
+        told = challenge
+        challenge?.let { newest = maxOf(newest, it.id) }
+        publish()
     }
+
+    private fun publish() {
+        shown.value = told?.takeIf { it.id != dismissed }
+    }
+
+    /** Whether a prompt is open. */
+    val pending: Boolean get() = challenge.value != null
+
+    /** A mark for [openedSince]: null while a prompt is open. */
+    internal fun mark(): ULong? = synchronized(this) { newest.takeIf { told == null } }
+
+    /** Whether a prompt was open at [mark] or opened since. */
+    internal fun openedSince(mark: ULong?): Boolean = synchronized(this) { mark == null || newest != mark }
 
     /**
-     * A live fetch got through while the prompt was open since before it started ([asksAtStart]):
-     * VTOP got signed in another way (another route, the server, background auto-fill), so the
-     * prompt closes as if the code was accepted and open pages fetch again.
+     * Waits for the code of the sign-in that asked for it (the Account page's `NeedsOtp`, Fetch
+     * all's): opens the prompt; true once VTOP accepted the code, false when the student closed
+     * it or it failed otherwise (in the log).
      */
-    fun signedIn(asksAtStart: Int, flow: String) {
-        if (message == null || asks != asksAtStart) return
-        Log.info("ui.otp", "signed in meanwhile, prompt closed", flow)
-        done()
-    }
-
-    /** [ask]s, then waits for the prompt to close; true when the code was accepted ([done]). */
-    suspend fun askAndWait(message: String): Boolean {
-        val before = generation
-        ask(message)
-        snapshotFlow { this.message }.first { it == null }
-        return generation != before
-    }
-
-    /** The code was accepted: open pages fetch again. */
-    fun done() {
-        message = null
-        generation++
-    }
+    suspend fun await(flow: String): Boolean = attempt { withContext(Dispatchers.IO) { AppCore.await().awaitOtp(flow) } }.isSuccess
 
     /**
      * The student dismissed the prompt: no fetch again (pull or the refresh button retries). Rust
      * drops the pending challenge, so that retry signs in afresh and VTOP mails a new code.
      */
     fun cancel() {
-        message = null
+        synchronized(this) {
+            dismissed = told?.id
+            publish()
+        }
         // Outlives the prompt, which closes as soon as it is cancelled.
         AppScope.launch {
             // A failure (signed out meanwhile, or nothing pending) is in the log already.

@@ -142,7 +142,7 @@ fun AccountScreen() {
                             AccountState.rejected = false
                             savedPassword = password
                         }
-                        OtpPrompt.askAndWait(result.message)
+                        OtpPrompt.await(flowId)
                     }
                 }
                 Log.info("ui.account", "save result", flowId, mapOf("done" to "$done"))

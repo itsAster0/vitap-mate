@@ -76,12 +76,11 @@ fun interface InspectorOpener {
 
 val LocalInspector = staticCompositionLocalOf { InspectorOpener {} }
 
-/** Opens the OTP prompt when [e] is a re-login asking for the code; true then (the prompt says it all, no toast). */
-fun askedOtp(e: Throwable): Boolean {
-    if (e !is CoreException.OtpRequired) return false
-    OtpPrompt.ask(e.reason)
-    return true
-}
+/**
+ * Whether [e] is a sign-in that wanted the OTP: Rust opened the prompt for it and waited, or
+ * nobody watched the call ([OtpPrompt]); true then, and no toast (the prompt said it all).
+ */
+fun askedOtp(e: Throwable): Boolean = e is CoreException.OtpRequired
 
 /**
  * [block]'s value or failure, like `runCatching`, but a cancellation still cancels: a

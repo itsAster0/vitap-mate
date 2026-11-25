@@ -57,7 +57,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import vitapmate.data.AppCore
-import vitapmate.data.OtpPrompt
 import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
@@ -198,11 +197,6 @@ internal fun VtopScreen() {
             prepare.job?.cancel()
             browser.destroy()
         }
-    }
-    // The OTP was accepted elsewhere (the app's prompt): try again.
-    val otpAtStart = remember { OtpPrompt.generation }
-    LaunchedEffect(OtpPrompt.generation) {
-        if (OtpPrompt.generation != otpAtStart) dispatch(VtopWebEvent.OtpResolved)
     }
 
     val phase = webState.phase

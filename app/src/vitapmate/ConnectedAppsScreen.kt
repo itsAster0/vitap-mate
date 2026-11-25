@@ -65,7 +65,6 @@ import vitapmate.core.defaultServer
 import vitapmate.data.AppCore
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
-import vitapmate.data.OtpPrompt
 import vitapmate.data.ServerFailure
 import vitapmate.data.problemOf
 import vitapmate.data.rememberLive
@@ -263,7 +262,8 @@ internal suspend fun <T> appsCall(name: String, call: suspend (Core, String) -> 
     }.getOrElse { e ->
         Log.warn("ui.connected_apps", "$name failed: ${e::class.simpleName}", flowId)
         when (e) {
-            is CoreException.OtpRequired -> OtpPrompt.ask(e.reason)
+            // Rust's prompt asked for the code and the student closed it: nothing to add.
+            is CoreException.OtpRequired -> {}
             is CoreException.Other -> showToast("Connected apps", e.reason)
             else -> showToast(problemOf(e, flowId, server = true))
         }

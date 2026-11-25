@@ -677,6 +677,9 @@ internal interface UniffiCallbackInterfaceConvexSocketListenerMethod1 : com.sun.
 internal interface UniffiCallbackInterfaceConvexSocketListenerMethod2 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`reason`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
+internal interface UniffiCallbackInterfaceOtpListenerMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`challenge`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
 internal interface UniffiCallbackInterfaceProofNetworkMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`headers`: RustBuffer.ByValue,`timeoutMs`: Int,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
@@ -803,6 +806,25 @@ internal open class UniffiVTableCallbackInterfaceConvexSocketListener(
         `onOpen` = other.`onOpen`
         `onText` = other.`onText`
         `onClosed` = other.`onClosed`
+    }
+
+}
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "onChallenge")
+internal open class UniffiVTableCallbackInterfaceOtpListener(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `onChallenge`: UniffiCallbackInterfaceOtpListenerMethod0? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `onChallenge`: UniffiCallbackInterfaceOtpListenerMethod0? = null,
+    ): UniffiVTableCallbackInterfaceOtpListener(`uniffiFree`,`uniffiClone`,`onChallenge`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceOtpListener) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `onChallenge` = other.`onChallenge`
     }
 
 }
@@ -1098,6 +1120,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_push_token(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_await_otp(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_attendance_outlook(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_attendance(
@@ -1326,6 +1350,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_convexsocketlistener_on_closed(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_otplistener_on_challenge(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_proofnetwork_open(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_proofsocket_send(
@@ -1393,6 +1419,7 @@ internal object UniffiLib {
         uniffiCallbackInterfaceCookieGate.register(this)
         uniffiCallbackInterfaceHttpTransport.register(this)
         uniffiCallbackInterfaceLiveListener.register(this)
+        uniffiCallbackInterfaceOtpListener.register(this)
         uniffiCallbackInterfacePasswordCipher.register(this)
         uniffiCallbackInterfaceProofNetwork.register(this)
         uniffiCallbackInterfaceProofSocket.register(this)
@@ -1438,6 +1465,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_dev_simulate_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
     external fun uniffi_vtop_ffi_fn_method_core_set_push_token(`ptr`: Long,`flow`: RustBuffer.ByValue,`token`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_await_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_attendance_outlook(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1682,6 +1711,14 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_convexsocketlistener_on_text(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_convexsocketlistener_on_closed(`ptr`: Long,`reason`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_clone_otplistener(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_otplistener(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_otplistener(`vtable`: UniffiVTableCallbackInterfaceOtpListener,
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_otplistener_on_challenge(`ptr`: Long,`challenge`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_clone_proofnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -2024,6 +2061,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_push_token() and 0xFFFF) != 60677) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_await_otp() and 0xFFFF) != 52124) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_attendance_outlook() and 0xFFFF) != 38857) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2318,7 +2358,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 64996) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 59215) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 57187) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_ensure_fresh_session() and 0xFFFF) != 19372) {
@@ -2364,6 +2404,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_convexsocketlistener_on_closed() and 0xFFFF) != 6255) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_otplistener_on_challenge() and 0xFFFF) != 26219) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_proofnetwork_open() and 0xFFFF) != 59287) {
@@ -4642,6 +4685,15 @@ public interface CoreInterface {
     suspend fun `setPushToken`(`flow`: kotlin.String, `token`: kotlin.String)
     
     /**
+     * Waits for the OTP of the sign-in just started (`sign_in` said `NeedsOtp`) or of the
+     * prompt open now: opens the prompt, then Ok once the session is signed in.
+     * `OtpRequired` when nothing waits for a code (the student closed the prompt), it stayed
+     * open over ten minutes or nobody watches `flow`; `InvalidCredentials` or `NotSignedIn` as
+     * for a fetch.
+     */
+    suspend fun `awaitOtp`(`flow`: kotlin.String)
+    
+    /**
      * Each saved course's plan, until the next exam when one comes before
      * the last class day, else until the semester's end; from the saved
      * attendance, timetable and academic calendar (empty without a
@@ -5206,7 +5258,8 @@ public interface CoreInterface {
     /**
      * Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
      * fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
-     * a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
+     * a challenge VTOP may have dropped meanwhile. The prompt closes, and the calls waiting on
+     * it fail with `OtpRequired`. Nothing pending: the session stays as it is.
      */
     suspend fun `cancelOtp`(`flow`: kotlin.String)
     
@@ -5687,6 +5740,36 @@ open class Core: Disposable, AutoCloseable, CoreInterface
                 
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`token`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Waits for the OTP of the sign-in just started (`sign_in` said `NeedsOtp`) or of the
+     * prompt open now: opens the prompt, then Ok once the session is signed in.
+     * `OtpRequired` when nothing waits for a code (the student closed the prompt), it stayed
+     * open over ten minutes or nobody watches `flow`; `InvalidCredentials` or `NotSignedIn` as
+     * for a fetch.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `awaitOtp`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_await_otp(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
@@ -7984,7 +8067,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     /**
      * Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
      * fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
-     * a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
+     * a challenge VTOP may have dropped meanwhile. The prompt closes, and the calls waiting on
+     * it fail with `OtpRequired`. Nothing pending: the session stays as it is.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -9206,6 +9290,325 @@ public object FfiConverterTypeLiveWatch: FfiConverter<LiveWatch, Long> {
     override fun allocationSize(value: LiveWatch) = 8UL
 
     override fun write(value: LiveWatch, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * Told the prompt as it opens, changes and closes (None), outside any lock. The app sets one
+ * ([`crate::Platform`]); it is told the current one when set.
+ */
+public interface OtpListener {
+    
+    fun `onChallenge`(`challenge`: OtpChallenge?)
+    
+    companion object
+}
+
+/**
+ * Told the prompt as it opens, changes and closes (None), outside any lock. The app sets one
+ * ([`crate::Platform`]); it is told the current one when set.
+ */
+open class OtpListenerImpl: Disposable, AutoCloseable, OtpListener
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_vtop_ffi_fn_free_otplistener(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_vtop_ffi_fn_clone_otplistener(handle, status)
+        }
+    }
+
+    override fun `onChallenge`(`challenge`: OtpChallenge?)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_otplistener_on_challenge(
+        it,
+        
+        FfiConverterOptionalTypeOtpChallenge.lower(`challenge`),_status)
+}
+    }
+    
+    
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceOtpListener {
+    internal object `onChallenge`: UniffiCallbackInterfaceOtpListenerMethod0 {
+        override fun callback(`uniffiHandle`: Long,`challenge`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeOtpListener.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`onChallenge`(
+                    FfiConverterOptionalTypeOtpChallenge.lift(`challenge`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeOtpListener.handleMap.remove(handle)
+        }
+    }
+
+    internal object uniffiClone: UniffiCallbackInterfaceClone {
+        override fun callback(handle: Long): Long {
+            return FfiConverterTypeOtpListener.handleMap.clone(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceOtpListener.UniffiByValue(
+        uniffiFree,
+        uniffiClone,
+        `onChallenge`,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_vtop_ffi_fn_init_callback_vtable_otplistener(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOtpListener: FfiConverter<OtpListener, Long> {
+    internal val handleMap = UniffiHandleMap<OtpListener>()
+
+    override fun lower(value: OtpListener): Long {
+        if (value is OtpListenerImpl) {
+             // Rust-implemented object.  Clone the handle and return it
+            return value.uniffiCloneHandle()
+         } else {
+            // Kotlin object, generate a new vtable handle and return that.
+            return handleMap.insert(value)
+         }
+    }
+
+    override fun lift(value: Long): OtpListener {
+        if ((value and 1.toLong()) == 0.toLong()) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return OtpListenerImpl(UniffiWithHandle, value)
+        } else {
+            // Kotlin-generated handle, get the object from the handle map
+            return handleMap.remove(value)
+        }
+    }
+
+    override fun read(buf: ByteBuffer): OtpListener {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: OtpListener) = 8UL
+
+    override fun write(value: OtpListener, buf: ByteBuffer) {
         buf.putLong(lower(value))
     }
 }
@@ -16328,6 +16731,61 @@ public object FfiConverterTypeNextClass: FfiConverterRustBuffer<NextClass> {
 
 
 /**
+ * The security-OTP challenge the app's sheet shows.
+ */
+data class OtpChallenge (
+    /**
+     * The prompt's: the same while it stays open, through a resent code or a fresh sign-in.
+     */
+    val `id`: kotlin.ULong
+    , 
+    /**
+     * VTOP's text.
+     */
+    val `message`: kotlin.String
+    , 
+    /**
+     * When VTOP mailed the current code (unix seconds); None when unknown.
+     */
+    val `issuedAt`: kotlin.ULong?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOtpChallenge: FfiConverterRustBuffer<OtpChallenge> {
+    override fun read(buf: ByteBuffer): OtpChallenge {
+        return OtpChallenge(
+            FfiConverterULong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: OtpChallenge) = (
+            FfiConverterULong.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`message`) +
+            FfiConverterOptionalULong.allocationSize(value.`issuedAt`)
+    )
+
+    override fun write(value: OtpChallenge, buf: ByteBuffer) {
+            FfiConverterULong.write(value.`id`, buf)
+            FfiConverterString.write(value.`message`, buf)
+            FfiConverterOptionalULong.write(value.`issuedAt`, buf)
+    }
+}
+
+
+
+/**
  * A `<select>` option: what VTOP expects back and what to show.
  */
 data class OutingChoice (
@@ -16960,6 +17418,11 @@ data class Platform (
      */
     val `cipher`: PasswordCipher
     , 
+    /**
+     * Shows the OTP prompt ([`otp`]).
+     */
+    val `otp`: OtpListener
+    , 
     val `dev`: DevConfig
     , 
     /**
@@ -16984,6 +17447,7 @@ data class Platform (
         this.`proof`,
         this.`cookieGate`,
         this.`cipher`,
+        this.`otp`,
         this.`dev`,
         this.`deviceLabel`
     )
@@ -17005,6 +17469,7 @@ public object FfiConverterTypePlatform: FfiConverterRustBuffer<Platform> {
             FfiConverterTypeProofNetwork.read(buf),
             FfiConverterTypeCookieGate.read(buf),
             FfiConverterTypePasswordCipher.read(buf),
+            FfiConverterTypeOtpListener.read(buf),
             FfiConverterTypeDevConfig.read(buf),
             FfiConverterString.read(buf),
         )
@@ -17018,6 +17483,7 @@ public object FfiConverterTypePlatform: FfiConverterRustBuffer<Platform> {
             FfiConverterTypeProofNetwork.allocationSize(value.`proof`) +
             FfiConverterTypeCookieGate.allocationSize(value.`cookieGate`) +
             FfiConverterTypePasswordCipher.allocationSize(value.`cipher`) +
+            FfiConverterTypeOtpListener.allocationSize(value.`otp`) +
             FfiConverterTypeDevConfig.allocationSize(value.`dev`) +
             FfiConverterString.allocationSize(value.`deviceLabel`)
     )
@@ -17030,6 +17496,7 @@ public object FfiConverterTypePlatform: FfiConverterRustBuffer<Platform> {
             FfiConverterTypeProofNetwork.write(value.`proof`, buf)
             FfiConverterTypeCookieGate.write(value.`cookieGate`, buf)
             FfiConverterTypePasswordCipher.write(value.`cipher`, buf)
+            FfiConverterTypeOtpListener.write(value.`otp`, buf)
             FfiConverterTypeDevConfig.write(value.`dev`, buf)
             FfiConverterString.write(value.`deviceLabel`, buf)
     }
@@ -23420,6 +23887,38 @@ public object FfiConverterOptionalTypeMentor: FfiConverterRustBuffer<Mentor?> {
         } else {
             buf.put(1)
             FfiConverterTypeMentor.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeOtpChallenge: FfiConverterRustBuffer<OtpChallenge?> {
+    override fun read(buf: ByteBuffer): OtpChallenge? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeOtpChallenge.read(buf)
+    }
+
+    override fun allocationSize(value: OtpChallenge?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeOtpChallenge.allocationSize(value)
+        }
+    }
+
+    override fun write(value: OtpChallenge?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeOtpChallenge.write(value, buf)
         }
     }
 }

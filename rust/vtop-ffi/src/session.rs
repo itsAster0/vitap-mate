@@ -168,7 +168,8 @@ impl Core {
 
     /// Drops a re-login's pending OTP challenge (the student cancelled the prompt), so the next
     /// fetch that needs a session signs in afresh and VTOP mails a new code, instead of reopening
-    /// a challenge VTOP may have dropped meanwhile. Nothing pending: nothing changes.
+    /// a challenge VTOP may have dropped meanwhile. The prompt closes, and the calls waiting on
+    /// it fail with `OtpRequired`. Nothing pending: the session stays as it is.
     pub async fn cancel_otp(&self, flow: String) -> Result<(), CoreError> {
         traced("cancel_otp", &flow, async {
             let slot = self.current()?;
@@ -177,6 +178,7 @@ impl Core {
                 session.restart(&self.shared)?;
                 info!("pending otp dropped");
             }
+            session.otp.close(session.otp_session);
             Ok(())
         })
         .await
@@ -204,7 +206,10 @@ impl Core {
                 return Ok(());
             }
             info!(age, max_age_secs, "session older than asked");
-            self.sign_in_again(&slot, &mut session).await
+            let result = self.sign_in_again(&slot, &mut session).await;
+            let logins = session.logins;
+            drop(session);
+            self.after_sign_in_again(&slot, &flow, logins, result).await
         })
         .await
     }
@@ -261,12 +266,34 @@ impl Core {
     }
 
     pub(crate) async fn relogin(&self, slot: &Arc<Slot>, seen: u64) -> Result<(), CoreError> {
-        let mut session = slot.write().await;
-        if session.logins != seen {
-            return Ok(()); // Another call already signed in again.
+        let (logins, result) = {
+            let mut session = slot.write().await;
+            if session.logins != seen {
+                return Ok(()); // Another call already signed in again.
+            }
+            info!("session expired");
+            let result = self.sign_in_again(slot, &mut session).await;
+            (session.logins, result)
+        };
+        self.after_sign_in_again(slot, &crate::transport::flow(), logins, result)
+            .await
+    }
+
+    /// A sign-in again's `result`, with the session's lock let go: one that wants the OTP
+    /// waits for it when the student watches `flow` ([`Core::wait_for_otp`]).
+    async fn after_sign_in_again(
+        &self,
+        slot: &Arc<Slot>,
+        flow: &str,
+        logins: u64,
+        result: Result<(), CoreError>,
+    ) -> Result<(), CoreError> {
+        match result {
+            Err(failed @ CoreError::OtpRequired { .. }) => {
+                self.wait_for_otp(slot, flow, logins, failed).await
+            }
+            result => result,
         }
-        info!("session expired");
-        self.sign_in_again(slot, &mut session).await
     }
 
     /// Signs `session` in again with the saved password; an open OTP challenge or a

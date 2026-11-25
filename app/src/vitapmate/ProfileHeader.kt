@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,10 +59,11 @@ fun ProfileHeader(user: String?, name: String?, vtopPhoto: String?, regno: Strin
     val tones = AppTheme.tones
     val semester = SemesterChoice.semesters?.let { list -> list.items.firstOrNull { it.id == list.selected } }
     val number = regno?.takeIf { it.isNotBlank() && !it.equals(user, ignoreCase = true) }
+    val otp by OtpPrompt.challenge.collectAsState()
     val (state, tone) = when {
         user == null -> "Not signed in" to tones.warning
         AccountState.rejected -> "Needs attention" to tones.warning
-        OtpPrompt.message != null -> "OTP waiting" to tones.danger
+        otp != null -> "OTP waiting" to tones.danger
         Activity.offline -> "Offline" to tones.warning
         else -> "Signed in" to tones.success
     }

@@ -68,7 +68,6 @@ import vitapmate.core.ServerVault
 import vitapmate.core.SessionSource
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
-import vitapmate.data.OtpPrompt
 import vitapmate.data.Problem
 import vitapmate.data.ServerFailure
 import vitapmate.data.problemOf
@@ -499,7 +498,8 @@ private suspend fun <T> run(name: String, call: suspend (Core, String) -> T): Re
     }.getOrElse { e ->
         Log.warn("ui.server", "$name failed: ${e::class.simpleName}", flowId)
         when (e) {
-            is CoreException.OtpRequired -> OtpPrompt.ask(e.reason)
+            // Rust's prompt asked for the code and the student closed it: nothing to add.
+            is CoreException.OtpRequired -> {}
             is CoreException.Other -> showToast("Server", e.reason)
             else -> showToast(problemOf(e, flowId, server = true))
         }

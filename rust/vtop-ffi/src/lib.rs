@@ -30,6 +30,7 @@ mod demo;
 mod dev;
 mod device;
 mod obs;
+mod otp;
 mod pages;
 mod remote;
 mod session;
@@ -297,6 +298,9 @@ struct Session {
     phase: SessionPhase,
     /// Monotonic id for OTP challenges on this slot so stale submissions are rejected.
     next_challenge: u64,
+    /// The OTP prompt every session shares ([`Shared::otp`]) and this session's id on it.
+    otp: Arc<otp::Board>,
+    otp_session: u64,
 }
 
 impl Session {
@@ -323,6 +327,8 @@ impl Session {
             logins: 0,
             phase,
             next_challenge: 0,
+            otp: shared.otp.clone(),
+            otp_session: shared.otp.session(),
         })
     }
 
@@ -333,6 +339,7 @@ impl Session {
         } else {
             SessionPhase::Active
         };
+        let otp = Arc::new(otp::Board::default());
         Self {
             client,
             cookies: store::cookies::SessionCookies::new(),
@@ -340,6 +347,8 @@ impl Session {
             logins: 0,
             phase,
             next_challenge: 0,
+            otp_session: otp.session(),
+            otp,
         }
     }
 
@@ -372,6 +381,8 @@ impl Session {
     pub(crate) fn begin_otp(&mut self, via: OtpVia, message: String) -> u64 {
         self.next_challenge = self.next_challenge.saturating_add(1);
         let challenge_id = self.next_challenge;
+        self.otp
+            .challenged(self.otp_session, &message, self.client.otp_issued_at());
         self.phase = SessionPhase::AwaitingOtp {
             via,
             message,
@@ -384,12 +395,14 @@ impl Session {
         self.account.rejected = false;
         self.phase = SessionPhase::Active;
         self.logins = self.logins.saturating_add(1);
+        self.otp.close(self.otp_session);
     }
 
     pub(crate) fn mark_password_rejected(&mut self) {
         vtop_core::session::CookieStore::clear(self.cookies.as_ref());
         self.account.rejected = true;
         self.phase = SessionPhase::PasswordRejected;
+        self.otp.close(self.otp_session);
     }
 
     /// Starts over on a fresh client with no cookies (the shared store's go too): no
@@ -400,6 +413,8 @@ impl Session {
         self.client = fresh.client;
         self.cookies = fresh.cookies;
         self.phase = fresh.phase;
+        // An open prompt stays: a fresh sign-in under it follows, or the caller closes it.
+        self.otp.touch();
         Ok(())
     }
 }
@@ -424,6 +439,8 @@ pub struct Platform {
     pub cookie_gate: Arc<dyn remote::consent::CookieGate>,
     /// Seals the saved password (the Android Keystore).
     pub cipher: Arc<dyn PasswordCipher>,
+    /// Shows the OTP prompt ([`otp`]).
+    pub otp: Arc<dyn otp::OtpListener>,
     pub dev: dev::DevConfig,
     /// The name the server shows for this phone ("OnePlus CPH2573").
     pub device_label: String,
@@ -457,6 +474,8 @@ struct Shared {
     label: Option<String>,
     /// Without one (host tests), the password is saved as it is.
     cipher: Option<Arc<dyn PasswordCipher>>,
+    /// The OTP prompt and the calls waiting on it.
+    otp: Arc<otp::Board>,
     /// The server account proofs are held to, and its roots, in place of VTOP's.
     #[cfg(all(test, feature = "tlsn"))]
     proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
@@ -483,6 +502,7 @@ impl From<Platform> for Shared {
             ..Self::default()
         };
         shared.consent().gate = Some(platform.cookie_gate);
+        shared.otp.set_listener(platform.otp);
         shared
     }
 }
@@ -611,6 +631,8 @@ impl Core {
 
     fn install(&self, slot: Option<Arc<Slot>>) {
         *self.slot.lock().unwrap_or_else(PoisonError::into_inner) = slot;
+        // The last session's prompt (and the calls waiting on it) end with it.
+        self.shared.otp.close_all();
     }
 
     fn current(&self) -> Result<Arc<Slot>, CoreError> {

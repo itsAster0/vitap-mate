@@ -15,7 +15,6 @@ import vitapmate.core.LiveTopic
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.LiveWake
-import vitapmate.data.OtpPrompt
 import vitapmate.data.OtpSource
 import vitapmate.data.PauseReason
 import vitapmate.data.Settings
@@ -144,9 +143,8 @@ object OtpAutofill {
                             tried += code
                             try {
                                 withContext(Dispatchers.IO) { core.submitOtp(flow, code) }
+                                // The app's prompt for the same sign-in, if open, closes from Rust.
                                 Log.info("sync", "otp accepted", flow, mapOf("source" to source.name.lowercase()))
-                                // The app's prompt for the same sign-in, if open, has nothing left to do.
-                                if (OtpPrompt.message != null) withContext(Dispatchers.Main) { OtpPrompt.done() }
                                 gmail?.let { Gmail.tidyUp(it, flow) }
                                 why = null
                                 return@withTimeoutOrNull

@@ -38,7 +38,6 @@ internal sealed interface VtopWebPhase {
 internal sealed interface VtopWebEvent {
     data object Open : VtopWebEvent
     data object Retry : VtopWebEvent
-    data object OtpResolved : VtopWebEvent
     data class ViewAttached(val generation: Int) : VtopWebEvent
     data class PrepareSucceeded(val requestId: Long, val session: WebSession) : VtopWebEvent
     data class PrepareFailed(val requestId: Long, val problem: Problem) : VtopWebEvent
@@ -79,12 +78,6 @@ internal data class VtopWebState(
 
         VtopWebEvent.Retry -> when (phase) {
             is VtopWebPhase.Failed, is VtopWebPhase.Crashed -> startPrepare(FLOW_OPEN, force = false)
-            else -> noOp()
-        }
-
-        VtopWebEvent.OtpResolved -> when (phase) {
-            is VtopWebPhase.Failed -> startPrepare(FLOW_OPEN, force = false)
-            is VtopWebPhase.Preparing -> if (phase.requestId > 0L) startPrepare(FLOW_OPEN, force = false) else noOp()
             else -> noOp()
         }
 

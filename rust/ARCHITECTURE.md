@@ -64,6 +64,7 @@ A few design points:
 | --- | --- |
 | `lib.rs` | `Core`, `CoreError`, the shared types and the session slot |
 | `session.rs` | sign-in, the OTP prompt, signing in again, sign-out |
+| `otp.rs` | the OTP prompt the app's sheet shows (`OtpListener`); a re-login the student watches waits there for the code instead of failing |
 | `pages/` | one file per feature (`attendance.rs`, `timetable.rs`, `marks.rs`, `exams.rs`, `outing.rs`, ...) with its own `#[uniffi::export] impl Core` block and ready-to-draw records (`records.rs`), the change inbox (`changes.rs`) and Gmail's OTP (`gmail.rs`) |
 | `remote/` | everything that talks to our servers: `edge.rs` (the edge's URL and the session cookies sent to it), `route.rs` (+ `route/`), `udp.rs`, `consent.rs`, `account_token.rs`, `keys.rs` (Connected apps), `forwarding.rs` and `server.rs` (the Server page) |
 | `store.rs` (+ `store/`) | the file reads and writes; `decoded.rs` (decoded copies) and `cookies.rs` (the shared cookie store) |

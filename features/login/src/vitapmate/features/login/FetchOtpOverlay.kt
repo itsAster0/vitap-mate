@@ -2,6 +2,8 @@ package vitapmate.features.login
 
 import vitapmate.ui.rememberHaptics
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.coroutines.cancellation.CancellationException
@@ -16,23 +18,25 @@ import vitapmate.ui.ToastTone
 import vitapmate.ui.showToast
 
 /**
- * The OTP sheet for a fetch whose re-login wants the code ([OtpPrompt]); the app draws it over
- * everything. An accepted code ends with [OtpPrompt.done] (open pages fetch again); Cancel or a
- * failure other than a wrong code or the network ends with [OtpPrompt.cancel]. Flows `fetch_otp.*`.
+ * The OTP sheet for a sign-in that waits for the code ([OtpPrompt]); the app draws it over
+ * everything. An accepted code closes it from Rust (the waiting fetches go on); Cancel or a
+ * failure other than a wrong code or the network ends with [OtpPrompt.cancel]. The sheet keeps
+ * its own UI state only ([OtpChallenge]: the code typed, minimised). Flows `fetch_otp.*`.
  */
 @Composable
 fun FetchOtpOverlay() {
     // Before the early return, so a flow launched while closing isn't cancelled with the sheet.
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
-    val message = OtpPrompt.message ?: return
-    val challenge = remember(OtpPrompt.challengeId) { OtpChallenge(message, "fetch_otp", "ui.otp") }
+    val shown by OtpPrompt.challenge.collectAsState()
+    val open = shown ?: return
+    val challenge = remember(open.id) { OtpChallenge(open.message, "fetch_otp", "ui.otp") }
     OtpSheet(
         challenge,
         onSubmit = {
             scope.launch {
                 try {
-                    if (challenge.submit(AppCore.await())) { haptics.confirm(); OtpPrompt.done() } else if (challenge.error != null) haptics.reject()
+                    if (challenge.submit(AppCore.await())) haptics.confirm() else if (challenge.error != null) haptics.reject()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {

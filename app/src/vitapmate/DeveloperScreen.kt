@@ -215,7 +215,7 @@ fun DeveloperScreen() {
                     })
                     GroupItem("Clear session", "dev.clear_session", Lucide.Unplug, "Drop VTOP's cookies; the next fetch signs in again", tone = AppTheme.tones.danger, onClick = {
                         confirm = Confirm("Clear the session?", "The saved VTOP session is dropped. Your account stays; the next fetch signs in again, and VTOP may ask for an OTP.", "Clear") {
-                            if (OtpPrompt.message != null) OtpPrompt.cancel()
+                            if (OtpPrompt.pending) OtpPrompt.cancel()
                             dev("dev.clear_session") { c, f -> c.devClearSession(f) }?.let {
                                 // The web view's cookies are the same session's.
                                 runCatching { android.webkit.CookieManager.getInstance().removeAllCookies(null) }

@@ -67,7 +67,7 @@ const val ACTIVITY_HISTORY = "activity.history"
 @Composable
 private fun rememberRuns(source: StateFlow<List<Run>?>, older: Boolean = false): List<Run>? {
     val runs by source.collectAsState()
-    val pending = OtpPrompt.message != null
+    val pending = OtpPrompt.challenge.collectAsState().value != null
     return remember(runs, pending, older) {
         runs?.let { all -> if (older) all else all.filter { it.startT >= Inspector.startedAt } }?.settleOtp(pending, Inspector.startedAt)
     }

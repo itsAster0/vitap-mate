@@ -161,8 +161,8 @@ class VtopWebStateTest {
         val opened = VtopWebState().reduce(VtopWebEvent.Open, nowMs = 100L)
         val attached = opened.state.reduce(VtopWebEvent.ViewAttached(0), nowMs = 110L)
 
-        // OTP resolves while request 1 is still in flight -> cancels 1 and starts 2.
-        val superseded = attached.state.reduce(VtopWebEvent.OtpResolved, nowMs = 150L)
+        // Opened again while request 1 is still in flight -> cancels 1 and starts 2.
+        val superseded = attached.state.reduce(VtopWebEvent.Open, nowMs = 150L)
         assertEquals(VtopWebPhase.Preparing(requestId = 2L, force = false), superseded.state.phase)
         assertEquals(
             listOf(VtopWebEffect.CancelPrepare, VtopWebEffect.Prepare(2L, VtopWebState.FLOW_OPEN, force = false)),
@@ -236,33 +236,6 @@ class VtopWebStateTest {
         val laterBounce = authed.state.reduce(VtopWebEvent.LoginPageHit, nowMs = 5_000L)
         assertEquals(VtopWebPhase.Preparing(requestId = 4L, force = true), laterBounce.state.phase)
         assertEquals(listOf(VtopWebEffect.Prepare(4L, VtopWebState.FLOW_RELOGIN, force = true)), laterBounce.effects)
-    }
-
-    @Test
-    fun otpResolvedRetriesFromFailedAndIsIgnoredWhenActiveOrWaitingForView() {
-        val opened = VtopWebState().reduce(VtopWebEvent.Open, nowMs = 100L)
-        val attached = opened.state.reduce(VtopWebEvent.ViewAttached(0), nowMs = 110L)
-        val otpProblem = problemOf(CoreException.OtpRequired("Check your mail", null), "f1")
-        val failed = attached.state.reduce(VtopWebEvent.PrepareFailed(1L, otpProblem), nowMs = 200L)
-        assertEquals(VtopWebPhase.Failed(otpProblem), failed.state.phase)
-
-        val retried = failed.state.reduce(VtopWebEvent.OtpResolved, nowMs = 300L)
-        assertEquals(VtopWebPhase.Preparing(requestId = 2L, force = false), retried.state.phase)
-        assertEquals(listOf(VtopWebEffect.Prepare(2L, VtopWebState.FLOW_OPEN, force = false)), retried.effects)
-
-        // Once Active, OTP resolved elsewhere does not disrupt the open page.
-        val active = retried.state.reduce(VtopWebEvent.PrepareSucceeded(2L, session1), nowMs = 400L).state
-        val ignoredActive = active.reduce(VtopWebEvent.OtpResolved, nowMs = 500L)
-        assertEquals(active, ignoredActive.state)
-        assertEquals(emptyList(), ignoredActive.effects)
-
-        // While WaitingForView, OTP resolved elsewhere is also ignored.
-        val waiting = VtopWebState().reduce(VtopWebEvent.Open, nowMs = 100L).state
-            .reduce(VtopWebEvent.PrepareSucceeded(1L, session1), nowMs = 200L).state
-        assertEquals(VtopWebPhase.WaitingForView(session1, VtopRecovery.Ready), waiting.phase)
-        val ignoredWaiting = waiting.reduce(VtopWebEvent.OtpResolved, nowMs = 300L)
-        assertEquals(waiting, ignoredWaiting.state)
-        assertEquals(emptyList(), ignoredWaiting.effects)
     }
 
     @Test

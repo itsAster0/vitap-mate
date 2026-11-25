@@ -281,6 +281,15 @@ private fun segment(lines: List<LogLine>, call: String?, label: String): List<MS
                 open(SIGN_IN, StepState.Running, line.t).end(StepState.Failed, line.t, "Password rejected")
             }
             m == "attendance detail just fetched" -> cur.cached = true
+            // A re-login waits in Rust for the student's code (`otp.rs`), then the call goes on.
+            line.src.startsWith("core.") && m == "waiting for the otp" -> if (cur.state != StepState.WaitingOtp) {
+                if (cur.state == StepState.Running) cur.end(StepState.Skipped, line.t, "Not signed in")
+                open(OTP, StepState.WaitingOtp, line.t)
+            }
+            line.src.startsWith("core.") && m == "otp answered" && cur.state == StepState.WaitingOtp -> {
+                cur.end(StepState.Done, line.t)
+                open(label, StepState.Running, line.t)
+            }
             line.src == QUEUE && m == "queued" -> cur.reason = WAITING
             line.src == QUEUE && m == "started" && cur.reason == WAITING -> cur.reason = null
             line.src == AUTH -> when {

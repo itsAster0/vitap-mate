@@ -119,6 +119,28 @@ class RunsTest {
     }
 
     @Test
+    fun aFetchWaitingForTheCodeGoesOnOnceItIsIn() {
+        val text = """
+            {"ev":"start","flow":"a","msg":"marks.refresh start","src":"flow","step":"marks.refresh","t":1000}
+            {"flow":"a","msg":"refreshing","src":"ui.marks","state":"refreshing","t":1001,"trigger":"open"}
+            {"flow":"a","msg":"start","src":"core.fetch_marks","t":1001}
+            {"flow":"a","msg":"waiting for the otp","src":"core.fetch_marks","t":1002}
+        """
+        val waiting = runs(text).single()
+        assertTrue(waiting.waiting)
+        assertEquals("Marks (Not signed in) Skipped → OTP WaitingOtp", waiting.chain())
+        val done = runs(
+            text + """
+            {"flow":"a","msg":"otp answered","src":"core.fetch_marks","t":5000}
+            {"flow":"a","msg":"response vtop.vitap.ac.in/vtop/examinations/doStudentMarkView 200 90ms","src":"rust.network","t":5100}
+            {"flow":"a","ms":4200,"msg":"done","outcome":"ok","src":"core.fetch_marks","t":5200}
+            {"ev":"done","flow":"a","msg":"marks.refresh done","outcome":"ok","src":"flow","step":"marks.refresh","t":5201}
+            """,
+        ).single()
+        assertEquals("Marks (Not signed in) Skipped → OTP Done → Marks Done", done.chain())
+    }
+
+    @Test
     fun backgroundAutofillMissShowsWhyOnTheOtpStep() {
         val r = runs(
             """
