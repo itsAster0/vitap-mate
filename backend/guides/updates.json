@@ -93,16 +93,20 @@
     {
       "version": "3.2.1",
       "code": 3002100,
-      "summary": "3.2.1 asks before sharing your registration number, seals your saved VTOP password with the Android Keystore, makes OTP sign-in, forwarding and connected apps more dependable, and fixes many smaller problems.",
+      "summary": "3.2.1 moves the server settings to where you use them, keeps no VTOP session on the server unless you ask, asks before sharing your registration number, seals your saved VTOP password with the Android Keystore, and makes OTP sign-in, forwarding and connected apps more dependable.",
       "sections": [
         {
           "title": "New",
           "items": [
+            "The Server page is gone: its settings are where you use them. Account has sharing your registration number, linked phones, signing out everywhere and deleting the server account; Connected apps has session handover and storage; Connection asks before the cookie leaves for server routes.",
+            "The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps. Turning it off deletes them at once.",
+            "Swipe the week strip on the timetable to see next week, or the weeks after.",
             "The app asks before it shares your registration number with the server, and says what it is used for.",
             "Your saved VTOP password is sealed with the Android Keystore. If the Keystore fails, the app keeps the password instead of losing it, and tells you when a locked password signs you out.",
             "Stopping sharing signs the phone out of the server.",
+            "OTP auto-fill shows the phones on your forwarding address, and can delete the address everywhere.",
             "Forwarding setup is marked done as soon as Gmail's confirmation arrives.",
-            "Connected apps and Server show a banner while their live connection is failing.",
+            "Connected apps shows a banner while its live connection is failing.",
             "The browser extension signs you in live and follows each step as it happens, with a redesigned popup, a badge on VTOP, and sign-in again after VTOP signs you out."
           ]
         },
@@ -116,12 +120,16 @@
             "Sleeping timers share one thread, which saves a little battery.",
             "Every screen uses India's date for today.",
             "Logs leave out secret values.",
-            "Reinstalling no longer brings back an old sign-in; sign in again."
+            "Reinstalling no longer brings back an old sign-in; sign in again.",
+            "Account opens without unlocking; the fingerprint or PIN is asked only to show the saved password.",
+            "Each kind of cookie question (server routes, connected apps) can be turned on or off on its own.",
+            "When your phone doesn't answer a connected app in time, the app or extension says so and how to fix it, instead of waiting."
           ]
         },
         {
           "title": "Fixed",
           "items": [
+            "Moving keys to this phone no longer signs your other phone out.",
             "A resent OTP shows its own time on the open prompt, and the app looks for mail that arrived after it.",
             "Submitting or resending an OTP on a server sign-in could hang.",
             "An expired OTP is recognised, and when VTOP drops an OTP sign-in the app signs in again by itself.",
@@ -135,7 +143,8 @@
             "The Google sign-in is kept when Gmail setup is interrupted.",
             "Big numbers in Semester Wrapped shrink to fit beside their heading.",
             "Technical live-update errors stay out of the screen.",
-            "A very large session no longer breaks the slow-connection (UDP) mode."
+            "A very large session no longer breaks the slow-connection (UDP) mode.",
+            "Deleting the server account no longer makes a new one on the next start."
           ]
         }
       ]
