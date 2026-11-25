@@ -76,7 +76,7 @@ platform :android do
 
   desc 'upload_testing, then promote_production: one build on every track, production as a staged rollout (rollout:0.2 by default)'
   lane :upload_all do |options|
-    rollout = rollout_fraction(options[:rollout] || '0.2') # checked before anything uploads
+    rollout = rollout_fraction(options[:rollout] || '1') # checked before anything uploads
     upload_testing(options)
     promote_production(rollout: rollout)
   end

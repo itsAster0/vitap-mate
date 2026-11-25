@@ -9,6 +9,7 @@ import { issueV2Token } from "./lib/jwt";
 import { PROVED_TTL_SECS } from "./auth";
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -28,6 +29,9 @@ describe("signed calls", () => {
 
 describe("the proof ticket", () => {
   it("is 128 bits, one at a time, and rate limited per install", async () => {
+    // The rate limiter starts a fixed window at a random point in the hour; one that ended
+    // within these 100 s would hand out a fresh 20.
+    vi.spyOn(Math, "random").mockReturnValue(0);
     const t = await setup();
     const p = await phone(1);
     const first = await t.mutation(api.auth.proveStart, await p.signed("auth:proveStart", {}));
