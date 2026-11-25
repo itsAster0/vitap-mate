@@ -4,8 +4,9 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import vitapmate.data.Activity
 import vitapmate.data.AppScope
@@ -35,7 +36,7 @@ object FetchAll {
         AppScope.launch {
             // The page being fetched, from the activity entries VtopSync adds, or the OTP its sign-in waits for.
             val follow = launch {
-                snapshotFlow { Activity.running.lastOrNull { it.label.startsWith(LABEL) }?.label }.combine(OtpPrompt.challenge) { label, otp ->
+                Activity.state.map { s -> s.running.lastOrNull { it.label.startsWith(LABEL) }?.label }.distinctUntilChanged().combine(OtpPrompt.challenge) { label, otp ->
                     if (otp != null) "Waiting for the OTP…" else label?.let { "Fetching ${it.substringAfter(": ").replace('_', ' ')}…" }
                 }.collect { text -> text?.let { status = it } }
             }

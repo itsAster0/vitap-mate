@@ -45,7 +45,7 @@ object Downloads {
     private val ctx: Context get() = checkNotNull(app) { "Downloads.init not called" }
     private val prefs get() = ctx.getSharedPreferences("downloads", Context.MODE_PRIVATE)
 
-    /** The chosen folder (a tree URI), or null for Downloads/vitapmate. */
+    /** The chosen folder (a tree URI), or null for Downloads/vitapmate. Compose state; [folder] and [prompt] change under `this`. */
     var folder by mutableStateOf<Uri?>(null)
         private set
 
@@ -56,18 +56,22 @@ object Downloads {
     var prompt by mutableStateOf<CompletableDeferred<Unit>?>(null)
         private set
 
+    @Synchronized
     fun init(context: Context) {
         if (app != null) return
         app = context.applicationContext
         folder = prefs.getString("tree", null)?.let(Uri::parse)
     }
 
-    /** Waits, the first time, for the student to pick where files go; then the chosen folder, or null for Downloads/vitapmate. */
+    /**
+     * Waits, the first time, for the student to pick where files go; then the chosen folder, or
+     * null for Downloads/vitapmate. Saves at once share one prompt.
+     */
     suspend fun target(): Uri? {
-        if (!prefs.getBoolean("asked", false)) {
-            val ask = prompt ?: CompletableDeferred<Unit>().also { prompt = it }
-            ask.await()
+        val ask = synchronized(this) {
+            if (prefs.getBoolean("asked", false)) null else prompt ?: CompletableDeferred<Unit>().also { prompt = it }
         }
+        ask?.await()
         return folder
     }
 
@@ -177,10 +181,12 @@ object Downloads {
         val context = app ?: return
         val old = folder
         tree?.let { context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
-        folder = tree
-        prefs.edit().putString("tree", tree?.toString()).putBoolean("asked", true).apply()
-        prompt?.complete(Unit)
-        prompt = null
+        val waiting = synchronized(this) {
+            folder = tree
+            prefs.edit().putString("tree", tree?.toString()).putBoolean("asked", true).apply()
+            prompt.also { prompt = null }
+        }
+        waiting?.complete(Unit)
         if (old == tree) return
         scope.launch {
             flow("downloads.move") { f ->

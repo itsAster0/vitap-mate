@@ -74,6 +74,7 @@ val Forwarding.lastMailAt get() = when (this) {
  * keys, codes or mail.
  */
 object MailForwarding {
+    /** Compose state, written on the main thread only ([load], [poll] and [run] go there), so start-if-idle is atomic. */
     var phase by mutableStateOf<ForwardingPhase>(ForwardingPhase.Idle(null))
         private set
 
@@ -94,7 +95,7 @@ object MailForwarding {
     private val calls = Mutex()
 
     /** Reads the saved status (no network); while an action runs, its own result shows instead. */
-    suspend fun load(trigger: String) {
+    suspend fun load(trigger: String): Unit = withContext(Dispatchers.Main.immediate) {
         try {
             flow("forwarding.status") { id ->
                 val value = withContext(Dispatchers.IO) { AppCore.await().forwardingStatus(id) }
@@ -144,8 +145,8 @@ object MailForwarding {
         }
     }
 
-    private suspend fun poll() {
-        if (phase is ForwardingPhase.Busy || !calls.tryLock()) return
+    private suspend fun poll(): Unit = withContext(Dispatchers.Main.immediate) {
+        if (phase is ForwardingPhase.Busy || !calls.tryLock()) return@withContext
         var flowId = ""
         try {
             flow("forwarding.check") { id ->
@@ -166,8 +167,8 @@ object MailForwarding {
     }
 
     /** [op] as flow `forwarding.<tag>`, after any quiet check; a failure is a toast, and the status is read again. */
-    private suspend fun run(op: ForwardingOp, call: suspend (String) -> Forwarding): Forwarding? {
-        phase = phase.start(op) ?: return null
+    private suspend fun run(op: ForwardingOp, call: suspend (String) -> Forwarding): Forwarding? = withContext(Dispatchers.Main.immediate) {
+        phase = phase.start(op) ?: return@withContext null
         error = null
         report()
         var flowId = ""
@@ -192,7 +193,7 @@ object MailForwarding {
             report()
         }
         if (failed) load("after_${op.tag}")
-        return value
+        value
     }
 
     private fun show(value: Forwarding, flow: String, vararg extra: Pair<String, String>) {

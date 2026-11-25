@@ -16,6 +16,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.toShape
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.graphics.shapes.RoundedPolygon
@@ -105,7 +106,7 @@ private val CHANGE_PAGES = ChangeKind.entries.map(::pageOf).toSet()
 /** The unread count, read again after each VTOP run finishes (More's card and Changes row). */
 @Composable
 fun rememberUnseenChanges(): Int {
-    val last = Activity.recent.firstOrNull()?.flow
+    val last = Activity.state.collectAsState().value.recent.firstOrNull()?.flow
     LaunchedEffect(last) { Unseen.read() }
     return Unseen.count
 }

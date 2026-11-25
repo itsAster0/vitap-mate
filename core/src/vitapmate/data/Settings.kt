@@ -12,7 +12,7 @@ val DISPLAY_SIZES = listOf(0, 90, 100, 110)
 
 /** App settings (SharedPreferences "settings", the Flutter app's keys) as Compose-observable state. */
 object Settings {
-    private var prefs: SharedPreferences? = null
+    @Volatile private var prefs: SharedPreferences? = null
     private val all = mutableListOf<Pref<*>>()
     private val tuned = mutableStateMapOf<Tunable, Int>()
     private val notifyOff = mutableStateMapOf<String, Boolean>()
@@ -202,10 +202,14 @@ object Settings {
         prefs?.edit { if (v == null || v == t.default) remove(t.key) else putInt(t.key, v) }
     }
 
-    /** Reads the saved values; call once at start. */
+    /**
+     * Reads the saved values, once: every entry point (the activity, FCM, WorkManager, widgets,
+     * the tile) calls it first, on whatever thread it runs, and returns with them read.
+     */
+    @Synchronized
     fun load(context: Context) {
+        if (prefs != null) return
         val p = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        prefs = p
         // Older apps counted missed codes in their own file.
         val old = context.getSharedPreferences("sync", Context.MODE_PRIVATE)
         if (old.contains("otp_misses")) {
@@ -215,6 +219,8 @@ object Settings {
         all.forEach { it.load(p) }
         Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
         NOTIFY_KINDS.forEach { k -> if (!p.getBoolean("settings_notify_$k", true)) notifyOff[k] = true }
+        // Set last: once [prefs] is there, every value has been read.
+        prefs = p
     }
 
     /** Every value, for the state dump. */

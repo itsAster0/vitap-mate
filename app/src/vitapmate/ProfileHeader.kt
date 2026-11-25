@@ -1,5 +1,6 @@
 package vitapmate
 
+import androidx.compose.runtime.collectAsState
 import vitapmate.data.AccountState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -58,13 +59,14 @@ fun ProfileHeader(user: String?, name: String?, vtopPhoto: String?, regno: Strin
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val semester = SemesterChoice.semesters?.let { list -> list.items.firstOrNull { it.id == list.selected } }
+    val work by Activity.state.collectAsState()
     val number = regno?.takeIf { it.isNotBlank() && !it.equals(user, ignoreCase = true) }
     val otp by OtpPrompt.challenge.collectAsState()
     val (state, tone) = when {
         user == null -> "Not signed in" to tones.warning
         AccountState.rejected -> "Needs attention" to tones.warning
         otp != null -> "OTP waiting" to tones.danger
-        Activity.offline -> "Offline" to tones.warning
+        work.offline -> "Offline" to tones.warning
         else -> "Signed in" to tones.success
     }
     Box(

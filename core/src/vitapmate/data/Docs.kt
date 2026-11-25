@@ -136,12 +136,12 @@ object Docs {
     /** Safety re-check interval in case an OEM removes a cancelled download without broadcasting. */
     private const val DOWNLOAD_RECHECK_MS = 30_000L
 
+    // Compose state, written only under [lock] (after [ready]), so no change is lost.
     private val state = mutableStateOf<List<Doc>>(emptyList())
     private val sortState = mutableStateOf(DocSort.RecentlyOpened)
     private val lock = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val ready = CompletableDeferred<Unit>()
-    @Volatile private var sortTouched = false
     private var dir: File? = null
     private var app: Context? = null
 
@@ -153,15 +153,16 @@ object Docs {
     @Suppress("MemberNameEqualsClassName") // Docs.docs reads as the list it is.
     val docs: List<Doc> get() = state.value
 
-    /** The library's sort, kept in the index. */
+    /** The library's sort, kept in the index; a pick before the index is read applies over it. */
     var sort: DocSort
         get() = sortState.value
         set(value) {
-            sortTouched = true
-            sortState.value = value
             scope.launch {
                 ready.await()
-                lock.withLock { write() }
+                lock.withLock {
+                    sortState.value = value
+                    write()
+                }
             }
         }
 
@@ -188,7 +189,7 @@ object Docs {
                     val index = File(d, "index.json")
                     if (index.exists()) runCatching { DocIndex.decode(index.readText()) }
                         .onSuccess { (s, list) ->
-                            if (!sortTouched) sortState.value = s
+                            sortState.value = s
                             state.value = list
                         }
                         .onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }

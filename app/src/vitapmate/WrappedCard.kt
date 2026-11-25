@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -55,7 +56,7 @@ fun WrappedCard() {
     val nav = LocalNav.current
     // Read again after each VTOP run (a calendar that arrives while More is open), like the
     // Changes count; Settings.wrappedSeen is state, so opening Wrapped turns the card into the row.
-    val last = Activity.recent.firstOrNull()?.flow
+    val last = Activity.state.collectAsState().value.recent.firstOrNull()?.flow
     val report by produceState<WrappedReport?>(null, SemesterChoice.selected, last) {
         value = attempt {
             coreFlow("more.wrapped", Core::cachedWrapped)

@@ -1,5 +1,6 @@
 package vitapmate
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.History
 import androidx.compose.animation.AnimatedContent
@@ -73,8 +74,9 @@ private fun thing(label: String) = label.removePrefix("Refreshing ").removePrefi
 fun TabBarLead() {
     var activity by rememberSaveable { mutableStateOf(false) }
     val now by rememberNow()
-    val running = Activity.running.lastOrNull()
-    val label = running?.let { thing(it.label) + (Activity.running.size - 1).let { more -> if (more > 0) " +$more" else "" } }
+    val work by Activity.state.collectAsState()
+    val running = work.running.lastOrNull()
+    val label = running?.let { thing(it.label) + (work.running.size - 1).let { more -> if (more > 0) " +$more" else "" } }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             Modifier.clip(MaterialTheme.shapes.large).clickable { activity = true }.padding(horizontal = 8.dp, vertical = 6.dp).testTag("bar.activity"),
@@ -97,7 +99,7 @@ fun TabBarLead() {
                 }
             }
         }
-        AnimatedVisibility(Activity.offline && running == null, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
+        AnimatedVisibility(work.offline && running == null, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()) {
             IconButton({ activity = true }, Modifier.testTag("bar.offline")) {
                 Icon(Lucide.CloudOff, "Offline", Modifier.size(20.dp), tint = AppTheme.tones.warning.base)
             }
@@ -114,7 +116,8 @@ fun TabBarLead() {
 @Composable
 fun ActivityTitle(title: String) {
     var activity by rememberSaveable { mutableStateOf(false) }
-    val running = Activity.running.lastOrNull()?.label?.let(::thing)
+    val work by Activity.state.collectAsState()
+    val running = work.running.lastOrNull()?.label?.let(::thing)
     Box(Modifier.clip(MaterialTheme.shapes.large).clickable { activity = true }.testTag("bar.activity")) {
         AnimatedContent(
             running,
@@ -148,9 +151,10 @@ fun AccountButton(feature: Feature?, onClick: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     val pdf = feature?.pdf
     val otp by OtpPrompt.challenge.collectAsState()
+    val work by Activity.state.collectAsState()
     val dot = when {
         otp != null -> tones.accentTone.base
-        Activity.offline || Activity.recent.firstOrNull()?.problem != null -> tones.warning.base
+        work.offline || work.recent.firstOrNull()?.problem != null -> tones.warning.base
         else -> null
     }
     Box {

@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -104,23 +105,22 @@ object Gmail {
     /** What went wrong, for the student; [code] is stable, for logs. */
     class GmailException(val code: String, message: String) : Exception(message)
 
-    /** The connected account, or null. Compose state. */
+    /** The connected account, or null. Compose state, written only under [lock], so no change is lost. */
     var account by mutableStateOf<Account?>(null)
         private set
 
     private lateinit var app: Context
     private val lock = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    @Volatile private var desiredDeleteAfterReading: Boolean? = null
 
     /** Call once at start, then [load] off the main thread. */
     fun init(context: Context) {
         app = context.applicationContext
     }
 
-    /** Reads the saved account (a Keystore decrypt). */
-    fun load() {
-        account = Secrets.read(app, FILE)?.let { runCatching { decode(JSONObject(String(it))) }.getOrNull() }
+    /** Reads the saved account (a Keystore decrypt); blocks, so off the main thread. */
+    fun load() = runBlocking {
+        lock.withLock { account = Secrets.read(app, FILE)?.let { runCatching { decode(JSONObject(String(it))) }.getOrNull() } }
     }
 
     /** The client in Google Cloud's JSON ([bytes]), or a [GmailException] saying what's wrong. */
@@ -202,10 +202,8 @@ object Gmail {
             collegeAccountProblem(email, regno)?.let { throw GmailException("wrong_account", it) }
             verifyGmail(access, flow)
             val ends = tokens.optLong("refresh_token_expires_in", 0).takeIf { it > 0 }?.let { System.currentTimeMillis() + it * 1000 } ?: 0
-            val saved = Account(email, client, refresh, access, expiry(tokens), account?.deleteAfterReading ?: true, ends)
-            lock.withLock {
-                desiredDeleteAfterReading = null
-                save(saved)
+            val saved = lock.withLock {
+                Account(email, client, refresh, access, expiry(tokens), account?.deleteAfterReading ?: true, ends).also(::save)
             }
             Settings.otpSource = OtpSource.Gmail
             // Paused over Gmail: the next run can try again.
@@ -221,7 +219,6 @@ object Gmail {
     /** Forgets the account and revokes its grant (best effort). */
     suspend fun disconnect(flow: String) = withContext(Dispatchers.IO) {
         val old = lock.withLock {
-            desiredDeleteAfterReading = null
             account.also {
                 account = null
                 Secrets.delete(app, FILE)
@@ -231,15 +228,12 @@ object Gmail {
         Log.info(SRC, "disconnected", flow)
     }
 
+    /** Saved over the latest account under [lock], so a token refresh meanwhile keeps the choice. */
     fun setDeleteAfterReading(on: Boolean) {
-        val current = account ?: return
-        desiredDeleteAfterReading = on
-        account = current.copy(deleteAfterReading = on)
         scope.launch {
             lock.withLock {
                 val latest = account ?: return@withLock
-                val target = desiredDeleteAfterReading ?: return@withLock
-                runCatching { save(latest.copy(deleteAfterReading = target)) }
+                runCatching { save(latest.copy(deleteAfterReading = on)) }
                     .onFailure { Log.warn(SRC, "save failed: ${it::class.simpleName}") }
             }
         }
@@ -509,6 +503,7 @@ object Gmail {
         JSONObject(String(Base64.decode(payload, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP))).optString("email").trim().ifEmpty { null }
     }.getOrNull()
 
+    /** The caller holds [lock]. */
     private fun save(a: Account) {
         account = a
         Secrets.write(app, FILE, encode(a).toString().toByteArray())

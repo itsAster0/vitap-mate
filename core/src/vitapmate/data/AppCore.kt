@@ -8,6 +8,7 @@ import android.os.Build
 import android.util.Base64
 import java.io.File
 import java.security.KeyStore
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -34,8 +35,8 @@ suspend fun <T> coreFlow(name: String, block: suspend (Core, String) -> T): T =
 object AppCore {
     private val core = CompletableDeferred<Core>()
 
-    private var started = false
-    private var app: Context? = null
+    private val started = AtomicBoolean(false)
+    @Volatile private var app: Context? = null
     private var proving: Job? = null
 
     /**
@@ -43,8 +44,9 @@ object AppCore {
      * builds, registers the state dump (`vitapmate.DUMP`); later calls do nothing.
      */
     fun start(context: Context) {
-        if (started) return
-        started = true
+        // The activity, FCM, WorkManager and widgets each call this, on their own threads.
+        if (!started.compareAndSet(false, true)) return
+        Settings.load(context)
         Log.catchUncaught()
         val app = context.applicationContext
         this.app = app
@@ -116,6 +118,7 @@ object AppCore {
      * registration number's sheet, while the student was never asked: Rust proves only after a
      * Share.
      */
+    @Synchronized
     fun proveInBackground() {
         val context = app ?: return
         if (proving?.isActive == true) return

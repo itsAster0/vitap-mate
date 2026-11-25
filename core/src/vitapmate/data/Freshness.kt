@@ -3,7 +3,6 @@ package vitapmate.data
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -187,7 +186,7 @@ object StaleSweep {
         }
         /** Fetches the pages saved at [ats] (one, or a batch as [id]), each given [Tunable.SlowPage]. */
         suspend fun run(id: String, label: String, ats: List<Long>, fetch: suspend (Core) -> Unit): Step {
-            snapshotFlow { Activity.running.isEmpty() }.first { it }
+            Activity.state.first { it.running.isEmpty() }
             delay(QUIET_MS.milliseconds)
             if (!Settings.autoRefresh || !Foreground.shown) return Step.Stop("app left or auto refresh off")
             val ms = attempt {
