@@ -14,8 +14,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -32,9 +36,9 @@ import vitapmate.observability.flow
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * A VTOP page on a screen ([rememberPage]). [state] is the cache, then the fetch's result; every
- * change is logged as `ui.<id>` (state, ms since open, count) and reported to [StateRegistry]
- * as `page.<id>`.
+ * A VTOP page on a screen ([rememberPage]). [state] is the cache, then the fetch's result, each
+ * change a [PageEvent] ([next]); every change is logged as `ui.<id>` (state, ms since open,
+ * count) and reported to [StateRegistry] as `page.<id>`. State changes on the main thread.
  */
 @Stable
 class PageHandle<T> internal constructor(
@@ -50,12 +54,15 @@ class PageHandle<T> internal constructor(
     var state: PageState<T> by mutableStateOf(PageState.Loading())
         private set
 
-    internal var fetching by mutableStateOf(false)
-        private set
-    private var running: Pair<Deferred<Throwable?>, Asked>? = null
-
     /** Whether the student asked for a running fetch (it started for them, or they joined it). */
     private class Asked(@Volatile var user: Boolean)
+
+    /** This handle's fetch while it runs. */
+    private class Running(val job: Deferred<Throwable?>, val asked: Asked)
+    private var running: Running? = null
+
+    /** Done once the cache was read (or found missing): fetches start after it, so it never lands over theirs. */
+    private val cacheRead = CompletableDeferred<Unit>()
     private val opened = System.nanoTime()
 
     /**
@@ -72,48 +79,54 @@ class PageHandle<T> internal constructor(
 
     /** One fetch at a time: joins the running one, else starts one; returns its failure. */
     internal suspend fun fetchIn(flow: String, trigger: String, user: Boolean = true): Throwable? {
+        cacheRead.await()
         val (job, joined) = synchronized(this) {
-            running?.takeIf { it.first.isActive }?.let { (job, asked) -> asked.user = asked.user || user; job to true }
-                ?: Asked(user).let { asked -> scope.async { fetchNow(flow, trigger, asked) }.also { running = it to asked } }.let { it to false }
+            running?.takeIf { it.job.isActive }?.let { r ->
+                r.asked.user = r.asked.user || user
+                r.job to true
+            } ?: Asked(user).let { asked ->
+                val job = scope.async(start = CoroutineStart.LAZY) { fetchNow(flow, trigger, asked) }
+                running = Running(job, asked)
+                job to false
+            }
         }
         if (joined) {
             if (user) PageFetches.ask(key)
             log("join", flow, "trigger" to trigger)
+        } else {
+            job.start()
         }
         return job.await()
     }
 
     private suspend fun fetchNow(flow: String, trigger: String, asked: Asked): Throwable? {
-        fetching = true
-        val before = state
-        if (before is PageState.Ready) set(before.copy(activity = PageActivity.Refreshing()), "refreshing", flow, "trigger" to trigger)
-        else set(PageState.Loading(), "fetching", flow, "trigger" to trigger)
+        val hasCache = state is PageState.Ready
+        on(PageEvent.FetchStarted, if (hasCache) "refreshing" else "fetching", flow, "trigger" to trigger)
         // The fetch itself runs in PageFetches: a tab switch doesn't cancel it, and a handle for the
         // same page and semester (the tab shown again) joins it. It may wait for a lane first (shown
         // as [PageState.Loading.waiting]). Problems name the flow that ran it.
-        val run = PageFetches.start(key, flow, asked.user, hasCache = before is PageState.Ready) { download(flow) }
+        val run = PageFetches.start(key, flow, asked.user, hasCache) { download(flow) }
         if (run.joined) log("join", flow, "trigger" to trigger, "running" to run.flow)
         val note = scope.launch { noteWaiting(run.started) }
         return try {
             val fresh = run.result.await()
-            set(PageState.Ready(fresh, updatedAt(fresh)), "fresh", flow)
+            on(PageEvent.FetchSucceeded(fresh, updatedAt(fresh)), "fresh", flow)
             null
         } catch (e: CancellationException) {
-            (state as? PageState.Ready)?.let { state = it.copy(activity = it.activity.settled()) }
-            throw e
+            on(PageEvent.FetchCancelled(run.flow), "cancelled", flow)
+            // This screen went away: stop. Only the run was cancelled (sign-out): the state says so.
+            currentCoroutineContext().ensureActive()
+            null
         } catch (_: Dropped) {
             // Waited off screen past Tunable.QueueDrop: the cached copy stays, no problem.
-            (state as? PageState.Ready)?.let { set(it.copy(activity = it.activity.settled()), "dropped", flow) }
+            on(PageEvent.FetchDropped(run.flow), "dropped", flow)
             null
         } catch (e: Throwable) {
             val problem = problemOf(e, run.flow).copy(userInitiated = asked.user)
-            val now = state
-            if (now is PageState.Ready) set(now.copy(activity = PageActivity.Stale(problem)), "stale_kept", flow, "error" to e.kindName(), "user" to "${asked.user}")
-            else set(PageState.Failed(problem), "failed", flow, "error" to e.kindName(), "user" to "${asked.user}")
+            on(PageEvent.FetchFailed(problem), if (state is PageState.Ready) "stale_kept" else "failed", flow, "error" to e.kindName(), "user" to "${asked.user}")
             e
         } finally {
             note.cancel()
-            fetching = false
         }
     }
 
@@ -123,20 +136,12 @@ class PageHandle<T> internal constructor(
         if (started.isCompleted) return
         try {
             coroutineScope {
-                val names = launch { snapshotFlow { PageFetches.runningPages.toList() }.collect { waiting(waitingFor(it)) } }
+                val names = launch { PageFetches.runningPages.collect { state = state.next(PageEvent.WaitingChanged(waitingFor(it))) } }
                 started.join()
                 names.cancel()
             }
         } finally {
-            waiting(null)
-        }
-    }
-
-    private fun waiting(text: String?) {
-        state = when (val s = state) {
-            is PageState.Loading -> s.copy(waiting = text)
-            is PageState.Ready -> s.copy(activity = s.activity.waiting(text))
-            is PageState.Failed -> s
+            state = state.next(PageEvent.WaitingChanged(null))
         }
     }
 
@@ -172,20 +177,20 @@ class PageHandle<T> internal constructor(
         }
     }
 
-    /** Shows the cached copy; a corrupt or unreadable cache counts as none. */
+    /** Shows the cached copy, before any fetch; a corrupt or unreadable cache counts as none. */
     internal suspend fun readCache(flow: String) {
-        if (state is PageState.Ready) return
-        val data = attempt {
-            withContext(Dispatchers.IO) { cached(AppCore.await(), flow) }
-        }.getOrElse { e ->
-            Log.warn("ui.$id", "cache unreadable, ignored: ${e.kindName()}", flow, mapOf("error" to e.toString().take(200)))
-            null
-        }
-        if (data == null) return log("no_cache", flow)
-        when (val s = state) {
-            is PageState.Ready -> return // a fetch finished first
-            // A fetch failed first (e.g. offline): the cache, with its problem.
-            else -> set(PageState.Ready(data, updatedAt(data), PageActivity.cached(s, fetching)), "cached", flow)
+        try {
+            if (state is PageState.Ready) return
+            val data = attempt {
+                withContext(Dispatchers.IO) { cached(AppCore.await(), flow) }
+            }.getOrElse { e ->
+                Log.warn("ui.$id", "cache unreadable, ignored: ${e.kindName()}", flow, mapOf("error" to e.toString().take(200)))
+                null
+            }
+            if (data == null) return log("no_cache", flow)
+            on(PageEvent.CacheLoaded(data, updatedAt(data)), "cached", flow)
+        } finally {
+            cacheRead.complete(Unit)
         }
     }
 
@@ -193,8 +198,8 @@ class PageHandle<T> internal constructor(
     internal fun isStale(nowSeconds: Long = System.currentTimeMillis() / 1000): Boolean =
         (state as? PageState.Ready)?.let { nowSeconds - it.updatedAt > Settings.tunable(Tunable.PageMaxAge) * 3600L } ?: false
 
-    private fun set(new: PageState<T>, what: String, flow: String, vararg extra: Pair<String, String>) {
-        state = new
+    private fun on(event: PageEvent<T>, what: String, flow: String, vararg extra: Pair<String, String>) {
+        state = state.next(event)
         log(what, flow, *extra)
     }
 
@@ -223,6 +228,7 @@ class PageHandle<T> internal constructor(
                 "kind" to s.kindName(),
                 "updatedAt" to (s as? PageState.Ready)?.updatedAt,
                 "refreshing" to ((s as? PageState.Ready)?.activity is PageActivity.Refreshing),
+                "fetching" to s.fetching,
                 "waiting" to (((s as? PageState.Ready)?.activity as? PageActivity.Refreshing)?.waiting ?: (s as? PageState.Loading)?.waiting),
                 "count" to (s as? PageState.Ready)?.let { count(it.data) },
                 "problem" to s.problem()?.kind?.name,
@@ -288,6 +294,9 @@ fun <T> rememberPage(
     // another semester when the tab returns to the screen.
     var fetchedFor by rememberSaveable(id) { mutableStateOf<String?>(null) }
     val otpAtStart = remember { OtpPrompt.generation }
+    val resumesAtStart = remember { Foreground.resumes }
+    // One effect, in turn: the cache, the fetch on open, then a fetch each time the app comes
+    // back with old data. None of them overlaps another (and fetches wait for the cache).
     LaunchedEffect(page) {
         flow("$id.open") { f -> page.readCache(f) }
         // Its fetch finished while the screen was away (a tab switch mid-fetch, at most
@@ -296,26 +305,27 @@ fun <T> rememberPage(
             fetchedFor = semester
         }
         val ready = page.state is PageState.Ready
-        val trigger = refreshTrigger(
+        refreshTrigger(
             PageWake.Open,
             ready = ready,
             running = ready && PageFetches.isRunning(page.key),
             autoRefresh = Settings.autoRefresh,
             fetched = fetchedFor == semester,
             stale = page.isStale(),
-        ) ?: return@LaunchedEffect
-        page.refresh(trigger, user = false)
-        if (page.state.let { it is PageState.Ready && it.activity !is PageActivity.Stale }) fetchedFor = semester
+        )?.let { trigger ->
+            page.refresh(trigger, user = false)
+            if (page.state.let { it is PageState.Ready && it.activity !is PageActivity.Stale }) fetchedFor = semester
+        }
+        // Back in the app after a while: old data is fetched again.
+        var seen = resumesAtStart
+        snapshotFlow { Foreground.resumes }.collect { resumes ->
+            if (resumes == seen) return@collect
+            seen = resumes
+            refreshTrigger(PageWake.Resume, autoRefresh = Settings.autoRefresh, stale = page.isStale())?.let { page.refresh(it, user = false) }
+        }
     }
     LaunchedEffect(page, OtpPrompt.generation) {
         if (OtpPrompt.generation != otpAtStart) page.refresh(refreshTrigger(PageWake.Otp) ?: return@LaunchedEffect)
-    }
-    // Back in the app after a while: old data is fetched again.
-    val resumesAtStart = remember { Foreground.resumes }
-    LaunchedEffect(page, Foreground.resumes) {
-        if (Foreground.resumes == resumesAtStart) return@LaunchedEffect
-        val trigger = refreshTrigger(PageWake.Resume, autoRefresh = Settings.autoRefresh, stale = page.isStale())
-        page.refresh(trigger ?: return@LaunchedEffect, user = false)
     }
     DisposableEffect(page) {
         PageFetches.shown(id, true)

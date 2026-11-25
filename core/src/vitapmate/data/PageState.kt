@@ -36,15 +36,6 @@ sealed interface PageActivity {
 
     /** [text] as [Refreshing.waiting]; only a running fetch waits. */
     fun waiting(text: String?): PageActivity = if (this is Refreshing) Refreshing(text) else this
-
-    companion object {
-        /** A cached copy shown over [before]: still fetching, or the fetch that failed first. */
-        fun cached(before: PageState<*>, fetching: Boolean): PageActivity = when {
-            fetching -> Refreshing((before as? PageState.Loading)?.waiting)
-            before is PageState.Failed -> Stale(before.problem)
-            else -> Idle
-        }
-    }
 }
 
 /**

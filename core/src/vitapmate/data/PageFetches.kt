@@ -1,10 +1,12 @@
 package vitapmate.data
 
-import androidx.compose.runtime.mutableStateListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import vitapmate.observability.Log
 
 /** A waiting fetch nobody needed any more, dropped before it ran ([SingleFlight]). */
@@ -20,7 +22,8 @@ internal class Dropped : Exception("dropped while waiting")
  * student left, then background work; within one, runs the student asked for, then the oldest.
  * A waiting run is never cancelled by navigation, only moved; one that is automatic, has a cached
  * copy, is off screen and has waited over [Tunable.QueueDrop] is dropped instead (it fails with
- * [Dropped]). A running one always finishes. Queue events go to [log] (src `fetch.queue`).
+ * [Dropped]). A running one always finishes. The decisions are [FetchQueue]'s; this runs them.
+ * Queue events go to [log] (src `fetch.queue`).
  */
 open class SingleFlight internal constructor(
     private val scope: CoroutineScope,
@@ -33,37 +36,18 @@ open class SingleFlight internal constructor(
      */
     internal class Run<T>(val result: Deferred<T>, val flow: String, val joined: Boolean, val started: Deferred<Boolean>)
 
-    private class Entry(
-        val key: String,
-        val result: Deferred<Any?>,
-        val go: CompletableDeferred<Boolean>,
-        val flow: String,
-        val page: String,
-        var user: Boolean,
-        val hasCache: Boolean,
-        val background: Boolean,
-        val at: Long,
-        val order: Long,
-    ) {
-        var queued = false
-    }
+    private class Handle(val go: CompletableDeferred<Boolean>, val result: Deferred<Any?>)
 
-    private val runs = mutableMapOf<String, Entry>()
-    private var order = 0L
+    private val lock = Any()
+    private var queue = FetchQueue()
 
-    /** When each key's last run succeeded. */
-    private val succeeded = mutableMapOf<String, Long>()
+    /** The runs' coroutines by ticket id, until they end. */
+    private val handles = mutableMapOf<Long, Handle>()
 
-    /** Page ids on screen, with how many screens show each. */
-    private val onScreen = mutableMapOf<String, Int>()
+    private val running = MutableStateFlow<List<String>>(emptyList())
 
-    /** The last few page fetches' times (ms), and whether the last one came over UDP. */
-    private val took = ArrayDeque<Long>()
-    private var udp = false
-    private var lanes = 0
-
-    /** Page ids of the runs holding a lane, for "Waiting for Attendance to finish" (Compose state). */
-    val runningPages = mutableStateListOf<String>()
+    /** Page ids of the runs holding a lane, for "Waiting for Attendance to finish". */
+    val runningPages: StateFlow<List<String>> = running.asStateFlow()
 
     /**
      * The running or waiting run of [key], else [work] queued now in [flow]. [user]: the student
@@ -78,115 +62,86 @@ open class SingleFlight internal constructor(
         hasCache: Boolean = false,
         background: Boolean = false,
         work: suspend () -> T,
-    ): Run<T> = synchronized(runs) {
-        runs[key]?.takeIf { it.result.isActive }?.let { e ->
-            e.user = e.user || user
-            return Run(e.result as Deferred<T>, e.flow, joined = true, e.go)
-        }
-        val go = CompletableDeferred<Boolean>()
-        val result = scope.async {
-            if (!go.await()) throw Dropped()
-            work().also { synchronized(runs) { succeeded[key] = clock() } }
-        }
-        val entry = Entry(key, result, go, flow, key.substringBefore('/'), user, hasCache, background, clock(), order++)
-        runs[key] = entry
-        result.invokeOnCompletion {
-            synchronized(runs) {
-                if (runs[key] === entry) runs.remove(key)
-                pump(entry.flow)
+    ): Run<T> {
+        val (started, effects) = synchronized(lock) {
+            queue.active(key)?.let { t ->
+                val handle = handles.getValue(t.id)
+                val effects = if (user && !t.user) step(QueueEvent.Ask(key)) else emptyList()
+                return@synchronized Run(handle.result as Deferred<T>, t.flow, joined = true, handle.go) to effects
             }
+            val ticket = Ticket(queue.nextId, key, flow, user, hasCache, background, clock())
+            val go = CompletableDeferred<Boolean>()
+            val result = scope.async {
+                if (!go.await()) throw Dropped()
+                work()
+            }
+            handles[ticket.id] = Handle(go, result)
+            result.invokeOnCompletion { cause ->
+                perform(
+                    synchronized(lock) {
+                        handles.remove(ticket.id)
+                        step(QueueEvent.Finished(ticket.id, key, flow, succeeded = cause == null))
+                    },
+                )
+            }
+            Run(result, flow, joined = false, go) to step(QueueEvent.Start(ticket))
         }
-        pump(flow)
-        if (!go.isCompleted) {
-            entry.queued = true
-            log("queued", flow, mapOf("page" to entry.page, "position" to "${waiting().indexOf(entry) + 1}", "priority" to priorityName(entry), "user" to "$user", "lanes" to "$lanes"))
-        }
-        Run(result, flow, joined = false, go)
+        perform(effects)
+        return started
     }
 
     /** The student asked for [key]'s run too (joined it): it goes ahead and is never dropped. */
-    internal fun ask(key: String) = synchronized(runs) { runs[key]?.user = true }
+    internal fun ask(key: String) = dispatch(QueueEvent.Ask(key))
 
     /** Whether a run of [key] is going on or waiting for a lane. */
-    internal fun isRunning(key: String): Boolean = synchronized(runs) { runs[key]?.result?.isActive == true }
+    internal fun isRunning(key: String): Boolean = synchronized(lock) { queue.active(key) != null }
 
     /** Whether [key]'s last run succeeded at most [ms] ago. */
-    internal fun succeededWithin(key: String, ms: Long): Boolean =
-        synchronized(runs) { succeeded[key]?.let { clock() - it <= ms } ?: false }
+    internal fun succeededWithin(key: String, ms: Long): Boolean = synchronized(lock) { queue.succeededWithin(key, ms, clock()) }
 
     /** A screen showing page [id] came ([on]) or went; its waiting runs move up or down. */
-    internal fun shown(id: String, on: Boolean) = synchronized(runs) {
-        val n = (onScreen[id] ?: 0) + if (on) 1 else -1
-        if (n <= 0) onScreen.remove(id) else onScreen[id] = n
-    }
+    internal fun shown(id: String, on: Boolean) = dispatch(QueueEvent.Shown(id, on))
 
     /** Whether a screen shows page [id]. */
-    internal fun isShown(id: String): Boolean = synchronized(runs) { id in onScreen }
+    internal fun isShown(id: String): Boolean = synchronized(lock) { queue.isShown(id) }
 
     /** A page fetch in [flow] took [ms] and came over UDP or not: sets the lanes ([slowLink]). */
-    internal fun fetched(flow: String, ms: Long, udp: Boolean) = synchronized(runs) {
-        took.addLast(ms)
-        while (took.size > RECENT) took.removeFirst()
-        this.udp = udp
-        pump(flow)
-    }
+    internal fun fetched(flow: String, ms: Long, udp: Boolean) = dispatch(QueueEvent.Fetched(flow, ms, udp))
 
     /** The link is slow: most of the last few fetches took over [Tunable.SlowFetch], or it is UDP. */
-    internal val slowLink: Boolean get() = synchronized(runs) { slow() }
-
-    private fun slow() = udp || (took.sorted().getOrNull((took.size - 1) / 2) ?: 0) > Settings.tunable(Tunable.SlowFetch) * 1000L
+    internal val slowLink: Boolean get() = synchronized(lock) { queue.slow(QueueConfig.current()) }
 
     /** Cancels every run, waiting ones too, and forgets which succeeded (sign-out). */
-    fun cancelAll() = synchronized(runs) {
-        runs.values.forEach {
-            it.go.cancel()
-            it.result.cancel()
-        }
-        runs.clear()
-        succeeded.clear()
-        runningPages.clear()
-    }
+    fun cancelAll() = dispatch(QueueEvent.CancelAll)
 
-    private fun waiting() = runs.values.filter { !it.go.isCompleted }.sortedWith(compareBy({ rank(it) }, { !it.user }, { it.order }))
+    private fun dispatch(event: QueueEvent) = perform(synchronized(lock) { step(event) })
 
-    private fun rank(e: Entry) = when {
-        e.background -> 2
-        e.page in onScreen -> 0
-        else -> 1
-    }
-
-    private fun priorityName(e: Entry) = listOf("on_screen", "left", "background")[rank(e)]
-
-    /** Drops stale waiting runs, then starts the next while a lane is free. Holds the lock. */
-    private fun pump(flow: String) {
-        val now = clock()
-        val want = if (slow()) 1 else Settings.tunable(Tunable.FetchLanes)
-        if (want != lanes) {
-            if (lanes != 0) log("lanes", flow, mapOf("from" to "$lanes", "to" to "$want", "udp" to "$udp", "recent_ms" to took.joinToString(",")))
-            lanes = want
-        }
-        val limit = Settings.tunable(Tunable.QueueDrop) * 1000L
-        for (e in waiting()) {
-            if (e.user || !e.hasCache || e.page in onScreen || now - e.at <= limit) continue
-            runs.remove(e.key)
-            e.go.complete(false)
-            log("dropped", e.flow, mapOf("page" to e.page, "waited_ms" to "${now - e.at}"))
-        }
-        while (runs.values.count { it.go.isCompleted } < lanes) {
-            val next = waiting().firstOrNull() ?: break
-            next.go.complete(true)
-            if (next.queued) log("started", next.flow, mapOf("page" to next.page, "waited_ms" to "${now - next.at}", "priority" to priorityName(next)))
-        }
-        val pages = runs.values.filter { it.go.isCompleted }.map { it.page }
-        if (pages != runningPages) {
-            runningPages.clear()
-            runningPages.addAll(pages)
+    /** [event] applied to the queue; its effects with their runs, to [perform] outside the lock. Holds the lock. */
+    private fun step(event: QueueEvent): List<Pair<QueueEffect, Handle?>> {
+        val next = queue.next(event, clock(), QueueConfig.current())
+        queue = next.queue
+        running.value = queue.runningPages
+        return next.effects.map { e ->
+            e to when (e) {
+                is QueueEffect.Go -> handles[e.ticketId]
+                is QueueEffect.Drop -> handles.remove(e.ticketId)
+                is QueueEffect.Cancel -> handles.remove(e.ticketId)
+                is QueueEffect.Log -> null
+            }
         }
     }
 
-    private companion object {
-        /** How many recent fetch times decide [slowLink]. */
-        const val RECENT = 3
+    /** Outside the lock: a run resumed here may start work that comes back to the queue. */
+    private fun perform(effects: List<Pair<QueueEffect, Handle?>>) {
+        for ((e, handle) in effects) when (e) {
+            is QueueEffect.Go -> handle?.go?.complete(true)
+            is QueueEffect.Drop -> handle?.go?.complete(false)
+            is QueueEffect.Cancel -> handle?.let {
+                it.go.cancel()
+                it.result.cancel()
+            }
+            is QueueEffect.Log -> log(e.msg, e.flow, e.fields)
+        }
     }
 }
 

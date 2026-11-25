@@ -114,7 +114,7 @@ class SingleFlightTest {
         // Waiting counts as running: a page shown again joins it.
         assertTrue(flights.isRunning("page2//AP1"))
         assertTrue(flights.hold("page2//AP1", gates[2]).joined)
-        assertEquals(listOf("page0", "page1"), flights.runningPages.toList())
+        assertEquals(listOf("page0", "page1"), flights.runningPages.value)
         gates[0].complete(Unit)
         runs[0].result.await()
         settle()
@@ -208,7 +208,7 @@ class SingleFlightTest {
         assertTrue(running.result.isCancelled)
         assertTrue(waiting.result.isCancelled)
         assertFalse(flights.isRunning("marks//AP1"))
-        assertTrue(flights.runningPages.isEmpty())
+        assertTrue(flights.runningPages.value.isEmpty())
         val again = flights.start("marks//AP1", "f2") { "fresh" }
         assertFalse(again.joined)
         assertEquals("fresh", again.result.await())
