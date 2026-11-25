@@ -7,11 +7,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingReadiness
+import vitapmate.core.ForwardingUses
 
 class ForwardingPhaseTest {
-    private val off = Forwarding.Off("noreply.sdc@vitap.ac.in", ForwardingReadiness.OFF)
-    private val waiting = Forwarding.Waiting("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", null, 10L, ForwardingReadiness.NEEDS_FILTER)
-    private val on = Forwarding.On("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", 20L, 20L, ForwardingReadiness.READY)
+    private val off = Forwarding.Off("noreply.sdc@vitap.ac.in", ForwardingReadiness.OFF, ForwardingUses(false, false))
+    private val waiting = Forwarding.Waiting("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", null, 10L, ForwardingReadiness.NEEDS_FILTER, ForwardingUses(true, true))
+    private val on = Forwarding.On("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", 20L, 20L, ForwardingReadiness.READY, ForwardingUses(true, true))
 
     @Test
     fun oneActionAtATime() {
@@ -41,5 +42,6 @@ class ForwardingPhaseTest {
             listOf(ForwardingReadiness.OFF, ForwardingReadiness.OFF, ForwardingReadiness.NEEDS_FILTER, ForwardingReadiness.READY),
             listOf(null.readiness, off.readiness, waiting.readiness, on.readiness),
         )
+        assertEquals(listOf(null, false, true), listOf(null.uses, off.uses, waiting.uses).map { it?.usableForAutofill })
     }
 }

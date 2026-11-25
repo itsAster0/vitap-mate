@@ -170,6 +170,27 @@ pub enum ForwardingReadiness {
     Ready,
 }
 
+/// What forwarding at a [`ForwardingReadiness`] is good for, decided here so the OTP prompt,
+/// background sync and the setup sheet agree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct ForwardingUses {
+    /// The OTP prompt fills in forwarded codes: there is an address, set up or not yet (an OTP
+    /// may come through while the student finishes in Gmail).
+    pub usable_for_autofill: bool,
+    /// Background sync may sign in with it: Gmail's mail reaches the address (its confirmation
+    /// came, or an OTP did).
+    pub ready_for_sync: bool,
+}
+
+impl ForwardingReadiness {
+    fn uses(self) -> ForwardingUses {
+        ForwardingUses {
+            usable_for_autofill: self != Self::Off,
+            ready_for_sync: matches!(self, Self::NeedsFilter | Self::Ready),
+        }
+    }
+}
+
 /// This phone's forwarding address and how far its setup got, for the app.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum Forwarding {
@@ -178,6 +199,7 @@ pub enum Forwarding {
         /// What the Gmail filter matches in From.
         sender: String,
         readiness: ForwardingReadiness,
+        uses: ForwardingUses,
     },
     /// An address, not finished setting up in Gmail yet (or kept from v2 and not rejoined).
     Waiting {
@@ -188,6 +210,7 @@ pub enum Forwarding {
         /// Unix seconds of the latest forwarded mail of either kind.
         last_mail_at: Option<i64>,
         readiness: ForwardingReadiness,
+        uses: ForwardingUses,
     },
     /// Forwarding is set up: an OTP came through, or the student marked setup done after
     /// Gmail's confirmation arrived.
@@ -198,6 +221,7 @@ pub enum Forwarding {
         last_otp_at: Option<i64>,
         last_mail_at: Option<i64>,
         readiness: ForwardingReadiness,
+        uses: ForwardingUses,
     },
 }
 
@@ -1155,8 +1179,13 @@ impl Core {
 fn view(state: &MailboxState) -> Forwarding {
     let sender = VTOP_SENDER.to_string();
     let readiness = state.readiness();
+    let uses = readiness.uses();
     match state {
-        MailboxState::Off => Forwarding::Off { sender, readiness },
+        MailboxState::Off => Forwarding::Off {
+            sender,
+            readiness,
+            uses,
+        },
         // Nothing is forwarded to this install until it rejoins, so it isn't on yet.
         MailboxState::NeedsRejoin { mailbox, .. } => Forwarding::Waiting {
             address: mailbox.address.clone(),
@@ -1164,6 +1193,7 @@ fn view(state: &MailboxState) -> Forwarding {
             confirmation: None,
             last_mail_at: None,
             readiness,
+            uses,
         },
         MailboxState::Joined {
             mailbox,
@@ -1178,6 +1208,7 @@ fn view(state: &MailboxState) -> Forwarding {
             confirmation: confirmation.clone(),
             last_mail_at: *last_mail_at,
             readiness,
+            uses,
         },
         MailboxState::Joined {
             mailbox,
@@ -1192,6 +1223,7 @@ fn view(state: &MailboxState) -> Forwarding {
             last_otp_at: *last_otp_at,
             last_mail_at: *last_mail_at,
             readiness,
+            uses,
         },
     }
 }

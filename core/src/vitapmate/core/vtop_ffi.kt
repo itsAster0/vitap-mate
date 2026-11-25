@@ -2373,7 +2373,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_regno_sharing() and 0xFFFF) != 22665) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_regno_sharing() and 0xFFFF) != 32421) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_regno_sharing() and 0xFFFF) != 31212) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_route_status() and 0xFFFF) != 46716) {
@@ -2424,7 +2424,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_server_options() and 0xFFFF) != 51426) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 64996) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 48377) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 57187) {
@@ -5545,8 +5545,10 @@ public interface CoreInterface {
     
     /**
      * Settings' switch: Share, or NotNow to stop. Stopping drops this install's JWT and
-     * refresh token, so nothing goes as the student from then on; the server keeps what it
-     * has until they delete it on the Server page. A server route chosen goes back to Direct.
+     * refresh token, so nothing goes as the student from then on, and signs this install out
+     * of the server with the refresh token (`auth:signOut`): at once, or kept for the next
+     * call that reaches the server. The account, its address and keys stay until the student
+     * deletes them on the Server page. A server route chosen goes back to Direct.
      */
     suspend fun `setRegnoSharing`(`flow`: kotlin.String, `answer`: RegnoAnswer): RegnoSharing
     
@@ -5646,7 +5648,8 @@ public interface CoreInterface {
      * Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
      * address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
      * (for every phone on the account with `everywhere`), then forgets the identity here. Best
-     * effort: offline, an address stays queued and the install stays listed in Server.
+     * effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
+     * later, the install listed in Server until it goes.
      */
     suspend fun `signOutOfServer`(`flow`: kotlin.String, `everywhere`: kotlin.Boolean)
     
@@ -8014,8 +8017,10 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Settings' switch: Share, or NotNow to stop. Stopping drops this install's JWT and
-     * refresh token, so nothing goes as the student from then on; the server keeps what it
-     * has until they delete it on the Server page. A server route chosen goes back to Direct.
+     * refresh token, so nothing goes as the student from then on, and signs this install out
+     * of the server with the refresh token (`auth:signOut`): at once, or kept for the next
+     * call that reaches the server. The account, its address and keys stay until the student
+     * deletes them on the Server page. A server route chosen goes back to Direct.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8456,7 +8461,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
      * Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
      * address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
      * (for every phone on the account with `everywhere`), then forgets the identity here. Best
-     * effort: offline, an address stays queued and the install stays listed in Server.
+     * effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
+     * later, the install listed in Server until it goes.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -15038,6 +15044,56 @@ public object FfiConverterTypeFileLink: FfiConverterRustBuffer<FileLink> {
 
 
 
+/**
+ * What forwarding at a [`ForwardingReadiness`] is good for, decided here so the OTP prompt,
+ * background sync and the setup sheet agree.
+ */
+data class ForwardingUses (
+    /**
+     * The OTP prompt fills in forwarded codes: there is an address, set up or not yet (an OTP
+     * may come through while the student finishes in Gmail).
+     */
+    val `usableForAutofill`: kotlin.Boolean
+    , 
+    /**
+     * Background sync may sign in with it: Gmail's mail reaches the address (its confirmation
+     * came, or an OTP did).
+     */
+    val `readyForSync`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeForwardingUses: FfiConverterRustBuffer<ForwardingUses> {
+    override fun read(buf: ByteBuffer): ForwardingUses {
+        return ForwardingUses(
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ForwardingUses) = (
+            FfiConverterBoolean.allocationSize(value.`usableForAutofill`) +
+            FfiConverterBoolean.allocationSize(value.`readyForSync`)
+    )
+
+    override fun write(value: ForwardingUses, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`usableForAutofill`, buf)
+            FfiConverterBoolean.write(value.`readyForSync`, buf)
+    }
+}
+
+
+
 data class GeneralOuting (
     /**
      * Unix seconds.
@@ -17134,7 +17190,7 @@ public object FfiConverterTypeMentorMessage: FfiConverterRustBuffer<MentorMessag
 
 
 /**
- * A key just made: [`NewKey::key`] is shown once.
+ * A key just made (`keys:create`'s answer): [`NewKey::key`] is shown once.
  */
 data class NewKey (
     val `id`: kotlin.String
@@ -22379,7 +22435,8 @@ sealed class Forwarding {
          * What the Gmail filter matches in From.
          */
         val `sender`: kotlin.String, 
-        val `readiness`: vitapmate.core.ForwardingReadiness) : Forwarding()
+        val `readiness`: vitapmate.core.ForwardingReadiness, 
+        val `uses`: vitapmate.core.ForwardingUses) : Forwarding()
         
     {
         
@@ -22401,7 +22458,8 @@ sealed class Forwarding {
          * Unix seconds of the latest forwarded mail of either kind.
          */
         val `lastMailAt`: kotlin.Long?, 
-        val `readiness`: vitapmate.core.ForwardingReadiness) : Forwarding()
+        val `readiness`: vitapmate.core.ForwardingReadiness, 
+        val `uses`: vitapmate.core.ForwardingUses) : Forwarding()
         
     {
         
@@ -22421,7 +22479,8 @@ sealed class Forwarding {
          */
         val `lastOtpAt`: kotlin.Long?, 
         val `lastMailAt`: kotlin.Long?, 
-        val `readiness`: vitapmate.core.ForwardingReadiness) : Forwarding()
+        val `readiness`: vitapmate.core.ForwardingReadiness, 
+        val `uses`: vitapmate.core.ForwardingUses) : Forwarding()
         
     {
         
@@ -22448,6 +22507,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
             1 -> Forwarding.Off(
                 FfiConverterString.read(buf),
                 FfiConverterTypeForwardingReadiness.read(buf),
+                FfiConverterTypeForwardingUses.read(buf),
                 )
             2 -> Forwarding.Waiting(
                 FfiConverterString.read(buf),
@@ -22455,6 +22515,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalTypeGmailConfirmation.read(buf),
                 FfiConverterOptionalLong.read(buf),
                 FfiConverterTypeForwardingReadiness.read(buf),
+                FfiConverterTypeForwardingUses.read(buf),
                 )
             3 -> Forwarding.On(
                 FfiConverterString.read(buf),
@@ -22462,6 +22523,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalLong.read(buf),
                 FfiConverterOptionalLong.read(buf),
                 FfiConverterTypeForwardingReadiness.read(buf),
+                FfiConverterTypeForwardingUses.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -22474,6 +22536,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 4UL
                 + FfiConverterString.allocationSize(value.`sender`)
                 + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
+                + FfiConverterTypeForwardingUses.allocationSize(value.`uses`)
             )
         }
         is Forwarding.Waiting -> {
@@ -22485,6 +22548,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterOptionalTypeGmailConfirmation.allocationSize(value.`confirmation`)
                 + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
                 + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
+                + FfiConverterTypeForwardingUses.allocationSize(value.`uses`)
             )
         }
         is Forwarding.On -> {
@@ -22496,6 +22560,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterOptionalLong.allocationSize(value.`lastOtpAt`)
                 + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
                 + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
+                + FfiConverterTypeForwardingUses.allocationSize(value.`uses`)
             )
         }
     }
@@ -22506,6 +22571,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 buf.putInt(1)
                 FfiConverterString.write(value.`sender`, buf)
                 FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
+                FfiConverterTypeForwardingUses.write(value.`uses`, buf)
                 Unit
             }
             is Forwarding.Waiting -> {
@@ -22515,6 +22581,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalTypeGmailConfirmation.write(value.`confirmation`, buf)
                 FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
                 FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
+                FfiConverterTypeForwardingUses.write(value.`uses`, buf)
                 Unit
             }
             is Forwarding.On -> {
@@ -22524,6 +22591,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalLong.write(value.`lastOtpAt`, buf)
                 FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
                 FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
+                FfiConverterTypeForwardingUses.write(value.`uses`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }

@@ -159,8 +159,11 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
     }
     // Steps 1 and 2 are done once Gmail's confirmation arrives (or forwarding is ready); step 3 is
     // done once an OTP comes through or the student marks setup done.
-    val added = readiness == ForwardingReadiness.NEEDS_FILTER || readiness == ForwardingReadiness.READY
-    val filtered = readiness == ForwardingReadiness.READY
+    val (added, filtered) = when (readiness) {
+        ForwardingReadiness.READY -> true to true
+        ForwardingReadiness.NEEDS_FILTER -> true to false
+        ForwardingReadiness.NEEDS_CONFIRMATION, ForwardingReadiness.OFF -> false to false
+    }
     fun state(done: Boolean, current: Boolean) = if (done) StepState.Done else if (current) StepState.Current else StepState.Plain
     Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings", state = state(added, true)) {
         "In the Gmail where VTOP's mail arrives (usually @vitapstudent.ac.in): Add a forwarding address, paste yours, then Next → Proceed → OK. " +

@@ -9,7 +9,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CoreException
-import vitapmate.core.ForwardingReadiness
 import vitapmate.core.GmailGrant
 import vitapmate.core.LiveTopic
 import vitapmate.data.AppCore
@@ -28,10 +27,10 @@ import vitapmate.observability.flow
  */
 object OtpAutofill {
     /** The pick; before there is one, whichever is set up (forwarding first). */
-    fun selected(): OtpSource = Settings.otpSource ?: if (MailForwarding.readiness == ForwardingReadiness.OFF && Gmail.account != null) OtpSource.Gmail else OtpSource.Forwarding
+    fun selected(): OtpSource = Settings.otpSource ?: if (!MailForwarding.usableForAutofill && Gmail.account != null) OtpSource.Gmail else OtpSource.Forwarding
 
     fun ready(source: OtpSource) = when (source) {
-        OtpSource.Forwarding -> MailForwarding.readiness != ForwardingReadiness.OFF
+        OtpSource.Forwarding -> MailForwarding.usableForAutofill
         OtpSource.Gmail -> Gmail.account?.needsReconnect == false
     }
 

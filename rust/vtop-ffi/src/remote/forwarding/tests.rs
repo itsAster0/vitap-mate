@@ -839,6 +839,29 @@ fn readiness_follows_every_stage_of_setup() {
 }
 
 #[test]
+fn every_stage_says_what_it_is_good_for() {
+    use ForwardingReadiness::*;
+    let uses = |readiness: ForwardingReadiness| {
+        let ForwardingUses {
+            usable_for_autofill,
+            ready_for_sync,
+        } = readiness.uses();
+        (usable_for_autofill, ready_for_sync)
+    };
+    assert_eq!(uses(Off), (false, false));
+    assert_eq!(uses(NeedsConfirmation), (true, false));
+    assert_eq!(uses(NeedsFilter), (true, true));
+    assert_eq!(uses(Ready), (true, true));
+    let Forwarding::On { uses: on, .. } = view(&MailboxState::Joined {
+        mailbox: mailbox(ID),
+        setup: Setup::NEW.mail(&confirm(10)).mark_done(),
+    }) else {
+        panic!("not on");
+    };
+    assert_eq!(on, Ready.uses());
+}
+
+#[test]
 fn setup_moves_only_forward() {
     // Gmail's confirmation shows, with only a Gmail link kept.
     let waiting = Setup::NEW.mail(&confirm(10));

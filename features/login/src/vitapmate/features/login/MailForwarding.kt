@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.CoreException
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingReadiness
+import vitapmate.core.ForwardingUses
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.OtpSource
@@ -57,6 +58,15 @@ val Forwarding?.readiness: ForwardingReadiness
         is Forwarding.On -> readiness
     }
 
+/** What forwarding is good for now (OTP auto-fill, background sync), as decided by Rust; null before it loaded. */
+val Forwarding?.uses: ForwardingUses?
+    get() = when (this) {
+        null -> null
+        is Forwarding.Off -> uses
+        is Forwarding.Waiting -> uses
+        is Forwarding.On -> uses
+    }
+
 /** Whether the phone has an address, set up or not. */
 val Forwarding?.hasAddress get() = readiness != ForwardingReadiness.OFF
 
@@ -88,6 +98,12 @@ object MailForwarding {
         internal set
 
     val readiness get() = status.readiness
+
+    /** Whether the OTP prompt fills in forwarded codes (Rust's `ForwardingUses`). */
+    val usableForAutofill get() = status.uses?.usableForAutofill == true
+
+    /** Whether background sync may sign in with forwarded codes (Rust's `ForwardingUses`). */
+    val readyForSync get() = status.uses?.readyForSync == true
 
     val isOn get() = status.hasAddress
 
