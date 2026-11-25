@@ -133,6 +133,7 @@
           "title": "Improved",
           "items": [
             "Proving who you are runs in the background and takes less time.",
+    "On a weak network, a sign-in to the server that drops halfway no longer makes you prove who you are again.",
             "Pages that need an OTP wait for the code instead of failing.",
             "Saved files and settings are written safely, so a crash or a full phone no longer leaves a half-written page, and old leftovers are cleaned up.",
             "The server keeps you signed in for longer, without proving again.",
