@@ -34,6 +34,7 @@ const post = (path: string, handler: (ctx: ActionCtx, req: Request) => Promise<R
 
 const MAX_MCP_BODY_BYTES = 64 * 1024;
 const MCP_TIMEOUT_MS = 32_000;
+const NO_STORE = { "cache-control": "no-store", pragma: "no-cache" } as const;
 
 function decodeSegment(raw: string): string {
   try {
@@ -85,11 +86,11 @@ for (const spec of [
     if (started.limited) return error(429, "rate_limited", "Too many requests for this account.", { headers: { "retry-after": "60" } });
     const cached = await cachedCookies(ctx, started.accountId, started.regno, started.cached);
     console.log(`[regno=${started.regno}] account: a key asked for a session (${cached ? "cached" : "new request"})`);
-    if (cached) return Response.json(ready(cached.cookies, started.source));
+    if (cached) return Response.json(ready(cached.cookies, started.source), { headers: NO_STORE });
     const opened = await ctx.runMutation(internal.sessions.open, { accountId: started.accountId, keyHash, requestId: crypto.randomUUID() });
     if (opened.opened) await begin(ctx, opened.requestId, opened.opened);
     const state = await ctx.runQuery(internal.sessions.state, { requestId: opened.requestId });
-    return Response.json(state?.startedView ?? opened.joined, { status: 202, headers: { "retry-after": "2" } });
+    return Response.json(state?.startedView ?? opened.joined, { status: 202, headers: { "retry-after": "2", ...NO_STORE } });
   }),
   ...corsRoutes("GET", { pathPrefix: "/v1/session/requests/" }, async (ctx, req) => {
     const keyHash = await keyHashOf(req);
@@ -97,7 +98,7 @@ for (const spec of [
     if (!accountId) return keyUnknown();
     const requestId = decodeSegment(new URL(req.url).pathname.slice("/v1/session/requests/".length)).trim();
     const { status, body } = await ctx.runQuery(internal.sessions.poll, { accountId, requestId });
-    return Response.json(body, { status });
+    return Response.json(body, { status, headers: NO_STORE });
   }),
   ...corsRoutes("POST", { path: "/v1/session/expire" }, async (ctx, req) => {
     const keyHash = await keyHashOf(req);
@@ -114,7 +115,7 @@ for (const spec of [
     if (!ok) return keyUnknown();
     if (ok.limited) return error(429, "rate_limited", "Too many token requests for this account.", { headers: { "retry-after": "60" } });
     const { jwt, expiresAt } = await signAccessJwt({ sub: keyHash, kind: "key" }, now());
-    return Response.json({ jwt, expiresAt }, { headers: { "cache-control": "no-store", pragma: "no-cache" } });
+    return Response.json({ jwt, expiresAt }, { headers: NO_STORE });
   }),
   // The extension polls for the key the app made with its code.
   ...corsRoutes("POST", { path: "/v1/pair" }, async (ctx, req) => {
@@ -124,9 +125,9 @@ for (const spec of [
     const code = pairCode(str((await jsonBody(req))?.code));
     if (code === null) return error(400, "bad_request", "code must be a pairing code.");
     const key = await ctx.runMutation(internal.pair.take, { codeHash: await sha256Hex(code) });
-    if (key === null) return Response.json({ status: "pending", pollAfterMs: POLL_AFTER_MS }, { status: 202 });
+    if (key === null) return Response.json({ status: "pending", pollAfterMs: POLL_AFTER_MS }, { status: 202, headers: NO_STORE });
     console.log("pair: handed a key to the extension");
-    return Response.json({ status: "ready", key });
+    return Response.json({ status: "ready", key }, { headers: NO_STORE });
   }),
 ]) {
   http.route(spec);
@@ -330,7 +331,7 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   const url = new URL(req.url);
   const pathKey = url.pathname.startsWith("/mcp/") ? url.pathname.slice("/mcp/".length).split("/")[0].trim() : "";
   const unauthorized = (code: string, message: string) =>
-    error(401, code, message, { headers: { "www-authenticate": challenge() } });
+    cors(error(401, code, message, { headers: { "www-authenticate": challenge() } }));
   if (req.method !== "OPTIONS") {
     const presented = pathKey || bearer(req);
     if (!presented) return unauthorized("unauthorized", "Connect with OAuth or an access key from the app.");
@@ -346,7 +347,7 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   const init: RequestInit = { method: req.method, headers, signal: AbortSignal.timeout(MCP_TIMEOUT_MS) };
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const body = await readBodyCapped(req, MAX_MCP_BODY_BYTES);
-    if (body === null) return error(413, "too_large", "The request is too large.");
+    if (body === null) return cors(error(413, "too_large", "The request is too large."));
     if (body.byteLength > 0) init.body = body;
   }
   let response: Response;
@@ -355,10 +356,10 @@ async function mcp(ctx: ActionCtx, req: Request): Promise<Response> {
   } catch (e) {
     if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
       logWarn({}, "mcp: engine timed out");
-      return error(504, "vtop_timeout", "The MCP tool took too long to answer.");
+      return cors(error(504, "vtop_timeout", "The MCP tool took too long to answer."));
     }
     logError({}, "mcp: engine unreachable", e);
-    return error(503, "engine_unavailable", "The server can't reach the MCP tools right now.");
+    return cors(error(503, "engine_unavailable", "The server can't reach the MCP tools right now."));
   }
   if (response.status !== 401 || response.headers.has("www-authenticate")) return response;
   const out = new Response(response.body, response);
@@ -383,8 +384,8 @@ const LOGIN_ERROR_STATUS: Record<string, number> = {
 
 /** A sign-in answer for the UDP gateway: pending is `202`, followed at its `requestId`. */
 function loginReply(answer: LoginAnswer): Response {
-  if (answer.status === "error") return error(LOGIN_ERROR_STATUS[answer.code] ?? 503, answer.code, answer.error);
-  return Response.json(answer, { status: answer.status === "ok" ? 200 : 202 });
+  if (answer.status === "error") return error(LOGIN_ERROR_STATUS[answer.code] ?? 503, answer.code, answer.error, { headers: NO_STORE });
+  return Response.json(answer, { status: answer.status === "ok" ? 200 : 202, headers: NO_STORE });
 }
 
 post("/v1/app/login", async (ctx, req) => loginReply(await loginFor(ctx, str((await jsonBody(req))?.flow) ?? "udp")));

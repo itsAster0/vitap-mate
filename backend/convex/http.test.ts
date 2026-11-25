@@ -138,11 +138,14 @@ describe("access keys", () => {
     expect(pairCode("oil00-00000")).toBe("01100000000".slice(0, 10));
     expect(pairCode("short")).toBeNull();
     expect((await post(t, "/v1/pair", { code: "bad" })).status).toBe(400);
-    expect((await post(t, "/v1/pair", { code: "ABCDE-FGHJK" })).status).toBe(202);
+    const pendingPair = await post(t, "/v1/pair", { code: "ABCDE-FGHJK" });
+    expect(pendingPair.status).toBe(202);
+    expect(pendingPair.headers.get("cache-control")).toBe("no-store");
     expect(await as.query(api.pair.info, { code: "ABCDE-FGHJK" })).toEqual({ kind: "browser" });
     expect(await codeOf(as.query(api.pair.info, { code: "bad" }))).toBe("bad_request");
     const made = await as.action(api.keys.create, { flow: "f", pairCode: "abcde fghjk" });
     const ready = await post(t, "/v1/pair", { code: "ABCDEFGHJK" });
+    expect(ready.headers.get("cache-control")).toBe("no-store");
     expect(await json(ready)).toEqual({ status: "ready", key: made.key });
     expect((await post(t, "/v1/pair", { code: "ABCDEFGHJK" })).status).toBe(202);
     expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: "nope" }))).toBe("bad_request");
@@ -161,6 +164,7 @@ describe("access keys", () => {
     });
     const started = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
     expect(started.status).toBe(202);
+    expect(started.headers.get("cache-control")).toBe("no-store");
     const pending = await json(started);
     expect(pending).toMatchObject({ status: "pending", stage: "phone" });
     // The phone sees the request live; a phone of another student does not.
@@ -174,9 +178,11 @@ describe("access keys", () => {
     });
     expect(answered).toEqual({ ok: true, late: false });
     const polled = await t.fetch(`/v1/session/requests/${pending.requestId}`, { headers: { authorization: `Bearer ${made.key}` } });
+    expect(polled.headers.get("cache-control")).toBe("no-store");
     expect(await json(polled)).toMatchObject({ status: "ready", session: { cookies: "JSESSIONID=abc" }, source: { from: "phone", cached: false } });
     // The answer is cached now.
     const cached = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
+    expect(cached.headers.get("cache-control")).toBe("no-store");
     expect(await json(cached)).toMatchObject({ status: "ready", source: { from: "phone", cached: true } });
     expect((await t.fetch("/v1/session/expire", { method: "POST", headers: { authorization: `Bearer ${made.key}` } })).status).toBe(204);
     expect(await as.query(api.sessions.pending, { flow: "f" })).toEqual([]);
@@ -438,7 +444,11 @@ describe("/mcp", () => {
     const none = await t.fetch("/mcp", { method: "POST", body: "{}" });
     expect(none.status).toBe(401);
     expect(none.headers.get("www-authenticate")).toContain("/.well-known/oauth-protected-resource/mcp");
-    expect((await t.fetch("/mcp", { method: "POST", body: "{}", headers: { authorization: "Bearer vtm_unknown" } })).status).toBe(401);
+    expect(none.headers.get("access-control-allow-origin")).toBe("*");
+    expect(none.headers.get("access-control-expose-headers")).toBe("WWW-Authenticate");
+    const badKey = await t.fetch("/mcp", { method: "POST", body: "{}", headers: { authorization: "Bearer vtm_unknown" } });
+    expect(badKey.status).toBe(401);
+    expect(badKey.headers.get("access-control-allow-origin")).toBe("*");
     const ok = await t.fetch(`/mcp/${made.key}`, {
       method: "POST",
       body: "{}",
@@ -447,17 +457,27 @@ describe("/mcp", () => {
     expect(ok.status).toBe(200);
     expect(calls.at(-1)?.path).toBe(`/mcp/${made.key}`);
     expect(calls.at(-1)?.headers.get("x-forwarded-for")).toBe("1.2.3.4");
-    // Oversized body rejected before reaching the engine.
+    // Oversized body rejected before reaching the engine, with CORS.
     const big = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "x".repeat(65 * 1024) });
     expect(big.status).toBe(413);
+    expect(big.headers.get("access-control-allow-origin")).toBe("*");
     expect((await json(big)).code).toBe("too_large");
-    // Engine timeout returns 504 vtop_timeout.
+    // Engine timeout returns 504 vtop_timeout, with CORS.
     engine(() => {
       throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
     });
     const slow = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "{}" });
     expect(slow.status).toBe(504);
+    expect(slow.headers.get("access-control-allow-origin")).toBe("*");
     expect((await json(slow)).code).toBe("vtop_timeout");
+    // Engine unreachable returns 503 engine_unavailable, with CORS.
+    engine(() => {
+      throw new TypeError("connect refused");
+    });
+    const down = await t.fetch(`/mcp/${made.key}`, { method: "POST", body: "{}" });
+    expect(down.status).toBe(503);
+    expect(down.headers.get("access-control-allow-origin")).toBe("*");
+    expect((await json(down)).code).toBe("engine_unavailable");
   });
 
   it("caps OAuth clients via oauthMeta counter and evicts the least-recently-used", async () => {
