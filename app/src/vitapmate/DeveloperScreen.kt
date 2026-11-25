@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.toShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.SquareActivity
 import com.composables.icons.lucide.Trash
+import com.composables.icons.lucide.Smartphone
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Zap
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +68,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.CacheScope
 import vitapmate.core.Core
+import vitapmate.core.ServerDevice
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
@@ -76,6 +79,7 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
+import vitapmate.features.login.ago
 import vitapmate.ui.StatusChip
 import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
@@ -312,9 +316,10 @@ fun DeveloperScreen() {
                 }
             }
             item {
-                ListGroup("Server") {
+                ListGroup("Server", footer = "Requests carry a short-lived token from your account proof, renewed with a key only this phone holds.") {
                     GroupItem("Server", "dev.forwarding_server", Lucide.Server, server ?: "…", onClick = { editServer = true })
                     tunable(Tunable.OtpPoll)
+                    ServerDeviceRows()
                 }
             }
         }
@@ -394,4 +399,63 @@ private suspend fun <T : Any> dev(name: String, work: suspend (Core, String) -> 
 }.getOrElse { e ->
     Log.warn("ui.dev", "$name failed: ${e::class.simpleName}")
     null
+}
+
+/** Developer's server calls, as flows `dev.<name>`. */
+private val devServerCall = ServerCalls("dev", "Developer")
+
+/**
+ * This phone on the server (Rust's `server_device`, which never proves): its id, when it was
+ * registered, whether the server holds its push token, and Remove (asks first). A removed phone
+ * registers again the next time it talks to the server.
+ */
+@Composable
+private fun ServerDeviceRows() {
+    val scope = rememberCoroutineScope()
+    val actions = rememberServerActions(devServerCall)
+    var phase by remember { mutableStateOf<ServerLoad<ServerDevice>>(ServerLoad.Loading) }
+    fun load() {
+        scope.launch { phase = phase.after(devServerCall("server_device") { c, f -> c.serverDevice(f) }) }
+    }
+    LaunchedEffect(Unit) { load() }
+    when (val p = phase) {
+        ServerLoad.Loading -> GroupItem("This phone on the server", "dev.server_device", Lucide.Smartphone, "…")
+        is ServerLoad.Failed -> GroupItem("This phone on the server", "dev.server_device", Lucide.Smartphone, p.problem.message, onClick = { phase = ServerLoad.Loading; load() })
+        is ServerLoad.Ready -> when (val d = p.value) {
+            is ServerDevice.Unregistered -> GroupItem(d.label, "dev.server_device", Lucide.Smartphone, "Not registered: no identity on the server yet")
+            is ServerDevice.Registered -> {
+                GroupItem(
+                    d.label,
+                    "dev.server_device",
+                    Lucide.Smartphone,
+                    listOfNotNull("Id ${d.id}…", d.registeredAt?.let { "registered ${ago(it)}" }).joinToString(" · "),
+                    below = {
+                        Row(Modifier.padding(top = 4.dp)) {
+                            if (d.pushToken) StatusChip("Push token set", AppTheme.tones.success) else StatusChip("No push token", neutralTone)
+                        }
+                    },
+                )
+                GroupItem(
+                    "Remove this phone from the server",
+                    "dev.server_device.remove",
+                    Lucide.Unplug,
+                    "Its keys and push token; it registers again later",
+                    enabled = !actions.busy,
+                    tone = AppTheme.tones.danger,
+                    onClick = {
+                        actions.ask(
+                            ServerConfirm(
+                                "Remove this phone from the server?",
+                                "The server deletes this phone's keys and push token, unlinks it from your account and takes it off the forwarding address (deleting the address if it's the only phone on it). Your account and its other phones stay. The phone registers again the next time it talks to the server.",
+                                "Remove",
+                                "remove_device",
+                                "This phone is removed from the server.",
+                            ) { c, f -> c.deleteServerDevice(f) },
+                        )
+                    },
+                )
+            }
+        }
+    }
+    actions.Dialog { load() }
 }
