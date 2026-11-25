@@ -68,15 +68,24 @@
           "text": "Assistants can also read your exams, marks, grades, outings, the academic calendar, today's mess menu and how many classes you can miss.",
           "since": 3001010
         },
+        "Connection, in Settings, reaches VTOP directly, through a compressing proxy or through the vitapmate server. If the server is down, the app goes straight to VTOP.",
+        {
+          "text": "On a weak network, the slow-connection (UDP) mode fetches through the server with far less data.",
+          "since": 3001010
+        },
         "Connected apps pairs the browser extension and makes keys for Claude and other AI apps (MCP).",
         "Share or print the timetable and grade history as a PDF. Long-press the round button with your initial on either page.",
         {
-          "text": "The app asks before your VTOP cookie leaves the phone and says where it goes. Settings lets you turn the question back on.",
+          "text": "The app asks before your VTOP cookie leaves the phone and says where it goes, and you can turn the question back on.",
           "since": 3000300
         },
         {
           "text": "Semester Wrapped: after a semester's last class, More shows that semester as a story you can tap through and share as images, with Hide grades for the shared copy.",
           "since": 3000400
+        },
+        {
+          "text": "The app asks before it shares your registration number with the server, and server features (connected apps, OTP forwarding, server routes) wait until you say yes.",
+          "since": 3002100
         },
         {
           "text": "Account has your server account: sharing your registration number, linked phones, signing out everywhere and deleting the account. The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps.",
