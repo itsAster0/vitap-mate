@@ -426,7 +426,7 @@ abstract class AssistantFunctions : AppFunctionService() {
     suspend fun getMessMenu(daysFromToday: Int): AssistantMessMenu? {
         if (daysFromToday !in 0..7) throw AppFunctionInvalidArgumentException("daysFromToday must be from 0 to 7")
         return read("mess") { _, _ ->
-            val doc = Docs.docs.filter { it.asMessMenu }.maxByOrNull { it.addedAt } ?: return@read null
+            val doc = Docs.messMenu() ?: return@read null
             val day = istDay(System.currentTimeMillis()) + daysFromToday
             val month = formatDay(day, "M").toInt()
             val menu = parseMessMenu(Docs.withFile(doc, ::readSpreadsheet)) { m -> messMenuYear(m, doc.name, formatDay(day, "yyyy").toInt(), month) }
@@ -446,7 +446,7 @@ abstract class AssistantFunctions : AppFunctionService() {
     }
 
     /** [block] on the app's cache, off the main thread; refused while the setting is off. */
-    private suspend fun <T> read(name: String, block: (Core, String) -> T): T = flow("assistant.$name") { f ->
+    private suspend fun <T> read(name: String, block: suspend (Core, String) -> T): T = flow("assistant.$name") { f ->
         Settings.load(applicationContext)
         if (!Settings.assistant) {
             Log.info("assistant", "refused: off", f)

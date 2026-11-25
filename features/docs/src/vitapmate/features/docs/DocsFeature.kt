@@ -9,6 +9,7 @@ import com.composables.icons.lucide.Files
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Utensils
 import vitapmate.data.Docs
+import vitapmate.data.newestMessMenu
 import vitapmate.ui.EmptyView
 import vitapmate.ui.Feature
 
@@ -21,7 +22,8 @@ val messFeature = Feature("mess", "Mess", Lucide.Utensils) { MessMenu() }
 /** The newest mess menu: the whole month, or with [mealOnly] the meal on now (or next) only; where to add one while there is none. */
 @Composable
 fun MessMenu(mealOnly: Boolean = false) {
-    val doc = Docs.docs.filter { it.asMessMenu }.maxByOrNull { it.addedAt }
+    if (!Docs.isLoaded) return Loading()
+    val doc = Docs.docs.newestMessMenu()
         ?: return EmptyView(Lucide.Utensils, "No mess menu yet", Modifier.testTag("mess.empty"), message = "Import the menu spreadsheet in More → Docs as a mess menu.")
     // The menu leaves room for the nav bar itself and scrolls under it.
     Box(Modifier.fillMaxSize().testTag("mess.menu")) { DocContent(doc, embedded = mealOnly, inTab = true) }

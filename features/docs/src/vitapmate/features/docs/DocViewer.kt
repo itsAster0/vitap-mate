@@ -81,6 +81,7 @@ import vitapmate.ui.Space
 /** The full-screen viewer (Feature.detail): logs `docs.view` and marks the document opened. */
 @Composable
 internal fun DocViewer(id: String) {
+    if (!Docs.isLoaded) return Loading()
     val doc = Docs.byId(id) ?: return EmptyView(Lucide.FileX, "Document not found", Modifier.testTag("docs.viewer.missing"))
     LaunchedEffect(id) {
         flow("docs.view") { f ->

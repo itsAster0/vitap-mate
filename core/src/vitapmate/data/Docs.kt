@@ -94,6 +94,9 @@ fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = "", kind: DocKind?
     return docs.filter { needle in it.name.lowercase() && (kind == null || it.kind == kind) }.sortedWith(primary.then(byName).thenBy { it.id })
 }
 
+/** The newest of these documents read as the mess menu. */
+fun List<Doc>.newestMessMenu(): Doc? = filter { it.asMessMenu }.maxByOrNull { it.addedAt }
+
 /** The index file: the sort and every document, newest last. */
 internal object DocIndex {
     fun encode(sort: DocSort, docs: List<Doc>): String = JSONObject()
@@ -142,6 +145,7 @@ object Docs {
     private val lock = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val ready = CompletableDeferred<Unit>()
+    private val readState = mutableStateOf(false)
     private var dir: File? = null
     private var app: Context? = null
 
@@ -149,9 +153,21 @@ object Docs {
     private val ctx: Context get() = checkNotNull(app) { "Docs.init not called" }
     private var counter = 0
 
-    /** Every document, in saved order; Compose state. */
+    /** Every document, in saved order; Compose state. Empty until the index is read ([isLoaded]). */
     @Suppress("MemberNameEqualsClassName") // Docs.docs reads as the list it is.
     val docs: List<Doc> get() = state.value
+
+    /** Whether the index has been read, so an empty or missing document means it isn't there. Compose state. */
+    val isLoaded: Boolean get() = readState.value
+
+    /** Every document, once the index has been read (a widget or the assistant may run first). */
+    suspend fun loaded(): List<Doc> {
+        ready.await()
+        return docs
+    }
+
+    /** The newest document read as the mess menu, once the index has been read. */
+    suspend fun messMenu(): Doc? = loaded().newestMessMenu()
 
     /** The library's sort, kept in the index; a pick before the index is read applies over it. */
     var sort: DocSort
@@ -196,6 +212,7 @@ object Docs {
                 }
             } finally {
                 ready.complete(Unit)
+                readState.value = true
             }
             // Where Rust used to stream course files, with any partial ones: nothing writes there now.
             File(ctx.filesDir, "downloads").deleteRecursively()

@@ -65,7 +65,7 @@ object MessWidget : GlanceAppWidget() {
 
     /** Null without a menu; a failure when the menu has no entry for the day. */
     private suspend fun load(context: Context): Result<Menu>? = Widgets.cached(context, "mess") { _, f ->
-        val doc = Docs.docs.filter { it.asMessMenu }.maxByOrNull { it.addedAt } ?: return@cached null
+        val doc = Docs.messMenu() ?: return@cached null
         val ms = System.currentTimeMillis()
         val minute = minuteOf(ms)
         val windows = MessTimings.windows

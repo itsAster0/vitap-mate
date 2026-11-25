@@ -60,6 +60,13 @@ class DocsTest {
     }
 
     @Test
+    fun theMessMenuIsTheNewestMarkedOne() {
+        val menus = docs + doc("m1", "Menu Oct", added = 5).copy(asMessMenu = true) + doc("m2", "Menu Nov", added = 9).copy(asMessMenu = true)
+        assertEquals("m2", menus.newestMessMenu()?.id)
+        assertEquals(null, docs.newestMessMenu())
+    }
+
+    @Test
     fun kindFromExtension() {
         assertEquals(DocKind.Pdf, DocKind.of("a.PDF"))
         assertEquals(DocKind.Image, DocKind.of("x.jpeg"))
