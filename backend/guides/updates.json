@@ -80,12 +80,62 @@
         },
         {
           "text": "Account has your server account: sharing your registration number, linked phones, signing out everywhere and deleting the account. The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps.",
-          "since": 3002200
+          "since": 3002100
         }
       ]
     }
   ],
   "releases": [
+    {
+      "version": "3.2.1",
+      "code": 3002100,
+      "summary": "3.2.1 asks before sharing your registration number, seals your saved VTOP password with the Android Keystore, makes OTP sign-in, forwarding and connected apps more dependable, and fixes many smaller problems.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "The app asks before it shares your registration number with the server, and says what it is used for.",
+            "Your saved VTOP password is sealed with the Android Keystore. If the Keystore fails, the app keeps the password instead of losing it, and tells you when a locked password signs you out.",
+            "Stopping sharing signs the phone out of the server.",
+            "Forwarding setup is marked done as soon as Gmail's confirmation arrives.",
+            "Connected apps and Server show a banner while their live connection is failing.",
+            "The browser extension signs you in live and follows each step as it happens, with a redesigned popup, a badge on VTOP, and sign-in again after VTOP signs you out."
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "Proving who you are runs in the background and takes less time.",
+            "Pages that need an OTP wait for the code instead of failing.",
+            "Saved files and settings are written safely, so a crash or a full phone no longer leaves a half-written page, and old leftovers are cleaned up.",
+            "The server keeps you signed in for longer, without proving again.",
+            "Sleeping timers share one thread, which saves a little battery.",
+            "Every screen uses India's date for today.",
+            "Logs leave out secret values.",
+            "Reinstalling no longer brings back an old sign-in; sign in again."
+          ]
+        },
+        {
+          "title": "Fixed",
+          "items": [
+            "A resent OTP shows its own time on the open prompt, and the app looks for mail that arrived after it.",
+            "Submitting or resending an OTP on a server sign-in could hang.",
+            "An expired OTP is recognised, and when VTOP drops an OTP sign-in the app signs in again by itself.",
+            "A wrong saved password no longer asks VTOP again, and signing out while a save was running no longer signs you in again after a restart.",
+            "Switching to another student clears the last student's saved things from the app.",
+            "A request from a connected app is answered once and expires cleanly.",
+            "Connected AI apps like Gemini connect without hitting redirect limits.",
+            "Connection reloads each time you open it.",
+            "A refresh you cancel no longer leaves pages behind, and a page forgotten while it loads isn't saved.",
+            "Docs waits for its list of files instead of showing none, and quick sort picks are saved.",
+            "The Google sign-in is kept when Gmail setup is interrupted.",
+            "Big numbers in Semester Wrapped shrink to fit beside their heading.",
+            "Technical live-update errors stay out of the screen.",
+            "A very large session no longer breaks the slow-connection (UDP) mode."
+          ]
+        }
+      ]
+    },
     {
       "version": "3.2.0",
       "code": 3002000,
