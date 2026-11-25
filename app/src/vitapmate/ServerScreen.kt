@@ -54,28 +54,21 @@ import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.User
 import com.composables.icons.lucide.Zap
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import vitapmate.core.AccessKey
 import vitapmate.core.Core
-import vitapmate.core.CoreException
 import vitapmate.core.ServerOptions
 import vitapmate.core.LiveTopic
 import vitapmate.core.ServerSession
 import vitapmate.core.ServerStatus
 import vitapmate.core.ServerVault
 import vitapmate.core.SessionSource
-import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.Problem
 import vitapmate.data.ServerFailure
-import vitapmate.data.problemOf
 import vitapmate.data.rememberLive
 import vitapmate.features.login.OtpAutofill
 import vitapmate.features.login.ago
-import vitapmate.observability.Log
-import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
@@ -87,7 +80,6 @@ import vitapmate.ui.ProblemView
 import vitapmate.ui.ProofProgress
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
-import vitapmate.data.attempt
 
 /** Route id of Settings → Account → Server. */
 const val SERVER = "server"
@@ -490,19 +482,5 @@ private fun AccountHero(s: ServerStatus) {
 private fun keyText(key: AccessKey) =
     listOfNotNull("Made ${ago(key.createdAt)}", key.lastUsedAt?.let { "last used ${ago(it)}" } ?: "never used").joinToString(" · ")
 
-/** One call as flow `server.<name>`, off the main thread; a failure is logged, toasted and returned as a [ServerFailure]. */
-private suspend fun <T> run(name: String, call: suspend (Core, String) -> T): Result<T> {
-    var flowId = ""
-    return attempt {
-        Result.success(flow("server.$name") { f -> flowId = f; withContext(Dispatchers.IO) { call(AppCore.await(), f) } })
-    }.getOrElse { e ->
-        Log.warn("ui.server", "$name failed: ${e::class.simpleName}", flowId)
-        when (e) {
-            // Rust's prompt asked for the code and the student closed it: nothing to add.
-            is CoreException.OtpRequired -> {}
-            is CoreException.Other -> showToast("Server", e.reason)
-            else -> showToast(problemOf(e, flowId, server = true))
-        }
-        Result.failure(ServerFailure(flowId, e))
-    }
-}
+/** The Server page's calls, as flows `server.<name>`. */
+private val run = ServerCalls("server", "Server")

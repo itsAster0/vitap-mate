@@ -52,25 +52,18 @@ import vitapmate.core.KeyPhone
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Sparkles
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import vitapmate.core.AccessKey
 import vitapmate.core.ConnectedApps
-import vitapmate.core.CoreException
 import vitapmate.core.Core
 import vitapmate.core.KeyKind
 import vitapmate.core.LiveTopic
 import vitapmate.core.defaultServer
-import vitapmate.data.AppCore
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.data.ServerFailure
-import vitapmate.data.problemOf
 import vitapmate.data.rememberLive
 import vitapmate.features.login.ago
-import vitapmate.observability.Log
-import vitapmate.observability.flow
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
@@ -80,7 +73,6 @@ import vitapmate.ui.ProofProgress
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 import vitapmate.data.Problem
-import vitapmate.data.attempt
 
 /** Route id of Settings → Account → Connected apps. */
 const val CONNECTED_APPS = "connected_apps"
@@ -254,22 +246,8 @@ private fun KeyTags(key: AccessKey) {
     }
 }
 
-/** One call as flow `connected_apps.<name>`, off the main thread; a failure is logged, toasted and returned as a [ServerFailure]. */
-internal suspend fun <T> appsCall(name: String, call: suspend (Core, String) -> T): Result<T> {
-    var flowId = ""
-    return attempt {
-        Result.success(flow("connected_apps.$name") { f -> flowId = f; withContext(Dispatchers.IO) { call(AppCore.await(), f) } })
-    }.getOrElse { e ->
-        Log.warn("ui.connected_apps", "$name failed: ${e::class.simpleName}", flowId)
-        when (e) {
-            // Rust's prompt asked for the code and the student closed it: nothing to add.
-            is CoreException.OtpRequired -> {}
-            is CoreException.Other -> showToast("Connected apps", e.reason)
-            else -> showToast(problemOf(e, flowId, server = true))
-        }
-        Result.failure(ServerFailure(flowId, e))
-    }
-}
+/** Connected apps' calls, as flows `connected_apps.<name>`. */
+internal val appsCall = ServerCalls("connected_apps", "Connected apps")
 
 
 internal fun copy(context: Context, label: String, text: String) {
