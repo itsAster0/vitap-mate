@@ -92,7 +92,7 @@
           "since": 3002100
         },
         {
-          "text": "Account has your server account: sharing your registration number, linked phones, signing out everywhere and deleting the account. The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps.",
+          "text": "Account has your server account: sharing your registration number, linked phones, signing out everywhere and deleting the account. Store on server, in Connected apps, lets connected apps keep working while your phone is off.",
           "since": 3002100
         },
         {
@@ -106,14 +106,14 @@
     {
       "version": "3.2.1",
       "code": 3002100,
-      "summary": "3.2.1 moves the server settings to where you use them, keeps no VTOP session on the server unless you ask, asks before sharing your registration number, seals your saved VTOP password with the Android Keystore, and makes OTP sign-in, forwarding and connected apps more dependable.",
+      "summary": "3.2.1 puts the server settings where you use them and shows you which app is asking for your VTOP session, and from where, before you approve it. It also asks before sharing your registration number, seals your saved password with the Android Keystore, and makes OTP sign-in, forwarding and connected apps more dependable.",
       "sections": [
         {
           "title": "New",
           "items": [
             "The Server page is gone: its settings are where you use them. Account has sharing your registration number, linked phones, signing out everywhere and deleting the server account; Connected apps has session handover and storage; Connection asks before the cookie leaves for server routes.",
             "When a connected app asks for your session, opening the app shows an approve sheet with the key's name and the IP it asked from (new IPs are marked), and a notification follows while your phone signs it in. The extension tells you to open the app instead of waiting for the notification.",
-            "The server keeps no VTOP session or password for connected apps unless you turn on Store on server in Connected apps. Turning it off deletes them at once.",
+            "Store on server, in Connected apps, lets connected apps keep working while your phone is off. It's your choice, and turning it off deletes what the server holds at once.",
             "Swipe the week strip on the timetable to see next week, or the weeks after.",
             "The app asks before it shares your registration number with the server, and says what it is used for.",
             "Your saved VTOP password is sealed with the Android Keystore. If the Keystore fails, the app keeps the password instead of losing it, and tells you when a locked password signs you out.",
