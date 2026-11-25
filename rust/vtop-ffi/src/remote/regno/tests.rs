@@ -326,3 +326,19 @@ async fn a_fresh_sign_in_after_a_sign_out_is_asked_again() {
     assert_eq!(core.read::<Stored>(FILE), Some(Stored::default()));
     assert_eq!(core.sharing_of(REGNO), RegnoSharing::Unasked);
 }
+
+#[tokio::test]
+async fn waiting_for_an_identity_ends_at_share() {
+    let (core, _edge, server) = setup("wait").await;
+    keep_token(&core, &server);
+    core.run_regno_effects(REGNO, vec![Effect::Save(StoredAnswer::Declined)]);
+    let wait = core.wait_server_identity("w".into());
+    futures::pin_mut!(wait);
+    // Held but not shared: nothing to follow with yet.
+    assert!(futures::poll!(wait.as_mut()).is_pending());
+    assert!(futures::poll!(wait.as_mut()).is_pending());
+    core.set_regno_sharing("s".into(), RegnoAnswer::Share)
+        .await
+        .unwrap();
+    assert!(futures::poll!(wait.as_mut()).is_ready());
+}

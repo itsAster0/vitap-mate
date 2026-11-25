@@ -15,6 +15,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -156,17 +157,16 @@ object Push {
     private const val TIMEOUT_ERROR = "The phone took too long to sign in to VTOP."
     private const val FOLLOW_RETRY_MS = 30_000L
     private const val FOLLOW_RETRY_MAX_MS = 5 * 60_000L
-    private const val IDENTITY_CHECK_MS = 5_000L
 
     private val coordinator = HandoverCoordinator()
 
     /**
      * Answers each session request waiting on this phone as the server lists it
      * (`sessions:pending`, live) while the app runs; FCM only wakes an app that isn't. Flow
-     * `push.pending` per change. Without a server identity (it proves only when a server feature
-     * needs it) the watch can't follow, so the phone looks again on its own every
-     * [IDENTITY_CHECK_MS] and follows as soon as it has one. A watch that ends anyway is tried
-     * again with back-off. Flow `push.follow` while on screen.
+     * `push.pending` per change. Without a server identity (none until the student shares their
+     * registration number and the phone proves who they are) the watch can't follow, so it waits
+     * for Rust to say one came. A watch that ends anyway is tried again with back-off. Flow
+     * `push.follow` while on screen.
      */
     suspend fun follow(context: Context): Nothing = Foreground.shownFlow.collectLatest { shown ->
         // Off screen, FCM brings requests and the socket may close.
@@ -175,7 +175,8 @@ object Push {
         flow("push.follow") { f ->
             var wait = FOLLOW_RETRY_MS
             while (true) {
-                while (!attempt { withContext(Dispatchers.IO) { AppCore.await().hasServerIdentity(f) } }.getOrDefault(false)) delay(IDENTITY_CHECK_MS)
+                // No core, no identity ever: nothing to follow until the app leaves the screen.
+                if (attempt { AppCore.await().waitServerIdentity(f) }.isFailure) awaitCancellation()
                 var followed = false
                 Live.changes(LiveTopic.SESSION_REQUESTS).collect {
                     followed = true

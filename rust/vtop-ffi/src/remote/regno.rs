@@ -223,6 +223,7 @@ impl Core {
     ) -> RegnoSharing {
         let (to, effects) = next(from, answer);
         self.run_regno_effects(regno, effects);
+        self.shared.identity_may_have_changed();
         info!(
             flow,
             kind = "regno",

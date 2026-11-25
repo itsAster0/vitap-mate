@@ -23,6 +23,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ import vitapmate.core.RegnoSharing
 import vitapmate.core.Route as VtopRoute
 import vitapmate.core.SkippedRoute
 import vitapmate.core.RouteStatus
+import vitapmate.data.Activity
 import vitapmate.data.AppCore
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
@@ -69,6 +71,7 @@ import vitapmate.ui.StatusChip
 import vitapmate.ui.heroCookie
 import vitapmate.ui.neutralTone
 import vitapmate.ui.rememberHaptics
+import vitapmate.ui.rememberNow
 import vitapmate.ui.showToast
 
 /** Route id of Settings → Connection. */
@@ -100,11 +103,15 @@ fun ConnectionScreen() {
     suspend fun load() {
         status = orNull { coreFlow("connection.status") { c, f -> c.routeStatus(f) } }
     }
-    LaunchedEffect(Unit) {
-        while (true) {
-            load()
-            delay(5_000)
-        }
+    // Read again after each VTOP run (the route it took, one skipped after failing), and when
+    // the soonest skip ends.
+    val lastRun = Activity.state.collectAsState().value.recent.firstOrNull()?.flow
+    LaunchedEffect(lastRun) { load() }
+    val skipEnds = status?.skipped?.minOfOrNull { it.until }
+    LaunchedEffect(skipEnds) {
+        skipEnds ?: return@LaunchedEffect
+        delay((skipEnds * 1000 - System.currentTimeMillis()).coerceAtLeast(0))
+        load()
     }
     fun choose(route: VtopRoute, consented: Boolean = false) {
         haptics.toggle(true)
@@ -205,6 +212,9 @@ private fun RouteHero(status: RouteStatus) {
         }
         val used = status.lastUsed
         val at = status.lastUsedAt
+        // "2 min ago" moves on by itself.
+        val now by rememberNow()
+        val ago = remember(now, at) { at?.let(::ago) }
         Row(
             Modifier.fillMaxWidth().background(AppTheme.colors.card, MaterialTheme.shapes.large).padding(horizontal = 12.dp, vertical = 10.dp).testTag("connection.last_used"),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -212,7 +222,7 @@ private fun RouteHero(status: RouteStatus) {
         ) {
             Dot(size = 8.dp, color = if (used != null && at != null) tones.success.base else scheme.outlineVariant)
             Text(
-                if (used != null && at != null) "Last refresh: ${used.title()}, ${ago(at)}" else "Nothing fetched since the app opened",
+                if (used != null && ago != null) "Last refresh: ${used.title()}, $ago" else "Nothing fetched since the app opened",
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurface,
             )

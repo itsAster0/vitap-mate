@@ -633,6 +633,7 @@ impl Core {
         *self.slot.lock().unwrap_or_else(PoisonError::into_inner) = slot;
         // The last session's prompt (and the calls waiting on it) end with it.
         self.shared.otp.close_all();
+        self.shared.identity_may_have_changed();
     }
 
     fn current(&self) -> Result<Arc<Slot>, CoreError> {

@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
+use futures::channel::oneshot;
 use futures::future::{BoxFuture, Either, select};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -213,6 +214,22 @@ impl Core {
         })
         .await
         .unwrap_or(false)
+    }
+
+    /// Returns once [`Core::has_server_identity`] holds: at once, or when a proof, the student's
+    /// Share or a sign-in brings an identity. The app's watch of session requests waits here.
+    pub async fn wait_server_identity(&self, flow: String) {
+        loop {
+            // Registered before the check, so a change between the two still wakes it.
+            let changed = self.shared.identity_change();
+            if self.has_server_identity(flow.clone()).await {
+                return;
+            }
+            // Dropped unsent only with the core: looking again is all there is to do.
+            if changed.await.is_err() {
+                info!(flow, "identity wait woken without a change");
+            }
+        }
     }
 
     /// Follows `topic` as the student this install proved to be: `listener` hears each change
@@ -562,6 +579,8 @@ pub(crate) struct State {
     backend: Option<Arc<dyn Backend>>,
     auth: AuthMachine,
     renewal: Renewal,
+    /// The calls in [`Core::wait_server_identity`], woken when the identity may have come.
+    identity_waiters: Vec<oneshot::Sender<()>>,
 }
 
 /// The refresh token `auth:token` handed this install. No `Debug`: it holds the token.
@@ -596,6 +615,26 @@ pub(crate) fn signed_out_already(error: &EdgeError) -> bool {
 impl Shared {
     fn backend_state(&self) -> std::sync::MutexGuard<'_, State> {
         self.backend.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Wakes the next time [`Shared::identity_may_have_changed`] runs.
+    fn identity_change(&self) -> oneshot::Receiver<()> {
+        let (wake, woken) = oneshot::channel();
+        self.backend_state().identity_waiters.push(wake);
+        woken
+    }
+
+    /// The identity, the registration number's answer or the signed-in student changed: the
+    /// calls waiting for an identity look again.
+    pub(crate) fn identity_may_have_changed(&self) {
+        let waiters = std::mem::take(&mut self.backend_state().identity_waiters);
+        for wake in waiters {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "a waiter that went away needs no wake-up"
+            )]
+            let _ = wake.send(());
+        }
     }
 
     /// The Convex socket itself got `AuthError` and already cleared its own auth token: drop the
@@ -938,6 +977,7 @@ impl Core {
                 Effect::ForgetForwarding => self.forget_any_forwarding(),
             }
         }
+        self.shared.identity_may_have_changed();
     }
 
     /// Makes sure the client goes with a live JWT for the signed-in student, returning the

@@ -1238,6 +1238,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_prove_in_background(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_wait_server_identity(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remember_cookie_consent(
@@ -1583,6 +1585,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_live_watch(`ptr`: Long,`flow`: RustBuffer.ByValue,`topic`: RustBuffer.ByValue,`listener`: Long,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_prove_in_background(`ptr`: Long,`flow`: RustBuffer.ByValue,`timeoutMs`: Int,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_wait_server_identity(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2236,6 +2240,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_prove_in_background() and 0xFFFF) != 60927) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_wait_server_identity() and 0xFFFF) != 22010) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 55337) {
@@ -5019,6 +5026,12 @@ public interface CoreInterface {
     suspend fun `proveInBackground`(`flow`: kotlin.String, `timeoutMs`: kotlin.UInt): kotlin.Boolean
     
     /**
+     * Returns once [`Core::has_server_identity`] holds: at once, or when a proof, the student's
+     * Share or a sign-in brings an identity. The app's watch of session requests waits here.
+     */
+    suspend fun `waitServerIdentity`(`flow`: kotlin.String)
+    
+    /**
      * The kinds the student ticked "don't ask again" for.
      */
     fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind>
@@ -7044,6 +7057,32 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { FfiConverterBoolean.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Returns once [`Core::has_server_identity`] holds: at once, or when a proof, the student's
+     * Share or a sign-in brings an identity. The app's watch of session requests waits here.
+     */
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `waitServerIdentity`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_wait_server_identity(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        UniffiNullRustCallStatusErrorHandler,
     )
     }
 
