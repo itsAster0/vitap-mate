@@ -68,6 +68,12 @@ platform :android do
     end
   end
 
+  desc 'upload_internal, then promote_testing: one build on internal, friends, alpha and beta (never production)'
+  lane :upload_testing do |options|
+    upload_internal(options)
+    promote_testing
+  end
+
   desc 'Promote the beta build to production as a staged rollout (rollout:0.2 by default)'
   lane :promote_production do |options|
     upload_to_play_store(

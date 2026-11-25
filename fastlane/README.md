@@ -31,6 +31,14 @@ Build (`mise run bundle`, skip with build:false) and upload the AAB to internal,
 
 Promote the latest internal build to the closed (friends), alpha and beta tracks
 
+### android upload_testing
+
+```sh
+[bundle exec] fastlane android upload_testing
+```
+
+upload_internal, then promote_testing: one build on internal, friends, alpha and beta (never production)
+
 ### android promote_production
 
 ```sh
