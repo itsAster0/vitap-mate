@@ -55,7 +55,7 @@ import com.composables.icons.lucide.Utensils
 import kotlinx.coroutines.launch
 import vitapmate.core.Core
 import vitapmate.core.Route as VtopRoute
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.data.Downloads
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
@@ -99,9 +99,9 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
     var otpSheet by remember { mutableStateOf(false) }
     // What already shows as a warning on a row, repeated at the top; each does what its row does.
     val needs = buildList {
-        if (AccountState.rejected) add(Need("Username and password", "VTOP rejected the saved password", "account") { deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) } })
+        if (AccountWatch.rejected) add(Need("Username and password", "VTOP rejected the saved password", "account") { deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) } })
         syncPaused()?.let { add(Need("Background sync", "Paused: $it", "sync") { nav.push(Route.Screen(SYNC_HISTORY)) }) }
-        if (!AccountState.demo) otpWarning()?.let { add(Need("OTP auto-fill", it, "otp") { otpSheet = true }) }
+        if (!AccountWatch.demo) otpWarning()?.let { add(Need("OTP auto-fill", it, "otp") { otpSheet = true }) }
         val resumes = Foreground.resumes
         if (remember(resumes) { ClassMode.blocked(context) }) add(Need("Allow Do Not Disturb access", "Nothing is silenced until you allow vitapmate", "class_mode") { ClassMode.allow(context) })
         if (remember(resumes) { liveUpdatesBlocked(context) }) add(Need("Allow Live updates", "Android shows them as plain notifications until you allow it", "live_updates") { allowLiveUpdates(context) })
@@ -146,17 +146,17 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             }
             item {
                 ListGroup("Account") {
-                    if (!AccountState.demo) GroupItem(
+                    if (!AccountWatch.demo) GroupItem(
                         "Username and password",
                         "settings.account",
                         Lucide.Key,
-                        if (AccountState.rejected) "VTOP rejected the saved password" else null,
+                        if (AccountWatch.rejected) "VTOP rejected the saved password" else null,
                         onClick = { deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) } },
                         trailing = { Chevron() },
-                        tone = if (AccountState.rejected) AppTheme.tones.warning else null,
+                        tone = if (AccountWatch.rejected) AppTheme.tones.warning else null,
                     )
                     SemesterSetting()
-                    if (!AccountState.demo) OtpAutofillSetting()
+                    if (!AccountWatch.demo) OtpAutofillSetting()
                 }
             }
             item {
@@ -175,7 +175,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             }
             // The demo account reaches nothing: the item stays, empty, so the chips keep their indices.
             item {
-                if (!AccountState.demo) ListGroup("Connections", footer = "How the app reaches VTOP, and what it shares with the vitapmate server.") {
+                if (!AccountWatch.demo) ListGroup("Connections", footer = "How the app reaches VTOP, and what it shares with the vitapmate server.") {
                     GroupItem(
                         "Connection",
                         "settings.connection",

@@ -28,16 +28,14 @@ impl Core {
             .map(|saved| saved.username)
     }
 
-    /// The saved username and whether VTOP rejected the password, for Settings' "Needs
-    /// attention" and the Gmail sign-in's registration number. The password is
-    /// [`Core::saved_password`]'s.
+    /// The saved username, for the Gmail sign-in's registration number. The password is
+    /// [`Core::saved_password`]'s, and whether VTOP rejected it the [`crate::AccountStatus`].
     pub fn saved_account(&self, flow: String) -> Option<SavedAccount> {
         traced_sync("saved_account", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
             .map(|account| SavedAccount {
                 username: account.username,
-                rejected: account.rejected,
                 // An account saved before this field: the saved session has it.
                 registration_number: account.registration_number.or_else(|| {
                     self.read::<PersistedVtopSession>(SESSION)
@@ -64,7 +62,6 @@ impl Core {
         let account = Account {
             username: username.trim().to_uppercase(),
             password,
-            rejected: false,
             registration_number: None,
         };
         traced("sign_in", &flow, async {
@@ -85,6 +82,13 @@ impl Core {
             // a cancelled OTP doesn't leave the old, rejected one on disk.
             if outcome != SignIn::Done {
                 self.keep_accepted_password(&session.account);
+            }
+            // VTOP took the password: a rejection the server reported for it is over.
+            if self
+                .read_account()
+                .is_some_and(|saved| saved.username == session.account.username)
+            {
+                self.set_server_rejected(false);
             }
             // Accepted: its cookies become the app's (and the web view's).
             session.cookies.activate(&self.shared.cookies, true);
@@ -354,7 +358,7 @@ impl Core {
                     warn!("VTOP rejected the saved password; no more sign-ins with it");
                     session.mark_password_rejected();
                     if self.is_current(slot) {
-                        self.write_account(&session.account);
+                        self.write_account(&session.account, true);
                     }
                 }
                 _ => {}
@@ -391,7 +395,7 @@ impl Core {
         if let Ok(regno) = session.client.registration_number() {
             account.registration_number = Some(regno);
         }
-        self.write_account(&account);
+        self.write_account(&account, session.is_password_rejected());
         #[expect(
             clippy::disallowed_methods,
             reason = "saved to session.json on the phone; nothing leaves it"
@@ -440,7 +444,7 @@ impl Core {
             && (saved.password() != Some(account.password.as_str()) || saved.rejected)
         {
             info!("password accepted before the otp: saved");
-            self.write_account(account);
+            self.write_account(account, false);
         }
     }
 }

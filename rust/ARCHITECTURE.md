@@ -105,7 +105,13 @@ Every call takes the caller's flow id first. `mise run rust-android` builds
   on another phone, or after a reinstall, doesn't open (`Opening::WrongKey`): the
   password is gone and the student signs in again. A Keystore that fails for a
   moment (`Opening::Unavailable`) leaves the student signed in: `Core::current`
-  opens it again on the next call (`CoreError::PasswordLocked` until then). Kotlin gets the plain text only from `saved_password`, for the
+  opens it again on the next call (`CoreError::PasswordLocked` until then). Beside the
+  password the file keeps whether VTOP rejected it, on this phone's sign-in
+  (`rejected`, the session's `SessionPhase::PasswordRejected` in memory) or the
+  server's (`server_rejected`, from the `credentials_rejected` push, until the
+  student signs in again). Kotlin hears where the account stands (`AccountStatus`:
+  signed out, demo, signed in, password rejected by the phone or the server) from
+  `Core::watch_account` (`AccountWatch.kt`) and keeps no copy of its own. Kotlin gets the plain text only from `saved_password`, for the
   Account page. Decoded copies and the
   log pipeline stay process-wide: `obs_init` runs before the core, so Kotlin's
   start-up lines (Gmail) reach the log file.

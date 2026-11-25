@@ -1,6 +1,6 @@
 package vitapmate.ui
 
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.data.toasts
 import kotlinx.coroutines.flow.drop
 import androidx.compose.runtime.snapshotFlow
@@ -105,7 +105,7 @@ fun <T> PageScaffold(
                     LaunchedEffect((activity as? PageActivity.Stale)?.problem) {
                         val p = (activity as? PageActivity.Stale)?.problem ?: return@LaunchedEffect
                         val action = when {
-                            p.kind == ProblemKind.SignInNeeded && signIn != null -> (if (AccountState.rejected) "Update password" else "Sign in") to signIn
+                            p.kind == ProblemKind.SignInNeeded && signIn != null -> (if (AccountWatch.rejected) "Update password" else "Sign in") to signIn
                             p.retryable -> "Retry" to refresh
                             else -> null
                         }

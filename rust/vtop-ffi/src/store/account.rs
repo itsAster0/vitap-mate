@@ -6,12 +6,12 @@
 //! Keystore that fails for a moment is not that: the password stays on disk and is opened again
 //! on the next use. Neither the password nor the sealed text is ever logged.
 
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use crate::{ACCOUNT, Account, Core};
+use crate::{ACCOUNT, Account, Core, demo, traced_sync};
 
 /// [`PasswordCipher::seal`]'s answer.
 #[derive(uniffi::Enum)]
@@ -53,12 +53,53 @@ struct Stored {
     username: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     password: Option<String>,
+    /// VTOP rejected the password on a sign-in from this phone (or its server route).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     rejected: bool,
+    /// VTOP rejected the password the server keeps (its `credentials_rejected` push). The phone
+    /// still signs in with its own; kept until the student signs in again.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    server_rejected: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     registration_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     sealed: Option<String>,
+}
+
+/// Where the signed-in account stands, for Settings' "Needs attention", the profile and the
+/// sign-in problems. Rust's alone: Kotlin hears it through [`Core::watch_account`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum AccountStatus {
+    SignedOut,
+    /// The demo account: what needs a real VTOP session or the server is hidden.
+    Demo,
+    SignedIn,
+    /// VTOP rejected the saved password: the student updates it on the Account page.
+    PasswordRejected {
+        by: RejectedBy,
+    },
+}
+
+/// Whose sign-in VTOP turned down.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum RejectedBy {
+    /// This phone's (or its server route's): no sign-in is tried with it again.
+    Phone,
+    /// The server's, with the password it keeps.
+    Server,
+}
+
+/// Hears every change of [`AccountStatus`]; Kotlin implements it. Called off the main thread.
+#[uniffi::export(with_foreign)]
+pub trait AccountListener: Send + Sync {
+    fn changed(&self, status: AccountStatus);
+}
+
+/// The listener and the status it heard last, so it hears each change once.
+#[derive(Default)]
+pub(crate) struct Watch {
+    listener: Option<Arc<dyn AccountListener>>,
+    heard: Option<AccountStatus>,
 }
 
 /// The saved password as read back. No `Debug`: it holds the password.
@@ -89,7 +130,6 @@ impl Saved {
         Some(Account {
             password,
             username: self.username,
-            rejected: self.rejected,
             registration_number: self.registration_number,
         })
     }
@@ -205,27 +245,54 @@ impl Core {
         }
     }
 
-    /// Writes `account`, keeping the saved registration number when `account` has none (it is
-    /// only known once signed in).
-    pub(crate) fn write_account(&self, account: &Account) {
-        let _file = self
-            .shared
-            .account_file
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        let mut account = account.clone();
-        if account.registration_number.is_none() {
-            account.registration_number = self
+    /// Writes `account`, `rejected` when VTOP turned its password down. The same student's
+    /// registration number (when `account` has none: it is only known once signed in) and the
+    /// server's rejection stay.
+    pub(crate) fn write_account(&self, account: &Account, rejected: bool) {
+        {
+            let _file = self
+                .shared
+                .account_file
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let same = self
                 .read::<Stored>(ACCOUNT)
-                .filter(|saved| saved.username == account.username)
-                .and_then(|saved| saved.registration_number);
+                .filter(|saved| saved.username == account.username);
+            let mut account = account.clone();
+            if account.registration_number.is_none() {
+                account.registration_number = same
+                    .as_ref()
+                    .and_then(|saved| saved.registration_number.clone());
+            }
+            let server_rejected = same.is_some_and(|saved| saved.server_rejected);
+            self.write_stored(&account, rejected, server_rejected);
         }
-        self.write_stored(&account);
+        self.account_changed();
+    }
+
+    /// Flags (or clears) the server's rejection of the saved account's password.
+    pub(crate) fn set_server_rejected(&self, rejected: bool) {
+        {
+            let _file = self
+                .shared
+                .account_file
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let Some(mut stored) = self.read::<Stored>(ACCOUNT) else {
+                return;
+            };
+            if stored.server_rejected == rejected {
+                return;
+            }
+            stored.server_rejected = rejected;
+            self.write(ACCOUNT, &stored);
+        }
+        self.account_changed();
     }
 
     /// Writes `account` with its password sealed; without a cipher (host tests), as it is. The
     /// password sealed last is reused, so the Keystore is asked only for a new one.
-    fn write_stored(&self, account: &Account) {
+    fn write_stored(&self, account: &Account, rejected: bool, server_rejected: bool) {
         let (password, sealed) = match &self.shared.cipher {
             Some(cipher) => {
                 let sealed = self
@@ -251,11 +318,94 @@ impl Core {
         let stored = Stored {
             username: account.username.clone(),
             password,
-            rejected: account.rejected,
+            rejected,
+            server_rejected,
             registration_number: account.registration_number.clone(),
             sealed,
         };
         self.write(ACCOUNT, &stored);
+    }
+
+    /// Where the account stands: signed out unless a session is installed (or its password is
+    /// waiting on the Keystore); a rejection as saved beside it, this phone's first.
+    pub(crate) fn account_status(&self) -> AccountStatus {
+        if !self.has_account() {
+            return AccountStatus::SignedOut;
+        }
+        let Some(stored) = self.read::<Stored>(ACCOUNT) else {
+            return AccountStatus::SignedIn;
+        };
+        if stored.username == demo::USERNAME {
+            AccountStatus::Demo
+        } else if stored.rejected {
+            AccountStatus::PasswordRejected {
+                by: RejectedBy::Phone,
+            }
+        } else if stored.server_rejected {
+            AccountStatus::PasswordRejected {
+                by: RejectedBy::Server,
+            }
+        } else {
+            AccountStatus::SignedIn
+        }
+    }
+
+    /// Tells the listener the status, when it changed since it last heard. The watch's lock is
+    /// held throughout, so two changes reach it in order.
+    pub(crate) fn account_changed(&self) {
+        let mut watch = self
+            .shared
+            .account_watch
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let Some(listener) = watch.listener.clone() else {
+            return;
+        };
+        let status = self.account_status();
+        if watch.heard != Some(status) {
+            info!(?status, "account status");
+            watch.heard = Some(status);
+            listener.changed(status);
+        }
+    }
+}
+
+#[uniffi::export]
+impl Core {
+    /// Sends `listener` the [`AccountStatus`] now and on every change after; one listener, the
+    /// last one given.
+    pub fn watch_account(&self, flow: String, listener: Arc<dyn AccountListener>) {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "traced_sync already logs the error"
+        )]
+        let _ = traced_sync("watch_account", &flow, || {
+            *self
+                .shared
+                .account_watch
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = Watch {
+                listener: Some(listener),
+                heard: None,
+            };
+            self.account_changed();
+            Ok(())
+        });
+    }
+
+    /// VTOP rejected the password the server keeps (its `credentials_rejected` push): kept with
+    /// the account, so Settings flags it after a restart too, until the student signs in again.
+    pub fn password_rejected_on_server(&self, flow: String) {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "traced_sync already logs the error"
+        )]
+        let _ = traced_sync("password_rejected_on_server", &flow, || {
+            if self.has_account() {
+                self.set_server_rejected(true);
+            }
+            Ok(())
+        });
     }
 }
 
@@ -348,13 +498,115 @@ mod tests {
         fs::read_to_string(core.at(ACCOUNT)).unwrap()
     }
 
-    fn account(password: &str, rejected: bool) -> Account {
+    fn account(password: &str) -> Account {
         Account {
             username: "22BCE0001".into(),
             password: password.into(),
-            rejected,
             registration_number: Some("22BCE0001".into()),
         }
+    }
+
+    /// What the listener heard, in order.
+    #[derive(Default)]
+    struct Heard(Mutex<Vec<AccountStatus>>);
+
+    impl AccountListener for Heard {
+        fn changed(&self, status: AccountStatus) {
+            self.0.lock().unwrap().push(status);
+        }
+    }
+
+    impl Heard {
+        fn take(&self) -> Vec<AccountStatus> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    const PHONE: AccountStatus = AccountStatus::PasswordRejected {
+        by: RejectedBy::Phone,
+    };
+    const SERVER: AccountStatus = AccountStatus::PasswordRejected {
+        by: RejectedBy::Server,
+    };
+
+    #[tokio::test]
+    async fn the_status_is_heard_on_each_change_and_survives_a_restart() {
+        let cipher = Fake::new("phone-a");
+        let dir = dir("status");
+        let core = open(&dir, &cipher);
+        let heard = Arc::new(Heard::default());
+        core.watch_account("f".into(), heard.clone());
+        assert_eq!(heard.take(), [AccountStatus::SignedOut]);
+        // Signed out, the server's push has nothing to flag.
+        core.password_rejected_on_server("f".into());
+        assert!(heard.take().is_empty());
+
+        let session = crate::Session::new(account("pw-1"), &core.shared).unwrap();
+        core.write_account(&session.account, false);
+        core.install(Some(Arc::new(vtop_core::sync::RwLock::new(session))));
+        assert_eq!(heard.take(), [AccountStatus::SignedIn]);
+        core.password_rejected_on_server("f".into());
+        assert_eq!(heard.take(), [SERVER]);
+        // Written again (a sign-in saving the registration number): the server's flag stays.
+        core.write_account(&account("pw-1"), false);
+        assert!(heard.take().is_empty());
+        drop(core);
+
+        // As after the process died: read back from account.json.
+        let core = open(&dir, &cipher);
+        assert_eq!(core.account_status(), SERVER);
+        core.write_account(&account("pw-1"), true);
+        assert_eq!(core.account_status(), PHONE, "this phone's first");
+        assert!(
+            !core.current().unwrap().read().await.is_password_rejected(),
+            "the open session went on as it was"
+        );
+        let core = open(&dir, &cipher);
+        assert!(
+            core.current().unwrap().read().await.is_password_rejected(),
+            "a restored session doesn't sign in with a rejected password"
+        );
+        core.set_server_rejected(false);
+        core.write_account(&account("pw-2"), false);
+        assert_eq!(core.account_status(), AccountStatus::SignedIn);
+        core.sign_out_here("f");
+        assert_eq!(core.account_status(), AccountStatus::SignedOut);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn another_student_starts_without_the_last_ones_rejections() {
+        let core = core("status-other", &Fake::new("phone-a"));
+        core.write_account(&account("pw-1"), true);
+        core.set_server_rejected(true);
+        let other = Account {
+            username: "22BCE0002".into(),
+            ..account("pw-2")
+        };
+        core.write_account(&other, false);
+        assert_eq!(
+            file(&core),
+            r#"{"username":"22BCE0002","registration_number":"22BCE0001","sealed":"phone-a:2-wp"}"#
+        );
+        let _ = fs::remove_dir_all(&core.dir);
+    }
+
+    #[test]
+    fn a_file_from_before_the_flags_reads_as_not_rejected() {
+        let core = core("status-old", &Fake::new("phone-a"));
+        fs::write(
+            core.at(ACCOUNT),
+            r#"{"username":"22BCE0001","sealed":"phone-a:1-wp"}"#,
+        )
+        .unwrap();
+        let saved = core.read_account().unwrap();
+        assert!(!saved.rejected && saved.password() == Some("pw-1"));
+        core.set_server_rejected(true);
+        assert_eq!(
+            file(&core),
+            r#"{"username":"22BCE0001","server_rejected":true,"sealed":"phone-a:1-wp"}"#
+        );
+        let _ = fs::remove_dir_all(&core.dir);
     }
 
     const PLAIN: &str = r#"{"username":"22BCE0001","password":"pw-secret-1","rejected":true}"#;
@@ -403,11 +655,11 @@ mod tests {
     fn writing_the_same_password_while_the_keystore_fails_keeps_it() {
         let cipher = Fake::new("phone-a");
         let core = core("rewrite-down", &cipher);
-        core.write_account(&account("pw-1", false));
+        core.write_account(&account("pw-1"), false);
         let sealed = file(&core);
         cipher.set_down(true);
         // As a rejected password is flagged, or the registration number saved.
-        core.write_account(&account("pw-1", true));
+        core.write_account(&account("pw-1"), true);
         assert_eq!(
             file(&core),
             sealed.replace(
@@ -416,7 +668,7 @@ mod tests {
             )
         );
         // A new password the Keystore can't take isn't saved in plain text.
-        core.write_account(&account("pw-2", false));
+        core.write_account(&account("pw-2"), false);
         assert!(!file(&core).contains("pw-2") && !file(&core).contains("sealed"));
         let _ = fs::remove_dir_all(&core.dir);
     }
@@ -425,7 +677,7 @@ mod tests {
     fn a_keystore_that_fails_at_start_keeps_the_student_signed_in() {
         let cipher = Fake::new("phone-a");
         let first = core("locked", &cipher);
-        first.write_account(&account("pw-1", false));
+        first.write_account(&account("pw-1"), false);
         cipher.set_down(true);
         let core = open(&first.dir, &cipher);
         assert_eq!(
@@ -445,7 +697,7 @@ mod tests {
     #[test]
     fn another_phones_copy_has_no_password_and_signs_in_nobody() {
         let first = core("restore-a", &Fake::new("phone-a"));
-        first.write_account(&account("pw-secret-1", false));
+        first.write_account(&account("pw-secret-1"), false);
         // As a backup restores it on a new phone, whose Keystore has another key.
         let other = Fake::new("phone-b");
         let second = core("restore-b", &other);
@@ -464,7 +716,7 @@ mod tests {
     #[test]
     fn the_stored_form_roundtrips_and_an_empty_password_is_none() {
         let core = core("stored", &Fake::new("phone-a"));
-        core.write_account(&account("pw-1", true));
+        core.write_account(&account("pw-1"), true);
         assert_eq!(
             file(&core),
             r#"{"username":"22BCE0001","rejected":true,"registration_number":"22BCE0001","sealed":"phone-a:1-wp"}"#

@@ -120,15 +120,12 @@ fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem {
             "VTOP Is Down",
             "${e.reason.trim().trimEnd('.').ifEmpty { "VTOP is not answering" }}. This is on VTOP's side, not your connection; try again in a few minutes.",
         )
-        is CoreException.InvalidCredentials -> {
-            AccountState.rejected = true
-            p(
-                ProblemKind.SignInNeeded,
-                "VTOP Sign-In Failed",
-                "VTOP rejected the saved password. Update it in Settings, under Username and password.",
-                retryable = false,
-            )
-        }
+        is CoreException.InvalidCredentials -> p(
+            ProblemKind.SignInNeeded,
+            "VTOP Sign-In Failed",
+            "VTOP rejected the saved password. Update it in Settings, under Username and password.",
+            retryable = false,
+        )
         is CoreException.NotSignedIn -> p(ProblemKind.SignInNeeded, "Sign-In Needed", "Your saved session expired. Please sign in again.", retryable = false)
         is CoreException.PasswordLocked -> p(ProblemKind.Unexpected, "Couldn't Open Your Password", "The phone's keystore didn't open the saved password just now. Try again in a moment.")
         is CoreException.OtpRequired -> p(ProblemKind.OtpNeeded, "Verify Your Sign-In", "We need to verify this sign-in with the OTP sent to your registered email.")

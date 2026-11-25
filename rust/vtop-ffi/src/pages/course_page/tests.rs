@@ -259,7 +259,6 @@ fn signed_in_core(base: String, name: &str) -> (Core, PathBuf) {
         crate::Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
-            rejected: false,
             registration_number: None,
         },
     );

@@ -36,7 +36,6 @@ fn awaiting(name: &str, attended: bool) -> (Core, Arc<Slot>, Arc<Told>) {
     let account = Account {
         username: "21BCE0001".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));

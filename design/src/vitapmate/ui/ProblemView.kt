@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.LogIn
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RotateCw
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.data.LocalInspector
 import vitapmate.data.Problem
 import vitapmate.data.ProblemKind
@@ -73,7 +73,7 @@ fun ProblemView(
                 if (busy) LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
                 else Icon(if (signIn) Lucide.LogIn else Lucide.RotateCw, null, Modifier.size(ButtonDefaults.IconSize))
                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text(if (!signIn) "Try again" else if (AccountState.rejected) "Update password" else "Sign in again")
+                Text(if (!signIn) "Try again" else if (AccountWatch.rejected) "Update password" else "Sign in again")
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {

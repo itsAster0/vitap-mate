@@ -121,7 +121,6 @@ pub(crate) fn signed_in(core: &Core) {
     let account = Account {
         username: "22BCE0001".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let session = Session::new(account, &core.shared).unwrap();
@@ -278,7 +277,6 @@ fn another_student_forgets_remembered_kinds() {
     let account = Account {
         username: "21BCE0002".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let slot = Arc::new(RwLock::new(Session::new(account, &core.shared).unwrap()));

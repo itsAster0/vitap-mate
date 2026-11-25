@@ -1,7 +1,7 @@
 package vitapmate
 
 import androidx.compose.runtime.collectAsState
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,7 +64,7 @@ fun ProfileHeader(user: String?, name: String?, vtopPhoto: String?, regno: Strin
     val otp by OtpPrompt.challenge.collectAsState()
     val (state, tone) = when {
         user == null -> "Not signed in" to tones.warning
-        AccountState.rejected -> "Needs attention" to tones.warning
+        AccountWatch.rejected -> "Needs attention" to tones.warning
         otp != null -> "OTP waiting" to tones.danger
         work.offline -> "Offline" to tones.warning
         else -> "Signed in" to tones.success

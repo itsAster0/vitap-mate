@@ -22,8 +22,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import vitapmate.core.LiveTopic
-import vitapmate.data.AccountState
 import vitapmate.data.AppCore
+import vitapmate.data.orNull
 import vitapmate.data.AppScope
 import vitapmate.data.Foreground
 import vitapmate.data.Live
@@ -193,8 +193,9 @@ object Push {
      * VTOP rejected the password the server keeps (`credentials_rejected`): Settings flags
      * Username and password, and a notification opens Settings, where it shows on top.
      */
-    internal fun rejected(context: Context, flow: String) {
-        AccountState.rejected = true
+    internal suspend fun rejected(context: Context, flow: String) {
+        // Kept with the account by Rust, so Settings still flags it after a restart.
+        orNull { withContext(Dispatchers.IO) { AppCore.await().passwordRejectedOnServer(flow) } }
         Log.info("push", "credentials rejected", flow, mapOf("notified" to "${canNotify(context)}"))
         if (!canNotify(context)) return
         context.getSystemService(NotificationManager::class.java)

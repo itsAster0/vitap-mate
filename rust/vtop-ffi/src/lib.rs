@@ -46,8 +46,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::SystemTime;
 
+use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 use tracing::field::Empty;
 use tracing::{Instrument, Span, info, info_span, warn};
 use vtop_core::inputs::{Password, Username};
@@ -64,7 +64,9 @@ pub use pages::records::{
     NextClass, Semester, Semesters, Timetable, TimetableDay, attendance_goal_split,
     project_attendance,
 };
-pub use store::account::{Opening, PasswordCipher, Sealing};
+pub use store::account::{
+    AccountListener, AccountStatus, Opening, PasswordCipher, RejectedBy, Sealing,
+};
 pub use store::cookies::SharedCookies;
 
 uniffi::setup_scaffolding!();
@@ -247,19 +249,16 @@ impl From<std::io::Error> for CoreError {
     }
 }
 
-/// Saved sign-in; on disk its password is sealed ([`store::account`]).
-#[derive(Clone, Serialize, Deserialize)]
+/// Saved sign-in; on disk its password is sealed and whether VTOP rejected it is kept beside it
+/// ([`store::account`]). In memory a rejected password is the session's
+/// [`SessionPhase::PasswordRejected`].
+#[derive(Clone)]
 struct Account {
     username: String,
     /// Always there: a saved account without one (another phone's) is a
     /// [`store::account::Saved`], never an `Account`.
     password: String,
-    /// VTOP rejected this password: no sign-in is tried with it again (repeated failures can
-    /// lock the VTOP account) until the student signs in with a new one.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    rejected: bool,
     /// VTOP's registration number, saved at the first sign-in (the college email ends with it).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     registration_number: Option<String>,
 }
 
@@ -267,7 +266,6 @@ struct Account {
 #[derive(Clone, PartialEq, uniffi::Record)]
 pub struct SavedAccount {
     pub username: String,
-    pub rejected: bool,
     /// Known once signed in.
     pub registration_number: Option<String>,
 }
@@ -290,7 +288,8 @@ pub(crate) enum SessionPhase {
         message: String,
         challenge_id: u64,
     },
-    /// VTOP rejected the saved password; no automatic sign-in is tried again.
+    /// VTOP rejected the saved password; no automatic sign-in is tried again (repeated failures
+    /// can lock the VTOP account) until the student signs in with a new one.
     PasswordRejected,
 }
 
@@ -321,17 +320,12 @@ impl Session {
             .config(dev::vtop_config(shared))
             .transport(transport::current(shared)?)
             .cookie_store(cookies.clone());
-        let phase = if account.rejected {
-            SessionPhase::PasswordRejected
-        } else {
-            SessionPhase::Active
-        };
         Ok(Self {
             client: client.with_credentials(username, password)?,
             cookies,
             account,
             logins: 0,
-            phase,
+            phase: SessionPhase::Active,
             next_challenge: 0,
             otp: shared.otp.clone(),
             otp_session: shared.otp.session(),
@@ -340,22 +334,25 @@ impl Session {
 
     #[cfg(test)]
     pub(crate) fn for_test(client: VtopClient, account: Account) -> Self {
-        let phase = if account.rejected {
-            SessionPhase::PasswordRejected
-        } else {
-            SessionPhase::Active
-        };
         let otp = Arc::new(otp::Board::default());
         Self {
             client,
             cookies: store::cookies::SessionCookies::new(),
             account,
             logins: 0,
-            phase,
+            phase: SessionPhase::Active,
             next_challenge: 0,
             otp_session: otp.session(),
             otp,
         }
+    }
+
+    /// The session as saved: `rejected` when VTOP had rejected its password.
+    fn rejected(mut self, rejected: bool) -> Self {
+        if rejected {
+            self.phase = SessionPhase::PasswordRejected;
+        }
+        self
     }
 
     pub(crate) fn is_awaiting_otp(&self) -> bool {
@@ -398,7 +395,6 @@ impl Session {
     }
 
     pub(crate) fn mark_signed_in(&mut self) {
-        self.account.rejected = false;
         self.phase = SessionPhase::Active;
         self.logins = self.logins.saturating_add(1);
         self.otp.close(self.otp_session);
@@ -406,15 +402,14 @@ impl Session {
 
     pub(crate) fn mark_password_rejected(&mut self) {
         vtop_core::session::CookieStore::clear(self.cookies.as_ref());
-        self.account.rejected = true;
         self.phase = SessionPhase::PasswordRejected;
         self.otp.close(self.otp_session);
     }
 
     /// Starts over on a fresh client with no cookies (the shared store's go too): no
-    /// half-finished login, cookies, CSRF token or OTP wait.
+    /// half-finished login, cookies, CSRF token or OTP wait. A rejected password stays rejected.
     fn restart(&mut self, shared: &Arc<Shared>) -> Result<(), CoreError> {
-        let fresh = Self::new(self.account.clone(), shared)?;
+        let fresh = Self::new(self.account.clone(), shared)?.rejected(self.is_password_rejected());
         fresh.cookies.activate(&shared.cookies, true);
         self.client = fresh.client;
         self.cookies = fresh.cookies;
@@ -495,6 +490,8 @@ struct Shared {
     account_file: Mutex<()>,
     /// The password last sealed or opened ([`store::account`]).
     sealed: store::account::Sealed,
+    /// Who hears [`AccountStatus`] changes, and what it heard last.
+    account_watch: Mutex<store::account::Watch>,
     /// The server account proofs are held to, and its roots, in place of VTOP's.
     #[cfg(all(test, feature = "tlsn"))]
     proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
@@ -630,6 +627,7 @@ impl Core {
         let Some(saved) = self.read_account() else {
             return Ok(Signed::Out);
         };
+        let rejected = saved.rejected;
         let account = match saved.password {
             store::account::SavedPassword::Locked => return Ok(Signed::Locked),
             store::account::SavedPassword::Gone => return Ok(Signed::Out),
@@ -638,7 +636,7 @@ impl Core {
         let Some(account) = account else {
             return Ok(Signed::Out);
         };
-        let session = Session::new(account, &self.shared)?;
+        let session = Session::new(account, &self.shared)?.rejected(rejected);
         let saved = self
             .read::<PersistedVtopSession>(SESSION)
             .filter(|saved| dev::reusable(&self.shared, saved));
@@ -670,6 +668,15 @@ impl Core {
         // The last session's prompt (and the calls waiting on it) end with it.
         self.shared.otp.close_all();
         self.shared.identity_may_have_changed();
+        self.account_changed();
+    }
+
+    /// Whether an account is signed in (its password perhaps not opened yet).
+    fn has_account(&self) -> bool {
+        !matches!(
+            *self.slot.lock().unwrap_or_else(PoisonError::into_inner),
+            Signed::Out
+        )
     }
 
     /// The signed-in session. A password the Keystore didn't open at start is opened again here.

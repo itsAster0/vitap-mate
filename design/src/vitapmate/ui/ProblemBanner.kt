@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.data.LocalInspector
 import vitapmate.data.Problem
 import vitapmate.data.ProblemKind
@@ -56,7 +56,7 @@ fun ProblemBanner(
                     val pad = ButtonDefaults.TextButtonContentPadding
                     action?.let {
                         TextButton(it, Modifier.testTag("problem.action"), contentPadding = pad) {
-                            Text(if (signIn == null) "Try again" else if (AccountState.rejected) "Update password" else "Sign in again", color = tone.onSubtle)
+                            Text(if (signIn == null) "Try again" else if (AccountWatch.rejected) "Update password" else "Sign in again", color = tone.onSubtle)
                         }
                     }
                     TextButton({ inspector.open(problem.flow) }, Modifier.testTag("problem.details"), contentPadding = pad) {

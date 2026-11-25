@@ -281,12 +281,14 @@ async fn an_old_install_with_an_identity_counts_as_shared() {
 async fn an_old_forwarding_address_counts_as_shared() {
     let (core, _edge, _) = setup("migrate-mail").await;
     core.remove_file(FILE);
-    core.write_account(&crate::Account {
-        username: REGNO.into(),
-        password: "pw".into(),
-        rejected: false,
-        registration_number: None,
-    });
+    core.write_account(
+        &crate::Account {
+            username: REGNO.into(),
+            password: "pw".into(),
+            registration_number: None,
+        },
+        false,
+    );
     fs::write(core.at(forwarding::FILE), "{}").unwrap();
     assert_eq!(core.regno_sharing("s".into()).await, RegnoSharing::Shared);
 }

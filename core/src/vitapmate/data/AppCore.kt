@@ -82,7 +82,7 @@ object AppCore {
                     dev = DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt(), debuggable),
                     deviceLabel = if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}",
                 )
-                runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path, platform) } }
+                runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path, platform).also { core -> core.watchAccount(it, AccountWatch) } } }
             }.fold(core::complete) { e ->
                 Log.error("core", "init failed: $e")
                 core.completeExceptionally(e)

@@ -21,7 +21,7 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
 import vitapmate.core.Core
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.data.AppCore
 import vitapmate.data.InspectorOpener
 import vitapmate.data.LocalInspector
@@ -66,10 +66,6 @@ fun App() {
     // then each time the pick comes or goes.
     LaunchedEffect(signedIn) {
         if (!signedIn) return@LaunchedEffect
-        AccountState.rejected = attempt {
-            coreFlow("account.check") { c, id -> c.savedAccount(id)?.rejected == true }
-        }.getOrDefault(false)
-        AccountState.demo = attempt { coreFlow("account.demo", Core::isDemo) }.getOrDefault(false)
         flow("semesters.check") { SemesterChoice.readCache(it) }
         on(SessionEvent.AccountRead(SemesterChoice.selected != null, Settings.onboarded))
         snapshotFlow { SemesterChoice.selected != null }.collect { on(SessionEvent.PickChanged(it, Settings.onboarded)) }
@@ -80,12 +76,11 @@ fun App() {
     // cache stays); with no saved account the login screen signs in again.
     val toLogin = {
         Log.info("ui.shell", "sign in again")
-        AccountState.rejected = false
         nav.goTab(navTabs.first())
         on(SessionEvent.SignedOut)
     }
     val signIn = {
-        if (AccountState.rejected) {
+        if (AccountWatch.rejected) {
             Log.info("ui.shell", "update password")
             deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) }
         } else {

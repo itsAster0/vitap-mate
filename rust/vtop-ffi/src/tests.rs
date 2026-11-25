@@ -140,7 +140,6 @@ async fn pages_wait_for_a_picked_semester() {
     let account = Account {
         username: "STUDENT".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let core = Core::for_test(&dir);
@@ -349,21 +348,6 @@ fn missing_or_behind_histories_are_mismatched() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-#[test]
-fn a_rejected_password_is_remembered() {
-    // Accounts saved before the flag existed load as not rejected, and the flag is written
-    // only when set, so a good account's file doesn't change.
-    let old: Account = serde_json::from_str(r#"{"username":"21BCE0001","password":"x"}"#).unwrap();
-    assert!(!old.rejected);
-    assert!(!serde_json::to_string(&old).unwrap().contains("rejected"));
-    let rejected = Account {
-        rejected: true,
-        ..old
-    };
-    let saved: Account = serde_json::from_str(&serde_json::to_string(&rejected).unwrap()).unwrap();
-    assert!(saved.rejected);
-}
-
 #[tokio::test]
 async fn another_student_signing_in_drops_the_last_ones_pages() {
     let dir = std::env::temp_dir().join(format!("vtop-ffi-switch-{}", std::process::id()));
@@ -389,7 +373,6 @@ async fn another_student_signing_in_drops_the_last_ones_pages() {
     let account = |username: &str| Account {
         username: username.into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let core = Core::for_test(&dir);
@@ -431,7 +414,6 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     let account = Account {
         username: "21BCE0001".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let core =
@@ -525,7 +507,6 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
     let account = Account {
         username: "22BCE0001".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let core = Core::for_test_on(
@@ -586,7 +567,6 @@ async fn clearing_the_session_empties_the_shared_store() {
     let account = Account {
         username: "22BCE0001".into(),
         password: "pw".into(),
-        rejected: false,
         registration_number: None,
     };
     let core = Core::for_test_on(
@@ -731,7 +711,6 @@ fn core_signed_in_ago(base: String, name: &str, age: u64) -> (Core, Arc<Slot>, P
         Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
-            rejected: false,
             registration_number: None,
         },
     )));

@@ -131,7 +131,7 @@ impl Core {
     /// Each page's answer (`{"data"}` or `{"code", "error"}`) from the server, in order; None
     /// when the phone fetches them (as [`Core::on_server`], or a server without batches).
     async fn server_batch(&self, flow: &str, names: &[&str], semester: &str) -> Option<Vec<Value>> {
-        if self.is_demo(flow.to_string()) {
+        if self.is_demo() {
             return None; // Its pages come from the demo file, one by one.
         }
         let action = format!("Fetch {} through the server", names.join(", "));

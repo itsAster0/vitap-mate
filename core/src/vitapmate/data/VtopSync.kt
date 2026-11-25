@@ -80,8 +80,8 @@ object VtopSync {
                     Log.warn("sync", "page timed out", f, mapOf("page" to id))
                     return
                 } catch (_: CoreException.InvalidCredentials) {
-                    // Every other page would be turned down the same way.
-                    AccountState.rejected = true
+                    // Every other page would be turned down the same way (Rust flagged the
+                    // account).
                     throw Rejected()
                 } catch (e: CoreException.OtpRequired) {
                     if (attempt > 0) throw Stop()

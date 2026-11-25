@@ -123,7 +123,6 @@ impl Core {
             let mut account = Account {
                 username: username.trim().to_uppercase(),
                 password,
-                rejected: false,
                 registration_number: None,
             };
             // Keep the known registration number when updating credentials for the same student,
@@ -151,13 +150,16 @@ impl Core {
                     self.restore(&fresh, Some(saved));
                     (session.client, session.cookies) = (fresh.client, fresh.cookies);
                     session.account = account.clone();
+                    if session.is_password_rejected() {
+                        session.phase = crate::SessionPhase::Active;
+                    }
                 }
                 Err(_) => {
                     self.restore(&fresh, self.read::<PersistedVtopSession>(SESSION));
                     self.install(Some(Arc::new(RwLock::new(fresh))));
                 }
             }
-            self.write_account(&account);
+            self.write_account(&account, false);
             info!("credentials replaced without signing in");
             Ok(())
         })
@@ -454,10 +456,9 @@ mod tests {
         let account = Account {
             username: "22BCE0001".into(),
             password: "pw-secret-1".into(),
-            rejected: false,
             registration_number: None,
         };
-        fs::write(dir.join(ACCOUNT), serde_json::to_vec(&account).unwrap()).unwrap();
+        core.write_account(&account, false);
         fs::write(dir.join(SESSION), "{}").unwrap();
         let mut session = Session::new(account, &core.shared).unwrap();
         session.begin_otp(crate::OtpVia::Phone, "pending".into());
@@ -491,33 +492,29 @@ mod tests {
         core.dev_set_account("f".into(), " 22bce0001 ".into(), "pw-1".into())
             .await
             .unwrap();
-        let saved: Account = core.read(ACCOUNT).unwrap();
+        let saved = core.read_account().unwrap();
         assert_eq!(
-            (saved.username.as_str(), saved.password.as_str()),
-            ("22BCE0001", "pw-1")
+            (saved.username.as_str(), saved.password()),
+            ("22BCE0001", Some("pw-1"))
         );
 
         // A rejected account with a session: only the credentials change, under any username.
-        let rejected = Account {
-            rejected: true,
-            ..saved
-        };
-        fs::write(dir.join(ACCOUNT), serde_json::to_vec(&rejected).unwrap()).unwrap();
-        core.current().unwrap().write().await.account = rejected;
+        let rejected = saved.usable().unwrap();
+        core.write_account(&rejected, true);
+        core.current().unwrap().write().await.phase = crate::SessionPhase::PasswordRejected;
         fs::write(dir.join(crate::remote::forwarding::FILE), "{}").unwrap();
         core.dev_set_account("f".into(), "other".into(), "pw-2".into())
             .await
             .unwrap();
-        let saved: Account = core.read(ACCOUNT).unwrap();
+        let saved = core.read_account().unwrap();
         assert_eq!(
-            (
-                saved.username.as_str(),
-                saved.password.as_str(),
-                saved.rejected
-            ),
-            ("OTHER", "pw-2", false)
+            (saved.username.as_str(), saved.password(), saved.rejected),
+            ("OTHER", Some("pw-2"), false)
         );
-        assert!(!core.current().unwrap().read().await.account.rejected);
+        assert!(
+            !core.current().unwrap().read().await.is_password_rejected(),
+            "the next re-login tries them"
+        );
         assert_eq!(fs::read_to_string(dir.join(SESSION)).unwrap(), session);
         let cookies = core.dev_cookie_editor_json("f".into()).await.unwrap();
         assert!(cookies.is_some_and(|json| json.contains("JSESSIONID")));
@@ -602,19 +599,18 @@ mod tests {
     }
 
     #[test]
-    fn saved_account_reports_the_rejected_flag() {
+    fn saved_account_reads_back_the_username_and_password() {
         let (core, _dir) = core("saved_account");
         assert!(core.saved_account("f".into()).is_none());
         let account = Account {
             username: "22BCE0001".into(),
             password: "pw-1".into(),
-            rejected: true,
             registration_number: None,
         };
-        core.write(ACCOUNT, &account);
+        core.write_account(&account, true);
         // No Debug on SavedAccount, so a failing test never prints the password.
         let saved = core.saved_account("f".into()).unwrap();
-        assert!(saved.username == "22BCE0001" && saved.rejected);
+        assert!(saved.username == "22BCE0001");
         assert_eq!(core.saved_password("f".into()).as_deref(), Some("pw-1"));
     }
 
@@ -624,29 +620,26 @@ mod tests {
         let saved = Account {
             username: "22BCE0001".into(),
             password: "old".into(),
-            rejected: true,
             registration_number: None,
         };
-        core.write(ACCOUNT, &saved);
+        core.write_account(&saved, true);
 
         // Another username: the saved account stays as it is.
         core.keep_accepted_password(&Account {
             username: "22BCE0002".into(),
             password: "other".into(),
-            rejected: false,
             registration_number: None,
         });
-        let kept: Account = core.read(ACCOUNT).unwrap();
-        assert!(kept.username == "22BCE0001" && kept.password == "old" && kept.rejected);
+        let kept = core.read_account().unwrap();
+        assert!(kept.username == "22BCE0001" && kept.password() == Some("old") && kept.rejected);
 
         // The same account with the new password VTOP accepted: saved, no longer rejected.
         core.keep_accepted_password(&Account {
             username: "22BCE0001".into(),
             password: "new".into(),
-            rejected: false,
             registration_number: None,
         });
-        let kept: Account = core.read(ACCOUNT).unwrap();
-        assert!(kept.password == "new" && !kept.rejected);
+        let kept = core.read_account().unwrap();
+        assert!(kept.password() == Some("new") && !kept.rejected);
     }
 }

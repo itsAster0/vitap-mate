@@ -62,7 +62,7 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.CoreException
 import vitapmate.core.SignIn
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PauseReason
@@ -90,7 +90,7 @@ var accountVersion by mutableIntStateOf(0)
 /**
  * The saved username and password (the Flutter app's Update Credentials). Save signs in to VTOP
  * with them, the OTP prompt included, and keeps them only once VTOP accepts; a new password also
- * clears the "VTOP rejected the saved password" stop ([AccountState]). Opened from Settings or
+ * clears the "VTOP rejected the saved password" stop ([AccountWatch]). Opened from Settings or
  * from a sign-in problem's "Update password"; the saved password is filled in and, when VTOP
  * rejected it, shown. Another username is another account.
  */
@@ -105,7 +105,7 @@ fun AccountScreen() {
     var username by remember(saved) { mutableStateOf(saved) }
     var password by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
-    val rejected = AccountState.rejected
+    val rejected = AccountWatch.rejected
     // The saved password, filled in (this page opens behind the phone's screen lock); shown
     // when VTOP rejected it, so the student can see what to correct.
     var savedPassword by remember { mutableStateOf<String?>(null) }
@@ -135,16 +135,12 @@ fun AccountScreen() {
                     is SignIn.NeedsOtp -> {
                         // VTOP accepted the password before asking for the OTP; Rust already kept
                         // it for the saved student, not yet for another one (saved with the code).
-                        if (!other) {
-                            AccountState.rejected = false
-                            savedPassword = password
-                        }
+                        if (!other) savedPassword = password
                         OtpPrompt.await(flowId)
                     }
                 }
                 Log.info("ui.account", "save result", flowId, mapOf("done" to "$done"))
                 if (done) {
-                    AccountState.rejected = false
                     // Paused over the old password: the next run can try again.
                     Settings.syncHealth = Settings.syncHealth.resumedIf { it == PauseReason.PasswordRejected }
                     savedPassword = password

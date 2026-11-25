@@ -322,7 +322,6 @@ pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
         crate::Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
-            rejected: false,
             registration_number: None,
         },
     );

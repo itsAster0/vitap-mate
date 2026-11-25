@@ -565,7 +565,7 @@ impl Core {
                 warn!("VTOP rejected the saved password on the server; no more sign-ins with it");
                 session.mark_password_rejected();
                 if self.is_current(slot) {
-                    self.write_account(&session.account);
+                    self.write_account(&session.account, true);
                 }
                 return Err(ServerError::Expired);
             }

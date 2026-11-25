@@ -530,7 +530,6 @@ async fn core_on(mock: &MockVtop, name: &str) -> (Core, PathBuf) {
         Account {
             username: "22BCE0001".into(),
             password: "pw".into(),
-            rejected: false,
             registration_number: None,
         },
     );

@@ -18,7 +18,7 @@ import vitapmate.features.profile.profileFeature
 import vitapmate.features.timetable.timetableFeature
 import vitapmate.features.vtop.vtopFeature
 import vitapmate.features.wrapped.wrappedFeature
-import vitapmate.data.AccountState
+import vitapmate.data.AccountWatch
 import vitapmate.ui.Feature
 
 /** More's sections, three features to a row. */
@@ -51,10 +51,10 @@ val builtIns: List<Feature> = listOf(
 val tabChoices: List<Feature> = features.filterNot { it.fullScreen } +
     Feature(MessOrExams.ID, "Mess or exams", Lucide.Utensils) {} + builtIns.filter { it.id != INSPECTOR }
 
-/** Need a real VTOP session or the server: hidden for the demo account ([AccountState.demo]). */
+/** Need a real VTOP session or the server: hidden for the demo account ([AccountWatch.demo]). */
 val notInDemo = setOf(vtopFeature.id)
 
 /** Whether [f] is offered to this account. */
-fun available(f: Feature): Boolean = !(AccountState.demo && f.id in notInDemo)
+fun available(f: Feature): Boolean = !(AccountWatch.demo && f.id in notInDemo)
 
 fun featureById(id: String): Feature? = if (id == MessOrExams.ID) MessOrExams.feature else (features + builtIns).firstOrNull { it.id == id }

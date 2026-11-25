@@ -722,6 +722,9 @@ internal interface UniffiCallbackInterfaceUdpSocketMethod1 : com.sun.jna.Callbac
 internal interface UniffiCallbackInterfaceUdpSocketMethod2 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
+internal interface UniffiCallbackInterfaceAccountListenerMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`status`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
 internal interface UniffiCallbackInterfacePasswordCipherMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`plain`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
 }
@@ -966,6 +969,25 @@ internal open class UniffiVTableCallbackInterfaceUdpSocket(
     }
 
 }
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "changed")
+internal open class UniffiVTableCallbackInterfaceAccountListener(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `changed`: UniffiCallbackInterfaceAccountListenerMethod0? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `changed`: UniffiCallbackInterfaceAccountListenerMethod0? = null,
+    ): UniffiVTableCallbackInterfaceAccountListener(`uniffiFree`,`uniffiClone`,`changed`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceAccountListener) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `changed` = other.`changed`
+    }
+
+}
 @Structure.FieldOrder("uniffiFree", "uniffiClone", "seal", "open")
 internal open class UniffiVTableCallbackInterfacePasswordCipher(
     @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
@@ -1103,8 +1125,6 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_semesters(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_select_semester(
-    ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_is_demo(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_dev_clear_attendance(
     ): Int
@@ -1346,6 +1366,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_submit_otp(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_password_rejected_on_server(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_watch_account(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_web_session(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_convexnetwork_open(
@@ -1392,6 +1416,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_udpsocket_shutdown(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_accountlistener_changed(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_passwordcipher_seal(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_passwordcipher_open(
@@ -1424,6 +1450,7 @@ internal object UniffiLib {
 
     init {
         Native.register(UniffiLib::class.java, findLibraryName(componentName = "vtop_ffi"))
+        uniffiCallbackInterfaceAccountListener.register(this)
         uniffiCallbackInterfaceConvexNetwork.register(this)
         uniffiCallbackInterfaceConvexSocket.register(this)
         uniffiCallbackInterfaceCookieGate.register(this)
@@ -1452,8 +1479,6 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_select_semester(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_method_core_is_demo(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
     external fun uniffi_vtop_ffi_fn_method_core_dev_clear_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_vtop_ffi_fn_method_core_dev_clear_cache(`ptr`: Long,`flow`: RustBuffer.ByValue,`scope`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1694,6 +1719,10 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_submit_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_password_rejected_on_server(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_watch_account(`ptr`: Long,`flow`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_web_session(`ptr`: Long,`flow`: RustBuffer.ByValue,`force`: Byte,
     ): Long
     external fun uniffi_vtop_ffi_fn_clone_convexnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1801,6 +1830,14 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_udpsocket_receive(`ptr`: Long,`timeoutMs`: Int,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_udpsocket_shutdown(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_clone_accountlistener(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_accountlistener(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_accountlistener(`vtable`: UniffiVTableCallbackInterfaceAccountListener,
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_accountlistener_changed(`ptr`: Long,`status`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_clone_passwordcipher(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -2055,9 +2092,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_select_semester() and 0xFFFF) != 14628) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_is_demo() and 0xFFFF) != 25598) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_dev_clear_attendance() and 0xFFFF) != 21396) {
@@ -2402,7 +2436,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_otp() and 0xFFFF) != 42733) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 50674) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 11633) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_password() and 0xFFFF) != 34201) {
@@ -2418,6 +2452,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_submit_otp() and 0xFFFF) != 18234) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_password_rejected_on_server() and 0xFFFF) != 43802) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_watch_account() and 0xFFFF) != 50906) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_web_session() and 0xFFFF) != 60390) {
@@ -2487,6 +2527,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_shutdown() and 0xFFFF) != 36603) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_accountlistener_changed() and 0xFFFF) != 34354) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_passwordcipher_seal() and 0xFFFF) != 36347) {
@@ -3068,6 +3111,323 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
     override fun write(value: ByteArray, buf: ByteBuffer) {
         buf.putInt(value.size)
         buf.put(value)
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * Hears every change of [`AccountStatus`]; Kotlin implements it. Called off the main thread.
+ */
+public interface AccountListener {
+    
+    fun `changed`(`status`: AccountStatus)
+    
+    companion object
+}
+
+/**
+ * Hears every change of [`AccountStatus`]; Kotlin implements it. Called off the main thread.
+ */
+open class AccountListenerImpl: Disposable, AutoCloseable, AccountListener
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_vtop_ffi_fn_free_accountlistener(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_vtop_ffi_fn_clone_accountlistener(handle, status)
+        }
+    }
+
+    override fun `changed`(`status`: AccountStatus)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_accountlistener_changed(
+        it,
+        
+        FfiConverterTypeAccountStatus.lower(`status`),_status)
+}
+    }
+    
+    
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceAccountListener {
+    internal object `changed`: UniffiCallbackInterfaceAccountListenerMethod0 {
+        override fun callback(`uniffiHandle`: Long,`status`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeAccountListener.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`changed`(
+                    FfiConverterTypeAccountStatus.lift(`status`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeAccountListener.handleMap.remove(handle)
+        }
+    }
+
+    internal object uniffiClone: UniffiCallbackInterfaceClone {
+        override fun callback(handle: Long): Long {
+            return FfiConverterTypeAccountListener.handleMap.clone(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceAccountListener.UniffiByValue(
+        uniffiFree,
+        uniffiClone,
+        `changed`,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_vtop_ffi_fn_init_callback_vtable_accountlistener(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAccountListener: FfiConverter<AccountListener, Long> {
+    internal val handleMap = UniffiHandleMap<AccountListener>()
+
+    override fun lower(value: AccountListener): Long {
+        if (value is AccountListenerImpl) {
+             // Rust-implemented object.  Clone the handle and return it
+            return value.uniffiCloneHandle()
+         } else {
+            // Kotlin object, generate a new vtable handle and return that.
+            return handleMap.insert(value)
+         }
+    }
+
+    override fun lift(value: Long): AccountListener {
+        if ((value and 1.toLong()) == 0.toLong()) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return AccountListenerImpl(UniffiWithHandle, value)
+        } else {
+            // Kotlin-generated handle, get the object from the handle map
+            return handleMap.remove(value)
+        }
+    }
+
+    override fun read(buf: ByteBuffer): AccountListener {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: AccountListener) = 8UL
+
+    override fun write(value: AccountListener, buf: ByteBuffer) {
+        buf.putLong(lower(value))
     }
 }
 
@@ -4644,11 +5004,6 @@ public interface CoreInterface {
     fun `selectSemester`(`flow`: kotlin.String, `id`: kotlin.String)
     
     /**
-     * Signed in as the demo account: the app hides what needs a real session or the server.
-     */
-    fun `isDemo`(`flow`: kotlin.String): kotlin.Boolean
-    
-    /**
      * Saves the selected semester's attendance with no courses, as before VTOP posts any (the
      * Flutter app's Clear Attendance); a refresh restores it. False when none is saved.
      */
@@ -5313,9 +5668,8 @@ public interface CoreInterface {
     suspend fun `resendOtp`(`flow`: kotlin.String)
     
     /**
-     * The saved username and whether VTOP rejected the password, for Settings' "Needs
-     * attention" and the Gmail sign-in's registration number. The password is
-     * [`Core::saved_password`]'s.
+     * The saved username, for the Gmail sign-in's registration number. The password is
+     * [`Core::saved_password`]'s, and whether VTOP rejected it the [`crate::AccountStatus`].
      */
     fun `savedAccount`(`flow`: kotlin.String): SavedAccount?
     
@@ -5344,6 +5698,18 @@ public interface CoreInterface {
     fun `signedInUser`(`flow`: kotlin.String): kotlin.String?
     
     suspend fun `submitOtp`(`flow`: kotlin.String, `code`: kotlin.String)
+    
+    /**
+     * VTOP rejected the password the server keeps (its `credentials_rejected` push): kept with
+     * the account, so Settings flags it after a restart too, until the student signs in again.
+     */
+    fun `passwordRejectedOnServer`(`flow`: kotlin.String)
+    
+    /**
+     * Sends `listener` the [`AccountStatus`] now and on every change after; one listener, the
+     * last one given.
+     */
+    fun `watchAccount`(`flow`: kotlin.String, `listener`: AccountListener)
     
     /**
      * The signed-in session for the web view, after VTOP confirmed it (signing in again with
@@ -5532,23 +5898,6 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 }
     }
     
-    
-
-    
-    /**
-     * Signed in as the demo account: the app hides what needs a real session or the server.
-     */override fun `isDemo`(`flow`: kotlin.String): kotlin.Boolean {
-            return FfiConverterBoolean.lift(
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_vtop_ffi_fn_method_core_is_demo(
-        it,
-        
-        FfiConverterString.lower(`flow`),_status)
-}
-    }
-    )
-    }
     
 
     
@@ -8215,9 +8564,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * The saved username and whether VTOP rejected the password, for Settings' "Needs
-     * attention" and the Gmail sign-in's registration number. The password is
-     * [`Core::saved_password`]'s.
+     * The saved username, for the Gmail sign-in's registration number. The password is
+     * [`Core::saved_password`]'s, and whether VTOP rejected it the [`crate::AccountStatus`].
      */override fun `savedAccount`(`flow`: kotlin.String): SavedAccount? {
             return FfiConverterOptionalTypeSavedAccount.lift(
     callWithHandle {
@@ -8346,6 +8694,41 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         CoreException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * VTOP rejected the password the server keeps (its `credentials_rejected` push): kept with
+     * the account, so Settings flags it after a restart too, until the student signs in again.
+     */override fun `passwordRejectedOnServer`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_password_rejected_on_server(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Sends `listener` the [`AccountStatus`] now and on every change after; one listener, the
+     * last one given.
+     */override fun `watchAccount`(`flow`: kotlin.String, `listener`: AccountListener)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_watch_account(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeAccountListener.lower(`listener`),_status)
+}
+    }
+    
+    
 
     
     /**
@@ -17875,8 +18258,6 @@ public object FfiConverterTypeRouteStatus: FfiConverterRustBuffer<RouteStatus> {
 data class SavedAccount (
     val `username`: kotlin.String
     , 
-    val `rejected`: kotlin.Boolean
-    , 
     /**
      * Known once signed in.
      */
@@ -17898,20 +18279,17 @@ public object FfiConverterTypeSavedAccount: FfiConverterRustBuffer<SavedAccount>
     override fun read(buf: ByteBuffer): SavedAccount {
         return SavedAccount(
             FfiConverterString.read(buf),
-            FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
         )
     }
 
     override fun allocationSize(value: SavedAccount) = (
             FfiConverterString.allocationSize(value.`username`) +
-            FfiConverterBoolean.allocationSize(value.`rejected`) +
             FfiConverterOptionalString.allocationSize(value.`registrationNumber`)
     )
 
     override fun write(value: SavedAccount, buf: ByteBuffer) {
             FfiConverterString.write(value.`username`, buf)
-            FfiConverterBoolean.write(value.`rejected`, buf)
             FfiConverterOptionalString.write(value.`registrationNumber`, buf)
     }
 }
@@ -20901,6 +21279,117 @@ public object FfiConverterTypeWrappedTime: FfiConverterRustBuffer<WrappedTime> {
 
 
 /**
+ * Where the signed-in account stands, for Settings' "Needs attention", the profile and the
+ * sign-in problems. Rust's alone: Kotlin hears it through [`Core::watch_account`].
+ */
+sealed class AccountStatus {
+    
+    object SignedOut : AccountStatus()
+    
+    
+    /**
+     * The demo account: what needs a real VTOP session or the server is hidden.
+     */
+    object Demo : AccountStatus()
+    
+    
+    object SignedIn : AccountStatus()
+    
+    
+    /**
+     * VTOP rejected the saved password: the student updates it on the Account page.
+     */
+    data class PasswordRejected(
+        val `by`: vitapmate.core.RejectedBy) : AccountStatus()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAccountStatus : FfiConverterRustBuffer<AccountStatus>{
+    override fun read(buf: ByteBuffer): AccountStatus {
+        return when(buf.getInt()) {
+            1 -> AccountStatus.SignedOut
+            2 -> AccountStatus.Demo
+            3 -> AccountStatus.SignedIn
+            4 -> AccountStatus.PasswordRejected(
+                FfiConverterTypeRejectedBy.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: AccountStatus): ULong = when(value) {
+        is AccountStatus.SignedOut -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is AccountStatus.Demo -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is AccountStatus.SignedIn -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is AccountStatus.PasswordRejected -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeRejectedBy.allocationSize(value.`by`)
+            )
+        }
+    }
+
+    override fun write(value: AccountStatus, buf: ByteBuffer) {
+        when(value) {
+            is AccountStatus.SignedOut -> {
+                buf.putInt(1)
+                Unit
+            }
+            is AccountStatus.Demo -> {
+                buf.putInt(2)
+                Unit
+            }
+            is AccountStatus.SignedIn -> {
+                buf.putInt(3)
+                Unit
+            }
+            is AccountStatus.PasswordRejected -> {
+                buf.putInt(4)
+                FfiConverterTypeRejectedBy.write(value.`by`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
  * Which cached pages [`Core::dev_clear_cache`] removes.
  */
 
@@ -22816,6 +23305,49 @@ public object FfiConverterTypeRegnoSharing: FfiConverterRustBuffer<RegnoSharing>
     override fun allocationSize(value: RegnoSharing) = 4UL
 
     override fun write(value: RegnoSharing, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Whose sign-in VTOP turned down.
+ */
+
+enum class RejectedBy {
+    
+    /**
+     * This phone's (or its server route's): no sign-in is tried with it again.
+     */
+    PHONE,
+    /**
+     * The server's, with the password it keeps.
+     */
+    SERVER;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRejectedBy: FfiConverterRustBuffer<RejectedBy> {
+    override fun read(buf: ByteBuffer) = try {
+        RejectedBy.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RejectedBy) = 4UL
+
+    override fun write(value: RejectedBy, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }

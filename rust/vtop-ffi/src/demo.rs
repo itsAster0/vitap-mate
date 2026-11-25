@@ -19,7 +19,7 @@ use vtop_core::sync::RwLock;
 
 use crate::device::EdgeError;
 use crate::remote::backend::Kind;
-use crate::{Account, Core, CoreError, SignIn, Slot, dev, obs, traced_sync};
+use crate::{Account, Core, CoreError, SignIn, Slot, dev, obs};
 
 /// Not a VTOP registration number, so no student lands here by mistake.
 pub(crate) const USERNAME: &str = "DEMO2026";
@@ -74,18 +74,13 @@ pub(crate) fn refuse(account: &Account) -> Result<(), CoreError> {
     }
 }
 
-#[uniffi::export]
 impl Core {
-    /// Signed in as the demo account: the app hides what needs a real session or the server.
-    pub fn is_demo(&self, flow: String) -> bool {
-        traced_sync("is_demo", &flow, || Ok(self.read_account()))
-            .ok()
-            .flatten()
+    /// Signed in as the demo account (Kotlin hears it as [`crate::AccountStatus::Demo`]).
+    pub(crate) fn is_demo(&self) -> bool {
+        self.read_account()
             .is_some_and(|saved| saved.username == USERNAME)
     }
-}
 
-impl Core {
     /// Signs in as the demo account: the sample pages from `server`, then the account saved
     /// like any other (another student's cached pages go).
     pub(crate) async fn sign_in_demo(
