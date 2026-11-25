@@ -482,8 +482,9 @@ describe("FCM", () => {
     );
     vi.stubEnv("FCM_URL", "https://fcm.test");
     let tokenCalls = 0;
-    const fcmStatuses = [200, 401, 200];
+    const fcmStatuses = [200, 401, 200, 200];
     const signals: Array<AbortSignal | undefined> = [];
+    const fcmUrls: string[] = [];
     vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
       signals.push(init?.signal ?? undefined);
       const url = typeof input === "string" || input instanceof URL ? String(input) : input.url;
@@ -491,6 +492,7 @@ describe("FCM", () => {
         tokenCalls += 1;
         return Response.json({ access_token: `tok-${tokenCalls}`, expires_in: 3600 });
       }
+      fcmUrls.push(url);
       return new Response("{}", { status: fcmStatuses.shift() ?? 200 });
     });
     expect(await sendFcm("dev-tok", { kind: "mail_otp" })).toBe("sent");
@@ -500,6 +502,19 @@ describe("FCM", () => {
     // After 401 cleared the cached token, the next call mints a fresh one.
     expect(await sendFcm("dev-tok", { kind: "mail_otp" })).toBe("sent");
     expect(tokenCalls).toBe(2);
+    // Empty FCM_URL is treated as unset and uses Google's FCM API origin.
+    vi.stubEnv("FCM_URL", "");
+    expect(await sendFcm("dev-tok", { kind: "mail_otp" })).toBe("sent");
+    expect(fcmUrls.at(-1)).toBe("https://fcm.googleapis.com/v1/projects/proj/messages:send");
     expect(signals.every((s) => s instanceof AbortSignal)).toBe(true);
+  });
+
+  it("fails fast when INTERNAL_TOKEN is unset or blank", async () => {
+    const { enginePost } = await import("./lib/engine");
+    vi.stubEnv("ENGINE_URL", "https://engine.test");
+    vi.stubEnv("INTERNAL_TOKEN", "");
+    expect(() => enginePost("/engine/fetch", {})).toThrow("INTERNAL_TOKEN is not configured");
+    vi.stubEnv("INTERNAL_TOKEN", "   ");
+    expect(() => enginePost("/engine/fetch", {})).toThrow("INTERNAL_TOKEN is not configured");
   });
 });

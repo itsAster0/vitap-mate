@@ -25,11 +25,16 @@ export function accountId(registrationNumber: string): string {
   return registrationNumber.trim().toUpperCase();
 }
 
-/** A required environment value, without a trailing slash. */
-export function env(name: string): string {
+/** A required environment value, failing fast when unset or blank. */
+export function requiredEnv(name: string): string {
   const value = (process.env[name] ?? "").trim();
   if (!value) throw new Error(`${name} is not configured`);
-  return value.replace(/\/+$/, "");
+  return value;
+}
+
+/** A required environment value (URL or domain), without a trailing slash. */
+export function env(name: string): string {
+  return requiredEnv(name).replace(/\/+$/, "");
 }
 
 /** Who a log line is about: the app's flow id and the student, when known. */

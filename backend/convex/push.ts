@@ -12,6 +12,8 @@ import { logError, logWarn, now } from "./lib/util";
 
 /** An OAuth scope name, not an address. */
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+/** Google's FCM v1 API origin; tests override with `FCM_URL` (unset or empty uses this). */
+const GOOGLE_FCM_URL = "https://fcm.googleapis.com";
 /** Mint a new token this long before the old one expires. */
 const REFRESH_MARGIN_SECS = 300;
 /** Timeout for Google OAuth token exchange and FCM message sends. */
@@ -78,7 +80,7 @@ export async function sendFcm(token: string, data: Record<string, unknown>): Pro
     logError({}, "fcm: no access token", e);
     return "failed";
   }
-  const base = (process.env.FCM_URL ?? "https://fcm.googleapis.com").replace(/\/+$/, "");
+  const base = (process.env.FCM_URL?.trim() || GOOGLE_FCM_URL).replace(/\/+$/, "");
   const response = await fetch(`${base}/v1/projects/${account.project_id}/messages:send`, {
     method: "POST",
     headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
