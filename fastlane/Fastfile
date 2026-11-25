@@ -23,6 +23,13 @@ def update_priority
   end
 end
 
+# A staged rollout's share of users, as Play takes it: more than 0, at most 1.
+def rollout_fraction(value)
+  fraction = Float(value.to_s, exception: false)
+  UI.user_error!("rollout must be more than 0 and at most 1, not #{value}") unless fraction&.positive? && fraction <= 1
+  fraction.to_s
+end
+
 platform :android do
   desc 'Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt'
   lane :deploy_internal do |options|
@@ -44,7 +51,8 @@ platform :android do
 
   desc 'Promote the latest internal build to the closed (friends), alpha and beta tracks'
   lane :promote_all_testing do
-    %w[friends alpha beta production].each do |track|
+    # Production is its own lane (promote_production), never part of testing.
+    %w[friends alpha beta].each do |track|
       upload_to_play_store(
         track: 'internal',
         track_promote_to: track,
@@ -55,7 +63,35 @@ platform :android do
         in_app_update_priority: update_priority
       )
     end
-    # Production stays a manual step in the Play Console.
+  end
+
+  desc 'Promote the beta build to production as a staged rollout (rollout:0.2 by default)'
+  lane :promote_production do |options|
+    upload_to_play_store(
+      track: 'beta',
+      track_promote_to: 'production',
+      rollout: rollout_fraction(options[:rollout] || '0.2'),
+      skip_upload_changelogs: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      in_app_update_priority: update_priority
+    )
+  end
+
+  desc "Widen production's staged rollout (rollout:0.5), or rollout:1 for everyone"
+  lane :rollout do |options|
+    UI.user_error!('rollout needs a fraction, such as rollout:0.5') unless options[:rollout]
+    upload_to_play_store(
+      track: 'production',
+      rollout: rollout_fraction(options[:rollout]),
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_changelogs: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
   end
 
   desc 'Build, upload to internal, then promote through the testing tracks'

@@ -21,8 +21,8 @@ engine use.
 - Renaming a spec's name, args or file (`rust/vtop-proto/tests/spec_contract.txt`
   only grows at its end).
 - Sending the VTOP session to our servers without `consent::allowed`.
-- Release lanes: pushing a `v*` tag, `fastlane android deploy_internal` or
-  `promote_all_testing` upload to Play.
+- Release lanes: pushing a `v*` tag, `fastlane android deploy_internal`,
+  `promote_all_testing`, `promote_production` or `rollout` upload to Play.
 
 Agents never open PRs or issues, push, or deploy unless asked.
 
@@ -220,7 +220,9 @@ the AAB. To release:
 3. Push the tag `v<versionName>`. `android-release.yml` builds the signed AAB
    (64-bit and 32-bit) and uploads it to the internal track.
 4. Promote in the Play Console, or with `bundle exec fastlane android
-   promote_all_testing` (friends, alpha, beta). Production stays manual.
+   promote_all_testing` (friends, alpha, beta). Production is its own lane:
+   `promote_production` sends the beta build to production as a staged rollout
+   (`rollout:0.2` by default) and `rollout rollout:0.5` (or `1`) widens it.
 
 How hard the app asks to update is the release's in-app update priority, set
 per versionCode in `UPDATE_PRIORITIES` in `fastlane/Fastfile` (add a line in the
