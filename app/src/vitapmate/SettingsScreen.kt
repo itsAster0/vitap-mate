@@ -43,9 +43,9 @@ import com.composables.icons.lucide.CalendarMinus
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.FolderDown
 import com.composables.icons.lucide.History
-import com.composables.icons.lucide.Key
 import com.composables.icons.lucide.LogOut
 import com.composables.icons.lucide.Network
+import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.RefreshCcw
@@ -97,7 +97,7 @@ fun SettingsScreen() {
     var otpSheet by remember { mutableStateOf(false) }
     // What already shows as a warning on a row, repeated at the top; each does what its row does.
     val needs = buildList {
-        if (AccountWatch.rejected) add(Need("Username and password", "VTOP rejected the saved password", "account") { nav.push(Route.Screen(ACCOUNT)) })
+        if (AccountWatch.rejected) add(Need("Your account", "VTOP rejected the saved password", "account") { nav.push(Route.Screen(ACCOUNT)) })
         syncPaused()?.let { add(Need("Background sync", "Paused: $it", "sync") { nav.push(Route.Screen(SYNC_HISTORY)) }) }
         if (!AccountWatch.demo) otpWarning()?.let { add(Need("OTP auto-fill", it, "otp") { otpSheet = true }) }
         val resumes = Foreground.resumes
@@ -145,10 +145,10 @@ fun SettingsScreen() {
             item {
                 ListGroup("Account") {
                     if (!AccountWatch.demo) GroupItem(
-                        "Username and password",
+                        "Your account",
                         "settings.account",
-                        Lucide.Key,
-                        if (AccountWatch.rejected) "VTOP rejected the saved password" else null,
+                        Lucide.CircleUser,
+                        if (AccountWatch.rejected) "VTOP rejected the saved password" else "VTOP sign-in, server and linked phones",
                         onClick = { nav.push(Route.Screen(ACCOUNT)) },
                         trailing = { Chevron() },
                         tone = if (AccountWatch.rejected) AppTheme.tones.warning else null,

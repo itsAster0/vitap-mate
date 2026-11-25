@@ -123,7 +123,7 @@ fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem {
         is CoreException.InvalidCredentials -> p(
             ProblemKind.SignInNeeded,
             "VTOP Sign-In Failed",
-            "VTOP rejected the saved password. Update it in Settings, under Username and password.",
+            "VTOP rejected the saved password. Update it in Settings, under Your account.",
             retryable = false,
         )
         is CoreException.NotSignedIn -> p(ProblemKind.SignInNeeded, "Sign-In Needed", "Your saved session expired. Please sign in again.", retryable = false)

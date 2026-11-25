@@ -157,7 +157,7 @@ object Push {
 
     /**
      * VTOP rejected the password the server keeps (`credentials_rejected`): Settings flags
-     * Username and password, and a notification opens Settings, where it shows on top.
+     * Your account, and a notification opens Settings, where it shows on top.
      */
     internal suspend fun rejected(context: Context, flow: String) {
         // Kept with the account by Rust, so Settings still flags it after a restart.
@@ -175,7 +175,7 @@ object Push {
         val n = NotificationCompat.Builder(context, REJECTED)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("VTOP rejected your saved password")
-            .setContentText("Update it in Settings, under Username and password")
+            .setContentText("Update it in Settings, under Your account")
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

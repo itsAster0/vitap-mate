@@ -15,7 +15,7 @@ import vitapmate.core.Standing
  * Rust's [AccountStatus] (`Core.watchAccount`): who is signed in, and where their account
  * stands. The app's phase (the login screen or the shell) and what Kotlin keeps for a student
  * follow [heard]; screens draw [status]: when VTOP rejected the saved password, Settings shows
- * "Needs attention" and highlights Username and password, and a sign-in problem opens the
+ * "Needs attention" and highlights Your account, and a sign-in problem opens the
  * Account page instead of the login screen, so nothing cached is dropped; the demo account
  * hides what needs a real VTOP session or the server. Only Rust changes it.
  */
