@@ -6,7 +6,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { type ActionCtx, type QueryCtx, action, internalQuery, mutation, query } from "./_generated/server";
-import { keysOf, phonesOf, saveRecord, signInsOf } from "./lib/accounts";
+import { keysOf, phonesOf, saveRecord, scheduleMcpEvict, signInsOf } from "./lib/accounts";
 import { fail } from "./lib/errors";
 import { actionCaller, caller, realCaller, recordOf } from "./lib/identity";
 import { address } from "./lib/mailboxes";
@@ -48,7 +48,7 @@ export const status = query({
     const doc = await recordOf(ctx, me.account);
     const id = me.account._id;
     const forwarding = doc.mailboxId === null ? null : address(doc.mailboxId);
-    return doc.statusView(forwarding, (await phonesOf(ctx, id)).length, await keysOf(ctx, id), await signInsOf(ctx, id));
+    return doc.statusView(forwarding, (await phonesOf(ctx, id)).length, await keysOf(ctx, id), await signInsOf(ctx, id), now());
   },
 });
 
@@ -60,6 +60,7 @@ export const sessionClear = mutation({
     const doc = await recordOf(ctx, me.account);
     doc.clearSession();
     await saveRecord(ctx, me.account._id, doc);
+    await scheduleMcpEvict(ctx, me.account._id, flow, me.regno);
     log({ flow, regno: me.regno }, "account: cached session cleared");
     return { ok: true };
   },
@@ -93,6 +94,7 @@ async function loginAnswer(ctx: QueryCtx, accountId: Id<"accounts">, requestId: 
     case "pending":
       return { status: "pending", requestId };
     case "expired":
+    case "scrubbed":
       return { status: "error", code: "vtop_timeout", error: "The server did not sign in in time." };
   }
 }

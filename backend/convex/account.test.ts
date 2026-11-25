@@ -44,25 +44,34 @@ describe("the account", () => {
     const at = Math.floor(Date.now() / 1000);
     await t.run(async (ctx) => {
       const id = ctx.db.normalizeId("accounts", account)!;
-      await ctx.db.patch(id, { sealedVault: "v", vaultSavedAt: at });
+      const row = (await ctx.db.get(id))!;
+      await ctx.db.patch(id, {
+        settings: { ...row.settings, cacheSession: true },
+        sealedVault: "v",
+        vaultSavedAt: at,
+      });
       await ctx.db.insert("signIns", { accountId: id, at, by: "server", ok: true, reason: null });
     });
     expect((await as.query(api.app.status, { flow: "f" })).signIns).toHaveLength(1);
+    expect(await as.query(api.account.signIns, { flow: "f" })).toHaveLength(1);
     expect((await as.query(api.account.view, { flow: "f" })).savedCredentials).toBe(true);
     await as.mutation(api.account.forgetCredentials, { flow: "f" });
     expect((await as.query(api.account.view, { flow: "f" })).savedCredentials).toBe(false);
     await as.mutation(api.account.clearSignIns, { flow: "f" });
     expect((await as.query(api.app.status, { flow: "f" })).signIns).toEqual([]);
+    expect(await as.query(api.account.signIns, { flow: "f" })).toEqual([]);
   });
 
-  it("saves credentials only when the server can read the OTP", async () => {
+  it("saves credentials only when the server can read the OTP, and turns cacheSession on", async () => {
     const t = await setup();
     const { as } = await prove(t, await phone(1));
+    expect((await as.query(api.account.view, { flow: "f" })).settings.cacheSession).toBe(false);
     const calls = engine((path) => (path === "/engine/seal" ? Response.json({ sealedVault: "sv" }) : undefined));
     const password = { username: "22bce0001", password: "pw" };
-    // No forwarding address and no Gmail access: nothing is sealed.
+    // No forwarding address and no Gmail access: nothing is sealed, cacheSession stays false.
     expect(await as.action(api.account.saveCredentials, { flow: "f", credentials: password })).toEqual({ savedCredentials: false, forwarding: false });
     expect(calls).toHaveLength(0);
+    expect((await as.query(api.account.view, { flow: "f" })).settings.cacheSession).toBe(false);
     const gmail = { refreshToken: "rt", clientId: "cid", clientSecret: null, deleteAfterReading: false };
     expect(await as.action(api.account.saveCredentials, { flow: "f", label: "Pixel", credentials: { ...password, gmail, otp: "gmail" } })).toEqual({
       savedCredentials: true,
@@ -71,8 +80,22 @@ describe("the account", () => {
     expect(calls[0].body).toEqual({ account: REGNO, username: "22bce0001", password: "pw", gmail: { refreshToken: "rt", clientId: "cid", deleteAfterReading: false }, otp: "gmail" });
     expect(calls[0].headers.get("x-vtop-flow")).toBe("f");
     const view = await as.query(api.account.view, { flow: "f" });
-    expect(view).toMatchObject({ savedCredentials: true, vaultGmail: true, vaultSavedAt: T0 });
+    expect(view).toMatchObject({
+      savedCredentials: true,
+      vaultGmail: true,
+      vaultSavedAt: T0,
+      vaultExpiresAt: null,
+      sessionSavedAt: null,
+      sessionSource: null,
+      settings: { cacheSession: true },
+    });
     expect(view.phones[0].label).toBe("Pixel");
+    // Older apps calling setSettings without cacheSession preserve cacheSession: true.
+    await as.mutation(api.account.setSettings, { flow: "f", settings: { alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 } });
+    expect(await as.query(api.account.view, { flow: "f" })).toMatchObject({
+      settings: { cacheSession: true, alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 },
+      vaultExpiresAt: T0 + 86_400,
+    });
     // With a forwarding address, a password alone is enough; a failed seal keeps the old vault.
     await as.mutation(api.mail.register, { flow: "f" });
     engine(() => new Response(null, { status: 500 }));
@@ -80,12 +103,62 @@ describe("the account", () => {
     await expect(as.action(api.account.saveCredentials, { flow: "f", credentials: null as never })).rejects.toThrow();
   });
 
-  it("refuses the demo's credentials", async () => {
+  it("turns storage off in one mutation: clears session, vault, logins, and evicts MCP RAM cache", async () => {
+    const t = await setup();
+    const { as, account } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f", label: "Claude" });
+    const keyHash = await sha256Hex(made.key);
+    const at = Math.floor(Date.now() / 1000);
+    await t.run(async (ctx) => {
+      const id = ctx.db.normalizeId("accounts", account)!;
+      const row = (await ctx.db.get(id))!;
+      await ctx.db.patch(id, {
+        settings: { ...row.settings, cacheSession: true },
+        sealedVault: "sv",
+        vaultSavedAt: at,
+        sealedSession: "ss",
+        sessionSavedAt: at,
+        sessionSource: "phone",
+      });
+      await ctx.db.insert("logins", {
+        accountId: id,
+        requestId: "r-inflight",
+        since: at,
+        phase: { kind: "waiting_otp", sealedState: "st" },
+        expiresAt: at + 300,
+      });
+    });
+    const calls = engine((path) => (path === "/engine/mcp/evict" ? Response.json({ evicted: 1 }) : undefined));
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
+    await as.mutation(api.account.setSettings, {
+      flow: "turn-off",
+      settings: { cacheSession: false, alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null },
+    });
+    // Immediately after the single mutation, session, vault and logins are all gone.
+    const after = await t.run(async (ctx) => ({
+      account: (await ctx.db.get(ctx.db.normalizeId("accounts", account)!))!,
+      logins: await ctx.db.query("logins").collect(),
+    }));
+    expect(after.account.settings.cacheSession).toBe(false);
+    expect(after.account.sealedSession).toBeNull();
+    expect(after.account.sealedVault).toBeNull();
+    expect(after.logins).toEqual([]);
+    // The scheduled eviction notifies the engine with the account's key hashes.
+    await t.finishAllScheduledFunctions(() => vi.advanceTimersByTime(100));
+    expect(calls).toHaveLength(1);
+    expect(calls[0].path).toBe("/engine/mcp/evict");
+    expect(calls[0].body).toEqual({ keyHashes: [keyHash] });
+    expect(calls[0].headers.get("x-vtop-flow")).toBe("turn-off");
+    expect(calls[0].headers.get("x-vtop-regno")).toBe(REGNO);
+  });
+
+  it("refuses the demo's credentials and returns empty signIns for demo", async () => {
     const t = await setup();
     const p = await phone(1);
     const demo = await t.action(api.auth.token, await p.signed("auth:token", { demo: true, device: p.device }));
     const as = t.withIdentity({ subject: p.deviceId, regno: demo.regno, acct: demo.account, demo: true });
     expect(await codeOf(as.action(api.account.saveCredentials, { flow: "f", credentials: { username: "u", password: "p" } }))).toBe("demo_unavailable");
+    expect(await as.query(api.account.signIns, { flow: "f" })).toEqual([]);
   });
 
   it("keeps the latest ten sign-ins, newest first", async () => {
@@ -340,7 +413,14 @@ describe("sweeps", () => {
     await t.mutation(api.auth.proveStart, await (await phone(2)).signed("auth:proveStart", {}));
     const at = Math.floor(Date.now() / 1000);
     await t.run(async (ctx) => {
-      await ctx.db.patch(ctx.db.normalizeId("accounts", account)!, { sealedSession: "s", sessionSavedAt: at, sessionSource: "phone" });
+      const id = ctx.db.normalizeId("accounts", account)!;
+      const row = (await ctx.db.get(id))!;
+      await ctx.db.patch(id, {
+        settings: { ...row.settings, cacheSession: true },
+        sealedSession: "s",
+        sessionSavedAt: at,
+        sessionSource: "phone",
+      });
     });
     advance(121);
     await t.mutation(internal.sweeps.fiveMinutes, {});
@@ -358,6 +438,51 @@ describe("sweeps", () => {
     await t.mutation(internal.sweeps.fiveMinutes, {});
     await t.mutation(internal.sweeps.quarter, {});
     expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(1);
+  });
+
+  it("drops unconsented legacy sealedSession where effective cacheSession is false while keeping vault holders", async () => {
+    const t = await setup();
+    const noVault = await prove(t, await phone(1), "22BCE0001");
+    const withVault = await prove(t, await phone(2), "22BCE0002");
+    const at = Math.floor(Date.now() / 1000);
+    await t.run(async (ctx) => {
+      // Legacy row without cacheSession and without vault, with a future sweepAt.
+      await ctx.db.patch(ctx.db.normalizeId("accounts", noVault.account)!, {
+        settings: { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null },
+        sealedVault: null,
+        sealedSession: "unconsented",
+        sessionSavedAt: at,
+        sessionSource: "phone",
+        sweepAt: at + SESSION_CACHE_SECS,
+      });
+      // Legacy row without cacheSession but WITH a vault -> effective cacheSession is true.
+      await ctx.db.patch(ctx.db.normalizeId("accounts", withVault.account)!, {
+        settings: { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null },
+        sealedVault: "vault",
+        vaultSavedAt: at,
+        sealedSession: "kept-session",
+        sessionSavedAt: at,
+        sessionSource: "server",
+        sweepAt: at + SESSION_CACHE_SECS,
+      });
+    });
+    // Even before sweep, noVault reads as off.
+    expect((await noVault.as.query(api.account.view, {})).settings.cacheSession).toBe(false);
+    expect((await noVault.as.query(api.account.view, {})).sessionSavedAt).toBeNull();
+    expect((await withVault.as.query(api.account.view, {})).settings.cacheSession).toBe(true);
+    expect((await withVault.as.query(api.account.view, {})).sessionSavedAt).toBe(at);
+
+    // Quarter sweep immediately drops noVault's leftover sealedSession and leaves withVault intact.
+    await t.mutation(internal.sweeps.quarter, {});
+    const rows = await t.run(async (ctx) => ({
+      noVault: (await ctx.db.get(ctx.db.normalizeId("accounts", noVault.account)!))!,
+      withVault: (await ctx.db.get(ctx.db.normalizeId("accounts", withVault.account)!))!,
+    }));
+    expect(rows.noVault.sealedSession).toBeNull();
+    expect(rows.noVault.sessionSavedAt).toBeNull();
+    expect(rows.noVault.sweepAt).toBeUndefined();
+    expect(rows.withVault.sealedSession).toBe("kept-session");
+    expect(rows.withVault.sealedVault).toBe("vault");
   });
 
   it("expires saved vault and cached session server-side at sweepAt so live queries re-run", async () => {

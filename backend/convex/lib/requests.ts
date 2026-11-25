@@ -48,10 +48,13 @@ export async function pendingRequest(ctx: QueryCtx, accountId: Id<"accounts">, a
  * could be. */
 export async function askPhone(ctx: MutationCtx, doc: AccountRecord, request: RequestRecord, at: number): Promise<RequestError | null> {
   let asked = false;
+  let pushSent = false;
   for (const device of request.phones) {
     const fields = { requestId: request.id, wantCredentials: doc.wantCredentials(at) ? "1" : "0" };
-    if (await notify(ctx, device, "vtop_cookie_request", fields)) asked = true;
+    const sent = await notify(ctx, device, "vtop_cookie_request", fields);
+    if (sent !== "missing") asked = true;
+    if (sent === "pushed") pushSent = true;
   }
-  if (asked) request.markPhoneAsked();
+  if (asked) request.markPhoneAsked(pushSent);
   return asked ? null : PHONE_UNREACHABLE;
 }

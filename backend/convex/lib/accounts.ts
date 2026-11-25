@@ -180,6 +180,17 @@ export const ACCOUNT_OWNED_TABLES = [
 
 export type AccountOwnedTable = (typeof ACCOUNT_OWNED_TABLES)[number];
 
+/** Asks the engine to evict the account's access keys from its in-memory MCP caches. */
+export async function scheduleMcpEvict(ctx: MutationCtx, accountId: Id<"accounts">, flow: string | undefined, regno: string): Promise<void> {
+  const keys = await keyRows(ctx, accountId);
+  if (keys.length === 0) return;
+  await ctx.scheduler.runAfter(0, internal.sessions.evictMcpCache, {
+    keyHashes: keys.map((k) => k.keyHash),
+    flow,
+    regno,
+  });
+}
+
 /** Deletes every row of the account in `table` (all are indexed `by_account`). */
 export async function deleteOwned(ctx: MutationCtx, table: AccountOwnedTable, accountId: Id<"accounts">): Promise<void> {
   const rows = await ctx.db

@@ -13,7 +13,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const OK = { status: "ok", cookies: "a=b", sealedSession: "s", csrfToken: "c" };
+const OK = { status: "ok", cookies: "a=b", sealedSession: "s", csrfToken: "c" } as const;
 const SESSION = { cookies: "a=b", csrf_token: "c", registration_number: REGNO };
 
 const mail = (t: T, otp: string) =>
@@ -31,7 +31,12 @@ async function student(t: T) {
   addressOf.set(t, box.id);
   await t.run(async (ctx) => {
     const id = ctx.db.normalizeId("accounts", proved.account)!;
-    await ctx.db.patch(id, { sealedVault: "vault", vaultSavedAt: Math.floor(Date.now() / 1000) });
+    const row = (await ctx.db.get(id))!;
+    await ctx.db.patch(id, {
+      settings: { ...row.settings, cacheSession: true },
+      sealedVault: "vault",
+      vaultSavedAt: Math.floor(Date.now() / 1000),
+    });
   });
   return proved;
 }
@@ -227,5 +232,38 @@ describe("server sign-ins", () => {
     const row = await t.run((ctx) => ctx.db.query("sessionRequests").first());
     expect(row?.expired).toBe(true);
     expect(await as.query(api.app.loginResult, { requestId: started.requestId })).toMatchObject({ status: "error", code: "vtop_timeout" });
+  });
+
+  it("does not save sealedSession in loginDone when cacheSession was turned off", async () => {
+    const t = await setup();
+    const { as, account } = await student(t);
+    const { loginDone } = await import("./sessions");
+    const at = Math.floor(Date.now() / 1000);
+    await as.mutation(api.account.setSettings, {
+      flow: "f",
+      settings: { cacheSession: false, alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null },
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("sessionRequests", {
+        requestId: "r-off",
+        accountId: ctx.db.normalizeId("accounts", account)!,
+        status: "pending",
+        cookies: null,
+        csrfToken: null,
+        error: null,
+        createdAt: at,
+        expiresAt: at + 120,
+        vaultDueAt: null,
+        vaultStarted: true,
+        phoneAsked: false,
+        phoneError: null,
+        source: null,
+        phones: [],
+      });
+      await loginDone(ctx, REGNO, "r-off", OK);
+    });
+    const saved = await t.run(async (ctx) => (await ctx.db.get(ctx.db.normalizeId("accounts", account)!))!);
+    expect(saved.sealedSession).toBeNull();
+    expect(saved.sessionSavedAt).toBeNull();
   });
 });

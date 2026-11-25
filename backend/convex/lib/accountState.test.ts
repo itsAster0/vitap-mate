@@ -58,8 +58,22 @@ describe("settings and ids", () => {
   it("settings only take offered choices", () => {
     expect(parseSettings(defaultSettings())).toEqual(defaultSettings());
     expect(parseSettings({ ...defaultSettings(), phoneWaitSecs: 11 })).toBeNull();
-    expect(parseSettings({ alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 })).not.toBeNull();
+    expect(parseSettings({ alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 })).toEqual({
+      cacheSession: false,
+      alwaysUseVault: false,
+      phoneWaitSecs: 45,
+      vaultTtlSecs: 86_400,
+    });
+    // Older apps omit cacheSession: preserves current value.
+    expect(parseSettings({ alwaysUseVault: false, phoneWaitSecs: 45, vaultTtlSecs: 86_400 }, true)).toEqual({
+      cacheSession: true,
+      alwaysUseVault: false,
+      phoneWaitSecs: 45,
+      vaultTtlSecs: 86_400,
+    });
+    expect(parseSettings({ ...defaultSettings(), cacheSession: "yes" })).toBeNull();
     expect(JSON.parse(JSON.stringify(defaultSettings()))).toEqual({
+      cacheSession: false,
       alwaysUseVault: true,
       phoneWaitSecs: 20,
       vaultTtlSecs: null,
@@ -134,29 +148,81 @@ describe("cookies", () => {
 });
 
 describe("accounts", () => {
-  it("follow the lifetime of saved credentials", () => {
+  it("follow the lifetime of saved credentials and never ask for piggybacked credentials", () => {
     const a = account();
+    expect(a.storage(NOW)).toEqual({ kind: "off" });
     expect(a.usableVault(NOW)).toBeNull();
-    expect(a.wantCredentials(NOW)).toBe(true);
+    expect(a.wantCredentials(NOW)).toBe(false);
     a.mailboxId = "m";
     a.saveVault("v", NOW);
+    // Saving a vault turns cacheSession on.
+    expect(a.settings.cacheSession).toBe(true);
+    expect(a.storage(NOW)).toMatchObject({ kind: "offline_sign_in", vault: { sealed: "v", savedAt: NOW, expiresAt: null, gmail: false } });
     expect(a.usableVault(NOW + 10 * 86_400)).toBe("v");
     expect(a.wantCredentials(NOW)).toBe(false);
     a.settings.vaultTtlSecs = 86_400;
-    expect(a.wantCredentials(NOW)).toBe(true);
+    expect(a.wantCredentials(NOW)).toBe(false);
     expect(a.usableVault(NOW + 86_399)).toBe("v");
+    expect(a.view([], [], null, false, NOW).vaultExpiresAt).toBe(NOW + 86_400);
     expect(a.usableVault(NOW + 86_400)).toBeNull();
+    expect(a.storage(NOW + 86_400)).toEqual({ kind: "session_only", session: null });
   });
 
-  it("want credentials again while the server cannot read the OTP", () => {
-    const a = account();
-    a.saveVault("v", NOW);
-    // No forwarding address and no Gmail access.
-    expect(a.wantCredentials(NOW)).toBe(true);
-    a.saveVault("v", NOW, true);
-    expect(a.wantCredentials(NOW)).toBe(false);
-    expect(a.view([], [], null, false, NOW).vaultGmail).toBe(true);
-    expect(a.statusView(null, 0, [], []).vaultGmail).toBe(true);
+  it("model storage state as a discriminated union and apply migration rules at the read boundary", () => {
+    // Missing cacheSession with no vault -> off, even if a leftover sealedSession exists.
+    const noVault = fromFields(
+      "22BCE0001",
+      {
+        settings: { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null },
+        semesterId: null,
+        sealedVault: null,
+        vaultSavedAt: null,
+        vaultGmail: false,
+        sealedSession: "leftover",
+        sessionSavedAt: NOW,
+        sessionSource: "phone",
+        credentialsRejectedAt: null,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      null,
+    );
+    expect(noVault.settings.cacheSession).toBe(false);
+    expect(noVault.storage(NOW)).toEqual({ kind: "off" });
+    expect(noVault.cachedSession(NOW)).toBeNull();
+    expect(noVault.view([], [], null, false, NOW)).toMatchObject({ sessionSavedAt: null, sessionSource: null, vaultExpiresAt: null });
+
+    // Missing cacheSession with a vault -> on (offline_sign_in) and keeps cached session.
+    const withVault = fromFields(
+      "22BCE0001",
+      {
+        settings: { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: 86_400 },
+        semesterId: null,
+        sealedVault: "v",
+        vaultSavedAt: NOW,
+        vaultGmail: true,
+        sealedSession: "s",
+        sessionSavedAt: NOW,
+        sessionSource: "server",
+        credentialsRejectedAt: null,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      null,
+    );
+    expect(withVault.settings.cacheSession).toBe(true);
+    expect(withVault.storage(NOW)).toEqual({
+      kind: "offline_sign_in",
+      session: { sealed: "s", savedAt: NOW, source: "server" },
+      vault: { sealed: "v", savedAt: NOW, expiresAt: NOW + 86_400, gmail: true },
+      options: { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: 86_400 },
+    });
+    expect(withVault.view([], [], null, false, NOW)).toMatchObject({
+      sessionSavedAt: NOW,
+      sessionSource: "server",
+      vaultExpiresAt: NOW + 86_400,
+    });
+    expect(withVault.statusView(null, 0, [], [], NOW).vaultGmail).toBe(true);
   });
 
   it("drop only the Gmail access Google refused", () => {
@@ -183,14 +249,21 @@ describe("accounts", () => {
     expect(a.credentialsRejectedAt).toBeNull();
   });
 
-  it("cache sessions for a week", () => {
+  it("cache sessions for a week only when cacheSession is on", () => {
     const a = account();
-    a.saveSession("s", NOW, "server");
+    // Default off refuses to cache.
+    expect(a.saveSession("s", NOW, "server")).toBe(false);
+    expect(a.cachedSession(NOW)).toBeNull();
+    a.setSettings({ ...defaultSettings(), cacheSession: true });
+    expect(a.saveSession("s", NOW, "server")).toBe(true);
+    expect(a.storage(NOW)).toEqual({ kind: "session_only", session: { sealed: "s", savedAt: NOW, source: "server" } });
     expect(a.cachedSource()).toMatchObject({ from: "server", cached: true });
     expect(a.cachedSession(NOW + SESSION_CACHE_SECS - 1)).toBe("s");
     expect(a.cachedSession(NOW + SESSION_CACHE_SECS)).toBeNull();
-    a.clearSession();
-    expect(a.cachedSession(NOW)).toBeNull();
+    // Turning cacheSession off clears session and vault.
+    a.setSettings({ ...defaultSettings(), cacheSession: false });
+    expect(a.sealedSession).toBeNull();
+    expect(a.storage(NOW)).toEqual({ kind: "off" });
   });
 
   it("plan who is asked", () => {
@@ -218,7 +291,7 @@ describe("accounts", () => {
     ]);
     const outsider = a.view(phones, keys, "d9", true, NOW);
     expect(outsider).toMatchObject({ thisPhone: false, phones: [], keys: [], phoneCount: 2, linked: true });
-    expect(a.statusView(null, 2, keys, []).keys.map((k) => k.id)).toEqual(["00abcdef", "01abcdef"]);
+    expect(a.statusView(null, 2, keys, [], NOW).keys.map((k) => k.id)).toEqual(["00abcdef", "01abcdef"]);
   });
 
   it("write a key's use at most once a minute, keeping the latest", () => {
@@ -301,10 +374,15 @@ describe("session requests", () => {
     r.succeed("JSESSIONID=a", "phone");
     expect(r.phase).toEqual({ kind: "success", cookies: "JSESSIONID=a", csrfToken: null, source: "phone" });
     expect(r.failure()).toBeNull();
-    const body = r.pollView(NOW + 1000).body as { status: string; session: { cookies: string }; cookies: { name: string }[] };
+    const body = r.pollView(NOW + 1000, false).body as { status: string; session: { cookies: string }; cookies: { name: string }[]; cacheable: boolean };
     expect(body.status).toBe("ready");
     expect(body.session.cookies).toBe("JSESSIONID=a");
     expect(body.cookies[0].name).toBe("JSESSIONID");
+    expect(body.cacheable).toBe(false);
+    expect(r.scrub()).toBe(true);
+    expect(r.scrub()).toBe(false);
+    expect(r.phase).toEqual({ kind: "scrubbed", source: "phone" });
+    expect(r.pollView(NOW + 1000, false).status).toBe(410);
     expect(r.startedView().pollAfterMs).toBe(POLL_AFTER_MS);
   });
 
@@ -351,13 +429,14 @@ describe("session requests", () => {
     const phases: RequestPhase[] = [
       { kind: "pending", stage: { kind: "starting", phoneError: null } },
       { kind: "pending", stage: { kind: "starting", phoneError: PHONE_UNREACHABLE } },
-      { kind: "pending", stage: { kind: "phone", vaultDueAt: null } },
-      { kind: "pending", stage: { kind: "phone", vaultDueAt: NOW + 20 } },
-      { kind: "pending", stage: { kind: "server", phoneAsked: false, phoneError: null } },
-      { kind: "pending", stage: { kind: "server", phoneAsked: true, phoneError: null } },
-      { kind: "pending", stage: { kind: "server", phoneAsked: false, phoneError: PHONE_UNREACHABLE } },
+      { kind: "pending", stage: { kind: "phone", vaultDueAt: null, pushSent: false } },
+      { kind: "pending", stage: { kind: "phone", vaultDueAt: NOW + 20, pushSent: true } },
+      { kind: "pending", stage: { kind: "server", phoneAsked: false, pushSent: false, phoneError: null } },
+      { kind: "pending", stage: { kind: "server", phoneAsked: true, pushSent: true, phoneError: null } },
+      { kind: "pending", stage: { kind: "server", phoneAsked: false, pushSent: false, phoneError: PHONE_UNREACHABLE } },
       { kind: "expired" },
       { kind: "success", cookies: "JSESSIONID=x", csrfToken: "tok", source: "server" },
+      { kind: "scrubbed", source: "phone" },
       { kind: "error", error: { code: "credentials_rejected", message: "Bad password." } },
     ];
     for (const phase of phases) {

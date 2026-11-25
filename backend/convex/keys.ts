@@ -105,7 +105,13 @@ export const revoke = mutation({
   args: { flow: v.string(), id: v.string() },
   handler: async (ctx, { flow, id }) => {
     const me = await realCaller(ctx);
-    await ctx.db.delete((await keyById(ctx, me.account._id, id))._id);
+    const key = await keyById(ctx, me.account._id, id);
+    await ctx.db.delete(key._id);
+    await ctx.scheduler.runAfter(0, internal.sessions.evictMcpCache, {
+      keyHashes: [key.keyHash],
+      flow,
+      regno: me.regno,
+    });
     log({ flow, regno: me.regno }, "keys: revoked a key");
     return null;
   },

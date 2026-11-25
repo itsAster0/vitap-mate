@@ -51,7 +51,7 @@ export const view = query({
     const keys = await keysOf(ctx, id);
     const account = doc.view(phones, keys, me.deviceId, doc.mailboxId !== null, at);
     const forwarding = doc.mailboxId === null ? null : address(doc.mailboxId);
-    const status = account.thisPhone ? doc.statusView(forwarding, phones.length, keys, await signInsOf(ctx, id)) : null;
+    const status = account.thisPhone ? doc.statusView(forwarding, phones.length, keys, await signInsOf(ctx, id), at) : null;
     return { account, device, status, mailbox: mailbox === undefined ? null : await phonesOn(ctx, mailbox, me.deviceId, id) };
   },
 });

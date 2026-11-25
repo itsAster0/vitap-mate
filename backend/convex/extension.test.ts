@@ -110,7 +110,12 @@ describe("live queries", () => {
     const { ext, key, account } = await withKey(t);
     await t.run(async (ctx) => {
       const id = ctx.db.normalizeId("accounts", account)!;
-      await ctx.db.patch(id, { sealedVault: "vault", vaultSavedAt: Math.floor(Date.now() / 1000) });
+      const row = (await ctx.db.get(id))!;
+      await ctx.db.patch(id, {
+        settings: { ...row.settings, cacheSession: true },
+        sealedVault: "vault",
+        vaultSavedAt: Math.floor(Date.now() / 1000),
+      });
     });
     engine(() => undefined);
     const started = (await (await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${key}` } })).json()) as { requestId: string };

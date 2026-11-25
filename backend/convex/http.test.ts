@@ -4,6 +4,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REGNO, TOKENS, advance, codeOf, engine, phone, prove, setup, type T } from "../test/kit";
 import { api, internal } from "./_generated/api";
+import { REQUEST_TIMEOUT_SECS, SCRUB_REQUEST_SECS } from "./lib/accountState";
+import { sha256Hex } from "./lib/crypto";
 import { clientIp, proxyHops } from "./lib/httpKit";
 import { pairCode } from "./lib/pairing";
 import { MAX_CLIENTS, redirectMatches, redirectUriOk, s256 } from "./oauth";
@@ -151,45 +153,150 @@ describe("access keys", () => {
     expect(await codeOf(as.action(api.keys.create, { flow: "f", pairCode: "nope" }))).toBe("bad_request");
   });
 
-  it("ask the phone that made the key for a session, and take its answer", async () => {
+  it("ask the phone that made the key for a session, never store sealedSession when off, scrub after 30 s, and discard late answers", async () => {
     const t = await setup();
     const p = await phone(1);
-    const { as } = await prove(t, p);
+    const { as, account } = await prove(t, p);
+    await as.mutation(api.devices.update, { flow: "f", fcmToken: "fcm-tok" });
     const made = await as.action(api.keys.create, { flow: "f" });
-    engine((path, body) => {
+    const calls = engine((path, body) => {
       if (path === "/engine/session") {
-        const cookies = (body as { cookies?: string }).cookies ?? "JSESSIONID=abc";
-        return Response.json({ status: "valid", registrationNumber: REGNO, cookies, sealedSession: "sealed", ownerHash: "o" });
+        const b = body as { cookies?: string; seal?: boolean };
+        const cookies = b.cookies ?? "JSESSIONID=abc";
+        return Response.json({
+          status: "valid",
+          registrationNumber: REGNO,
+          cookies,
+          ...(b.seal === false ? {} : { sealedSession: "sealed" }),
+          ownerHash: "o",
+        });
       }
+      if (path === "/engine/seal") return Response.json({ sealedVault: "should-not-seal" });
     });
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
     const started = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
     expect(started.status).toBe(202);
     expect(started.headers.get("cache-control")).toBe("no-store");
     const pending = await json(started);
-    expect(pending).toMatchObject({ status: "pending", stage: "phone" });
-    // The phone sees the request live; a phone of another student does not.
+    expect(pending).toMatchObject({ status: "pending", stage: "phone", pushSent: true });
+    // The phone sees the request live with wantCredentials: false and pushSent: true.
     expect(await as.query(api.sessions.pending, { flow: "f" })).toEqual([
-      { requestId: pending.requestId, wantCredentials: true, expiresAt: expect.any(Number) },
+      { requestId: pending.requestId, wantCredentials: false, pushSent: true, expiresAt: expect.any(Number) },
     ]);
+    // Piggybacked credentials are ignored and /engine/session is called with seal: false.
     const answered = await as.action(api.sessions.answer, {
       flow: "f",
       requestId: pending.requestId as string,
       cookies: [{ name: "JSESSIONID", value: "abc", domain: "vtop.vitap.ac.in" }],
+      credentials: { username: REGNO, password: "pw", gmail: { refreshToken: "rt", clientId: "cid" } },
     });
     expect(answered).toEqual({ ok: true, late: false });
+    expect(calls.find((c) => c.path === "/engine/session")?.body).toEqual({ cookies: "JSESSIONID=abc", seal: false });
+    expect(calls.some((c) => c.path === "/engine/seal")).toBe(false);
+    // Nothing written to accounts.sealedSession or sealedVault.
+    const acctRow = await t.run(async (ctx) => (await ctx.db.get(ctx.db.normalizeId("accounts", account)!))!);
+    expect(acctRow.sealedSession).toBeNull();
+    expect(acctRow.sealedVault).toBeNull();
+
     const polled = await t.fetch(`/v1/session/requests/${pending.requestId}`, { headers: { authorization: `Bearer ${made.key}` } });
     expect(polled.headers.get("cache-control")).toBe("no-store");
-    expect(await json(polled)).toMatchObject({ status: "ready", session: { cookies: "JSESSIONID=abc" }, source: { from: "phone", cached: false } });
-    // The answer is cached now.
+    expect(await json(polled)).toMatchObject({
+      status: "ready",
+      cacheable: false,
+      session: { cookies: "JSESSIONID=abc" },
+      source: { from: "phone", cached: false },
+    });
+
+    // Before 30 s, cookies are still present; after 30 s, scrubRequest nulls cookies and csrfToken.
+    vi.advanceTimersByTime((SCRUB_REQUEST_SECS - 1) * 1000);
+    await t.finishInProgressScheduledFunctions();
+    const beforeScrub = await t.run(async (ctx) =>
+      (await ctx.db.query("sessionRequests").collect()).find((r) => r.requestId === pending.requestId),
+    );
+    expect(beforeScrub?.cookies).toBe("JSESSIONID=abc");
+    vi.advanceTimersByTime(2_000);
+    await t.finishInProgressScheduledFunctions();
+    const scrubbedRow = await t.run(async (ctx) =>
+      (await ctx.db.query("sessionRequests").collect()).find((r) => r.requestId === pending.requestId),
+    );
+    expect(scrubbedRow?.cookies).toBeNull();
+    expect(scrubbedRow?.csrfToken).toBeNull();
+    // Polling after scrub returns 410 request_expired (never empty cookies), and extension:request returns not_found.
+    const afterScrub = await t.fetch(`/v1/session/requests/${pending.requestId}`, { headers: { authorization: `Bearer ${made.key}` } });
+    expect(afterScrub.status).toBe(410);
+    const ext = t.withIdentity({ subject: await sha256Hex(made.key), kind: "key" });
+    expect(await ext.query(api.extension.request, { requestId: pending.requestId as string })).toEqual({ status: "not_found" });
+
+    // Late answer when storage is off is discarded (writes neither cookies nor sealedSession nor signIns).
+    const started2 = await json(await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } }));
+    const signInsBefore = await as.query(api.account.signIns, { flow: "f" });
+    vi.advanceTimersByTime(REQUEST_TIMEOUT_SECS * 1000);
+    await t.finishInProgressScheduledFunctions();
+    const lateAns = await as.action(api.sessions.answer, {
+      flow: "f",
+      requestId: started2.requestId as string,
+      cookies: [{ name: "JSESSIONID", value: "late", domain: "vtop.vitap.ac.in" }],
+    });
+    expect(lateAns).toEqual({ ok: true, late: true });
+    const lateRow = await t.run(async (ctx) =>
+      (await ctx.db.query("sessionRequests").collect()).find((r) => r.requestId === started2.requestId),
+    );
+    expect(lateRow?.cookies).toBeNull();
+    expect(await as.query(api.account.signIns, { flow: "f" })).toEqual(signInsBefore);
+
+    // With storage on, phone answers ARE cached and served with cacheable: true.
+    await as.mutation(api.account.setSettings, {
+      flow: "f",
+      settings: { cacheSession: true, alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null },
+    });
+    const started3 = await json(await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } }));
+    await as.action(api.sessions.answer, {
+      flow: "f",
+      requestId: started3.requestId as string,
+      cookies: [{ name: "JSESSIONID", value: "cached1", domain: "vtop.vitap.ac.in" }],
+    });
+    const polled3 = await json(await t.fetch(`/v1/session/requests/${started3.requestId}`, { headers: { authorization: `Bearer ${made.key}` } }));
+    expect(polled3).toMatchObject({ status: "ready", cacheable: true, source: { from: "phone", cached: false } });
     const cached = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
     expect(cached.headers.get("cache-control")).toBe("no-store");
-    expect(await json(cached)).toMatchObject({ status: "ready", source: { from: "phone", cached: true } });
+    expect(await json(cached)).toMatchObject({ status: "ready", cacheable: true, source: { from: "phone", cached: true } });
     expect((await t.fetch("/v1/session/expire", { method: "POST", headers: { authorization: `Bearer ${made.key}` } })).status).toBe(204);
     expect(await as.query(api.sessions.pending, { flow: "f" })).toEqual([]);
     const other = await phone(2);
     const otherTokens = await prove(t, other, "23XYZ0002");
     expect(await otherTokens.as.query(api.sessions.pending, { flow: "f" })).toEqual([]);
     expect(await codeOf(otherTokens.as.action(api.sessions.answer, { flow: "f", requestId: pending.requestId as string, error: "x" }))).toBe("request_not_found");
+  });
+
+  it("evicts MCP RAM cache when a key is revoked", async () => {
+    const t = await setup();
+    const { as } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f", label: "MCP" });
+    const keyHash = await sha256Hex(made.key);
+    const calls = engine((path) => (path === "/engine/mcp/evict" ? Response.json({ evicted: 1 }) : undefined));
+    await as.mutation(api.keys.revoke, { flow: "rev-1", id: made.id });
+    await drain(t);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].path).toBe("/engine/mcp/evict");
+    expect(calls[0].body).toEqual({ keyHashes: [keyHash] });
+  });
+
+  it("skips a stale sealedSession in sessions:start when cacheSession is off, and reports pushSent: false without FCM token", async () => {
+    const t = await setup();
+    const { as, account } = await prove(t, await phone(1));
+    const made = await as.action(api.keys.create, { flow: "f" });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(ctx.db.normalizeId("accounts", account)!, {
+        sealedSession: "stale",
+        sessionSavedAt: Math.floor(Date.now() / 1000),
+        sessionSource: "phone",
+      });
+    });
+    const calls = engine(() => Response.json({ status: "valid", cookies: "SHOULD_NOT_BE_USED" }));
+    const res = await t.fetch("/v1/session", { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
+    expect(res.status).toBe(202);
+    expect(await json(res)).toMatchObject({ status: "pending", stage: "phone", pushSent: false });
+    expect(calls).toHaveLength(0);
   });
 
   it("let the engine sign in with saved credentials, and record it", async () => {
@@ -199,7 +306,12 @@ describe("access keys", () => {
     const made = await as.action(api.keys.create, { flow: "f" });
     await t.run(async (ctx) => {
       const id = ctx.db.normalizeId("accounts", account)!;
-      await ctx.db.patch(id, { sealedVault: "vault", vaultSavedAt: Math.floor(Date.now() / 1000) });
+      const row = (await ctx.db.get(id))!;
+      await ctx.db.patch(id, {
+        settings: { ...row.settings, cacheSession: true },
+        sealedVault: "vault",
+        vaultSavedAt: Math.floor(Date.now() / 1000),
+      });
     });
     const ok = { status: "ok", cookies: "a=b", sealedSession: "s", csrfToken: "c" };
     const calls = engine((path) => (path === "/engine/login" ? Response.json(ok) : undefined));

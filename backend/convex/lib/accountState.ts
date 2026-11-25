@@ -19,6 +19,8 @@ export const SESSION_CACHE_SECS = 7 * 24 * 3600;
 export const REQUEST_TIMEOUT_SECS = 120;
 /** How long a finished request is kept for late polls and answers. */
 export const REQUEST_KEEP_SECS = 600;
+/** How long an uncached phone answer's cookies remain on `sessionRequests` before being scrubbed. */
+export const SCRUB_REQUEST_SECS = 30;
 export const POLL_AFTER_MS = 1500;
 /** Session requests one account may make per minute. */
 /** Phones one account may link. Linking one more drops the one seen least
@@ -33,7 +35,7 @@ export type RequestError = { code: string; message: string };
 
 export const PHONE_UNREACHABLE: RequestError = {
   code: "phone_unreachable",
-  message: "Open VITAP Mate → Connected apps → Reconnect this phone.",
+  message: "This key's phone is no longer linked. Open VITAP Mate → Connected apps and move this key to your phone, or pair again.",
 };
 
 // ---- settings, keys and ids ---------------------------------------------------------
@@ -41,6 +43,8 @@ export const PHONE_UNREACHABLE: RequestError = {
 /** How sessions of an account are served; the student picks these in the
  * app. */
 export interface AccountSettings {
+  /** Cache VTOP sessions on the server for connected apps. Off by default. */
+  cacheSession: boolean;
   /** Sign in with saved credentials as soon as a session is needed,
    * without asking the phone first. */
   alwaysUseVault: boolean;
@@ -52,21 +56,41 @@ export interface AccountSettings {
   vaultTtlSecs: number | null;
 }
 
+/** Stored `accounts.settings` shape: `cacheSession` is absent on pre-migration rows. */
+export type StoredSettings = {
+  cacheSession?: boolean;
+  alwaysUseVault: boolean;
+  phoneWaitSecs: number;
+  vaultTtlSecs: number | null;
+};
+
+/** Effective `cacheSession` for a stored row: explicit setting, else `true` iff a vault is kept. */
+export function effectiveCacheSession(raw: StoredSettings, hasVault: boolean): boolean {
+  return raw.cacheSession ?? hasVault;
+}
+
 export const PHONE_WAIT_CHOICES = [10, 20, 45];
 export const VAULT_TTL_CHOICES = [86_400, 172_800, null];
 
 export function defaultSettings(): AccountSettings {
-  return { alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null };
+  return { cacheSession: false, alwaysUseVault: true, phoneWaitSecs: 20, vaultTtlSecs: null };
 }
 
-/** Settings as the app sends them, if they use the offered choices. */
-export function parseSettings(raw: unknown): AccountSettings | null {
+/** Settings as the app sends them, if they use the offered choices. Older apps omit
+ * `cacheSession`, in which case `currentCacheSession` is preserved. */
+export function parseSettings(raw: unknown, currentCacheSession = false): AccountSettings | null {
   if (raw === null || typeof raw !== "object") return null;
-  const { alwaysUseVault, phoneWaitSecs, vaultTtlSecs = null } = raw as Record<string, unknown>;
+  const { alwaysUseVault, phoneWaitSecs, vaultTtlSecs = null, cacheSession } = raw as Record<string, unknown>;
   if (typeof alwaysUseVault !== "boolean" || typeof phoneWaitSecs !== "number") return null;
+  if (cacheSession !== undefined && typeof cacheSession !== "boolean") return null;
   if (!PHONE_WAIT_CHOICES.includes(phoneWaitSecs)) return null;
   if (!VAULT_TTL_CHOICES.includes(vaultTtlSecs as number | null)) return null;
-  return { alwaysUseVault, phoneWaitSecs, vaultTtlSecs: vaultTtlSecs as number | null };
+  return {
+    cacheSession: cacheSession ?? currentCacheSession,
+    alwaysUseVault,
+    phoneWaitSecs,
+    vaultTtlSecs: vaultTtlSecs as number | null,
+  };
 }
 
 /** What an account id looks like: VTOP registration numbers are short and
@@ -244,6 +268,34 @@ export function keysToMove(keys: KeyRecord[], phones: PhoneRecord[], from: strin
   return { source, moving };
 }
 
+export type CachedSessionInfo = {
+  sealed: string;
+  savedAt: number;
+  source: string | null;
+};
+
+export type SavedVaultInfo = {
+  sealed: string;
+  savedAt: number;
+  expiresAt: number | null;
+  gmail: boolean;
+};
+
+/** Effective server storage state for connected apps, parsed once at the read boundary. */
+export type StorageState =
+  | { kind: "off" }
+  | { kind: "session_only"; session: CachedSessionInfo | null }
+  | {
+      kind: "offline_sign_in";
+      session: CachedSessionInfo | null;
+      vault: SavedVaultInfo;
+      options: {
+        alwaysUseVault: boolean;
+        phoneWaitSecs: number;
+        vaultTtlSecs: number | null;
+      };
+    };
+
 /** One student's account: settings, the cached session and saved credentials. Secrets are
  * sealed by the engine with `VAULT_KEY`: storage alone does not open them, but whoever controls
  * the engine can. */
@@ -275,17 +327,57 @@ export class AccountRecord {
     this.updatedAt = now;
   }
 
+  /** Effective server storage state at `now`, normalized into one discriminated union. */
+  storage(now: number): StorageState {
+    if (!this.settings.cacheSession) return { kind: "off" };
+    const session: CachedSessionInfo | null =
+      this.sealedSession !== null && this.sessionSavedAt !== null && now < this.sessionSavedAt + SESSION_CACHE_SECS
+        ? { sealed: this.sealedSession, savedAt: this.sessionSavedAt, source: this.sessionSource }
+        : null;
+    const ttl = this.settings.vaultTtlSecs;
+    const vaultValid =
+      this.sealedVault !== null && this.vaultSavedAt !== null && (ttl === null || now < this.vaultSavedAt + ttl);
+    if (vaultValid) {
+      return {
+        kind: "offline_sign_in",
+        session,
+        vault: {
+          sealed: this.sealedVault!,
+          savedAt: this.vaultSavedAt!,
+          expiresAt: ttl !== null ? this.vaultSavedAt! + ttl : null,
+          gmail: this.vaultGmail,
+        },
+        options: {
+          alwaysUseVault: this.settings.alwaysUseVault,
+          phoneWaitSecs: this.settings.phoneWaitSecs,
+          vaultTtlSecs: ttl,
+        },
+      };
+    }
+    return { kind: "session_only", session };
+  }
+
+  /** Applies new settings; turning `cacheSession` off clears any stored session and vault. */
+  setSettings(next: AccountSettings): void {
+    this.settings = next;
+    if (!next.cacheSession) {
+      this.clearSession();
+      this.clearVault();
+    }
+  }
+
   /** What `app:status` shows a linked phone: what the server keeps and its recent activity.
    * [forwarding] is the student's address. */
-  statusView(forwarding: string | null, phones: number, keys: KeyRecord[], signIns: SignInRecord[]) {
-    const ttl = this.settings.vaultTtlSecs;
-    const vault = this.sealedVault !== null;
+  statusView(forwarding: string | null, phones: number, keys: KeyRecord[], signIns: SignInRecord[], now: number) {
+    const state = this.storage(now);
+    const session = state.kind === "off" ? null : state.session;
+    const vault = state.kind === "offline_sign_in" ? state.vault : null;
     return {
-      sessionSavedAt: this.sealedSession !== null ? this.sessionSavedAt : null,
-      sessionSource: this.sealedSession !== null ? this.sessionSource : null,
-      vaultSavedAt: vault ? this.vaultSavedAt : null,
-      vaultExpiresAt: vault && ttl !== null && this.vaultSavedAt !== null ? this.vaultSavedAt + ttl : null,
-      vaultGmail: vault && this.vaultGmail,
+      sessionSavedAt: session?.savedAt ?? null,
+      sessionSource: session?.source ?? null,
+      vaultSavedAt: vault?.savedAt ?? null,
+      vaultExpiresAt: vault?.expiresAt ?? null,
+      vaultGmail: vault?.gmail ?? false,
       credentialsRejectedAt: this.credentialsRejectedAt,
       forwarding,
       signIns: signIns.map((s) => ({ ...s })),
@@ -294,22 +386,24 @@ export class AccountRecord {
     };
   }
 
-  /** Saved credentials that may still be used: not past the student's chosen lifetime. */
+  /** Saved credentials that may still be used: not past the student's chosen lifetime and with storage enabled. */
   usableVault(now: number): string | null {
-    const ttl = this.settings.vaultTtlSecs;
-    if (ttl !== null && this.vaultSavedAt !== null && now >= this.vaultSavedAt + ttl) return null;
-    return this.sealedVault;
+    const state = this.storage(now);
+    return state.kind === "offline_sign_in" ? state.vault.sealed : null;
   }
 
   cachedSession(now: number): string | null {
-    return now < (this.sessionSavedAt ?? 0) + SESSION_CACHE_SECS ? this.sealedSession : null;
+    const state = this.storage(now);
+    return state.kind === "off" ? null : (state.session?.sealed ?? null);
   }
 
-  /** Caches a session; `source` is who made it (`phone` or `server`). */
-  saveSession(sealed: string, now: number, source: string): void {
+  /** Caches a session when `cacheSession` is on; `source` is who made it (`phone` or `server`). */
+  saveSession(sealed: string, now: number, source: string): boolean {
+    if (!this.settings.cacheSession) return false;
     this.sealedSession = sealed;
     this.sessionSavedAt = now;
     this.sessionSource = source;
+    return true;
   }
 
   clearSession(): void {
@@ -323,8 +417,9 @@ export class AccountRecord {
     return sourceView(this.sessionSource, this.sessionSavedAt, true);
   }
 
-  /** Keeps sealed credentials; `gmail` when they carry Gmail access. */
+  /** Keeps sealed credentials; saving a password turns `cacheSession` on. `gmail` when they carry Gmail access. */
   saveVault(sealed: string, now: number, gmail = false): void {
+    this.settings = { ...this.settings, cacheSession: true };
     this.sealedVault = sealed;
     this.vaultSavedAt = now;
     this.vaultGmail = gmail;
@@ -350,17 +445,18 @@ export class AccountRecord {
     this.credentialsRejectedAt = now;
   }
 
-  /** The phone should send credentials with its answer: none are saved, saved ones expire (each
-   * answer restarts their clock), or the server has no way to read the OTP with them (Gmail
-   * access may come along). */
-  wantCredentials(now: number): boolean {
-    return this.usableVault(now) === null || this.settings.vaultTtlSecs !== null || (!this.vaultGmail && this.mailboxId === null);
+  /** Passwords are only ever saved explicitly via `account:saveCredentials`, never piggybacked on
+   * session handovers. */
+  wantCredentials(_now?: number): boolean {
+    return false;
   }
 
   /** What `account:view` shows. Keys and the phone list only to a linked phone (`me`). */
   view(phones: PhoneRecord[], keys: KeyRecord[], me: string | null, forwarding: boolean, now: number) {
     const mine = me !== null && phones.some((p) => p.deviceId === me);
-    const vault = this.usableVault(now);
+    const state = this.storage(now);
+    const session = state.kind === "off" ? null : state.session;
+    const vault = state.kind === "offline_sign_in" ? state.vault : null;
     return {
       registrationNumber: this.id,
       createdAt: this.createdAt,
@@ -368,8 +464,11 @@ export class AccountRecord {
       semesterId: this.semesterId,
       linked: phones.length > 0,
       savedCredentials: vault !== null,
-      vaultSavedAt: vault !== null ? this.vaultSavedAt : null,
-      vaultGmail: vault !== null && this.vaultGmail,
+      vaultSavedAt: vault?.savedAt ?? null,
+      vaultExpiresAt: vault?.expiresAt ?? null,
+      vaultGmail: vault?.gmail ?? false,
+      sessionSavedAt: session?.savedAt ?? null,
+      sessionSource: session?.source ?? null,
       credentialsRejectedAt: this.credentialsRejectedAt,
       forwarding,
       phoneLinked: phones.length > 0,
@@ -416,14 +515,16 @@ export type PendingStage =
   /** Request opened, neither phone nor server started yet. */
   | { kind: "starting"; phoneError: RequestError | null }
   /** Waiting on the phone; `vaultDueAt` is set when the server will take over. */
-  | { kind: "phone"; vaultDueAt: number | null }
+  | { kind: "phone"; vaultDueAt: number | null; pushSent: boolean }
   /** Server is signing in with saved credentials; `phoneAsked` is true when the phone was also asked. */
-  | { kind: "server"; phoneAsked: boolean; phoneError: RequestError | null };
+  | { kind: "server"; phoneAsked: boolean; pushSent: boolean; phoneError: RequestError | null };
 
 export type RequestPhase =
   | { kind: "pending"; stage: PendingStage }
   | { kind: "expired" }
   | { kind: "success"; cookies: string; csrfToken: string | null; source: string }
+  /** A succeeded uncached request whose cookies were scrubbed after `SCRUB_REQUEST_SECS`. */
+  | { kind: "scrubbed"; source: string }
   | { kind: "error"; error: RequestError };
 
 /** Flat stored `sessionRequests` fields, kept compatible with existing rows without a migration. */
@@ -438,6 +539,7 @@ export type StoredRequestFields = {
   vaultDueAt: number | null;
   vaultStarted: boolean;
   phoneAsked: boolean;
+  pushSent?: boolean;
   phoneErrorCode?: string | null;
   phoneError: string | null;
   source: string | null;
@@ -492,17 +594,30 @@ export class RequestRecord {
     return asked && this.phones.includes(deviceId);
   }
 
+  /** Whether an FCM wake-up push was scheduled when asking the phone. */
+  pushSent(): boolean {
+    if (this.phase.kind !== "pending") return false;
+    const { stage } = this.phase;
+    return stage.kind === "phone" || stage.kind === "server" ? stage.pushSent : false;
+  }
+
   /** Marks that at least one phone was asked for this request. */
-  markPhoneAsked(): void {
+  markPhoneAsked(pushSent = false): void {
     if (this.phase.kind !== "pending") return;
     switch (this.phase.stage.kind) {
       case "starting":
-        this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: null } };
+        this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: null, pushSent } };
         break;
       case "server":
-        this.phase = { kind: "pending", stage: { kind: "server", phoneAsked: true, phoneError: null } };
+        this.phase = {
+          kind: "pending",
+          stage: { kind: "server", phoneAsked: true, pushSent: this.phase.stage.pushSent || pushSent, phoneError: null },
+        };
         break;
       case "phone":
+        if (pushSent && !this.phase.stage.pushSent) {
+          this.phase = { kind: "pending", stage: { ...this.phase.stage, pushSent: true } };
+        }
         break;
     }
   }
@@ -510,14 +625,14 @@ export class RequestRecord {
   /** Schedules server takeover at `dueAt` while waiting on the phone. */
   scheduleServer(dueAt: number): void {
     if (this.phase.kind === "pending" && this.phase.stage.kind === "phone") {
-      this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: dueAt } };
+      this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: dueAt, pushSent: this.phase.stage.pushSent } };
     }
   }
 
   /** Clears a scheduled server takeover when saved credentials are no longer usable. */
   clearVaultDue(): void {
     if (this.phase.kind === "pending" && this.phase.stage.kind === "phone") {
-      this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: null } };
+      this.phase = { kind: "pending", stage: { kind: "phone", vaultDueAt: null, pushSent: this.phase.stage.pushSent } };
     }
   }
 
@@ -530,6 +645,7 @@ export class RequestRecord {
       stage: {
         kind: "server",
         phoneAsked: phase.stage.kind === "phone",
+        pushSent: phase.stage.kind === "phone" ? phase.stage.pushSent : false,
         phoneError: phase.stage.kind === "starting" ? phase.stage.phoneError : null,
       },
     };
@@ -560,6 +676,13 @@ export class RequestRecord {
     return true;
   }
 
+  /** Scrubs cookies and CSRF token from a succeeded request. */
+  scrub(): boolean {
+    if (this.phase.kind !== "success") return false;
+    this.phase = { kind: "scrubbed", source: this.phase.source };
+    return true;
+  }
+
   /** Answers the request; `source` is who made the session. */
   succeed(cookies: string, source: string, csrfToken: string | null = null): void {
     this.phase = { kind: "success", cookies, csrfToken, source };
@@ -579,7 +702,8 @@ export class RequestRecord {
    * takes over from a phone that has not answered. */
   private progress(stage: PendingStage) {
     const due = stage.kind === "phone" && stage.vaultDueAt !== null ? rfc3339(stage.vaultDueAt) : null;
-    return { status: "pending", stage: stage.kind, serverDueAt: due };
+    const pushSent = stage.kind === "phone" || stage.kind === "server" ? stage.pushSent : false;
+    return { status: "pending", stage: stage.kind, serverDueAt: due, pushSent };
   }
 
   /** The pending reply of `POST /v1/session`. */
@@ -587,7 +711,7 @@ export class RequestRecord {
     const progress =
       this.phase.kind === "pending"
         ? this.progress(this.phase.stage)
-        : { status: "pending", stage: "starting" as const, serverDueAt: null };
+        : { status: "pending", stage: "starting" as const, serverDueAt: null, pushSent: false };
     return {
       ...progress,
       requestId: this.id,
@@ -597,15 +721,16 @@ export class RequestRecord {
   }
 
   /** The reply of a poll, and its status code. */
-  pollView(now: number): { status: number; body: unknown } {
+  pollView(now: number, cacheable = true): { status: number; body: unknown } {
     const phase = this.phaseAt(now);
     switch (phase.kind) {
       case "expired":
+      case "scrubbed":
         return { status: 410, body: errorBody("request_expired", "The session request expired.") };
       case "pending":
         return { status: 202, body: this.progress(phase.stage) };
       case "success":
-        return { status: 200, body: ready(phase.cookies, sourceView(phase.source, null, false)) };
+        return { status: 200, body: ready(phase.cookies, sourceView(phase.source, null, false), cacheable) };
       case "error":
         // A poll that worked, about a request that failed: 200, with the
         // error fields as every error reply has them.
@@ -630,12 +755,15 @@ export function fromRequestFields(id: string, f: StoredRequestFields): RequestRe
   let phase: RequestPhase;
   switch (f.status) {
     case "success":
-      phase = {
-        kind: "success",
-        cookies: f.cookies ?? "",
-        csrfToken: f.csrfToken,
-        source: f.source ?? "unknown",
-      };
+      phase =
+        f.cookies === null
+          ? { kind: "scrubbed", source: f.source ?? "unknown" }
+          : {
+              kind: "success",
+              cookies: f.cookies,
+              csrfToken: f.csrfToken,
+              source: f.source ?? "unknown",
+            };
       break;
     case "error":
       phase = { kind: "error", error: parseStoredError(f.errorCode, f.error) };
@@ -649,13 +777,14 @@ export function fromRequestFields(id: string, f: StoredRequestFields): RequestRe
           stage: {
             kind: "server",
             phoneAsked: f.phoneAsked,
+            pushSent: f.phoneAsked && f.pushSent === true,
             phoneError: parseStoredPhoneError(f.phoneErrorCode, f.phoneError),
           },
         };
       } else if (f.phoneAsked) {
         phase = {
           kind: "pending",
-          stage: { kind: "phone", vaultDueAt: f.vaultDueAt },
+          stage: { kind: "phone", vaultDueAt: f.vaultDueAt, pushSent: f.pushSent === true },
         };
       } else {
         phase = {
@@ -691,6 +820,7 @@ export function toRequestFields(r: RequestRecord): StoredRequestFields {
         vaultDueAt: stage.kind === "phone" ? stage.vaultDueAt : null,
         vaultStarted: stage.kind === "server",
         phoneAsked: stage.kind === "phone" || (stage.kind === "server" && stage.phoneAsked),
+        pushSent: stage.kind === "phone" || stage.kind === "server" ? stage.pushSent : false,
         phoneErrorCode: stage.kind === "phone" ? null : (stage.phoneError?.code ?? null),
         phoneError: stage.kind === "phone" ? null : (stage.phoneError?.message ?? null),
         source: null,
@@ -708,6 +838,7 @@ export function toRequestFields(r: RequestRecord): StoredRequestFields {
         vaultDueAt: null,
         vaultStarted: false,
         phoneAsked: false,
+        pushSent: false,
         phoneErrorCode: null,
         phoneError: null,
         source: null,
@@ -724,6 +855,24 @@ export function toRequestFields(r: RequestRecord): StoredRequestFields {
         vaultDueAt: null,
         vaultStarted: false,
         phoneAsked: false,
+        pushSent: false,
+        phoneErrorCode: null,
+        phoneError: null,
+        source: r.phase.source,
+        expired: undefined,
+      };
+    case "scrubbed":
+      return {
+        ...base,
+        status: "success",
+        cookies: null,
+        csrfToken: null,
+        errorCode: null,
+        error: null,
+        vaultDueAt: null,
+        vaultStarted: false,
+        phoneAsked: false,
+        pushSent: false,
         phoneErrorCode: null,
         phoneError: null,
         source: r.phase.source,
@@ -740,6 +889,7 @@ export function toRequestFields(r: RequestRecord): StoredRequestFields {
         vaultDueAt: null,
         vaultStarted: false,
         phoneAsked: false,
+        pushSent: false,
         phoneErrorCode: null,
         phoneError: null,
         source: null,
@@ -749,13 +899,15 @@ export function toRequestFields(r: RequestRecord): StoredRequestFields {
 }
 
 /** A ready session as clients get it: VTOP's `SessionState` shape, the
- * cookies in Cookie-Editor form, and where the session came from. */
-export function ready(cookieHeader: string, source: ReturnType<typeof sourceView>) {
+ * cookies in Cookie-Editor form, where the session came from, and whether the
+ * account allows server-side session caching. */
+export function ready(cookieHeader: string, source: ReturnType<typeof sourceView>, cacheable = true) {
   return {
     status: "ready",
     session: { cookies: cookieHeader },
     cookies: fromHeader(cookieHeader),
     source,
+    cacheable,
   };
 }
 
@@ -774,8 +926,8 @@ export function rfc3339(secs: number): string {
 // ---- the `accounts` row -------------------------------------------------------------
 
 /** What the `accounts` row stores of a record, beside `regno` and `ownerHash`. */
-export type AccountFields = {
-  settings: AccountSettings;
+export type StoredAccountFields = {
+  settings: StoredSettings;
   semesterId: string | null;
   sealedVault: string | null;
   vaultSavedAt: number | null;
@@ -789,11 +941,19 @@ export type AccountFields = {
   updatedAt: number;
 };
 
+export type AccountFields = Omit<StoredAccountFields, "settings"> & {
+  settings: AccountSettings;
+};
+
 /** When the sweep must next look at the row: the earlier of the cached session's and the saved
- * credentials' expiry; undefined (unset) when neither is kept. */
-export function sweepAtOf(f: Omit<AccountFields, "sweepAt">): number | undefined {
+ * credentials' expiry; `0` when an unconsented `sealedSession` should be dropped immediately;
+ * undefined (unset) when neither is kept. */
+export function sweepAtOf(f: Omit<StoredAccountFields, "sweepAt">): number | undefined {
+  const cacheSession = effectiveCacheSession(f.settings, f.sealedVault !== null);
   const due: number[] = [];
-  if (f.sealedSession !== null) due.push((f.sessionSavedAt ?? 0) + SESSION_CACHE_SECS);
+  if (f.sealedSession !== null) {
+    due.push(cacheSession ? (f.sessionSavedAt ?? 0) + SESSION_CACHE_SECS : 0);
+  }
   const ttl = f.settings.vaultTtlSecs;
   if (f.sealedVault !== null && ttl !== null && f.vaultSavedAt !== null) due.push(f.vaultSavedAt + ttl);
   return due.length > 0 ? Math.min(...due) : undefined;
@@ -817,8 +977,12 @@ export function toFields(r: AccountRecord): AccountFields {
 }
 
 /** The record of a stored row; `mailboxId` is the student's forwarding address, kept elsewhere. */
-export function fromFields(id: string, f: AccountFields, mailboxId: string | null): AccountRecord {
-  const r = Object.assign(new AccountRecord(id, f.createdAt), f);
+export function fromFields(id: string, f: StoredAccountFields, mailboxId: string | null): AccountRecord {
+  const settings: AccountSettings = {
+    ...f.settings,
+    cacheSession: effectiveCacheSession(f.settings, f.sealedVault !== null),
+  };
+  const r = Object.assign(new AccountRecord(id, f.createdAt), f, { settings });
   r.mailboxId = mailboxId;
   return r;
 }

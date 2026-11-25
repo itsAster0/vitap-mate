@@ -5,7 +5,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { type MutationCtx, action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { ACCOUNT_OWNED_TABLES, deleteOwned, keysOf, phoneOf, phoneRows, phonesOf, saveRecord, unlinkPhone } from "./lib/accounts";
+import { ACCOUNT_OWNED_TABLES, deleteOwned, keysOf, phoneOf, phoneRows, phonesOf, saveRecord, scheduleMcpEvict, signInsOf, unlinkPhone } from "./lib/accounts";
 import { AccountRecord, SESSION_CACHE_SECS, parseSettings, phoneId, semesterId } from "./lib/accountState";
 import { deleteMailbox } from "./lib/mailboxes";
 import { badRequest, fail } from "./lib/errors";
@@ -31,6 +31,16 @@ export const view = query({
     const doc = await recordOf(ctx, me.account);
     const id = me.account._id;
     return doc.view(await phonesOf(ctx, id), await keysOf(ctx, id), me.deviceId, doc.mailboxId !== null, at);
+  },
+});
+
+/** The account's recent VTOP sign-ins (at most 10, newest first). Live. */
+export const signIns = query({
+  args: { flow: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const me = await caller(ctx);
+    if (!me.account) return [];
+    return signInsOf(ctx, me.account._id);
   },
 });
 
@@ -103,10 +113,17 @@ export const forgetCredentials = mutation({
 export const setSettings = mutation({
   args: { flow: v.string(), settings: settingsValidator },
   handler: (ctx, { flow, settings }) =>
-    change(ctx, flow, "settings changed", (doc) => {
-      const parsed = parseSettings(settings);
-      if (!parsed) badRequest("settings must use the offered choices.");
-      else doc.settings = parsed;
+    change(ctx, flow, "settings changed", async (doc, me) => {
+      const parsed = parseSettings(settings, doc.settings.cacheSession);
+      if (!parsed) {
+        badRequest("settings must use the offered choices.");
+        return;
+      }
+      doc.setSettings(parsed);
+      if (!parsed.cacheSession) {
+        await deleteOwned(ctx, "logins", me.account!._id);
+        await scheduleMcpEvict(ctx, me.account!._id, flow, me.regno);
+      }
     }),
 });
 
@@ -136,7 +153,7 @@ export const expire = internalMutation({
     const at = now();
     const doc = await recordOf(ctx, account);
     let changed = false;
-    if (doc.sealedSession !== null && at >= (doc.sessionSavedAt ?? 0) + SESSION_CACHE_SECS) {
+    if (doc.sealedSession !== null && (!doc.settings.cacheSession || at >= (doc.sessionSavedAt ?? 0) + SESSION_CACHE_SECS)) {
       doc.clearSession();
       changed = true;
     }
@@ -180,6 +197,7 @@ export const remove = mutation({
   handler: async (ctx, { flow }) => {
     const me = await realCaller(ctx);
     const id = me.account._id;
+    await scheduleMcpEvict(ctx, id, flow, me.regno);
     for (const phone of await phoneRows(ctx, id)) await unlinkPhone(ctx, phone);
     const mailbox = await mailboxOfAccount(ctx, id);
     if (mailbox) await deleteMailbox(ctx, mailbox);

@@ -74,12 +74,14 @@ export const request = query({
       case "error":
         return { status: "error" as const, code: phase.error.code, error: phase.error.message, expiresAt };
       case "expired":
+      case "scrubbed":
         return { status: "not_found" as const };
       case "pending":
         return {
           status: "pending" as const,
           stage: phase.stage.kind,
           serverDueAt: phase.stage.kind === "phone" && phase.stage.vaultDueAt !== null ? phase.stage.vaultDueAt * 1000 : null,
+          pushSent: phase.stage.kind === "phone" || phase.stage.kind === "server" ? phase.stage.pushSent : false,
           login: phase.stage.kind === "server" ? await loginStep(ctx, row) : null,
           expiresAt,
         };

@@ -12,13 +12,14 @@ import { internal } from "./_generated/api";
 import { rateLimits } from "./lib/rateLimits";
 import type { Doc, Id } from "./_generated/dataModel";
 import { type ActionCtx, type MutationCtx, type QueryCtx, action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
-import { accountByRegno, keyOf, phonesOf, recordSignIn, saveRecord } from "./lib/accounts";
+import { accountByRegno, keyOf, phonesOf, recordSignIn, saveRecord, scheduleMcpEvict } from "./lib/accounts";
 import {
   type AccountRecord,
   type KeyVia,
   type Plan,
   type RequestError,
   RequestRecord,
+  SCRUB_REQUEST_SECS,
   type SignInRecord,
   keyUse,
   parseRequestError,
@@ -27,11 +28,21 @@ import {
   toHeader,
   validCookies,
 } from "./lib/accountState";
-import { type Credentials, credentialsOf, credentialsValidator, usableText } from "./lib/credentials";
-import { engineJson } from "./lib/engine";
-import { type LoginOutcome, SEAL, SESSION, type SealVault, type SealedVault, type SessionCheck, type SessionChecked } from "./lib/engineApi";
+import { type Credentials, credentialsValidator } from "./lib/credentials";
+import { engineJson, enginePost } from "./lib/engine";
+import {
+  type LoginOutcome,
+  MCP_EVICT,
+  type McpEvict,
+  SEAL,
+  SESSION,
+  type SealVault,
+  type SealedVault,
+  type SessionCheck,
+  type SessionChecked,
+} from "./lib/engineApi";
 import { fail } from "./lib/errors";
-import { actionCaller, caller, deviceFcmToken, mailboxOfAccount, recordOf } from "./lib/identity";
+import { actionCaller, caller, deviceFcmToken, recordOf } from "./lib/identity";
 import { notify } from "./lib/notify";
 import { askPhone, insertRequest, pendingRequest, putRequest, requestOf, requestRow } from "./lib/requests";
 import { accountId, log, logError, logWarn, now } from "./lib/util";
@@ -69,7 +80,9 @@ export async function keyAccount(ctx: QueryCtx, keyHash: string): Promise<KeyHol
 export async function keyView(ctx: QueryCtx, { key, account }: KeyHolder) {
   const doc = await recordOf(ctx, account);
   const at = now();
-  const vault = doc.usableVault(at);
+  const storage = doc.storage(at);
+  const vault = storage.kind === "offline_sign_in" ? storage.vault : null;
+  const cachedSession = storage.kind !== "off" && storage.session !== null;
   const device = await ctx.db
     .query("devices")
     .withIndex("by_deviceId", (q) => q.eq("deviceId", key.deviceId))
@@ -86,9 +99,9 @@ export async function keyView(ctx: QueryCtx, { key, account }: KeyHolder) {
     phoneLinked: linked,
     phone: linked ? { label: device.label, notifications: deviceFcmToken(device) !== null } : null,
     savedCredentials: vault !== null,
-    vaultSavedAt: vault !== null ? doc.vaultSavedAt : null,
+    vaultSavedAt: vault?.savedAt ?? null,
     credentialsRejectedAt: doc.credentialsRejectedAt,
-    cachedSession: doc.cachedSession(at) !== null,
+    cachedSession,
   };
 }
 
@@ -132,6 +145,23 @@ export const clearSession = internalMutation({
     const doc = await recordOf(ctx, account);
     doc.clearSession();
     await saveRecord(ctx, id, doc);
+    await scheduleMcpEvict(ctx, id, undefined, doc.id);
+  },
+});
+
+/** Evicts the engine's in-memory MCP session and key caches for the given SHA-256 hex key hashes. */
+export const evictMcpCache = internalAction({
+  args: { keyHashes: v.array(v.string()), flow: v.optional(v.string()), regno: v.optional(v.string()) },
+  handler: async (_ctx, { keyHashes, flow, regno }) => {
+    if (keyHashes.length === 0) return;
+    try {
+      const response = await enginePost(MCP_EVICT, { keyHashes } satisfies McpEvict, { flow, regno });
+      if (!response.ok) {
+        logWarn({ flow, regno }, `mcp: cache eviction answered ${response.status}`);
+      }
+    } catch (e) {
+      logWarn({ flow, regno }, `mcp: cache eviction failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   },
 });
 
@@ -266,7 +296,9 @@ export const poll = internalQuery({
   handler: async (ctx, { accountId: id, requestId }) => {
     const row = await requestRow(ctx, requestId);
     if (!row || row.accountId !== id) return { status: 404, body: { code: "request_not_found", error: "Unknown session request." } };
-    return requestOf(row).pollView(now());
+    const account = await ctx.db.get(id);
+    const cacheable = account ? (await recordOf(ctx, account)).settings.cacheSession : false;
+    return requestOf(row).pollView(now(), cacheable);
   },
 });
 
@@ -324,6 +356,18 @@ export const expireRequest = internalMutation({
   },
 });
 
+/** Nulls cookies and CSRF token on a finished uncached request after `SCRUB_REQUEST_SECS`. */
+export const scrubRequest = internalMutation({
+  args: { requestId: v.string() },
+  handler: async (ctx, { requestId }) => {
+    const row = await requestRow(ctx, requestId);
+    if (!row) return;
+    const request = requestOf(row);
+    if (!request.scrub()) return;
+    await putRequest(ctx, row, request);
+  },
+});
+
 // ---- the phone's answer ---------------------------------------------------------------------
 
 /** The session requests waiting on this phone, live: the app's handover prompt. Empty for the
@@ -347,12 +391,13 @@ export const pending = query({
         requestId: r.id,
         expiresAt: r.expiresAt * 1000,
         wantCredentials: doc.wantCredentials(at),
+        pushSent: r.pushSent(),
       }));
   },
 });
 
 /** Whether install `deviceId`, one of the account's phones, was asked for request `requestId`;
- * the account's forwarding address when it was. */
+ * the account's forwarding address and storage setting when it was. */
 export const asked = internalQuery({
   args: { accountId: v.id("accounts"), requestId: v.string(), deviceId: v.string() },
   handler: async (ctx, { accountId: id, requestId, deviceId }) => {
@@ -361,12 +406,14 @@ export const asked = internalQuery({
     if (!account || !row || row.accountId !== id) return fail("request_not_found", "Unknown session request.");
     // The caller is linked to the account (checked from its JWT), so only the request's list matters.
     if (!row.phones.includes(deviceId)) return fail("not_asked", "This phone was not asked for this session.");
-    return { regno: account.regno, forwarding: (await mailboxOfAccount(ctx, id)) !== null };
+    const doc = await recordOf(ctx, account);
+    return { regno: account.regno, forwarding: doc.mailboxId !== null, cacheSession: doc.settings.cacheSession };
   },
 });
 
-/** The phone's checked session (and sealed credentials) for a request: cached even when the
- * client gave up. True when late. */
+/** The phone's checked session for a request. When storage is off, writes cookies only to the
+ * `sessionRequests` row, discards late answers, and schedules `scrubRequest` after 30 s.
+ * True when late. */
 export const answered = internalMutation({
   args: {
     requestId: v.string(),
@@ -374,22 +421,29 @@ export const answered = internalMutation({
     sealedSession: v.optional(v.string()),
     vault: v.optional(v.object({ sealed: v.string(), gmail: v.boolean() })),
   },
-  handler: async (ctx, { requestId, cookies, sealedSession, vault }) => {
+  handler: async (ctx, { requestId, cookies, sealedSession }) => {
     const at = now();
     const row = await requestRow(ctx, requestId);
     if (!row) return fail("request_not_found", "Unknown session request.");
     const account = await ctx.db.get(row.accountId);
     if (!account) return fail("request_not_found", "Unknown session request.");
     const request = requestOf(row);
+    const doc = await recordOf(ctx, account);
     const late = !request.pending(at);
+    if (!doc.settings.cacheSession) {
+      if (late) return true;
+      request.succeed(cookies, "phone");
+      await putRequest(ctx, row, request);
+      await recordSignIn(ctx, account._id, { at, by: "phone", ok: true, reason: null });
+      await ctx.scheduler.runAfter(SCRUB_REQUEST_SECS * 1000, internal.sessions.scrubRequest, { requestId });
+      return false;
+    }
     if (!late) {
       request.succeed(cookies, "phone");
       await putRequest(ctx, row, request);
     }
-    const doc = await recordOf(ctx, account);
     if (sealedSession) doc.saveSession(sealedSession, at, "phone");
     await recordSignIn(ctx, account._id, { at, by: "phone", ok: true, reason: null });
-    if (vault) doc.saveVault(vault.sealed, at, vault.gmail);
     await saveRecord(ctx, account._id, doc);
     return late;
   },
@@ -452,7 +506,8 @@ export const answer = action({
     const header = toHeader(cookies);
     let checked: SessionChecked;
     try {
-      checked = await engineJson<SessionChecked>(SESSION, { cookies: header } satisfies SessionCheck, { flow: args.flow, regno: check.regno });
+      const checkBody: SessionCheck = check.cacheSession ? { cookies: header } : { cookies: header, seal: false };
+      checked = await engineJson<SessionChecked>(SESSION, checkBody, { flow: args.flow, regno: check.regno });
     } catch (e) {
       logError({ flow: args.flow, regno: check.regno }, "account: checking a phone answer failed", e);
       return fail("vtop_unreachable", "VTOP is unreachable; try again.");
@@ -469,16 +524,20 @@ export const answer = action({
         logWarn({ flow: args.flow, regno: check.regno }, `account: the engine could not check a phone answer (${String(checked.status)})`);
         return fail("vtop_unreachable", "VTOP is unreachable; try again.");
     }
-    const credentials = credentialsOf(args.credentials);
-    const username = credentials ? (usableText(credentials.username) ?? usableText(args.username)) : null;
-    const vault = credentials && username !== null ? await sealCredentials(check.regno, username, credentials, check.forwarding, args.flow) : undefined;
+    // Piggybacked credentials are ignored: passwords are saved only via explicit `account:saveCredentials`.
     const late = await ctx.runMutation(internal.sessions.answered, {
       requestId,
       cookies: header,
-      ...(checked.sealedSession ? { sealedSession: checked.sealedSession } : {}),
-      ...(vault ? { vault } : {}),
+      ...(check.cacheSession && checked.sealedSession ? { sealedSession: checked.sealedSession } : {}),
     });
-    log({ flow: args.flow, regno: check.regno }, late ? "account: a late phone answer was cached" : "account: a phone answered a session request");
+    log(
+      { flow: args.flow, regno: check.regno },
+      late
+        ? check.cacheSession
+          ? "account: a late phone answer was cached"
+          : "account: a late phone answer was discarded"
+        : "account: a phone answered a session request",
+    );
     return { ok: true, late };
   },
 });
@@ -520,8 +579,13 @@ export async function loginDone(ctx: MutationCtx, regno: string, requestId: stri
   switch (outcome.status) {
     case "ok":
       signIn = { at, by: "server", ok: true, reason: null };
-      doc.saveSession(outcome.sealedSession, at, "server");
-      if (request?.pending(at)) request.succeed(outcome.cookies, "server", outcome.csrfToken ?? null);
+      if (doc.settings.cacheSession) doc.saveSession(outcome.sealedSession, at, "server");
+      if (request?.pending(at)) {
+        request.succeed(outcome.cookies, "server", outcome.csrfToken ?? null);
+        if (!doc.settings.cacheSession) {
+          await ctx.scheduler.runAfter(SCRUB_REQUEST_SECS * 1000, internal.sessions.scrubRequest, { requestId });
+        }
+      }
       break;
     case "invalid_credentials":
       log({ regno: doc.id }, "account: VTOP rejected saved credentials; dropping them");

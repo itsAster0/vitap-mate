@@ -68,10 +68,27 @@ export const quarter = internalMutation({
       .take(BATCH);
     for (const account of due) {
       const doc = await recordOf(ctx, account);
-      if (doc.sealedSession !== null && at >= (doc.sessionSavedAt ?? 0) + SESSION_CACHE_SECS) doc.clearSession();
+      if (doc.sealedSession !== null && (!doc.settings.cacheSession || at >= (doc.sessionSavedAt ?? 0) + SESSION_CACHE_SECS)) {
+        doc.clearSession();
+      }
       const ttl = doc.settings.vaultTtlSecs;
-      if (doc.sealedVault !== null && ttl !== null && doc.vaultSavedAt !== null && at >= doc.vaultSavedAt + ttl) doc.clearVault();
+      if (doc.sealedVault !== null && ttl !== null && doc.vaultSavedAt !== null && at >= doc.vaultSavedAt + ttl) {
+        doc.clearVault();
+      }
       // Saving sets the next `sweepAt` (or unsets it), so the row leaves this range either way.
+      await saveRecord(ctx, account._id, doc);
+    }
+    // Pre-migration accounts without a vault still carry a future `sweepAt` for their unconsented
+    // `sealedSession`; drop it now instead of waiting up to 7 days.
+    const future = await ctx.db
+      .query("accounts")
+      .withIndex("by_sweepAt", (q) => q.gt("sweepAt", at))
+      .take(BATCH);
+    for (const account of future) {
+      if (account.sealedSession === null) continue;
+      const doc = await recordOf(ctx, account);
+      if (doc.settings.cacheSession) continue;
+      doc.clearSession();
       await saveRecord(ctx, account._id, doc);
     }
     // Inactive demo refresh tokens (no accountId) and demo devices: swept bounded by index so

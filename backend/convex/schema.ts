@@ -16,6 +16,8 @@ export const settings = v.object({
   alwaysUseVault: v.boolean(),
   phoneWaitSecs: v.number(),
   vaultTtlSecs: nullable(v.number()),
+  /** Whether connected apps may cache a VTOP session on the server; omitted on legacy rows (defaults to `sealedVault !== null`). */
+  cacheSession: v.optional(v.boolean()),
 });
 
 export const loginPhase = v.union(
@@ -154,6 +156,8 @@ export default defineSchema({
     vaultDueAt: nullable(v.number()),
     vaultStarted: v.boolean(),
     phoneAsked: v.boolean(),
+    /** Whether at least one phone had an FCM push token when asked. */
+    pushSent: v.optional(v.boolean()),
     phoneErrorCode: v.optional(nullable(v.string())),
     phoneError: nullable(v.string()),
     source: nullable(v.string()),
