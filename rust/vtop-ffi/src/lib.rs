@@ -684,23 +684,33 @@ impl Core {
         )
     }
 
-    /// The signed-in session. A password the Keystore didn't open at start is opened again here.
+    /// The signed-in session. A password the Keystore didn't open at start is opened again here;
+    /// when it turns out gone, the student hears they are signed out.
     fn current(&self) -> Result<Arc<Slot>, CoreError> {
-        let mut signed = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
-        if matches!(*signed, Signed::Locked) {
-            *signed = self.restore_saved().unwrap_or_else(|error| {
-                warn!(%error, "saved account not restored");
-                Signed::Out
-            });
-            if let Signed::In(_) = *signed {
-                info!("saved password opened on a later try");
+        let (current, reopened) = {
+            let mut signed = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
+            let reopened = matches!(*signed, Signed::Locked);
+            if reopened {
+                *signed = self.restore_saved().unwrap_or_else(|error| {
+                    warn!(%error, "saved account not restored");
+                    Signed::Out
+                });
+                if let Signed::In(_) = *signed {
+                    info!("saved password opened on a later try");
+                }
             }
+            let current = match &*signed {
+                Signed::In(slot) => Ok(slot.clone()),
+                Signed::Locked => Err(CoreError::PasswordLocked),
+                Signed::Out => Err(CoreError::NotSignedIn),
+            };
+            (current, reopened)
+        };
+        // Outside the slot's lock: the status reads it.
+        if reopened {
+            self.account_changed();
         }
-        match &*signed {
-            Signed::In(slot) => Ok(slot.clone()),
-            Signed::Locked => Err(CoreError::PasswordLocked),
-            Signed::Out => Err(CoreError::NotSignedIn),
-        }
+        current
     }
 
     /// Whether `slot` is still the signed-in one (not signed out meanwhile).

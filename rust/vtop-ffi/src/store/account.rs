@@ -835,6 +835,28 @@ mod tests {
     }
 
     #[test]
+    fn a_locked_password_that_turns_out_gone_is_heard_as_signed_out() {
+        let cipher = Fake::new("phone-a");
+        let first = core("locked-gone", &cipher);
+        first.write_account(&account("pw-1"), false);
+        cipher.set_down(true);
+        let core = open(&first.dir, &cipher);
+        let heard = Arc::new(Heard::default());
+        core.watch_account("f".into(), heard.clone());
+        assert!(matches!(heard.take()[..], [AccountStatus::SignedIn { .. }]));
+        // Opened again on the next call, it is another phone's after all.
+        fs::write(
+            core.at(ACCOUNT),
+            r#"{"username":"22BCE0001","sealed":"phone-b:1-wp"}"#,
+        )
+        .unwrap();
+        cipher.set_down(false);
+        assert!(matches!(core.current(), Err(CoreError::NotSignedIn)));
+        assert_eq!(heard.take(), [AccountStatus::SignedOut]);
+        let _ = fs::remove_dir_all(&first.dir);
+    }
+
+    #[test]
     fn another_phones_copy_has_no_password_and_signs_in_nobody() {
         let first = core("restore-a", &Fake::new("phone-a"));
         first.write_account(&account("pw-secret-1"), false);
