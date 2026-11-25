@@ -427,7 +427,9 @@ describe("sweeps", () => {
     });
     advance(121);
     await t.mutation(internal.sweeps.fiveMinutes, {});
-    expect(await t.run((ctx) => ctx.db.query("proofTickets").collect())).toHaveLength(0);
+    // The traded-in ticket waits out its time for a lost answer; the open one went.
+    const tickets = () => t.run((ctx) => ctx.db.query("proofTickets").collect());
+    expect((await tickets()).map((r) => r.status)).toEqual(["proved"]);
     // Written without `sweepAt`, as rows from before it were: the one-off backfill sets it.
     expect(await t.mutation(internal.migrate.setSweepAt, {})).toBe(1);
     const row = () => t.run(async (ctx) => (await ctx.db.get(ctx.db.normalizeId("accounts", account)!))!);
@@ -440,6 +442,7 @@ describe("sweeps", () => {
     advance(180 * 86_400);
     await t.mutation(internal.sweeps.fiveMinutes, {});
     await t.mutation(internal.sweeps.quarter, {});
+    expect(await tickets()).toHaveLength(0);
     expect(await t.run((ctx) => ctx.db.query("refreshTokens").collect())).toHaveLength(1);
   });
 

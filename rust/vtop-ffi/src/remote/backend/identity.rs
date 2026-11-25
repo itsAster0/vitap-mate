@@ -131,7 +131,9 @@ impl Core {
 
     /// Makes sure the client goes with a live JWT for the signed-in student, getting one from
     /// the first source that works: the demo account, the kept refresh token, a v2 account
-    /// token (traded in once), then (only when `ask`) a proof. One at a time, so a refresh token
+    /// token (traded in once), a ticket proved earlier whose answer was lost, then (only when
+    /// `ask`) a proof. A proof runs only once the server turned the others down, never because
+    /// it couldn't be reached. One at a time, so a refresh token
     /// is never used twice. A new one first leaves the addresses queued to be left: a leave
     /// queued by a sign-in over another student waits for this phone's next identity.
     pub(crate) async fn identity(
@@ -217,7 +219,8 @@ impl Core {
                 return Ok((state.auth.stamp(), false));
             }
         }
-        for _ in 0..3 {
+        // Refresh refused, then v2 refused, then a proof and its ticket.
+        for _ in 0..4 {
             let now_ms = self.server_now_ms();
             let refresh = self.device().refresh;
             let v2 = self.kept_v2(regno.as_deref());
@@ -270,11 +273,16 @@ impl Core {
                     json!({ "v2AccountToken": token, "device": self.device_info() })
                 }
                 Grant::Proof => {
-                    let Some(budget) = prove else {
+                    let (Some(budget), Some(regno)) = (prove, regno.as_deref()) else {
                         return Err(CoreError::ConsentDenied);
                     };
                     info!(action, "no identity: proving");
                     let ticket = self.prove_account(flow, budget).await?;
+                    let now_ms = self.server_now_ms();
+                    (self.shared.backend_state().auth).on_proved(&server, regno, ticket, now_ms);
+                    continue;
+                }
+                Grant::Ticket(ticket) => {
                     json!({ "ticket": ticket, "device": self.device_info() })
                 }
             };

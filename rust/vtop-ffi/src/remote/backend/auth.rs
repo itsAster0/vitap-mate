@@ -44,6 +44,8 @@ pub(crate) enum GrantKind {
     Refresh,
     V2,
     Proof,
+    /// A proved ticket traded in ([`AuthMachine::on_proved`]).
+    Ticket,
 }
 
 impl GrantKind {
@@ -53,6 +55,7 @@ impl GrantKind {
             Self::Refresh => "refresh",
             Self::V2 => "v2",
             Self::Proof => "proof",
+            Self::Ticket => "ticket",
         }
     }
 }
@@ -62,7 +65,9 @@ pub(crate) enum Grant {
     Demo,
     Refresh(Refresh),
     V2(String),
+    /// Prove who the student is; the driver hands the ticket back with [`AuthMachine::on_proved`].
     Proof,
+    Ticket(String),
 }
 
 impl Grant {
@@ -72,6 +77,7 @@ impl Grant {
             Self::Refresh(_) => GrantKind::Refresh,
             Self::V2(_) => GrantKind::V2,
             Self::Proof => GrantKind::Proof,
+            Self::Ticket(_) => GrantKind::Ticket,
         }
     }
 }
@@ -153,11 +159,32 @@ impl Phase {
     }
 }
 
+/// How long a proved ticket is traded in again, under the server's 30 minutes
+/// (`PROVED_TTL_SECS`) so a clock a little off never tries one it dropped.
+pub(crate) const PROVED_TICKET_MS: i64 = 25 * 60_000;
+
+/// A ticket the engine proved, kept until `auth:token` answers for it: on a weak link that answer
+/// may be lost, and trading the ticket in again costs no new proof. In memory only. No `Debug`:
+/// it holds the ticket.
+struct ProvedTicket {
+    ticket: String,
+    server: String,
+    regno: String,
+    until_ms: i64,
+}
+
+impl ProvedTicket {
+    fn holds(&self, server: &str, regno: Option<&str>) -> bool {
+        self.server == server && regno.is_some_and(|r| r.eq_ignore_ascii_case(&self.regno))
+    }
+}
+
 /// Deterministic state machine for the install's server identity.
 pub(crate) struct AuthMachine {
     phase: Phase,
     generation: u64,
     jwt_epoch: u64,
+    proved: Option<ProvedTicket>,
 }
 
 impl Default for AuthMachine {
@@ -172,6 +199,7 @@ impl AuthMachine {
             phase: Phase::Unauthenticated,
             generation: 1,
             jwt_epoch: 0,
+            proved: None,
         }
     }
 
@@ -220,7 +248,14 @@ impl AuthMachine {
     ) -> bool {
         let server = normalize_server(server);
         let demo = regno.is_some_and(|r| r.eq_ignore_ascii_case(crate::demo::USERNAME));
-        if demo || matching_refresh(&server, regno, refresh).is_some() || has_v2 {
+        if demo
+            || matching_refresh(&server, regno, refresh).is_some()
+            || has_v2
+            || self
+                .proved
+                .as_ref()
+                .is_some_and(|proved| proved.holds(&server, regno))
+        {
             return true;
         }
         matches!(
@@ -262,12 +297,20 @@ impl AuthMachine {
         let demo = input
             .regno
             .is_some_and(|r| r.eq_ignore_ascii_case(crate::demo::USERNAME));
+        let proved = self
+            .proved
+            .take()
+            .filter(|proved| proved.holds(&server, input.regno) && proved.until_ms > input.now_ms);
+        let ticket = proved.as_ref().map(|proved| proved.ticket.clone());
+        self.proved = proved;
         let step = if demo {
             Step::FetchToken(Grant::Demo)
         } else if let Some(refresh) = matching_refresh(&server, input.regno, input.refresh) {
             Step::FetchToken(Grant::Refresh(refresh.clone()))
         } else if let Some(v2) = input.v2_token.filter(|_| input.regno.is_some()) {
             Step::FetchToken(Grant::V2(v2.to_string()))
+        } else if let Some(ticket) = ticket {
+            Step::FetchToken(Grant::Ticket(ticket))
         } else if input.allow_proof && input.regno.is_some() {
             Step::FetchToken(Grant::Proof)
         } else {
@@ -278,6 +321,16 @@ impl AuthMachine {
             })
         };
         (step, effects)
+    }
+
+    /// The engine proved `ticket` for `regno`: it is traded in next, and again after a lost answer.
+    pub(crate) fn on_proved(&mut self, server: &str, regno: &str, ticket: String, now_ms: i64) {
+        self.proved = Some(ProvedTicket {
+            ticket,
+            server: normalize_server(server),
+            regno: regno.to_ascii_uppercase(),
+            until_ms: now_ms + PROVED_TICKET_MS,
+        });
     }
 
     /// Records a newly issued JWT + rotated refresh token from `auth:token`.
@@ -296,6 +349,7 @@ impl AuthMachine {
         if source != GrantKind::Refresh {
             self.generation += 1;
         }
+        self.proved = None;
         self.jwt_epoch += 1;
         self.phase = Phase::Ready(Jwt {
             server: server.clone(),
@@ -329,12 +383,22 @@ impl AuthMachine {
 
     /// Handles a failed `auth:token`. Returns `(should_retry, effects)`.
     /// Only a refused token ([`ServerCode::is_token_refused`], on non-proof grants) drops the
-    /// rejected grant and retries; transient errors (offline, 5xx) keep the refresh token.
+    /// rejected grant and retries; transient errors (offline, 5xx) keep the refresh token. A
+    /// proved ticket is kept through them too, and while the engine is still on it; any other
+    /// answer ends it, with no retry, so a call proves at most once.
     pub(crate) fn on_token_refused(
         &mut self,
         source: GrantKind,
         error: &EdgeError,
     ) -> (bool, Vec<Effect>) {
+        if source == GrantKind::Ticket {
+            if let EdgeError::Status { code, .. } = error
+                && !matches!(code, ServerCode::ProofPending | ServerCode::ServerError)
+            {
+                self.proved = None;
+            }
+            return (false, Vec::new());
+        }
         let code = match error {
             EdgeError::Status { code, .. } if code.is_token_refused() => code,
             _ => return (false, Vec::new()),
@@ -441,6 +505,7 @@ impl AuthMachine {
         self.generation += 1;
         self.jwt_epoch += 1;
         self.phase = Phase::Unauthenticated;
+        self.proved = None;
         info!(
             from,
             to = self.phase.name(),
@@ -489,6 +554,7 @@ impl AuthMachine {
         self.generation += 1;
         self.jwt_epoch += 1;
         self.phase = Phase::Unauthenticated;
+        self.proved = None;
         info!(
             from,
             to = self.phase.name(),
@@ -731,5 +797,79 @@ mod tests {
             now_ms: 0,
         });
         assert!(matches!(step, Step::Blocked(Blocked::NotSignedIn)));
+    }
+
+    #[test]
+    fn a_proved_ticket_is_traded_in_again_until_the_server_says_no() {
+        let mut machine = AuthMachine::new();
+        let ticket = |machine: &mut AuthMachine, now_ms| match machine
+            .next_step(&input(None, false, now_ms))
+            .0
+        {
+            Step::FetchToken(Grant::Ticket(ticket)) => Some(ticket),
+            _ => None,
+        };
+        machine.on_proved(SERVER, "22bce0001", "t1".into(), 0);
+        assert!(machine.has_usable_identity(SERVER, Some(REGNO), None, false));
+        // A lost answer, the server busy, or the engine still on it: the ticket stays, so no
+        // proof runs again (not even where proving isn't allowed).
+        for error in [
+            EdgeError::Offline,
+            EdgeError::Status {
+                code: ServerCode::ServerError,
+                message: String::new(),
+            },
+            EdgeError::Status {
+                code: ServerCode::ProofPending,
+                message: String::new(),
+            },
+        ] {
+            assert_eq!(ticket(&mut machine, 1).as_deref(), Some("t1"));
+            assert_eq!(
+                machine.on_token_refused(GrantKind::Ticket, &error),
+                (false, Vec::new())
+            );
+        }
+        // Another student never takes it, and it goes.
+        let other = StepInput {
+            regno: Some("22BCE0002"),
+            ..input(None, false, 1)
+        };
+        assert!(matches!(
+            machine.next_step(&other).0,
+            Step::Blocked(Blocked::ConsentDenied)
+        ));
+        assert_eq!(ticket(&mut machine, 1), None);
+        machine.on_proved(SERVER, REGNO, "t1".into(), 0);
+        // The server turned it down: proving is next.
+        let unknown = EdgeError::Status {
+            code: ServerCode::Unknown("challenge_invalid".into()),
+            message: String::new(),
+        };
+        assert_eq!(ticket(&mut machine, 1).as_deref(), Some("t1"));
+        assert_eq!(
+            machine.on_token_refused(GrantKind::Ticket, &unknown),
+            (false, Vec::new())
+        );
+        assert!(matches!(
+            machine.next_step(&input(None, true, 1)).0,
+            Step::FetchToken(Grant::Proof)
+        ));
+
+        // Issued: the ticket is spent. Expired: proving is next.
+        machine.on_proved(SERVER, REGNO, "t2".into(), 0);
+        machine.on_issued(
+            GrantKind::Ticket,
+            SERVER,
+            REGNO,
+            "jwt".into(),
+            0,
+            "vrt_1".into(),
+        );
+        machine.on_forget("explicit");
+        assert_eq!(ticket(&mut machine, 1), None);
+        machine.on_proved(SERVER, REGNO, "t3".into(), 0);
+        assert_eq!(ticket(&mut machine, PROVED_TICKET_MS), None);
+        assert!(!machine.has_usable_identity(SERVER, Some(REGNO), None, false));
     }
 }

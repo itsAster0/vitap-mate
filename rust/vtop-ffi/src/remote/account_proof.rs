@@ -411,7 +411,12 @@ impl Core {
                 _ => failed(format!("{error:#}")),
             });
         }
-        let last = last.ok_or_else(|| failed("the server closed without an answer"))?;
+        // The prover finished, so the engine has the proof; its answer was lost on the way (a
+        // weak link). `auth:token` says whether it held, rather than a new proof.
+        let Some(last) = last else {
+            warn!(ms, route = "proof", "proof sent, its answer lost");
+            return Ok(ticket);
+        };
         let proved = match serde_json::from_str::<Proved>(&last) {
             Ok(proved) if proved.ok => proved,
             _ => {

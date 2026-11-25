@@ -28,6 +28,8 @@ pub(crate) enum ServerCode {
     PhoneNotFound,
     SessionInvalid,
     VtopUnreachable,
+    /// A proof ticket the engine hasn't said proved or failed yet.
+    ProofPending,
     /// The engine's: VTOP's session ran out.
     SessionExpired,
     /// The engine's: VTOP turned the saved password down.
@@ -51,7 +53,7 @@ pub(crate) enum ServerCode {
 impl ServerCode {
     /// Every code but [`Self::Unknown`], for the contract test.
     #[cfg(test)]
-    pub(crate) const KNOWN: [Self; 25] = [
+    pub(crate) const KNOWN: [Self; 26] = [
         Self::Unauthenticated,
         Self::DeviceRemoved,
         Self::RefreshReused,
@@ -69,6 +71,7 @@ impl ServerCode {
         Self::PhoneNotFound,
         Self::SessionInvalid,
         Self::VtopUnreachable,
+        Self::ProofPending,
         Self::SessionExpired,
         Self::InvalidCredentials,
         Self::AuthenticationFailed,
@@ -98,6 +101,7 @@ impl ServerCode {
             "phone_not_found" => Self::PhoneNotFound,
             "session_invalid" => Self::SessionInvalid,
             "vtop_unreachable" => Self::VtopUnreachable,
+            "proof_pending" => Self::ProofPending,
             "session_expired" => Self::SessionExpired,
             "invalid_credentials" => Self::InvalidCredentials,
             "authentication_failed" => Self::AuthenticationFailed,
@@ -129,6 +133,7 @@ impl ServerCode {
             Self::PhoneNotFound => "phone_not_found",
             Self::SessionInvalid => "session_invalid",
             Self::VtopUnreachable => "vtop_unreachable",
+            Self::ProofPending => "proof_pending",
             Self::SessionExpired => "session_expired",
             Self::InvalidCredentials => "invalid_credentials",
             Self::AuthenticationFailed => "authentication_failed",

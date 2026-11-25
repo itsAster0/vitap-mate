@@ -17,7 +17,8 @@
     "key_not_found",
     "phone_not_found",
     "session_invalid",
-    "vtop_unreachable"
+    "vtop_unreachable",
+    "proof_pending"
   ],
   "engine": [
     "session_expired",

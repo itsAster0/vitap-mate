@@ -245,6 +245,33 @@ async fn a_refused_refresh_token_is_dropped_and_proved_again_once() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_lost_token_answer_trades_the_ticket_in_again_without_a_second_proof() {
+    let (core, edge, _server, network) = setup("lost", Page::Honest).await;
+    can(
+        &edge,
+        "auth:token",
+        500,
+        json!({ "code": "server_error", "error": "x" }),
+    );
+    core.connected_apps("f".into()).await.unwrap_err();
+    view(&edge);
+    core.connected_apps("f2".into()).await.unwrap();
+    assert_eq!(network.opened.lock().unwrap().len(), 1);
+    assert_eq!(
+        paths(&edge),
+        [
+            "auth:proveStart",
+            "auth:token",
+            "auth:token",
+            "account:view",
+            "devices:info"
+        ]
+    );
+    assert_eq!(edge.lock().unwrap().requests[2].body["ticket"], CHALLENGE);
+    assert_eq!(core.device().refresh.unwrap().token, "vrt_1");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_failed_proof_fails_the_call_cleanly() {
     // The fake VTOP signs the session in, but sets a cookie: the prover refuses to prove it.
     let (core, edge, _server, _) = setup("failed", Page::SetsCookie).await;

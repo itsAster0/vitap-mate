@@ -6,6 +6,7 @@ import { REGNO, TOKENS, T0, advance, codeOf, phone, prove, setup } from "../test
 import { ensureAccount } from "./lib/accounts";
 import { api, internal } from "./_generated/api";
 import { issueV2Token } from "./lib/jwt";
+import { PROVED_TTL_SECS } from "./auth";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -101,6 +102,22 @@ describe("tokens", () => {
     expect(rows.devices[0]).toMatchObject({ deviceId: p.deviceId, accountId: tokens.account, sealKey: p.sealKey, linkedAt: T0 });
     expect(rows.refresh[0]).toMatchObject({ accountId: tokens.account, usedAt: null });
     expect(rows.refresh[0].hash).not.toContain("vrt_");
+  });
+
+  it("trades a proved ticket in again after a lost answer, until it expires", async () => {
+    const t = await setup();
+    const p = await phone(1);
+    const { ticket } = await t.mutation(api.auth.proveStart, await p.signed("auth:proveStart", {}));
+    await t.mutation(internal.auth.takeTicket, { ticket });
+    await t.mutation(internal.auth.proofDone, { ticket, regno: "22bce0001", ownerHash: "o" });
+    const lost = await t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }));
+    const again = await t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device }));
+    expect(again.regno).toBe(REGNO);
+    // The answer that never arrived is no use to anyone: its chain ended.
+    expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { refreshToken: lost.refreshToken })))).toBe("refresh_invalid");
+    expect((await t.action(api.auth.token, await p.signed("auth:token", { refreshToken: again.refreshToken }))).regno).toBe(REGNO);
+    advance(PROVED_TTL_SECS);
+    expect(await codeOf(t.action(api.auth.token, await p.signed("auth:token", { ticket, device: p.device })))).toBe("challenge_invalid");
   });
 
   it("asks for exactly one grant and a good device", async () => {

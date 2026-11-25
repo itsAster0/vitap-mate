@@ -9,7 +9,8 @@
 //    refresh token is good once: using it replaces it, and showing a replaced
 //    one again deletes its whole chain (`refresh_reused`), as only a leak
 //    makes that happen. A token is also only good from the install it was
-//    issued to, signed by its key.
+//    issued to, signed by its key. A proved ticket trades in again until it
+//    expires, so a lost answer costs no new proof.
 // 3. `auth:signOut` deletes the install's refresh tokens, or every phone's.
 
 import { v } from "convex/values";
@@ -29,8 +30,8 @@ import { accountId, log, now, str } from "./lib/util";
 
 /** How long a ticket waits for its proof. */
 export const TICKET_TTL_SECS = 120;
-/** How long a proved ticket waits for its `auth:token`. */
-export const PROVED_TTL_SECS = 300;
+/** How long a proved ticket waits for its `auth:token`, and takes it again after a lost answer. */
+export const PROVED_TTL_SECS = 1800;
 /** How long an inactive demo install and its refresh chain stay before being swept. */
 export const DEMO_INACTIVE_SECS = 7 * 86_400;
 export const REFRESH_PREFIX = "vrt_";
@@ -376,10 +377,14 @@ export const grant = internalMutation({
           : null;
         if (!row || row.deviceId !== deviceId || row.expiresAt <= at) return { refused: "challenge_invalid" };
         if (row.status === "open" || row.status === "taken") return { refused: "proof_pending" };
-        await ctx.db.delete(row._id);
         if (row.status === "failed" || !row.regno) {
+          await ctx.db.delete(row._id);
           return { proofFailed: row.code ?? "proof_failed" };
         }
+        // A proved ticket stays until it expires: on a weak link this call's answer may be lost,
+        // and the install trades the ticket in again instead of proving again. Only the install
+        // it was issued to can (every call is signed by its key), and each trade starts a chain
+        // that ends the last one.
         const device = await upsertDevice(ctx, deviceId, args.signKey, grant.device);
         const account = await ensureAccount(ctx, row.regno, row.ownerHash ?? null);
         await linkPhone(ctx, account, device);
