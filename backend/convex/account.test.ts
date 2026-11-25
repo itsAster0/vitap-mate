@@ -204,7 +204,7 @@ describe("the account", () => {
     expect((await tb.as.query(api.account.view, { flow: "f" })).phoneCount).toBe(1);
   });
 
-  it("moves an old phone's keys to this one", async () => {
+  it("moves another phone's keys to this one and leaves that phone signed in", async () => {
     const t = await setup();
     const a = await phone(1);
     const b = await phone(2);
@@ -215,7 +215,10 @@ describe("the account", () => {
     const old = (await tb.as.query(api.account.view, { flow: "f" })).phones.find((p) => !p.thisPhone)!;
     expect(await codeOf(tb.as.mutation(api.keys.move, { flow: "f", from: "nope" }))).toBe("phone_not_found");
     expect(await tb.as.mutation(api.keys.move, { flow: "f", from: old.id })).toEqual({ moved: 1 });
-    expect(await codeOf(ta.as.query(api.account.view, { flow: "f" }))).toBe("device_removed");
+    const after = await ta.as.query(api.account.view, { flow: "f" });
+    expect(after.phones).toHaveLength(2);
+    const mine = after.phones.find((p) => !p.thisPhone)!.id;
+    expect(after.keys.map((k) => k.phoneId)).toEqual([mine]);
   });
 
   it("deletes itself: keys go, and every phone loses access", async () => {

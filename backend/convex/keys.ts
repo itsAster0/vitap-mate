@@ -6,7 +6,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation, mutation } from "./_generated/server";
-import { keyRows, phoneRows, phonesOf, keyOf, unlinkPhone } from "./lib/accounts";
+import { keyRows, phonesOf, keyOf } from "./lib/accounts";
 import { KEY_PREFIX, MAX_KEYS_PER_ACCOUNT, keyId, keyLabel, keysToMove } from "./lib/accountState";
 import { randomHex, sha256Hex } from "./lib/crypto";
 import { badRequest, fail } from "./lib/errors";
@@ -128,8 +128,9 @@ export const setOutings = mutation({
   },
 });
 
-/** This phone now answers for the keys of phone `from` (which is unlinked) and of phones no
- * longer linked; without `from` only the latter. */
+/** This phone now answers for the keys of phone `from` and of phones no longer linked; without
+ * `from` only the latter. Phone `from` stays linked: both phones may be in use, and removing a
+ * phone is its own choice (`account:removeDevice`). */
 export const move = mutation({
   args: { flow: v.string(), from: v.optional(v.string()) },
   handler: async (ctx, { flow, from }) => {
@@ -140,10 +141,6 @@ export const move = mutation({
     if (plan === null) return fail("phone_not_found", "No such phone on this account.");
     const moving = new Set(plan.moving.map((k) => k.hash));
     for (const key of keys) if (moving.has(key.keyHash)) await ctx.db.patch(key._id, { deviceId: me.deviceId });
-    if (plan.source) {
-      const source = (await phoneRows(ctx, accountId)).find((row) => row.deviceId === plan.source!.deviceId);
-      if (source) await unlinkPhone(ctx, source);
-    }
     log({ flow, regno: me.regno }, "keys: moved keys");
     return { moved: moving.size };
   },
