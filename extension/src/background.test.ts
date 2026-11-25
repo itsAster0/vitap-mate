@@ -363,6 +363,60 @@ describe("background login flow", () => {
     expect(env.cookieValues()).toEqual({ JSESSIONID: "srv-1" });
   });
 
+  it("waits on the phone without serverDueAt when storage is off", async () => {
+    const env = installMockChrome({ local: { token: ACCESS_KEY } });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/v1/session")) {
+        return responseWithUrl({ status: "pending", requestId: "req-off", stage: "phone", serverDueAt: null }, { status: 202 });
+      }
+      if (url.endsWith("/v1/session/requests/req-off")) {
+        return responseWithUrl({
+          status: "ready",
+          cacheable: false,
+          cookies: [{ domain: "vtop.vitap.ac.in", name: "JSESSIONID", value: "p-1", path: "/vtop", hostOnly: true }],
+          source: { from: "phone", cached: false },
+        });
+      }
+      return responseWithUrl("<html>ok</html>", { status: 200, url: VTOP_CONTENT_URL });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    let pushView!: (view: RequestView) => void;
+    const subscribed = deferred();
+    const fakeClient: LiveClient = {
+      onUpdate: ((_q: unknown, _a: unknown, cb: (v: RequestView) => void) => {
+        pushView = cb;
+        subscribed.resolve();
+        return () => {};
+      }) as LiveClient["onUpdate"],
+      close: async () => {},
+    };
+
+    const bg = createBackground({ browserName: "Chrome", openLive: () => fakeClient });
+    const loginPromise = bg.runLogin(5);
+    await subscribed.promise;
+
+    pushView({
+      status: "pending",
+      stage: "phone",
+      serverDueAt: null,
+      pushSent: true,
+      login: null,
+      expiresAt: Date.now() + 120_000,
+    });
+    pushView({ status: "ready", from: "phone", expiresAt: Date.now() + 120_000 });
+
+    await loginPromise;
+
+    const phoneMsg = env.tabMessages.find(
+      (m) => m.message.type === "VTOP_MATE_LOADING" && m.message.text === "Waiting for your phone…",
+    );
+    expect(phoneMsg).toBeDefined();
+    expect(phoneMsg?.message.type === "VTOP_MATE_LOADING" && phoneMsg.message.serverDueAt).toBeUndefined();
+    expect(env.cookieValues()).toEqual({ JSESSIONID: "p-1" });
+  });
+
   it("expires and retries once when VTOP bounces the first session", async () => {
     const env = installMockChrome({ local: { token: ACCESS_KEY } });
     let sessionCall = 0;

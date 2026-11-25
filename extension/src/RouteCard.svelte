@@ -10,12 +10,14 @@
     running,
     vtopSignedIn,
     lastLogin,
+    serverSignIn = false,
     now,
   }: {
     login: LoginState;
     running: boolean;
     vtopSignedIn: boolean | null;
     lastLogin: LastLogin | undefined;
+    serverSignIn?: boolean;
     now: number;
   } = $props();
 
@@ -184,7 +186,9 @@
       tone: "",
       icon: "log-in" as IconName,
       title: "Not signed in yet",
-      sub: "Your phone or the server makes a session for this browser",
+      sub: serverSignIn
+        ? "Your phone or the server makes a session for this browser"
+        : "Your phone makes a session for this browser",
     };
   });
 
@@ -259,7 +263,7 @@
       </svg>
       <div class="legend">
         <span>
-          {#if serverIn}Server takes over in <b>{serverIn} s</b>{:else if login.phase === "server"}Server sign-in{/if}
+          {#if serverIn}Server takes over in <b>{serverIn} s</b>{:else if login.phase === "phone"}Waiting on phone{:else if login.phase === "server"}Server sign-in{/if}
         </span>
         <span><b>{secondsLeft} s</b> left</span>
       </div>

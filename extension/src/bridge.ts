@@ -77,7 +77,9 @@ export function friendlyLoginError(
   const parsed = parseAPIError(responseText);
   const code = parsed.code ?? "";
   if (code === "key_unknown" || status === 401) return UNKNOWN_KEY_MESSAGE;
-  if (code === "phone_unreachable") return "Your phone is not linked. Open VITAP Mate → Connected apps → Reconnect this phone.";
+  if (code === "phone_unreachable") {
+    return "This key's phone is no longer linked. Open VITAP Mate → Connected apps and move this key to your phone, or pair again.";
+  }
   if (code === "phone_timeout" || code === "request_expired" || status === 410) return PHONE_TIMEOUT_MESSAGE;
   if (code === "rate_limited" || status === 429) return "Too many attempts. Wait a minute and try again.";
   if ([502, 503, 504].includes(status)) {
@@ -118,8 +120,8 @@ const ACCESS_KEY_PATTERN = /^vtm_[0-9a-f]{64}$/;
 
 export const UNKNOWN_KEY_MESSAGE =
   "This access key is unknown or was revoked. Pair the extension again from VITAP Mate → Connected apps.";
-const PHONE_TIMEOUT_MESSAGE =
-  "Your phone did not answer in time. Open VITAP Mate once (so it can sign in) and try again.";
+export const PHONE_TIMEOUT_MESSAGE =
+  "Your phone didn't answer in time. Open VITAP Mate on your phone and try again, or turn on Store on server in Connected apps.";
 
 export function isAccessKey(value: string) {
   return ACCESS_KEY_PATTERN.test(value.trim());

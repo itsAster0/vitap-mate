@@ -308,7 +308,7 @@
           onPairingChange={(active) => (pairingActive = active)}
         />
       {:else}
-        <RouteCard {login} {running} {vtopSignedIn} {lastLogin} {now} />
+        <RouteCard {login} {running} {vtopSignedIn} {lastLogin} serverSignIn={Boolean(account?.savedCredentials)} {now} />
 
         {#if running}
           <button type="button" class="btn tonal" onclick={cancelLogin}>

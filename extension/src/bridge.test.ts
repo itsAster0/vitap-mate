@@ -28,7 +28,9 @@ describe("bridge helpers", () => {
   });
 
   it("maps machine-readable errors", () => {
-    expect(friendlyLoginError(410, '{"code":"request_expired"}')).toContain("phone did not answer");
+    const expired = friendlyLoginError(410, '{"code":"request_expired"}');
+    expect(expired).toContain("didn't answer in time");
+    expect(expired).toContain("Store on server");
     expect(friendlyLoginError(429, "")).toContain("Too many");
     expect(friendlyLoginError(503, '{"code":"engine_unavailable"}')).toContain("temporarily unavailable");
     expect(
@@ -125,18 +127,19 @@ describe("session responses", () => {
     const unreachable = interpretSessionResponse(200, {
       status: "error",
       code: "phone_unreachable",
-      error: "phone_unreachable: Open VITAP Mate → Connected apps → Reconnect this phone.",
+      error: "This key's phone is no longer linked.",
     });
     expect(unreachable.kind).toBe("error");
     expect(unreachable.kind === "error" && unreachable.message).toBe(
-      "Your phone is not linked. Open VITAP Mate → Connected apps → Reconnect this phone.",
+      "This key's phone is no longer linked. Open VITAP Mate → Connected apps and move this key to your phone, or pair again.",
     );
 
     const unknown = interpretSessionResponse(401, { code: "key_unknown", error: "x" });
     expect(unknown.kind === "error" && unknown.message).toContain("access key");
 
     const expired = interpretSessionResponse(410, { code: "request_expired" });
-    expect(expired.kind === "error" && expired.message).toContain("phone");
+    expect(expired.kind === "error" && expired.message).toContain("Open VITAP Mate");
+    expect(expired.kind === "error" && expired.message).toContain("Store on server");
   });
 });
 
@@ -214,9 +217,10 @@ describe("bridge URL setting", () => {
     });
   });
 
-  it("says who it is waiting for", () => {
+  it("says who it is waiting for, without a server countdown when storage is off", () => {
     expect(progressText("server", undefined)).toContain("server is signing in");
     expect(progressText("phone", 10_000, 0)).toContain("takes over in 10 s");
+    expect(progressText("phone", undefined, 0)).toBe("Waiting for your phone…");
     expect(progressText("phone", 0, 5_000)).toBe("Waiting for your phone…");
     expect(progressText("starting", undefined)).toBe("Starting sign-in…");
     expect(progressText("server", undefined, 0, "waiting_otp")).toBe("Waiting for VTOP's OTP email");

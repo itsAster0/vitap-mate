@@ -5,7 +5,7 @@
 
 import { ConvexClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { LoginError, UNKNOWN_KEY_MESSAGE, fetchWithTimeout } from "./bridge";
+import { LoginError, PHONE_TIMEOUT_MESSAGE, UNKNOWN_KEY_MESSAGE, fetchWithTimeout } from "./bridge";
 
 /** `extension:key`: the key's account, or null once it is revoked. Times in seconds. */
 export type KeyView = {
@@ -13,7 +13,7 @@ export type KeyView = {
   keyLabel: string | null;
   keyCreatedAt: number;
   keyLastUsedAt: number | null;
-  settings: { alwaysUseVault: boolean; phoneWaitSecs: number; vaultTtlSecs: number | null };
+  settings: { cacheSession?: boolean; alwaysUseVault: boolean; phoneWaitSecs: number; vaultTtlSecs: number | null };
   phoneLinked: boolean;
   /** The key's own phone: the only one its sign-ins ask. */
   phone: { label: string | null; notifications: boolean } | null;
@@ -28,7 +28,7 @@ export type LoginStep = "signing_in" | "waiting_otp" | "checking_otp";
 
 /** `extension:request`: a session request's progress, never its cookies. Times in ms. */
 export type RequestView =
-  | { status: "pending"; stage: "phone" | "server" | "starting"; serverDueAt: number | null; login: LoginStep | null; expiresAt: number }
+  | { status: "pending"; stage: "phone" | "server" | "starting"; serverDueAt: number | null; pushSent?: boolean; login: LoginStep | null; expiresAt: number }
   | { status: "ready"; from: string; expiresAt: number }
   | { status: "error"; code: string; error: string; expiresAt: number }
   | { status: "key_unknown" }
@@ -166,7 +166,7 @@ export function waitForRequest(
 }
 
 export const CANCELLED = "Sign-in cancelled.";
-const EXPIRED = "Your phone did not answer in time. Open VITAP Mate once (so it can sign in) and try again.";
+const EXPIRED = PHONE_TIMEOUT_MESSAGE;
 
 /** The pairing code as `keys:create` hashes it: without its dash, upper case. */
 export async function pairCodeHash(code: string): Promise<string> {

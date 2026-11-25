@@ -58,7 +58,7 @@ describe("waitForRequest", () => {
       [{ status: "error", code: "phone_timeout", error: "Open the app.", expiresAt: 0 }, "failed", "Open the app."],
       [{ status: "error", code: "login_failed", error: "note: keep colon", expiresAt: 0 }, "failed", "note: keep colon"],
       [{ status: "key_unknown" }, "key_unknown", UNKNOWN_KEY_MESSAGE],
-      [{ status: "not_found" }, "expired", /did not answer/],
+      [{ status: "not_found" }, "expired", /Open VITAP Mate.*Store on server/],
     ] as [RequestView, LoginErrorKind, string | RegExp][]) {
       const f = fakeClient();
       const wait = waitForRequest(f.client, "r", new AbortController().signal, () => {});
