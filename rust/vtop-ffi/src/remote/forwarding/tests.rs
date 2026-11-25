@@ -554,7 +554,7 @@ async fn an_address_kept_from_v2_is_rejoined_once() {
         "mail:inbox".into(),
         [(
             404,
-            json!({ "code": GONE, "error": "No such forwarding address." }),
+            json!({ "code": ServerCode::MailboxNotFound.as_str(), "error": "No such forwarding address." }),
         )]
         .into(),
     );
@@ -635,7 +635,7 @@ async fn forwarding_off_reports_device_removed_and_needs_sign_in() {
         "mail:inbox".into(),
         [(
             403,
-            json!({ "code": REMOVED, "error": "This phone was removed." }),
+            json!({ "code": ServerCode::DeviceRemoved.as_str(), "error": "This phone was removed." }),
         )]
         .into(),
     );
@@ -933,5 +933,39 @@ async fn a_setup_finished_after_a_sign_out_is_queued_to_leave() {
     core.save_new_mailbox(&slot, mailbox("zzzzzzzzzz")).unwrap();
     core.save_new_mailbox(&slot, mailbox(ID)).unwrap();
     assert_eq!(core.saved_mailbox().unwrap().1, "zzzzzzzzzz");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn a_phone_removed_on_the_server_forgets_its_address() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-removed-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let edge = Arc::new(Mutex::new(Edge::default()));
+    let url = serve(edge.clone()).await;
+    fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+    let core = signed_in(&dir, url.clone());
+    keep_token(&core, &url);
+    core.write(
+        FILE,
+        &json!({
+            "server": url, "id": ID, "address": format!("otp+{ID}@vmate.aster0.dev"),
+            "owner_claimed": true, "ready": true,
+        }),
+    );
+    edge.lock().unwrap().canned.insert(
+        "mail:inbox".into(),
+        [(
+            403,
+            json!({ "code": ServerCode::DeviceRemoved.as_str(), "error": "Removed." }),
+        )]
+        .into(),
+    );
+    let pulled = core.fetch_forwarded_otp("f".into(), 0).await;
+    assert!(
+        matches!(&pulled, Err(CoreError::ForwardingOff { kind: ForwardingOffKind::DeviceRemoved, reason }) if reason.contains("removed")),
+        "{pulled:?}"
+    );
+    assert!(core.saved_mailbox().is_none());
     let _ = fs::remove_dir_all(&dir);
 }

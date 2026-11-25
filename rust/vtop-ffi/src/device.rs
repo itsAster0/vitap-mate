@@ -46,6 +46,14 @@ impl EdgeError {
         }
     }
 
+    /// The server's code; None offline.
+    pub(crate) fn server_code(&self) -> Option<&ServerCode> {
+        match self {
+            Self::Offline => None,
+            Self::Status { code, .. } => Some(code),
+        }
+    }
+
     /// Whether the server answered with `code`.
     pub(crate) fn is(&self, code: &ServerCode) -> bool {
         matches!(self, Self::Status { code: got, .. } if got == code)

@@ -24,6 +24,7 @@ use vtop_core::spec;
 use vtop_core::types::StudentProfile;
 
 use crate::remote::backend::Kind;
+use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, ForwardingOffKind, PAGES, Slot, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
@@ -474,11 +475,6 @@ fn string(body: &Value, key: &str) -> Result<String, CoreError> {
         })
 }
 
-/// The edge no longer knows this address (deleted, or this install is no longer on it).
-pub(crate) const GONE: &str = "mailbox_not_found";
-/// This install was removed on the server, which took it off every address.
-const REMOVED: &str = "device_removed";
-
 /// Mail forwarding calls; each takes the caller's flow id first.
 #[uniffi::export]
 impl Core {
@@ -822,7 +818,9 @@ impl Core {
                 .await
             {
                 Ok(_) => info!("left an old address"),
-                Err(error) if error.code() == GONE => info!("old address already gone"),
+                Err(error) if error.is(&ServerCode::MailboxNotFound) => {
+                    info!("old address already gone");
+                }
                 // Offline, or no identity yet: tried again later.
                 Err(error) => {
                     warn!(code = error.code(), "old address not left yet");
@@ -901,7 +899,12 @@ impl Core {
         {
             Ok(_) => info!(everywhere, "left the address"),
             // Removed on another phone: the server took it off every address already.
-            Err(error) if matches!(error.code(), GONE | REMOVED) => {
+            // (`MailboxNotFound`: the edge no longer knows the address; `DeviceRemoved`: this
+            // install was removed on the server, which took it off every address.)
+            Err(error)
+                if error.is(&ServerCode::MailboxNotFound)
+                    || error.is(&ServerCode::DeviceRemoved) =>
+            {
                 info!(code = error.code(), "address already gone");
             }
             Err(error) => return Err(error.into()),
@@ -945,41 +948,45 @@ impl Core {
                 Ok(inbox) => return Ok(self.open_inbox(&id, &inbox)),
                 Err(error) => error,
             };
-            return Err(match error.code() {
+            return Err(match error.server_code() {
                 // Not on this address (any more): kept from v2 and not rejoined yet, or the
                 // server moved the student's phones to their old address. Joined where the
                 // student's address is, then read there; forgotten only when they have none
                 // (deleted) or it can't be asked.
-                GONE if !rejoined => match Box::pin(self.rejoin(flow, &id, !joined, false)).await {
-                    Ok(Rejoined::Joined) => {
-                        rejoined = true;
-                        continue;
-                    }
-                    Ok(Rejoined::Later) if !joined => CoreError::ForwardingOff {
-                        kind: ForwardingOffKind::NeedsSignIn,
-                        reason: "Mail forwarding reconnects once you're signed in.".into(),
-                    },
-                    Ok(Rejoined::Later | Rejoined::NoAddress) => {
-                        self.forget_forwarding(&id);
-                        CoreError::ForwardingOff {
-                            kind: ForwardingOffKind::AddressDeleted,
-                            reason: "Your forwarding address no longer exists. Set it up again."
-                                .into(),
+                Some(ServerCode::MailboxNotFound) if !rejoined => {
+                    match Box::pin(self.rejoin(flow, &id, !joined, false)).await {
+                        Ok(Rejoined::Joined) => {
+                            rejoined = true;
+                            continue;
                         }
+                        Ok(Rejoined::Later) if !joined => CoreError::ForwardingOff {
+                            kind: ForwardingOffKind::NeedsSignIn,
+                            reason: "Mail forwarding reconnects once you're signed in.".into(),
+                        },
+                        Ok(Rejoined::Later | Rejoined::NoAddress) => {
+                            self.forget_forwarding(&id);
+                            CoreError::ForwardingOff {
+                                kind: ForwardingOffKind::AddressDeleted,
+                                reason:
+                                    "Your forwarding address no longer exists. Set it up again."
+                                        .into(),
+                            }
+                        }
+                        Err(error) => error,
                     }
-                    Err(error) => error,
-                },
+                }
                 // Rejoined, and the server still doesn't know this install on the address.
-                GONE => CoreError::Other {
+                Some(ServerCode::MailboxNotFound) => CoreError::Other {
                     reason: "Mail forwarding reconnected. Try again.".into(),
                 },
                 // No identity on this install yet (updated from v2 without a live account
                 // token): the app proves and rejoins once signed in (`keep_forwarding`).
-                "unauthenticated" => CoreError::ForwardingOff {
+                Some(ServerCode::Unauthenticated) => CoreError::ForwardingOff {
                     kind: ForwardingOffKind::NeedsSignIn,
                     reason: "Mail forwarding reconnects once you're signed in.".into(),
                 },
-                REMOVED => {
+                // This install was removed on the server, which took it off every address.
+                Some(ServerCode::DeviceRemoved) => {
                     self.forget_forwarding(&id);
                     CoreError::ForwardingOff {
                         kind: ForwardingOffKind::DeviceRemoved,

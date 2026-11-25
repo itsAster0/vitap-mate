@@ -16,7 +16,7 @@ use vtop_shared::device_sig;
 use crate::Core;
 use crate::convex::CallError;
 use crate::remote::backend::{Backend, Kind, Refresh};
-use crate::remote::forwarding::GONE;
+use crate::remote::server_code::ServerCode;
 
 /// One call the fake server got.
 pub(crate) struct Request {
@@ -175,7 +175,7 @@ fn answer(edge: &mut Edge, path: &str, body: &Value) -> Result<Value, CallError>
     }
     let gone = || {
         Err(convex(
-            json!({ "code": GONE, "error": "No such forwarding address." }),
+            json!({ "code": ServerCode::MailboxNotFound.as_str(), "error": "No such forwarding address." }),
         ))
     };
     match path {
