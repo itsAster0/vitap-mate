@@ -287,8 +287,8 @@ async fn a_file_link_carries_the_session_and_never_its_secrets_in_debug() {
     );
     assert!(link.url.contains("_csrf=") && !link.cookie.is_empty());
     assert_eq!(
-        (link.name.as_str(), link.mime.as_str()),
-        ("Unit 1.pdf", "application/pdf")
+        (link.name.as_str(), link.mime.as_deref()),
+        ("Unit 1.pdf", Some("application/pdf"))
     );
     let debug = format!("{link:?}");
     assert!(
@@ -302,6 +302,30 @@ async fn a_file_link_carries_the_session_and_never_its_secrets_in_debug() {
             .is_err()
     );
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_file_link_without_a_type_has_none() {
+    let link = |file_name: &str, content_type: &str| {
+        file_link(
+            vtop_core::client::FileLink {
+                url: "u".into(),
+                cookie: "c".into(),
+                file_name: file_name.into(),
+                content_type: content_type.into(),
+            },
+            "course-plan",
+        )
+    };
+    assert_eq!(link("Plan.xls", "").mime, None);
+    assert_eq!(link("Plan.xls", " ; charset=binary").mime, None);
+    assert_eq!(
+        link("Plan.xls", "Application/PDF; charset=binary")
+            .mime
+            .as_deref(),
+        Some("application/pdf")
+    );
+    assert_eq!(link(" ", "").name, "course-plan");
 }
 
 #[tokio::test]

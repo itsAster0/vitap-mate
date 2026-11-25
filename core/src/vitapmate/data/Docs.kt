@@ -56,8 +56,8 @@ data class Doc(
     val id: String,
     val name: String,
     val file: String,
-    /** Empty only for a document still in app storage from before (moved out at start). */
-    val uri: String,
+    /** Null only for a document still in app storage from before (moved out at start). */
+    val uri: String?,
     val kind: DocKind,
     val size: Long,
     val source: String,
@@ -228,17 +228,20 @@ object Docs {
         }
     }
 
-    /** Where [doc]'s file is. */
-    fun uriOf(doc: Doc): Uri = Uri.parse(doc.uri)
+    /** Where [doc]'s file is; null while it is still in app storage from before. */
+    fun uriOf(doc: Doc): Uri? = doc.uri?.let(Uri::parse)
+
+    /** [doc]'s file in the download folder, to read. */
+    private fun fileOf(doc: Doc): Uri = uriOf(doc) ?: error("not in the download folder yet")
 
     /** Whether [doc]'s file is still there (it can be deleted in a file manager). Disk/binder: off the main thread. */
-    fun exists(doc: Doc): Boolean = doc.uri.isNotEmpty() && Downloads.exists(uriOf(doc))
+    fun exists(doc: Doc): Boolean = uriOf(doc)?.let(Downloads::exists) == true
 
     /** [doc]'s file for reading in place (PdfRenderer). */
     fun open(doc: Doc): ParcelFileDescriptor =
-        ctx.contentResolver.openFileDescriptor(uriOf(doc), "r") ?: error("can't open the file")
+        ctx.contentResolver.openFileDescriptor(fileOf(doc), "r") ?: error("can't open the file")
 
-    fun readBytes(doc: Doc): ByteArray = (ctx.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { it.readBytes() }
+    fun readBytes(doc: Doc): ByteArray = (ctx.contentResolver.openInputStream(fileOf(doc)) ?: error("can't open the file")).use { it.readBytes() }
 
     /**
      * Runs [block] on a temporary copy of [doc] in the cache, for APIs that need a [File] (a zip
@@ -247,7 +250,7 @@ object Docs {
     fun <T> withFile(doc: Doc, block: (File) -> T): T {
         val tmp = File(File(ctx.cacheDir, "docs").apply { mkdirs() }, "${System.nanoTime()}-${doc.file.substringAfterLast('/')}")
         try {
-            (ctx.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { input -> tmp.outputStream().use(input::copyTo) }
+            (ctx.contentResolver.openInputStream(fileOf(doc)) ?: error("can't open the file")).use { input -> tmp.outputStream().use(input::copyTo) }
             return block(tmp)
         } finally {
             tmp.delete()
@@ -307,8 +310,8 @@ object Docs {
         ready.await()
         if (reuse) byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it to true }
         val l = link()
-        val fileName = fileNameOf(l.name, l.mime.ifEmpty { null })
-        val mime = mimeOf(fileName, l.mime.ifEmpty { null })
+        val fileName = fileNameOf(l.name, l.mime)
+        val mime = mimeOf(fileName, l.mime)
         val manager = context.getSystemService(DownloadManager::class.java)
         // Downloads/vitapmate: DownloadManager writes the file there itself (Android 10+). A chosen
         // folder is a SAF tree it can't write, so the file streams in from its cache once done.
@@ -407,7 +410,7 @@ object Docs {
         ready.await()
         lock.withLock {
             val doc = docs.firstOrNull { it.id == id } ?: return@withLock
-            if (doc.uri.isNotEmpty()) Downloads.delete(uriOf(doc))
+            uriOf(doc)?.let { Downloads.delete(it) }
             state.value = docs - doc
             write()
         }
@@ -461,7 +464,7 @@ object Docs {
         ready.await()
         return lock.withLock {
             // Saving an [id] again replaces it (a re-download); [keep] is the way to reuse a copy.
-            docs.firstOrNull { id != null && it.id == id }?.takeIf { it.uri.isNotEmpty() && it.uri != uri.toString() }?.let { Downloads.delete(uriOf(it)) }
+            docs.firstOrNull { id != null && it.id == id }?.uri?.takeIf { it != uri.toString() }?.let { Downloads.delete(Uri.parse(it)) }
             val doc = Doc(
                 id ?: "doc-${System.currentTimeMillis()}-${counter++}",
                 fileName.substringBeforeLast('.').ifEmpty { fileName },
@@ -491,14 +494,13 @@ object Docs {
         val files = withContext(Dispatchers.IO) { Downloads.list() } ?: return
         lock.withLock {
             val byUri = files.associateBy { it.uri }
-            val known = docs.map { it.uri }.toSet()
+            val known = docs.mapNotNull { it.uri }.toSet()
             val added = files.filter { it.uri !in known }.toMutableList()
             var renamed = 0
             var removed = 0
             val kept = docs.mapNotNull { d ->
-                val file = byUri[d.uri]
+                val file = byUri[d.uri ?: return@mapNotNull d]
                 when {
-                    d.uri.isEmpty() -> d
                     file != null -> if (file.name == d.file) d else d.copy(file = file.name, name = file.name.substringBeforeLast('.'), kind = DocKind.of(file.name))
                     else -> added.firstOrNull { it.size == d.size && DocKind.of(it.name) == d.kind }?.let { moved ->
                         added -= moved
@@ -522,7 +524,7 @@ object Docs {
     private suspend fun remap(moves: Map<String, String>) {
         ready.await()
         lock.withLock {
-            state.value = docs.map { d -> moves[d.uri]?.let { d.copy(uri = it) } ?: d }
+            state.value = docs.map { d -> d.uri?.let(moves::get)?.let { d.copy(uri = it) } ?: d }
             write()
         }
     }
@@ -535,7 +537,7 @@ object Docs {
      */
     private suspend fun migrate() {
         val d = dir ?: return
-        val old = docs.filter { it.uri.isEmpty() }
+        val old = docs.filter { it.uri == null }
         if (old.isEmpty() && d.listFiles().orEmpty().none { it.isDirectory }) return
         flow("docs.migrate") { f ->
             val byName = Downloads.savedByName()
@@ -559,11 +561,11 @@ object Docs {
             lock.withLock {
                 val byId = moved.associateBy { it.id }
                 // Gone everywhere: dropped. Still in app storage after a failed write: kept for next time.
-                state.value = docs.mapNotNull { doc -> if (doc.uri.isNotEmpty()) doc else byId[doc.id] ?: doc.takeIf { File(d, it.file).exists() } }
+                state.value = docs.mapNotNull { doc -> if (doc.uri != null) doc else byId[doc.id] ?: doc.takeIf { File(d, it.file).exists() } }
                 write()
             }
             // Only the index stays in app storage.
-            val keep = docs.filter { it.uri.isEmpty() }.map { it.file.substringBefore('/') }.toSet()
+            val keep = docs.filter { it.uri == null }.map { it.file.substringBefore('/') }.toSet()
             d.listFiles().orEmpty().filter { it.isDirectory && it.name !in keep }.forEach { it.deleteRecursively() }
             Log.info("docs", "moved to download folder", f, mapOf("linked" to "$linked", "written" to "$written", "lost" to "$lost", "count" to "${docs.size}"))
         }

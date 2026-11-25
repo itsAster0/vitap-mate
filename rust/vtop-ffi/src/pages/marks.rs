@@ -90,8 +90,8 @@ pub struct Assessment {
     pub band: ScoreBand,
     /// VTOP's status ("Present", "Absent", ...).
     pub status: String,
-    /// VTOP's remark; empty when it only repeats the score.
-    pub remark: String,
+    /// VTOP's remark; none when blank or it only repeats the score.
+    pub remark: Option<String>,
     /// Re-marks an earlier assessment of the same title.
     pub reevaluation: bool,
     /// When the app first saw it posted, Unix seconds.
@@ -260,11 +260,8 @@ impl From<&MarksRecordEach> for Assessment {
                 ScoreBand::of(percent)
             },
             status: mark.status.trim().to_string(),
-            remark: if number(remark).is_some_and(|r| Some(r) == scored) {
-                String::new()
-            } else {
-                remark.to_string()
-            },
+            remark: (!remark.is_empty() && !number(remark).is_some_and(|r| Some(r) == scored))
+                .then(|| remark.to_string()),
             reevaluation: is_reevaluation(&mark.markstitle),
             posted_at: None,
             scored,
@@ -549,8 +546,10 @@ mod tests {
     fn a_remark_repeating_the_score_is_dropped() {
         let mut repeated = mark("CAT1", "50", "15", "Present", "35.0", "10.5");
         repeated.remark = "35".into();
-        assert_eq!(Assessment::from(&repeated).remark, "");
+        assert_eq!(Assessment::from(&repeated).remark, None);
+        repeated.remark = "  ".into();
+        assert_eq!(Assessment::from(&repeated).remark, None);
         repeated.remark = "Good".into();
-        assert_eq!(Assessment::from(&repeated).remark, "Good");
+        assert_eq!(Assessment::from(&repeated).remark.as_deref(), Some("Good"));
     }
 }

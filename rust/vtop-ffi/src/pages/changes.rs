@@ -29,6 +29,8 @@ pub(crate) const FILE: &str = "changes.json";
 const EXAMS: &str = crate::pages::exams::EXAMS;
 /// A course's lecture plans (`<class>.json`), where its files are listed.
 const PLANS: &str = vtop_core::spec::COURSE_PAGE_DETAIL.file;
+/// The semester as `changes.json` spells it for pages kept outside one (outings).
+const NO_SEMESTER: &str = "-";
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Enum,
@@ -57,10 +59,31 @@ pub struct Change {
     pub body: String,
     /// The attendance course it is about ("CSE4007.theory"), for opening it.
     pub course_key: Option<String>,
-    pub semester: String,
+    /// The semester its page is kept under; none for outings, kept outside any.
+    #[serde(with = "stored_semester")]
+    pub semester: Option<String>,
     /// Bad news the student should act on (below 75%, an outing rejected).
     #[serde(default)]
     pub urgent: bool,
+}
+
+/// How [`Change::semester`] is kept: older apps read a string, [`NO_SEMESTER`] for none.
+mod stored_semester {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    use super::NO_SEMESTER;
+
+    pub(super) fn serialize<S: Serializer>(
+        semester: &Option<String>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        s.serialize_str(semester.as_deref().unwrap_or(NO_SEMESTER))
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+        let semester = String::deserialize(d)?;
+        Ok(Some(semester).filter(|s| !s.is_empty() && s != NO_SEMESTER))
+    }
 }
 
 /// A change before it has an id and a time.

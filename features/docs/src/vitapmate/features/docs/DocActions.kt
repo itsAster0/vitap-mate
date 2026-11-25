@@ -75,11 +75,15 @@ import vitapmate.data.attempt
 
 /**
  * [doc]'s content URI in the download folder, shared as is; a plain file (Android 9 and older,
- * when the public Downloads wasn't writable) goes through the app's FileProvider instead.
+ * when the public Downloads wasn't writable) goes through the app's FileProvider instead. Null
+ * while the document is still being moved there from app storage (a toast says so).
  */
-private fun uriOf(context: Context, doc: Doc): Uri = Docs.uriOf(doc).let { uri ->
+private fun uriOf(context: Context, doc: Doc): Uri? = Docs.uriOf(doc)?.let { uri ->
     val path = uri.path
     if (uri.scheme == "file" && path != null) FileProvider.getUriForFile(context, "${context.packageName}.logs", java.io.File(path)) else uri
+} ?: run {
+    showToast("Not ready yet", "This document is still moving to your download folder.")
+    null
 }
 
 private fun mimeOf(doc: Doc): String =
@@ -88,7 +92,7 @@ private fun mimeOf(doc: Doc): String =
 /** Shares several [docs] at once through the share sheet (one goes through [share]). */
 internal fun shareAll(context: Context, docs: List<Doc>) {
     if (docs.size == 1) return share(context, docs.single())
-    val uris = docs.map { uriOf(context, it) }
+    val uris = docs.map { uriOf(context, it) ?: return }
     val types = docs.map(::mimeOf).distinct()
     val send = Intent(Intent.ACTION_SEND_MULTIPLE)
         .setType(types.singleOrNull() ?: types.map { it.substringBefore('/') }.distinct().singleOrNull()?.let { "$it/*" } ?: "*/*")
@@ -100,7 +104,7 @@ internal fun shareAll(context: Context, docs: List<Doc>) {
 
 /** Shares [doc] through the share sheet. */
 internal fun share(context: Context, doc: Doc) {
-    val uri = uriOf(context, doc)
+    val uri = uriOf(context, doc) ?: return
     val send = Intent(Intent.ACTION_SEND).setType(mimeOf(doc)).putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, doc.name)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     send.clipData = ClipData.newRawUri(doc.name, uri)
@@ -109,7 +113,7 @@ internal fun share(context: Context, doc: Doc) {
 
 /** Opens [doc] in another app; a toast when none can. */
 internal fun openWith(context: Context, doc: Doc) {
-    val view = Intent(Intent.ACTION_VIEW).setDataAndType(uriOf(context, doc), mimeOf(doc)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    val view = Intent(Intent.ACTION_VIEW).setDataAndType(uriOf(context, doc) ?: return, mimeOf(doc)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     try {
         context.startActivity(Intent.createChooser(view, doc.name))
     } catch (_: ActivityNotFoundException) {

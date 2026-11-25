@@ -135,12 +135,12 @@ object CalendarSync {
         val exams = c.cachedExams(f)?.groups.orEmpty().flatMap { g ->
             g.papers.mapNotNull { p ->
                 val day = p.day ?: return@mapNotNull null
-                val about = join(" · ", p.reporting?.let { "Reporting ${clock(it, true)}" }, p.seat.ifEmpty { null }?.let { "Seat $it" }, p.seatNo.ifEmpty { null }?.let { "Seat no. $it" }, p.slot, p.code)
+                val about = join(" · ", p.reporting?.let { "Reporting ${clock(it, true)}" }, p.seat?.let { "Seat $it" }, p.seatNo?.let { "Seat no. $it" }, p.slot, p.code)
                 val key = "exam.${g.name}.${p.key}"
                 val title = "${g.name}: ${p.name}"
                 val start = p.start
-                if (start == null) SyncEvent(key, title, day * DAY_MS, (day + 1) * DAY_MS, true, p.venue, about)
-                else SyncEvent(key, title, at(day, start), at(day, p.end ?: (start + 180)), false, p.venue, about)
+                if (start == null) SyncEvent(key, title, day * DAY_MS, (day + 1) * DAY_MS, true, p.venue.orEmpty(), about)
+                else SyncEvent(key, title, at(day, start), at(day, p.end ?: (start + 180)), false, p.venue.orEmpty(), about)
             }
         }
         // A run of days with one title (a week of CATs) is one all-day event.

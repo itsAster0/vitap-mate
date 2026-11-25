@@ -12739,9 +12739,9 @@ data class Assessment (
     val `status`: kotlin.String
     , 
     /**
-     * VTOP's remark; empty when it only repeats the score.
+     * VTOP's remark; none when blank or it only repeats the score.
      */
-    val `remark`: kotlin.String
+    val `remark`: kotlin.String?
     , 
     /**
      * Re-marks an earlier assessment of the same title.
@@ -12776,7 +12776,7 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
             FfiConverterOptionalDouble.read(buf),
             FfiConverterTypeScoreBand.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalLong.read(buf),
         )
@@ -12791,7 +12791,7 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
             FfiConverterOptionalDouble.allocationSize(value.`percent`) +
             FfiConverterTypeScoreBand.allocationSize(value.`band`) +
             FfiConverterString.allocationSize(value.`status`) +
-            FfiConverterString.allocationSize(value.`remark`) +
+            FfiConverterOptionalString.allocationSize(value.`remark`) +
             FfiConverterBoolean.allocationSize(value.`reevaluation`) +
             FfiConverterOptionalLong.allocationSize(value.`postedAt`)
     )
@@ -12805,7 +12805,7 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
             FfiConverterOptionalDouble.write(value.`percent`, buf)
             FfiConverterTypeScoreBand.write(value.`band`, buf)
             FfiConverterString.write(value.`status`, buf)
-            FfiConverterString.write(value.`remark`, buf)
+            FfiConverterOptionalString.write(value.`remark`, buf)
             FfiConverterBoolean.write(value.`reevaluation`, buf)
             FfiConverterOptionalLong.write(value.`postedAt`, buf)
     }
@@ -13753,7 +13753,10 @@ data class Change (
      */
     val `courseKey`: kotlin.String?
     , 
-    val `semester`: kotlin.String
+    /**
+     * The semester its page is kept under; none for outings, kept outside any.
+     */
+    val `semester`: kotlin.String?
     , 
     /**
      * Bad news the student should act on (below 75%, an outing rejected).
@@ -13781,7 +13784,7 @@ public object FfiConverterTypeChange: FfiConverterRustBuffer<Change> {
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
         )
     }
@@ -13793,7 +13796,7 @@ public object FfiConverterTypeChange: FfiConverterRustBuffer<Change> {
             FfiConverterString.allocationSize(value.`title`) +
             FfiConverterString.allocationSize(value.`body`) +
             FfiConverterOptionalString.allocationSize(value.`courseKey`) +
-            FfiConverterString.allocationSize(value.`semester`) +
+            FfiConverterOptionalString.allocationSize(value.`semester`) +
             FfiConverterBoolean.allocationSize(value.`urgent`)
     )
 
@@ -13804,7 +13807,7 @@ public object FfiConverterTypeChange: FfiConverterRustBuffer<Change> {
             FfiConverterString.write(value.`title`, buf)
             FfiConverterString.write(value.`body`, buf)
             FfiConverterOptionalString.write(value.`courseKey`, buf)
-            FfiConverterString.write(value.`semester`, buf)
+            FfiConverterOptionalString.write(value.`semester`, buf)
             FfiConverterBoolean.write(value.`urgent`, buf)
     }
 }
@@ -14534,9 +14537,9 @@ public object FfiConverterTypeDayClass: FfiConverterRustBuffer<DayClass> {
 data class Debar (
     /**
      * "CAT-I", "CAT-II", "FAT" (the calendar's names), or VTOP's text;
-     * empty when VTOP names none.
+     * none when VTOP names none.
      */
-    val `exam`: kotlin.String
+    val `exam`: kotlin.String?
     , 
     /**
      * VTOP's "Debarred & Permitted": let in after all.
@@ -14563,20 +14566,20 @@ data class Debar (
 public object FfiConverterTypeDebar: FfiConverterRustBuffer<Debar> {
     override fun read(buf: ByteBuffer): Debar {
         return Debar(
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
         )
     }
 
     override fun allocationSize(value: Debar) = (
-            FfiConverterString.allocationSize(value.`exam`) +
+            FfiConverterOptionalString.allocationSize(value.`exam`) +
             FfiConverterBoolean.allocationSize(value.`permitted`) +
             FfiConverterOptionalString.allocationSize(value.`nextExam`)
     )
 
     override fun write(value: Debar, buf: ByteBuffer) {
-            FfiConverterString.write(value.`exam`, buf)
+            FfiConverterOptionalString.write(value.`exam`, buf)
             FfiConverterBoolean.write(value.`permitted`, buf)
             FfiConverterOptionalString.write(value.`nextExam`, buf)
     }
@@ -14985,7 +14988,7 @@ public object FfiConverterTypeFieldGroup: FfiConverterRustBuffer<FieldGroup> {
 /**
  * A course page file or outing pass for Android's DownloadManager, which fetches it straight from VTOP: the
  * URL (its CSRF token in the query) and the `Cookie` header, both secrets that are never logged;
- * VTOP's name for it (else a name from the link) and its type ("application/pdf").
+ * VTOP's name for it (else a name from the link) and its type ("application/pdf"), when VTOP sends one.
  */
 data class FileLink (
     val `url`: kotlin.String
@@ -14994,7 +14997,7 @@ data class FileLink (
     , 
     val `name`: kotlin.String
     , 
-    val `mime`: kotlin.String
+    val `mime`: kotlin.String?
     
 ){
     
@@ -15014,7 +15017,7 @@ public object FfiConverterTypeFileLink: FfiConverterRustBuffer<FileLink> {
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -15022,14 +15025,14 @@ public object FfiConverterTypeFileLink: FfiConverterRustBuffer<FileLink> {
             FfiConverterString.allocationSize(value.`url`) +
             FfiConverterString.allocationSize(value.`cookie`) +
             FfiConverterString.allocationSize(value.`name`) +
-            FfiConverterString.allocationSize(value.`mime`)
+            FfiConverterOptionalString.allocationSize(value.`mime`)
     )
 
     override fun write(value: FileLink, buf: ByteBuffer) {
             FfiConverterString.write(value.`url`, buf)
             FfiConverterString.write(value.`cookie`, buf)
             FfiConverterString.write(value.`name`, buf)
-            FfiConverterString.write(value.`mime`, buf)
+            FfiConverterOptionalString.write(value.`mime`, buf)
     }
 }
 
@@ -18308,18 +18311,18 @@ data class ScheduledPaper (
     val `reporting`: kotlin.Int?
     , 
     /**
-     * "FN" / "AN"; empty when VTOP gives none.
+     * "FN" / "AN"; none when VTOP gives none (blank or "-"), as for the rest.
      */
-    val `session`: kotlin.String
+    val `session`: kotlin.String?
     , 
-    val `venue`: kotlin.String
+    val `venue`: kotlin.String?
     , 
     /**
      * "R6 · C6" for VTOP's "R6C6", else as given.
      */
-    val `seat`: kotlin.String
+    val `seat`: kotlin.String?
     , 
-    val `seatNo`: kotlin.String
+    val `seatNo`: kotlin.String?
     
 ){
     
@@ -18346,10 +18349,10 @@ public object FfiConverterTypeScheduledPaper: FfiConverterRustBuffer<ScheduledPa
             FfiConverterOptionalInt.read(buf),
             FfiConverterOptionalInt.read(buf),
             FfiConverterOptionalInt.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -18364,10 +18367,10 @@ public object FfiConverterTypeScheduledPaper: FfiConverterRustBuffer<ScheduledPa
             FfiConverterOptionalInt.allocationSize(value.`start`) +
             FfiConverterOptionalInt.allocationSize(value.`end`) +
             FfiConverterOptionalInt.allocationSize(value.`reporting`) +
-            FfiConverterString.allocationSize(value.`session`) +
-            FfiConverterString.allocationSize(value.`venue`) +
-            FfiConverterString.allocationSize(value.`seat`) +
-            FfiConverterString.allocationSize(value.`seatNo`)
+            FfiConverterOptionalString.allocationSize(value.`session`) +
+            FfiConverterOptionalString.allocationSize(value.`venue`) +
+            FfiConverterOptionalString.allocationSize(value.`seat`) +
+            FfiConverterOptionalString.allocationSize(value.`seatNo`)
     )
 
     override fun write(value: ScheduledPaper, buf: ByteBuffer) {
@@ -18381,10 +18384,10 @@ public object FfiConverterTypeScheduledPaper: FfiConverterRustBuffer<ScheduledPa
             FfiConverterOptionalInt.write(value.`start`, buf)
             FfiConverterOptionalInt.write(value.`end`, buf)
             FfiConverterOptionalInt.write(value.`reporting`, buf)
-            FfiConverterString.write(value.`session`, buf)
-            FfiConverterString.write(value.`venue`, buf)
-            FfiConverterString.write(value.`seat`, buf)
-            FfiConverterString.write(value.`seatNo`, buf)
+            FfiConverterOptionalString.write(value.`session`, buf)
+            FfiConverterOptionalString.write(value.`venue`, buf)
+            FfiConverterOptionalString.write(value.`seat`, buf)
+            FfiConverterOptionalString.write(value.`seatNo`, buf)
     }
 }
 
@@ -18961,9 +18964,10 @@ data class StoredDoc (
     val `file`: kotlin.String
     , 
     /**
-     * Empty only for a document still in app storage from before.
+     * None only for a document still in app storage from before. Older apps wrote that as "",
+     * and read a missing one as "", so none is left out.
      */
-    val `uri`: kotlin.String
+    val `uri`: kotlin.String?
     , 
     /**
      * The Kotlin `DocKind` name; empty or unknown, the app takes it from [`StoredDoc::file`].
@@ -19002,7 +19006,7 @@ public object FfiConverterTypeStoredDoc: FfiConverterRustBuffer<StoredDoc> {
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterString.read(buf),
@@ -19018,7 +19022,7 @@ public object FfiConverterTypeStoredDoc: FfiConverterRustBuffer<StoredDoc> {
             FfiConverterString.allocationSize(value.`id`) +
             FfiConverterString.allocationSize(value.`name`) +
             FfiConverterString.allocationSize(value.`file`) +
-            FfiConverterString.allocationSize(value.`uri`) +
+            FfiConverterOptionalString.allocationSize(value.`uri`) +
             FfiConverterString.allocationSize(value.`kind`) +
             FfiConverterLong.allocationSize(value.`size`) +
             FfiConverterString.allocationSize(value.`source`) +
@@ -19033,7 +19037,7 @@ public object FfiConverterTypeStoredDoc: FfiConverterRustBuffer<StoredDoc> {
             FfiConverterString.write(value.`id`, buf)
             FfiConverterString.write(value.`name`, buf)
             FfiConverterString.write(value.`file`, buf)
-            FfiConverterString.write(value.`uri`, buf)
+            FfiConverterOptionalString.write(value.`uri`, buf)
             FfiConverterString.write(value.`kind`, buf)
             FfiConverterLong.write(value.`size`, buf)
             FfiConverterString.write(value.`source`, buf)

@@ -274,8 +274,8 @@ object LiveUpdates {
             .setProgress((now - p.start + EXAM_LEAD_MIN).coerceIn(0, EXAM_LEAD_MIN + length))
             .setStyledByProgress(true)
         val text = listOfNotNull(
-            p.paper.venue.ifEmpty { null },
-            p.paper.seat.ifEmpty { null }?.let { "Seat $it" },
+            p.paper.venue,
+            p.paper.seat?.let { "Seat $it" },
             "${clock(p.start % 1440, h24)} – ${clock(p.end % 1440, h24)}",
             p.paper.reporting?.takeIf { !started }?.let { "report by ${clock(it, h24)}" },
         ).joinToString(" · ")
@@ -285,7 +285,7 @@ object LiveUpdates {
             .setContentText(text)
             .setSubText(if (started) "Exam on now" else "Exam soon")
             .setStyle(style)
-            .setShortCriticalText(p.paper.venue.ifEmpty { clock(p.start % 1440, h24) })
+            .setShortCriticalText(p.paper.venue ?: clock(p.start % 1440, h24))
             .setWhen(atMinute(ms, if (started) p.end else p.start))
             .setShowWhen(true)
             .setUsesChronometer(true)

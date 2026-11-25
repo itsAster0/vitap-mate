@@ -47,7 +47,9 @@ internal suspend fun openCourseFile(
             }
             Docs.opened(doc.id)
             val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(doc.file.substringAfterLast('.', "").lowercase()) ?: "*/*"
-            val uri = Docs.uriOf(doc).let { u -> u.path?.takeIf { u.scheme == "file" }?.let { FileProvider.getUriForFile(context, "${context.packageName}.logs", File(it)) } ?: u }
+            // Just saved, so in the download folder.
+            val saved = Docs.uriOf(doc) ?: error("not saved")
+            val uri = saved.let { u -> u.path?.takeIf { u.scheme == "file" }?.let { FileProvider.getUriForFile(context, "${context.packageName}.logs", File(it)) } ?: u }
             try {
                 context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (_: ActivityNotFoundException) {

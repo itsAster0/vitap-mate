@@ -26,9 +26,14 @@ pub struct StoredDoc {
     pub name: String,
     /// Its file name in the download folder (the kind and type come from it).
     pub file: String,
-    /// Empty only for a document still in app storage from before.
-    #[serde(default)]
-    pub uri: String,
+    /// None only for a document still in app storage from before. Older apps wrote that as "",
+    /// and read a missing one as "", so none is left out.
+    #[serde(
+        default,
+        deserialize_with = "blank_is_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub uri: Option<String>,
     /// The Kotlin `DocKind` name; empty or unknown, the app takes it from [`StoredDoc::file`].
     #[serde(default)]
     pub kind: String,
@@ -54,6 +59,10 @@ fn imported() -> String {
 
 fn whole() -> f64 {
     1.0
+}
+
+fn blank_is_none<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    Ok(Option::<String>::deserialize(d)?.filter(|uri| !uri.is_empty()))
 }
 
 fn readable_docs<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<StoredDoc>, D::Error> {
@@ -114,7 +123,7 @@ mod tests {
             id: "doc-1".into(),
             name: "Mess menu".into(),
             file: "Mess menu.xlsx".into(),
-            uri: "content://media/1".into(),
+            uri: Some("content://media/1".into()),
             kind: "Spreadsheet".into(),
             size: 2048,
             source: "import".into(),
@@ -149,7 +158,7 @@ mod tests {
                 id: "doc-1".into(),
                 name: "Mess menu".into(),
                 file: "doc-1/Mess menu.xlsx".into(),
-                uri: String::new(),
+                uri: None,
                 kind: String::new(),
                 size: 0,
                 source: "import".into(),
@@ -168,6 +177,28 @@ mod tests {
             })
         );
         assert_eq!(decode_doc_index("not json".into()), None);
+    }
+
+    #[test]
+    fn a_doc_still_in_app_storage_has_no_uri() {
+        let old = StoredDoc {
+            uri: None,
+            file: "doc-1/Mess menu.xlsx".into(),
+            ..doc()
+        };
+        let index = StoredDocIndex {
+            sort: "RecentlyAdded".into(),
+            docs: vec![old],
+        };
+        // Left out, which older apps read as "".
+        let text = encode_doc_index(index.clone());
+        assert!(!text.contains("uri"), "{text}");
+        assert_eq!(decode_doc_index(text.clone()), Some(index.clone()));
+        // What older apps wrote for one: "" or null.
+        for uri in [r#""uri":"","#, r#""uri":null,"#] {
+            let old = text.replace(r#""kind""#, &format!(r#"{uri}"kind""#));
+            assert_eq!(decode_doc_index(old), Some(index.clone()));
+        }
     }
 
     #[test]

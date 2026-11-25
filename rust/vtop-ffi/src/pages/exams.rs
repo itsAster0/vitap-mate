@@ -53,12 +53,12 @@ pub struct ScheduledPaper {
     pub start: Option<i32>,
     pub end: Option<i32>,
     pub reporting: Option<i32>,
-    /// "FN" / "AN"; empty when VTOP gives none.
-    pub session: String,
-    pub venue: String,
+    /// "FN" / "AN"; none when VTOP gives none (blank or "-"), as for the rest.
+    pub session: Option<String>,
+    pub venue: Option<String>,
     /// "R6 · C6" for VTOP's "R6C6", else as given.
-    pub seat: String,
-    pub seat_no: String,
+    pub seat: Option<String>,
+    pub seat_no: Option<String>,
 }
 
 #[uniffi::export]
@@ -232,14 +232,14 @@ impl From<&ExamScheduleRecord> for ScheduledPaper {
             } else {
                 ClassKind::Theory
             },
-            slot: value(&record.slot),
+            slot: value(&record.slot).unwrap_or_default(),
             day: records::history_day(&record.exam_date),
             start: start.or_else(|| records::minutes(&record.exam_time)),
             end,
             reporting: records::minutes(&record.reporting_time),
             session: value(&record.exam_session),
             venue: value(&record.venue),
-            seat: seat(&value(&record.seat_location)),
+            seat: value(&record.seat_location).map(|raw| seat(&raw)),
             seat_no: value(&record.seat_no),
             course_type,
             code,
@@ -247,10 +247,10 @@ impl From<&ExamScheduleRecord> for ScheduledPaper {
     }
 }
 
-/// VTOP's cell, empty for "-".
-fn value(raw: &str) -> String {
+/// VTOP's cell; none when blank or "-".
+fn value(raw: &str) -> Option<String> {
     let raw = raw.trim();
-    if raw == "-" { "" } else { raw }.to_string()
+    (!raw.is_empty() && raw != "-").then(|| raw.to_string())
 }
 
 /// "R6C6" → "R6 · C6"; anything else as given.
@@ -338,14 +338,14 @@ mod tests {
             (Some(570), Some(660), Some(555))
         );
         assert_eq!(
-            (first.seat.as_str(), first.session.as_str()),
-            ("R6 · C6", "FN")
+            (first.seat.as_deref(), first.session.as_deref()),
+            (Some("R6 · C6"), Some("FN"))
         );
         assert_eq!(cat2[2].kind, ClassKind::Lab);
         let undated = &exams.groups[2].papers[0];
         assert_eq!(
-            (undated.day, undated.start, undated.venue.as_str()),
-            (None, None, "AB1-101")
+            (undated.day, undated.start, undated.venue.as_deref()),
+            (None, None, Some("AB1-101"))
         );
         // CAT-I is over; CAT-II is still to come.
         assert_eq!(exams.opens, 1);
@@ -437,7 +437,9 @@ mod tests {
         assert_eq!(seat("r12c3"), "R12 · C3");
         assert_eq!(seat("Row 2"), "Row 2");
         assert_eq!(seat("RC"), "RC");
-        assert_eq!(value(" - "), "");
+        assert_eq!(value(" - "), None);
+        assert_eq!(value("  "), None);
+        assert_eq!(value(" AB1-101 ").as_deref(), Some("AB1-101"));
         assert_eq!(rank("CAT-III"), 3);
         assert!(rank("FAT") < rank("Lab"));
         assert!(rank("CAT") < rank("FAT"));

@@ -139,8 +139,8 @@ pub struct AttendanceCourse {
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct Debar {
     /// "CAT-I", "CAT-II", "FAT" (the calendar's names), or VTOP's text;
-    /// empty when VTOP names none.
-    pub exam: String,
+    /// none when VTOP names none.
+    pub exam: Option<String>,
     /// VTOP's "Debarred & Permitted": let in after all.
     pub permitted: bool,
     /// The exam attendance is checked for next ("FAT" after "CAT-II").

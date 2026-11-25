@@ -197,8 +197,8 @@ pub(super) fn exams(exams: &Exams, today: i32) -> Option<WrappedExams> {
         .groups
         .iter()
         .flat_map(|group| &group.papers)
-        .filter(|paper| paper.day.is_some_and(|day| day < today) && !paper.venue.is_empty())
-        .map(|paper| (paper.venue.clone(), 1));
+        .filter(|paper| paper.day.is_some_and(|day| day < today))
+        .filter_map(|paper| paper.venue.clone().map(|venue| (venue, 1)));
     (cats + fats > 0).then(|| WrappedExams {
         cats,
         fats,

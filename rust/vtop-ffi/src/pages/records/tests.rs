@@ -170,18 +170,19 @@ fn debar_status_names_the_exam() {
     let debar = Debar::parse("CAT - II : Debarred & Permitted").unwrap();
     assert_eq!(
         (
-            debar.exam.as_str(),
+            debar.exam.as_deref(),
             debar.permitted,
             debar.next_exam.as_deref()
         ),
-        ("CAT-II", true, Some("FAT"))
+        (Some("CAT-II"), true, Some("FAT"))
     );
     let debar = Debar::parse("FAT : Debarred").unwrap();
     assert_eq!(
-        (debar.exam.as_str(), debar.permitted, debar.next_exam),
-        ("FAT", false, None)
+        (debar.exam.as_deref(), debar.permitted, debar.next_exam),
+        (Some("FAT"), false, None)
     );
-    assert_eq!(Debar::parse("Debarred").unwrap().exam, "");
+    assert_eq!(Debar::parse("Debarred").unwrap().exam, None);
+    assert_eq!(Debar::parse(" : Debarred").unwrap().exam, None);
     assert_eq!(Debar::parse("-"), None);
 }
 

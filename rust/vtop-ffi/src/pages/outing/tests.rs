@@ -638,8 +638,8 @@ async fn weekend_cancel_and_pass() {
     );
     assert!(!link.cookie.is_empty());
     assert_eq!(
-        (link.name.as_str(), link.mime.as_str()),
-        ("Outing pass W9.pdf", "application/pdf")
+        (link.name.as_str(), link.mime.as_deref()),
+        ("Outing pass W9.pdf", Some("application/pdf"))
     );
 
     // Signing out drops the cached lists.

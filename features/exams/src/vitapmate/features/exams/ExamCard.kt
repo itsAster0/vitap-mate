@@ -80,7 +80,7 @@ internal fun ExamCard(
                     name,
                     paper.day?.let { formatDay(it, "EEEE d MMMM") },
                     paper.start?.let { clock(it, h24) },
-                    paper.venue.ifBlank { null },
+                    paper.venue,
                     if (next) "next" else null,
                 ).joinToString(", ")
             },
@@ -134,7 +134,7 @@ private fun Full(paper: ScheduledPaper, today: Int, minute: Int, next: Boolean, 
             Spacer(Modifier.width(Space.md))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    paper.start?.let { clock(it, h24) } ?: paper.session.ifBlank { "–" },
+                    paper.start?.let { clock(it, h24) } ?: paper.session ?: "–",
                     style = MaterialTheme.typography.titleMediumEmphasized.nums(),
                 )
                 paper.end?.let {
@@ -142,12 +142,12 @@ private fun Full(paper: ScheduledPaper, today: Int, minute: Int, next: Boolean, 
                 }
             }
         }
-        val facts = listOf(
-            "Venue" to paper.venue,
-            "Seat no." to paper.seatNo,
-            "Seat" to paper.seat,
-            "Report" to (paper.reporting?.let { clock(it, h24) } ?: ""),
-        ).filter { it.second.isNotBlank() }
+        val facts = listOfNotNull(
+            paper.venue?.let { "Venue" to it },
+            paper.seatNo?.let { "Seat no." to it },
+            paper.seat?.let { "Seat" to it },
+            paper.reporting?.let { "Report" to clock(it, h24) },
+        )
         // In tiles, two to a row; on the next paper, where to go and sit read larger.
         val tile = if (next) AppTheme.colors.card else scheme.surfaceContainerHigh
         if (facts.isNotEmpty()) Column(Modifier.padding(top = Space.md).clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -186,7 +186,7 @@ private fun Folded(paper: ScheduledPaper, today: Int, h24: Boolean) {
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
             Text(paper.name.ifBlank { paper.code }, style = MaterialTheme.typography.bodyMedium, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (paper.venue.isNotBlank()) Text(paper.venue, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1)
+            paper.venue?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1) }
         }
         paper.start?.let {
             Spacer(Modifier.width(Space.md))

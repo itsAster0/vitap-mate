@@ -355,7 +355,7 @@ abstract class AssistantFunctions : AppFunctionService() {
             }.map { p ->
                 AssistantExam(
                     g.name, p.name, p.code, p.kind == ClassKind.LAB, p.day?.let { formatDay(it, "yyyy-MM-dd") },
-                    p.start?.let { hhmm(it) }, p.end?.let { hhmm(it) }, p.reporting?.let { hhmm(it) }, p.session, p.venue, p.seat,
+                    p.start?.let { hhmm(it) }, p.end?.let { hhmm(it) }, p.reporting?.let { hhmm(it) }, p.session.orEmpty(), p.venue.orEmpty(), p.seat.orEmpty(),
                 )
             }
         }

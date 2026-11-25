@@ -125,7 +125,7 @@ object BackgroundSync {
     /** A sample change through [notify] (Developer → Show a test notification). */
     fun notifyTest(context: Context) = notify(
         context,
-        listOf(Change("test", ChangeKind.ATTENDANCE, System.currentTimeMillis(), "Sample course (Theory)", "Attendance posted · 1 class present, now 92%", null, "", false)),
+        listOf(Change("test", ChangeKind.ATTENDANCE, System.currentTimeMillis(), "Sample course (Theory)", "Attendance posted · 1 class present, now 92%", null, null, false)),
     )
 
     /**

@@ -109,13 +109,13 @@ pub struct Material {
 
 /// A course page file or outing pass for Android's DownloadManager, which fetches it straight from VTOP: the
 /// URL (its CSRF token in the query) and the `Cookie` header, both secrets that are never logged;
-/// VTOP's name for it (else a name from the link) and its type ("application/pdf").
+/// VTOP's name for it (else a name from the link) and its type ("application/pdf"), when VTOP sends one.
 #[derive(Clone, PartialEq, uniffi::Record)]
 pub struct FileLink {
     pub url: String,
     pub cookie: String,
     pub name: String,
-    pub mime: String,
+    pub mime: Option<String>,
 }
 
 impl std::fmt::Debug for FileLink {
@@ -321,7 +321,8 @@ pub(crate) fn file_link(link: vtop_core::client::FileLink, fallback: &str) -> Fi
         .unwrap_or_default()
         .trim()
         .to_ascii_lowercase();
-    info!(%mime, "file link ready");
+    let mime = Some(mime).filter(|mime| !mime.is_empty());
+    info!(?mime, "file link ready");
     FileLink {
         url: link.url,
         cookie: link.cookie,

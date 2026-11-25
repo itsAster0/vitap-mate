@@ -65,8 +65,8 @@ object ExamsWidget : GlanceAppWidget() {
                 .filter { (_, p) -> p.day.let { it != null && (it > today || it == today && (p.end ?: p.start ?: 1440) > now) } }
                 .sortedWith(compareBy({ it.second.day }, { it.second.start }))
                 .map { (exam, p) ->
-                    val seat = p.seat.ifEmpty { p.seatNo.takeIf { it.isNotEmpty() }?.let { "Seat $it" }.orEmpty() }
-                    Paper(exam, p.name, p.day!!, p.start?.let { clock(it, h24) } ?: p.session, p.venue, seat)
+                    val seat = p.seat ?: p.seatNo?.let { "Seat $it" }
+                    Paper(exam, p.name, p.day!!, p.start?.let { clock(it, h24) } ?: p.session.orEmpty(), p.venue.orEmpty(), seat.orEmpty())
                 }
             Log.info("widget", "exams", f, mapOf("coming" to "${papers.size}", "next_in_days" to "${papers.firstOrNull()?.let { it.day - today }}"))
             Schedule(today, papers)

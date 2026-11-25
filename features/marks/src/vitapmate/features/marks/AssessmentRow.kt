@@ -49,7 +49,7 @@ internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Mo
                 assessment.title,
                 assessment.scoreLabel,
                 weight?.let { "weightage ${it.marks()}, adds ${(assessment.weighted ?: 0.0).marks()}" },
-                assessment.remark.ifBlank { null },
+                assessment.remark,
             ).joinToString(", ")
         },
     ) {
@@ -108,9 +108,9 @@ internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Mo
                 }
             }
         }
-        if (assessment.remark.isNotBlank()) {
+        assessment.remark?.let { remark ->
             Text(
-                assessment.remark,
+                remark,
                 Modifier.padding(top = Space.xs),
                 style = MaterialTheme.typography.labelMedium,
                 color = scheme.onSurfaceVariant,

@@ -18,10 +18,11 @@ impl Debar {
         if !lower.contains("debar") {
             return None;
         }
-        let exam = raw.split_once(':').map_or(String::new(), |(exam, _)| {
-            crate::pages::calendar::exam_name(exam)
-        });
-        let next_exam = match exam.as_str() {
+        let exam = raw
+            .split_once(':')
+            .map(|(exam, _)| crate::pages::calendar::exam_name(exam))
+            .filter(|exam| !exam.is_empty());
+        let next_exam = match exam.as_deref().unwrap_or_default() {
             "CAT-I" => Some("CAT-II".to_string()),
             "CAT-II" => Some("FAT".to_string()),
             _ => None,
@@ -35,10 +36,9 @@ impl Debar {
 
     /// [`AttendanceCourse::debar_line`] for a course standing at `plan`.
     fn line(&self, plan: &Standing, lab: bool) -> String {
-        let mut parts = vec![if self.exam.trim().is_empty() {
-            "Debarred".to_string()
-        } else {
-            format!("Debarred for {}", self.exam)
+        let mut parts = vec![match &self.exam {
+            Some(exam) => format!("Debarred for {exam}"),
+            None => "Debarred".to_string(),
         }];
         if self.permitted {
             parts.push("Permitted".to_string());

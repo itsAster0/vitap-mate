@@ -10,7 +10,7 @@ use tracing::info;
 use vtop_core::types::{AttendanceData, TimetableData};
 
 use super::diff::{Version, detect, labelled};
-use super::{Change, ChangeKind, Context, Draft, EXAMS, FILE, PLANS};
+use super::{Change, ChangeKind, Context, Draft, EXAMS, FILE, NO_SEMESTER, PLANS};
 use crate::pages::grades::GRADES;
 use crate::pages::marks::MARKS;
 use crate::pages::outing::{GENERAL, WEEKEND};
@@ -21,8 +21,6 @@ use crate::{ATTENDANCE, ATTENDANCE_DETAIL, CALENDAR, Core, PAGES, SELECTED, TIME
 const DEDUPE_MS: i64 = 10 * 60 * 1000;
 /// A cap on count besides the app's byte cap ([`Core::trim_changes`]).
 const KEEP: usize = 1000;
-/// The semester part of the primed key for pages kept outside a semester (outings).
-const NO_SEMESTER: &str = "-";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(super) struct Store {
@@ -135,9 +133,9 @@ impl Core {
             return;
         };
         let (semester, page) = match rest.split_once('/') {
-            Some(split) => split,
+            Some((semester, page)) => (Some(semester), page),
             // Outings are kept outside a semester; nothing else there is compared.
-            None if rest == GENERAL || rest == WEEKEND => (NO_SEMESTER, rest),
+            None if rest == GENERAL || rest == WEEKEND => (None, rest),
             None => return,
         };
         if !compared(page) {
@@ -145,7 +143,7 @@ impl Core {
         }
         let picked = self.read_kept::<String>(SELECTED);
         // Grades may come from the semester before the pick (no grades yet in the picked one).
-        if page != GRADES && semester != NO_SEMESTER && picked.as_deref() != Some(semester) {
+        if page != GRADES && semester.is_some() && picked.as_deref() != semester {
             return;
         }
         if !self.at(file).is_file() {
@@ -181,11 +179,11 @@ impl Core {
     }
 
     /// Course code → name, from `semester`'s saved attendance, then its timetable.
-    fn course_names(&self, semester: &str) -> BTreeMap<String, String> {
+    fn course_names(&self, semester: Option<&str>) -> BTreeMap<String, String> {
         let mut names = BTreeMap::new();
-        if semester == NO_SEMESTER {
+        let Some(semester) = semester else {
             return names;
-        }
+        };
         if let Some(data) =
             self.read_kept::<AttendanceData>(&format!("{PAGES}/{semester}/{ATTENDANCE}"))
         {
@@ -243,16 +241,27 @@ fn compared(page: &str) -> bool {
 
 /// Marks `semester/page` as written; a new pick starts over. Whether it was primed before (so
 /// its old copy is worth comparing).
-pub(super) fn prime(store: &mut Store, picked: Option<&str>, semester: &str, page: &str) -> bool {
+pub(super) fn prime(
+    store: &mut Store,
+    picked: Option<&str>,
+    semester: Option<&str>,
+    page: &str,
+) -> bool {
     if store.semester.as_deref() != picked {
         store.semester = picked.map(str::to_string);
         store.primed.clear();
     }
+    let semester = semester.unwrap_or(NO_SEMESTER);
     !store.primed.insert(format!("{semester}/{page}"))
 }
 
 /// Adds `drafts` newest first (skipping one seen within [`DEDUPE_MS`]); how many were added.
-pub(super) fn add(store: &mut Store, drafts: Vec<Draft>, semester: &str, at_ms: i64) -> usize {
+pub(super) fn add(
+    store: &mut Store,
+    drafts: Vec<Draft>,
+    semester: Option<&str>,
+    at_ms: i64,
+) -> usize {
     let mut fresh = Vec::new();
     for (n, d) in drafts.into_iter().enumerate() {
         let repeat = store
@@ -273,7 +282,7 @@ pub(super) fn add(store: &mut Store, drafts: Vec<Draft>, semester: &str, at_ms: 
                 title: d.title,
                 body: d.body,
                 course_key: d.course_key,
-                semester: semester.to_string(),
+                semester: semester.map(str::to_string),
                 urgent: d.urgent,
             });
         }

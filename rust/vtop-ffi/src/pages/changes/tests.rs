@@ -483,7 +483,7 @@ fn old_changes_read_subject_first() {
         title: title.into(),
         body: body.into(),
         course_key: key.map(str::to_string),
-        semester: "S".into(),
+        semester: Some("S".into()),
         urgent: false,
     };
     let c = migrate(old(
@@ -543,18 +543,21 @@ fn old_changes_read_subject_first() {
 fn store_primes_dedupes_and_trims() {
     let mut store = Store::default();
     // First write of a page (or first after a new pick) is not compared.
-    assert!(!prime(&mut store, Some("S"), "S", ATTENDANCE));
-    assert!(prime(&mut store, Some("S"), "S", ATTENDANCE));
-    assert!(!prime(&mut store, Some("T"), "T", ATTENDANCE));
+    assert!(!prime(&mut store, Some("S"), Some("S"), ATTENDANCE));
+    assert!(prime(&mut store, Some("S"), Some("S"), ATTENDANCE));
+    assert!(!prime(&mut store, Some("T"), Some("T"), ATTENDANCE));
+    // Outings are kept outside a semester, primed under the key older apps wrote.
+    assert!(!prime(&mut store, Some("T"), None, GENERAL));
+    assert!(store.primed.contains(&format!("-/{GENERAL}")));
     let d = |body: &str| draft(ChangeKind::Marks, "Course", body, "", None);
-    assert_eq!(add(&mut store, vec![d("a")], "S", 1_000), 1);
-    assert_eq!(add(&mut store, vec![d("a"), d("b")], "S", 2_000), 1);
+    assert_eq!(add(&mut store, vec![d("a")], Some("S"), 1_000), 1);
+    assert_eq!(add(&mut store, vec![d("a"), d("b")], Some("S"), 2_000), 1);
     assert_eq!(store.changes[0].body, "b");
     for n in 0..200 {
         add(
             &mut store,
             vec![d(&format!("change {n}"))],
-            "S",
+            Some("S"),
             10_000_000 + n,
         );
     }
@@ -592,4 +595,36 @@ fn core_records_only_after_a_primed_copy() {
     core.clear_changes("t".into());
     assert!(core.changes("t".into()).is_empty());
     let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn change_semester_reads_and_writes_as_older_apps_did() {
+    let change = |semester: Option<&str>| Change {
+        id: "1-0".into(),
+        kind: ChangeKind::Outing,
+        at_ms: 1,
+        title: "General outing".into(),
+        body: "Approved".into(),
+        course_key: None,
+        semester: semester.map(str::to_string),
+        urgent: false,
+    };
+    // Older apps read the semester as a string, "-" for an outing's.
+    let outing = r#"{"id":"1-0","kind":"Outing","at_ms":1,"title":"General outing","body":"Approved","course_key":null,"semester":"-","urgent":false}"#;
+    assert_eq!(serde_json::to_string(&change(None)).unwrap(), outing);
+    assert_eq!(
+        serde_json::from_str::<Change>(outing).unwrap(),
+        change(None)
+    );
+    let picked = outing.replace(r#""semester":"-""#, r#""semester":"S""#);
+    assert_eq!(serde_json::to_string(&change(Some("S"))).unwrap(), picked);
+    assert_eq!(
+        serde_json::from_str::<Change>(&picked).unwrap(),
+        change(Some("S"))
+    );
+    let empty = outing.replace(r#""semester":"-""#, r#""semester":"""#);
+    assert_eq!(
+        serde_json::from_str::<Change>(&empty).unwrap(),
+        change(None)
+    );
 }
