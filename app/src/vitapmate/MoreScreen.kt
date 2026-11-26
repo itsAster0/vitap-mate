@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.LinearWavyProgressIndicator
@@ -37,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -45,7 +48,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.Github
 import com.composables.icons.lucide.Info
+import com.composables.icons.lucide.Instagram
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Pin
@@ -59,7 +64,7 @@ private const val COLUMNS = 3
 
 /**
  * Every feature as tiles under its section ([featureGroups]), the ones in the bar pinned (tapping
- * one switches to its tab), then Settings, the Inspector and the version.
+ * one switches to its tab), then Settings, the Inspector and the version, then the source code and Instagram links.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -149,6 +154,13 @@ fun MoreScreen() {
                     GroupItem("About", "more.about", Lucide.Info, version?.let { "vitapmate $it · what's new and credits" } ?: "What's new and credits", onClick = { nav.push(Route.Screen(UPDATES)) }, trailing = { Chevron() })
                 }
             }
+            item("links") {
+                val uri = LocalUriHandler.current
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), Arrangement.SpaceEvenly, Alignment.CenterVertically) {
+                    FooterLink("Source code", "more.github", Lucide.Github) { uri.openUri(GITHUB) }
+                    FooterLink("Instagram", "more.instagram", Lucide.Instagram) { uri.openUri(INSTAGRAM) }
+                }
+            }
         }
     }
 }
@@ -184,6 +196,13 @@ private fun FeatureTile(feature: Feature, pinned: Boolean, shape: Shape, onClick
         }
     }
 }
+
+/** A muted logo in More's footer that opens its link in the browser; [label] is read out. */
+@Composable
+private fun FooterLink(label: String, tag: String, icon: ImageVector, onClick: () -> Unit) =
+    IconButton(onClick, Modifier.testTag(tag)) {
+        Icon(icon, label, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 
 @Composable
 fun Chevron() = Icon(Lucide.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

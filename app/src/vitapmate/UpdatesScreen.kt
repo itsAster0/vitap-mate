@@ -58,8 +58,8 @@ import vitapmate.ui.rememberGuide
 /** Route id of More → About. */
 const val UPDATES = "updates"
 
-private const val GITHUB = "https://github.com/itsAster0/vitap-mate"
-private const val INSTAGRAM = "https://www.instagram.com/itsaster0/"
+internal const val GITHUB = "https://github.com/itsAster0/vitap-mate"
+internal const val INSTAGRAM = "https://www.instagram.com/itsaster0/"
 
 /** One version's notes: a line on what it is, then what changed, by section. */
 private class Release(val version: String, val summary: String, val sections: Sections)
