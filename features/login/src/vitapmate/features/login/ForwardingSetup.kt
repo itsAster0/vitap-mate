@@ -129,11 +129,24 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
         "In the Gmail where VTOP's mail arrives: Settings → Forwarding → Add a forwarding address, paste yours, then Next → Proceed. " +
             "Leave \"Disable forwarding\" selected."
     }
-    Step(2, "Confirm it", null, null, state = state(2), extra = {
+    // Opening the link is all the app sees: while Gmail's mail is kept, it can be opened again in
+    // case the student left Gmail before tapping Confirm.
+    val reopen = confirmation.link()?.takeIf { current > 2 }
+    Step(2, "Confirm it", null, null, state = state(2), trailing = reopen?.let { link ->
+        {
+            IconButton({ openInChrome(context, link) }, Modifier.testTag("forwarding.confirm_again")) {
+                Icon(Lucide.ExternalLink, "Open Gmail's confirmation again", Modifier.size(18.dp))
+            }
+        }
+    }, extra = {
         if (confirmation != null && current == 2) Confirmation(confirmation, collegeMail)
         if (current == 2) ShowMe { guide = 2 }
     }) {
-        if (current > 2) "Confirmed." else "One tap, here or from Gmail's confirmation. It shows up here on its own."
+        when {
+            current <= 2 -> "One tap, here or from Gmail's confirmation. It shows up here on its own."
+            reopen != null -> "Confirmed. Left Gmail before tapping Confirm? Open it again."
+            else -> "Confirmed."
+        }
     }
     Step(3, "Create the filter", null, null, state = state(3), last = true, extra = {
         if (current == 3) {
@@ -287,11 +300,7 @@ private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?) {
         ConfirmFrom.OWN_OTHER, ConfirmFrom.UNKNOWN -> "Gmail's confirmation for ${confirm.requester ?: "an address"} arrived."
     }
     val tone = if (confirm.from == ConfirmFrom.COLLEGE_INBOX) tones.success else tones.warning
-    val link = when (val by = confirm.confirmBy) {
-        is ConfirmBy.Link -> by.link
-        is ConfirmBy.CodeAndLink -> by.link
-        is ConfirmBy.Code, ConfirmBy.Neither -> null
-    }
+    val link = confirm.link()
     val code = when (val by = confirm.confirmBy) {
         is ConfirmBy.Code -> by.code
         is ConfirmBy.CodeAndLink -> by.code
@@ -320,6 +329,13 @@ private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?) {
             }
         }
     }
+}
+
+/** The confirm link in Gmail's mail, if it has one. */
+internal fun GmailConfirmation?.link(): String? = when (val by = this?.confirmBy) {
+    is ConfirmBy.Link -> by.link
+    is ConfirmBy.CodeAndLink -> by.link
+    is ConfirmBy.Code, ConfirmBy.Neither, null -> null
 }
 
 /** Gmail's confirmation came from a Gmail that isn't the college one: VTOP's OTPs never reach it. */
@@ -394,6 +410,7 @@ internal fun Step(
     tag: String = "forwarding",
     state: StepState = StepState.Plain,
     last: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
     extra: @Composable () -> Unit = {},
     body: () -> String,
 ) {
@@ -424,7 +441,10 @@ internal fun Step(
             }
         }
         Column(Modifier.weight(1f).padding(top = 4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                trailing?.invoke()
+            }
             Text(body(), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
             if (link != null && linkLabel != null) {
                 TextButton({ uri.openUri(link) }, Modifier.testTag("$tag.step$number.link")) {
