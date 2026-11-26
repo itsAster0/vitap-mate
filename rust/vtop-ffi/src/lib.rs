@@ -695,15 +695,13 @@ impl Core {
             return Ok(Signed::Out);
         };
         // An account saved before it kept the regno: this student's saved session has the one
-        // VTOP gave, kept with the account from now on.
-        if account.registration_number.is_none()
-            && let Some(regno) = self
+        // VTOP gave. Only in memory here, as this may run under the slot's lock;
+        // `Core::keep_regno` saves it after the next VTOP call.
+        if account.registration_number.is_none() {
+            account.registration_number = self
                 .read::<PersistedVtopSession>(SESSION)
                 .filter(|saved| saved.username.eq_ignore_ascii_case(&account.username))
-                .and_then(|saved| saved.registration_number)
-        {
-            account.registration_number = Some(regno);
-            self.write_account(&account, rejected);
+                .and_then(|saved| saved.registration_number);
         }
         let session = Session::new(account, &self.shared)?.rejected(rejected);
         let saved = self

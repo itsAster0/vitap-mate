@@ -389,7 +389,9 @@ impl Core {
     /// username.
     pub(crate) async fn keep_regno(&self, slot: &Arc<Slot>) {
         let session = slot.read().await;
-        let Ok(regno) = session.client.registration_number() else {
+        let Some(regno) = (session.client.registration_number().ok())
+            .or_else(|| session.account.registration_number.clone())
+        else {
             return;
         };
         if self.saved_regno().as_deref() != Some(regno.as_str()) {

@@ -997,8 +997,8 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    #[test]
-    fn a_restore_saves_the_regno_the_saved_session_has() {
+    #[tokio::test]
+    async fn a_restore_saves_the_regno_the_saved_session_has() {
         let core = core("restore-regno", &Fake::new("phone-a"));
         let account = Account {
             username: "STUDENT314".into(),
@@ -1011,13 +1011,18 @@ mod tests {
                 "csrf_token": null, "registration_number": "22BCE0001",
             })
         };
-        // Another student's saved session: its regno isn't this account's.
+        // Restored and installed the way `Core::new` does; the regno is saved by the first
+        // `keep_regno`, never while the slot's lock is held.
+        let restore = || {
+            let signed = core.restore_saved().unwrap();
+            *core.slot.lock().unwrap() = signed;
+            assert_eq!(core.saved_regno(), None);
+            core.current().unwrap()
+        };
         core.write_account(&account, false);
-        fs::write(core.at(crate::SESSION), session("OTHER1").to_string()).unwrap();
-        core.restore_saved().unwrap();
-        assert_eq!(core.saved_regno(), None);
         fs::write(core.at(crate::SESSION), session("student314").to_string()).unwrap();
-        core.restore_saved().unwrap();
+        let slot = restore();
+        core.keep_regno(&slot).await;
         assert_eq!(core.saved_regno().as_deref(), Some("22BCE0001"));
         let _ = fs::remove_dir_all(&core.dir);
     }
