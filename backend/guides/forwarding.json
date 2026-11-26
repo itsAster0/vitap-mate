@@ -11,18 +11,21 @@
     },
     {
       "type": "step",
+      "step": 1,
       "title": "Add your address in Gmail",
       "body": "Copy your address from the app. In the Gmail where VTOP's mail arrives, open Settings → See all settings → Forwarding and POP/IMAP, tap Add a forwarding address, paste it, then Next → Proceed → OK. On a phone, use Chrome with ⋮ → Desktop site.",
       "image": "forwarding/1-add.webp"
     },
     {
       "type": "step",
+      "step": 2,
       "title": "Confirm it",
       "body": "Gmail now shows Verify next to your address. Its confirmation mail comes to the app, not your inbox: tap Check, then Confirm in Gmail, or type the code into Gmail's Verify box. Leave \"Disable forwarding\" selected, so only the filter forwards mail.",
       "image": "forwarding/2-verify.webp"
     },
     {
       "type": "step",
+      "step": 3,
       "title": "Reload Gmail",
       "body": "After confirming, reload the Gmail page before you make the filter. Without a reload, the filter has no address to forward to and shows only Add forwarding address, like this.",
       "callout": {
@@ -35,18 +38,21 @@
     },
     {
       "type": "step",
+      "step": 3,
       "title": "Create the filter",
       "body": "Open Filters and Blocked Addresses → Create a new filter. Put {sender} in From, then tap Create filter.",
       "image": "forwarding/3-from.webp"
     },
     {
       "type": "step",
+      "step": 3,
       "title": "Forward it to your address",
       "body": "Tick Forward it to and pick your address. Mark as read keeps the OTP mails out of your unread count. Then tap Create filter.",
       "image": "forwarding/5-forward.webp"
     },
     {
       "type": "step",
+      "step": 3,
       "title": "Done",
       "body": "The filter shows in the list. Back in the app, tap Check: the next VTOP OTP fills in by itself. Mail sent before the filter isn't forwarded.",
       "image": "forwarding/6-done.webp"

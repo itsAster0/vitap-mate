@@ -100,11 +100,25 @@ async fn sets_up_checks_fetches_and_turns_off() {
     seal(
         &core,
         &edge,
-        json!({ "kind": "gmail_confirm", "code": "981234567", "link": null, "requester": "me@vitapstudent.ac.in", "sentAt": 1_700_000_000 }),
+        json!({ "kind": "gmail_confirm", "code": "981234567", "link": null, "requester": "a.22bce0001@vitapstudent.ac.in", "sentAt": 1_700_000_000 }),
     );
     let checked = core.check_forwarding("f".into()).await.unwrap();
     assert_eq!(state(&checked), "waiting");
     let confirm = confirmation(&checked).unwrap();
+    // No regno saved from VTOP: the username is never taken for it, even when they look alike.
+    assert_eq!(confirm.from, ConfirmFrom::Unknown);
+    // A VTOP username that isn't the regno: the college mail names the saved regno.
+    let slot = core.current().unwrap();
+    core.rename_student(&slot, "STUDENT314");
+    let account = crate::Account {
+        username: "STUDENT314".into(),
+        password: "pw".into(),
+        registration_number: Some("22BCE0001".into()),
+    };
+    core.write_account(&account, false);
+    let renamed = confirmation(&core.forwarding_status("f".into())).unwrap();
+    assert_eq!(renamed.from, ConfirmFrom::CollegeInbox);
+    core.rename_student(&slot, "22BCE0001");
     assert_eq!(
         confirm.confirm_by,
         ConfirmBy::Code {
@@ -506,32 +520,53 @@ fn opens_only_gmail_confirm_links() {
 }
 
 #[test]
-fn knows_a_requester_on_the_profile() {
-    let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-req-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(dir.join(PAGES)).unwrap();
-    let core = Core::for_test(&dir);
-    assert_eq!(core.requester_known(Some("me@gmail.com")), None);
-    let profile = json!({
-        "name": "A", "registration_number": "22BCE0001", "vit_email": "a.22bce0001@vitapstudent.ac.in",
+fn tells_who_confirmed() {
+    let profile: StudentProfile = serde_json::from_value(json!({
+        "name": "A", "registration_number": "22BCE0001", "vit_email": "odd.name@vitapstudent.ac.in",
         "program": "", "school": "", "photo": "", "update_time": 0,
         "sections": [{ "title": "PERSONAL", "groups": [{ "title": "", "fields": [
-            { "label": "Email", "value": "Me@Gmail.com, other@x.in" }
-        ] }] }],
-    });
-    fs::write(
-        dir.join(PAGES).join(spec::PROFILE.file),
-        profile.to_string(),
-    )
+            { "label": "Email", "value": "Me@Gmail.com, other@x.in" } ] }] }],
+    }))
     .unwrap();
-    assert_eq!(core.requester_known(Some("me@gmail.com")), Some(true));
+    let p = Some(&profile);
+    let r = Some("22BCE0001");
+    let college = ConfirmFrom::CollegeInbox;
     assert_eq!(
-        core.requester_known(Some("a.22bce0001@vitapstudent.ac.in")),
-        Some(true)
+        confirm_from(Some("a.22bce0001@vitapstudent.ac.in"), r, None),
+        college
     );
-    assert_eq!(core.requester_known(Some("someone@gmail.com")), Some(false));
-    assert_eq!(core.requester_known(None), None);
-    let _ = fs::remove_dir_all(&dir);
+    assert_eq!(
+        confirm_from(Some(" Ann <A.22BCE0001@VITAPSTUDENT.AC.IN> "), r, None),
+        college
+    );
+    assert_eq!(
+        confirm_from(Some("odd.name@vitapstudent.ac.in"), None, p),
+        college
+    );
+    let mut padded = profile.clone();
+    padded.vit_email = "  odd.name@vitapstudent.ac.in \n".into();
+    assert_eq!(
+        confirm_from(Some("odd.name@vitapstudent.ac.in"), None, Some(&padded)),
+        college
+    );
+    assert_eq!(
+        confirm_from(Some("b.22bce0002@vitapstudent.ac.in"), r, p),
+        ConfirmFrom::Unknown
+    );
+    assert_eq!(
+        confirm_from(Some("me@gmail.com"), r, p),
+        ConfirmFrom::OwnOther
+    );
+    assert_eq!(
+        confirm_from(Some("someone@gmail.com"), r, p),
+        ConfirmFrom::Unknown
+    );
+    assert_eq!(
+        confirm_from(Some("someone@gmail.com"), r, None),
+        ConfirmFrom::Unknown
+    );
+    assert_eq!(confirm_from(None, r, p), ConfirmFrom::NotSaid);
+    assert_eq!(confirm_from(Some("  "), r, p), ConfirmFrom::NotSaid);
 }
 
 #[tokio::test]
@@ -922,6 +957,7 @@ fn an_address_kept_from_v2_is_not_on_until_rejoined() {
         Forwarding::Waiting {
             last_mail_at: None,
             confirmation: None,
+            step: SetupStep::Rejoining,
             ..
         }
     ));
@@ -1072,4 +1108,146 @@ fn signed_out_of_the_server_the_address_waits_to_rejoin() {
     assert_eq!(joined.unjoined(), waiting);
     assert_eq!(waiting.clone().unjoined(), waiting);
     assert_eq!(MailboxState::Off.unjoined(), MailboxState::Off);
+}
+
+fn step(forwarding: &Forwarding) -> Option<SetupStep> {
+    match forwarding {
+        Forwarding::Waiting { step, .. } => Some(*step),
+        _ => None,
+    }
+}
+
+fn hint(forwarding: &Forwarding) -> Option<ForwardingHint> {
+    match forwarding {
+        Forwarding::On { hint, .. } => hint.clone(),
+        _ => None,
+    }
+}
+
+#[test]
+fn step_follows_gmail_mail_and_the_confirm_tap() {
+    let fresh = MailboxState::Joined {
+        mailbox: mailbox(ID),
+        setup: Setup::NEW,
+    };
+    let none = Progress::default();
+    assert_eq!(step(&view_with(&fresh, &none)), Some(SetupStep::AddAddress));
+    let confirmed = fresh.clone().with_setup(ID, |s| s.mail(&confirm(100)));
+    assert_eq!(
+        step(&view_with(&confirmed, &none)),
+        Some(SetupStep::Confirm)
+    );
+    let opened = Progress {
+        id: ID.into(),
+        confirm_opened_at: Some(100),
+        ..Progress::default()
+    };
+    assert_eq!(
+        step(&view_with(&confirmed, &opened)),
+        Some(SetupStep::Filter)
+    );
+    // A newer confirmation (added again in Gmail) asks again.
+    let again = confirmed.with_setup(ID, |s| s.mail(&confirm(200)));
+    assert_eq!(step(&view_with(&again, &opened)), Some(SetupStep::Confirm));
+    // Another address's progress doesn't count.
+    let other = Progress {
+        id: "other".into(),
+        confirm_opened_at: Some(999),
+        ..Progress::default()
+    };
+    assert_eq!(step(&view_with(&again, &other)), Some(SetupStep::Confirm));
+    // A kept address waiting to rejoin isn't a fresh setup.
+    let rejoining = MailboxState::NeedsRejoin {
+        mailbox: mailbox(ID),
+        kept: Setup::NEW,
+    };
+    assert_eq!(
+        step(&view_with(&rejoining, &none)),
+        Some(SetupStep::Rejoining)
+    );
+}
+
+#[test]
+fn the_typed_otp_hint_never_changes_the_state() {
+    let on = MailboxState::Joined {
+        mailbox: mailbox(ID),
+        setup: Setup::Active {
+            last_mail_at: Some(50),
+            last_otp_at: Some(50),
+        },
+    };
+    let typed = Progress {
+        id: ID.into(),
+        typed_otp_at: Some(60),
+        ..Progress::default()
+    };
+    let v = view_with(&on, &typed);
+    assert_eq!(hint(&v), Some(ForwardingHint::TypedOtp { at: 60 }));
+    assert_eq!(readiness(&v), ForwardingReadiness::Ready);
+    // A forwarded OTP after it, or a dismiss, hides it; a later typed one shows again.
+    let forwarded = on.clone().with_setup(ID, |s| s.otp_at(70));
+    assert_eq!(hint(&view_with(&forwarded, &typed)), None);
+    let dismissed = Progress {
+        dismissed_at: Some(60),
+        ..typed.clone()
+    };
+    assert_eq!(hint(&view_with(&on, &dismissed)), None);
+    let later = Progress {
+        typed_otp_at: Some(80),
+        ..dismissed
+    };
+    assert_eq!(
+        hint(&view_with(&on, &later)),
+        Some(ForwardingHint::TypedOtp { at: 80 })
+    );
+}
+
+#[tokio::test]
+async fn progress_lives_beside_forwarding_json_and_goes_with_it() {
+    let (core, edge, dir, _url) = forwarding_core("progress").await;
+    // Not set up yet: a typed OTP is not noted.
+    assert_eq!(hint(&core.note_typed_otp("f".into(), 10)), None);
+    seal(
+        &core,
+        &edge,
+        json!({ "kind": "gmail_confirm", "code": "1", "link": null, "requester": null, "sentAt": 5 }),
+    );
+    core.check_forwarding("f".into()).await.unwrap();
+    assert_eq!(
+        step(&core.opened_forwarding_confirm("f".into())),
+        Some(SetupStep::Filter)
+    );
+    core.mark_forwarding_done("f".into());
+    assert_eq!(
+        hint(&core.note_typed_otp("f".into(), 20)),
+        Some(ForwardingHint::TypedOtp { at: 20 })
+    );
+    assert_eq!(hint(&core.dismiss_forwarding_hint("f".into())), None);
+    // forwarding.json still parses as the old Stored (an older app reads it).
+    let stored: Stored = serde_json::from_slice(&fs::read(dir.join(FILE)).unwrap()).unwrap();
+    assert!(stored.ready);
+    assert!(dir.join(PROGRESS_FILE).exists());
+    core.turn_off_forwarding("f".into()).await.unwrap();
+    assert!(!dir.join(PROGRESS_FILE).exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_forwarded_copy_of_the_typed_round_clears_the_hint() {
+    // The typed OTP is noted at VTOP's time for the round; its forwarded copy may carry a
+    // `Date:` a few seconds before that.
+    let on = MailboxState::Joined {
+        mailbox: mailbox(ID),
+        setup: Setup::Active {
+            last_mail_at: Some(50),
+            last_otp_at: Some(50),
+        },
+    };
+    let typed = Progress {
+        id: ID.into(),
+        typed_otp_at: Some(100),
+        ..Progress::default()
+    };
+    let copy = on.with_setup(ID, |s| s.otp_at(98));
+    assert_eq!(hint(&view_with(&copy, &typed)), None);
 }

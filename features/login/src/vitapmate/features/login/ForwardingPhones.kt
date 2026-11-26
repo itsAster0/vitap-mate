@@ -128,15 +128,13 @@ internal fun ForwardingPhones() {
     confirm?.let { c ->
         val phone = c.phone
         val count = (phase as? PhonesPhase.Ready)?.phones?.size
-        AppDialog(
-            { confirm = null },
-            if (phone != null) "Take ${phone.label ?: "this phone"} off the address?" else "Delete the address everywhere?",
-            if (phone != null) "Remove" else "Delete",
-            {
-                confirm = null
-                if (phone == null) {
-                    MailForwarding.deleteEverywhere()
-                } else {
+        if (phone != null) {
+            AppDialog(
+                { confirm = null },
+                "Take ${phone.label ?: "this phone"} off the address?",
+                "Remove",
+                {
+                    confirm = null
                     scope.launch {
                         removing = true
                         val done = orNull { coreFlow("forwarding.remove_phone") { co, f -> co.removeForwardingPhone(f, phone.id) } } != null
@@ -150,15 +148,28 @@ internal fun ForwardingPhones() {
                         }
                         removing = false
                     }
-                }
-            },
-            icon = if (phone != null) Lucide.Smartphone else Lucide.Trash2,
-            danger = true,
-            confirmTag = "forwarding.phones.confirm",
-        ) {
-            Text(
-                if (phone != null) "It stops getting forwarded OTPs. The address keeps working on the other phones."
-                else "The address is deleted for ${count?.let { if (it == 1) "this phone" else "all $it phones" } ?: "every phone on it"}; mail Gmail forwards to it is rejected. Remove the forwarding in Gmail too.",
+                },
+                icon = Lucide.Smartphone,
+                danger = true,
+                confirmTag = "forwarding.phones.confirm",
+            ) {
+                Text("It stops getting forwarded OTPs. The address keeps working on the other phones.")
+            }
+        } else {
+            ForwardingConfirmSheet(
+                onDismiss = { confirm = null },
+                icon = Lucide.Trash2,
+                title = "Delete the address everywhere?",
+                body = "The address is deleted for ${count?.let { if (it == 1) "this phone" else "all $it phones" } ?: "every phone on it"}, and mail Gmail forwards to it is rejected.",
+                confirmLabel = "Delete",
+                confirmTag = "forwarding.phones.confirm",
+                dismissTag = "forwarding.phones.cancel",
+                sheetTag = "forwarding.delete.sheet",
+                target = MailForwarding.status.cleanupTarget(),
+                onConfirm = {
+                    confirm = null
+                    MailForwarding.deleteEverywhere()
+                },
             )
         }
     }

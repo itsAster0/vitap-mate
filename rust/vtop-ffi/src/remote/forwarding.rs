@@ -32,6 +32,9 @@ pub(crate) const FILE: &str = "forwarding.json";
 /// file): signed out, or with another student signed in, it must stop getting the last one's
 /// OTPs. Left by [`Core::leave_old_forwarding`].
 pub(crate) const LEAVE_FILE: &str = "forwarding_leave.json";
+/// What the setup sheet remembers beside [`FILE`]: kept apart because older apps read that
+/// file and refuse fields they don't know.
+pub(crate) const PROGRESS_FILE: &str = "forwarding_progress.json";
 /// VTOP's OTP sender: the Gmail filter's From.
 pub const VTOP_SENDER: &str = "noreply.sdc@vitap.ac.in";
 /// The sign-in's time (VTOP's `Date:` just before it mailed the code) and the mail's `Date:`,
@@ -48,9 +51,73 @@ pub struct GmailConfirmation {
     pub requester: Option<String>,
     /// Unix seconds.
     pub sent_at: i64,
-    /// Whether `requester` is an address on the student's saved VTOP profile; None without a
-    /// requester or a saved profile. Anyone who knows the address can make Gmail send one.
-    pub requester_known: Option<bool>,
+    /// Whose Gmail `requester` is. Anyone who knows the address can make Gmail send one, and
+    /// VTOP mails its OTPs to the college inbox only.
+    pub from: ConfirmFrom,
+}
+
+/// Whose Gmail asked to forward, as far as the app can tell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ConfirmFrom {
+    /// The student's college mail (`@vitapstudent.ac.in` with their regno, or the profile's
+    /// `vit_email`), where VTOP sends its OTPs.
+    CollegeInbox,
+    /// Another address on the student's saved profile: theirs, but VTOP's OTPs don't go there.
+    OwnOther,
+    /// An address the app doesn't know.
+    Unknown,
+    /// The mail named no address.
+    NotSaid,
+}
+
+/// Whose Gmail `requester` (a bare address or `Name <address>`) is, from the signed-in `regno`
+/// and the saved `profile`.
+fn confirm_from(
+    requester: Option<&str>,
+    regno: Option<&str>,
+    profile: Option<&StudentProfile>,
+) -> ConfirmFrom {
+    let raw = requester.unwrap_or_default();
+    let inner = raw
+        .split_once('<')
+        .and_then(|(_, rest)| rest.split_once('>'))
+        .map_or(raw, |(inner, _)| inner);
+    let address = inner.trim().to_ascii_lowercase();
+    if address.is_empty() {
+        return ConfirmFrom::NotSaid;
+    }
+    let college = address.split_once('@').is_some_and(|(local, domain)| {
+        domain == "vitapstudent.ac.in"
+            && regno.is_some_and(|regno| {
+                !regno.is_empty() && local.contains(&regno.to_ascii_lowercase())
+            })
+    });
+    if college
+        || profile.is_some_and(|profile| {
+            let vit_email = profile.vit_email.trim();
+            !vit_email.is_empty() && vit_email.eq_ignore_ascii_case(&address)
+        })
+    {
+        return ConfirmFrom::CollegeInbox;
+    }
+    let on_profile = profile.is_some_and(|profile| {
+        profile
+            .sections
+            .iter()
+            .flat_map(|section| &section.groups)
+            .flat_map(|group| &group.fields)
+            .flat_map(|field| {
+                field
+                    .value
+                    .split(|c: char| c.is_whitespace() || c == ',' || c == ';')
+            })
+            .any(|word| word.eq_ignore_ascii_case(&address))
+    });
+    if on_profile {
+        ConfirmFrom::OwnOther
+    } else {
+        ConfirmFrom::Unknown
+    }
 }
 
 /// What the confirmation mail offers: the code to type in Gmail, the link to open, or both.
@@ -113,7 +180,7 @@ impl From<StoredConfirmation> for GmailConfirmation {
             confirm_by: ConfirmBy::parse(stored.code, stored.link.as_deref()),
             requester: stored.requester,
             sent_at: stored.sent_at,
-            requester_known: None,
+            from: ConfirmFrom::NotSaid,
         }
     }
 }
@@ -191,6 +258,42 @@ impl ForwardingReadiness {
     }
 }
 
+/// The step of the Gmail setup the student is on, while forwarding isn't on yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SetupStep {
+    /// Add the address in Gmail; Gmail's confirmation hasn't reached it.
+    AddAddress,
+    /// Confirm the forwarding in Gmail: its confirmation arrived and its link wasn't opened.
+    Confirm,
+    /// Create the filter.
+    Filter,
+    /// Kept from before; reconnects once signed in, with nothing to do in Gmail.
+    Rejoining,
+}
+
+/// Something worth a look on a working address. It never changes the state: VTOP may not send
+/// an OTP for weeks, so nothing waits for one.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ForwardingHint {
+    /// The student typed an OTP by hand at `at` (unix seconds) and none was forwarded since:
+    /// the filter may not be forwarding.
+    TypedOtp { at: i64 },
+}
+
+/// [`PROGRESS_FILE`]: what the student did in the sheet, for the address `id`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Progress {
+    pub(crate) id: String,
+    /// The `sent_at` of the confirmation whose link the student opened.
+    #[serde(default)]
+    pub(crate) confirm_opened_at: Option<i64>,
+    #[serde(default)]
+    pub(crate) typed_otp_at: Option<i64>,
+    /// The typed OTP whose hint the student dismissed.
+    #[serde(default)]
+    pub(crate) dismissed_at: Option<i64>,
+}
+
 /// This phone's forwarding address and how far its setup got, for the app.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum Forwarding {
@@ -211,6 +314,9 @@ pub enum Forwarding {
         last_mail_at: Option<i64>,
         readiness: ForwardingReadiness,
         uses: ForwardingUses,
+        step: SetupStep,
+        /// The student's college mail from their saved profile, where VTOP sends OTPs.
+        college_mail: Option<String>,
     },
     /// Forwarding is set up: an OTP came through, or the student marked setup done after
     /// Gmail's confirmation arrived.
@@ -222,6 +328,8 @@ pub enum Forwarding {
         last_mail_at: Option<i64>,
         readiness: ForwardingReadiness,
         uses: ForwardingUses,
+        hint: Option<ForwardingHint>,
+        college_mail: Option<String>,
     },
 }
 
@@ -291,7 +399,7 @@ impl Setup {
                     confirm_by: ConfirmBy::parse(code.clone(), link.as_deref()),
                     requester: requester.clone(),
                     sent_at: *sent_at,
-                    requester_known: None,
+                    from: ConfirmFrom::NotSaid,
                 }),
                 last_mail_at: last_mail_at.max(Some(*sent_at)),
             },
@@ -660,6 +768,61 @@ impl Core {
         .unwrap_or_else(|_| view(&MailboxState::Off))
     }
 
+    /// The student opened Gmail's confirm link (from the sheet or the notification): Gmail
+    /// sends nothing after the click, so this moves the sheet on to the filter. No network.
+    pub fn opened_forwarding_confirm(&self, flow: String) -> Forwarding {
+        traced_sync("opened_forwarding_confirm", &flow, || {
+            self.update_progress(|state, progress| {
+                if let MailboxState::Joined {
+                    setup:
+                        Setup::Waiting {
+                            confirmation: Some(confirmation),
+                            ..
+                        },
+                    ..
+                } = state
+                {
+                    progress.confirm_opened_at = Some(confirmation.sent_at);
+                    info!("confirm link opened");
+                }
+            });
+            Ok(self.forwarding_view())
+        })
+        .unwrap_or_else(|_| view(&MailboxState::Off))
+    }
+
+    /// VTOP took an OTP the student typed for the round VTOP issued at `at` (unix seconds,
+    /// VTOP's clock) while forwarding was on: the sheet suggests a look at the filter until an
+    /// OTP of that round or a later one is forwarded. Changes nothing else. No network.
+    pub fn note_typed_otp(&self, flow: String, at: i64) -> Forwarding {
+        traced_sync("note_typed_otp", &flow, || {
+            self.update_progress(|state, progress| {
+                if let MailboxState::Joined {
+                    setup: Setup::Active { .. },
+                    ..
+                } = state
+                {
+                    progress.typed_otp_at = Some(at);
+                    info!("typed otp noted");
+                }
+            });
+            Ok(self.forwarding_view())
+        })
+        .unwrap_or_else(|_| view(&MailboxState::Off))
+    }
+
+    /// Hides the typed-OTP hint until the student types another OTP. No network.
+    pub fn dismiss_forwarding_hint(&self, flow: String) -> Forwarding {
+        traced_sync("dismiss_forwarding_hint", &flow, || {
+            self.update_progress(|_, progress| {
+                progress.dismissed_at = progress.typed_otp_at;
+                info!("hint dismissed");
+            });
+            Ok(self.forwarding_view())
+        })
+        .unwrap_or_else(|_| view(&MailboxState::Off))
+    }
+
     /// The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
     /// sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
     /// prompt, which calls it every few seconds. Never logs the code.
@@ -754,7 +917,10 @@ impl Core {
     fn store_mailbox(&self, state: &MailboxState) {
         match state.stored() {
             Some(stored) => self.write(FILE, &stored),
-            None => self.remove_file(FILE),
+            None => {
+                self.remove_file(FILE);
+                self.remove_file(PROGRESS_FILE);
+            }
         }
     }
 
@@ -961,26 +1127,6 @@ impl Core {
         }
     }
 
-    /// Whether `requester` is an address on the student's saved profile (any field, as VTOP
-    /// mails the OTP to the address the student gave it); None without one or the other.
-    fn requester_known(&self, requester: Option<&str>) -> Option<bool> {
-        let requester = requester?.trim();
-        let profile =
-            self.read_kept::<StudentProfile>(&format!("{PAGES}/{}", spec::PROFILE.file))?;
-        let fields = profile
-            .sections
-            .iter()
-            .flat_map(|section| &section.groups)
-            .flat_map(|group| &group.fields)
-            .map(|field| field.value.as_str());
-        Some(
-            std::iter::once(profile.vit_email.as_str())
-                .chain(fields)
-                .flat_map(|value| value.split(|c: char| c.is_whitespace() || c == ',' || c == ';'))
-                .any(|word| word.eq_ignore_ascii_case(requester)),
-        )
-    }
-
     /// This phone's address as `(server, mailbox id, address)`, if it has one.
     pub(crate) fn saved_mailbox(&self) -> Option<(String, String, String)> {
         self.mailbox_state().mailbox().map(|mailbox| {
@@ -1024,15 +1170,73 @@ impl Core {
     }
 
     fn forwarding_view(&self) -> Forwarding {
-        let mut forwarding = view(&self.mailbox_state());
-        if let Forwarding::Waiting {
-            confirmation: Some(confirmation),
-            ..
-        } = &mut forwarding
-        {
-            confirmation.requester_known = self.requester_known(confirmation.requester.as_deref());
+        let mut forwarding = view_with(&self.mailbox_state(), &self.progress());
+        let profile = self.read_kept::<StudentProfile>(&format!("{PAGES}/{}", spec::PROFILE.file));
+        let mail = profile
+            .as_ref()
+            .map(|profile| profile.vit_email.trim().to_string())
+            .filter(|mail| !mail.is_empty());
+        match &mut forwarding {
+            Forwarding::Off { .. } => {}
+            Forwarding::Waiting {
+                confirmation,
+                college_mail,
+                ..
+            } => {
+                if let Some(confirmation) = confirmation {
+                    confirmation.from = confirm_from(
+                        confirmation.requester.as_deref(),
+                        self.mail_regno().as_deref(),
+                        profile.as_ref(),
+                    );
+                }
+                *college_mail = mail;
+            }
+            Forwarding::On { college_mail, .. } => *college_mail = mail,
         }
         forwarding
+    }
+
+    /// The regno the college mail is named after: the one VTOP gave at sign-in, saved with the
+    /// account. Never the username, which can be something else; without it only the profile's
+    /// college mail matches.
+    fn mail_regno(&self) -> Option<String> {
+        let username = self.student()?;
+        self.read_account()
+            .filter(|saved| saved.username.eq_ignore_ascii_case(&username))
+            .and_then(|saved| saved.registration_number)
+    }
+
+    /// [`PROGRESS_FILE`]; empty without one.
+    fn progress(&self) -> Progress {
+        self.read::<Progress>(PROGRESS_FILE).unwrap_or_default()
+    }
+
+    /// The sheet's progress for this phone's address through `next`, under the forwarding
+    /// lock; nothing without an address.
+    fn update_progress(&self, next: impl FnOnce(&MailboxState, &mut Progress)) {
+        let _lock = self
+            .shared
+            .locks
+            .forwarding
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let state = self.mailbox_state();
+        let Some(id) = state.id() else {
+            return;
+        };
+        let mut progress = self.progress();
+        if progress.id != id {
+            progress = Progress {
+                id: id.to_string(),
+                ..Progress::default()
+            };
+        }
+        let before = progress.clone();
+        next(&state, &mut progress);
+        if progress != before {
+            self.write(PROGRESS_FILE, &progress);
+        }
     }
 
     /// The latest box in this phone's inbox, opened and recorded; None without an address, a
@@ -1177,6 +1381,18 @@ impl Core {
 }
 
 fn view(state: &MailboxState) -> Forwarding {
+    view_with(state, &Progress::default())
+}
+
+/// `state` for the app, with what the student did in the sheet (`progress`, counted only for
+/// this address). The college mail is filled in by [`Core::forwarding_view`].
+fn view_with(state: &MailboxState, progress: &Progress) -> Forwarding {
+    let none = Progress::default();
+    let progress = if state.id() == Some(progress.id.as_str()) {
+        progress
+    } else {
+        &none
+    };
     let sender = VTOP_SENDER.to_string();
     let readiness = state.readiness();
     let uses = readiness.uses();
@@ -1194,6 +1410,8 @@ fn view(state: &MailboxState) -> Forwarding {
             last_mail_at: None,
             readiness,
             uses,
+            step: SetupStep::Rejoining,
+            college_mail: None,
         },
         MailboxState::Joined {
             mailbox,
@@ -1209,6 +1427,16 @@ fn view(state: &MailboxState) -> Forwarding {
             last_mail_at: *last_mail_at,
             readiness,
             uses,
+            step: match (readiness, confirmation) {
+                (ForwardingReadiness::NeedsFilter, Some(confirmation))
+                    if Some(confirmation.sent_at) > progress.confirm_opened_at =>
+                {
+                    SetupStep::Confirm
+                }
+                (ForwardingReadiness::NeedsFilter, _) => SetupStep::Filter,
+                _ => SetupStep::AddAddress,
+            },
+            college_mail: None,
         },
         MailboxState::Joined {
             mailbox,
@@ -1224,6 +1452,17 @@ fn view(state: &MailboxState) -> Forwarding {
             last_mail_at: *last_mail_at,
             readiness,
             uses,
+            hint: progress
+                .typed_otp_at
+                // A forwarded copy of the typed round may be dated up to VTOP's slack before it.
+                .filter(|at| {
+                    Some(*at)
+                        > last_otp_at
+                            .map(|otp| otp + VTOP_SLACK_SECS)
+                            .max(progress.dismissed_at)
+                })
+                .map(|at| ForwardingHint::TypedOtp { at }),
+            college_mail: None,
         },
     }
 }

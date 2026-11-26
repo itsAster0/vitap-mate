@@ -8,11 +8,12 @@ import kotlin.test.assertTrue
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingReadiness
 import vitapmate.core.ForwardingUses
+import vitapmate.core.SetupStep
 
 class ForwardingPhaseTest {
     private val off = Forwarding.Off("noreply.sdc@vitap.ac.in", ForwardingReadiness.OFF, ForwardingUses(false, false))
-    private val waiting = Forwarding.Waiting("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", null, 10L, ForwardingReadiness.NEEDS_FILTER, ForwardingUses(true, true))
-    private val on = Forwarding.On("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", 20L, 20L, ForwardingReadiness.READY, ForwardingUses(true, true))
+    private val waiting = Forwarding.Waiting("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", null, 10L, ForwardingReadiness.NEEDS_FILTER, ForwardingUses(true, true), SetupStep.FILTER, null)
+    private val on = Forwarding.On("otp+x@vmate.aster0.dev", "noreply.sdc@vitap.ac.in", 20L, 20L, ForwardingReadiness.READY, ForwardingUses(true, true), null, null)
 
     @Test
     fun oneActionAtATime() {

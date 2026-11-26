@@ -1290,6 +1290,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_check_forwarding(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_dismiss_forwarding_hint(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_forwarding_status(
@@ -1299,6 +1301,10 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_mark_forwarding_done(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_note_typed_otp(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_opened_forwarding_confirm(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_up_forwarding(
     ): Int
@@ -1661,6 +1667,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_check_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_dismiss_forwarding_hint(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_forwarded_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`since`: Long,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_forwarding_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1670,6 +1678,10 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_leave_old_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_mark_forwarding_done(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_note_typed_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`at`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_opened_forwarding_confirm(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_set_up_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -2370,6 +2382,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 50526) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_dismiss_forwarding_hint() and 0xFFFF) != 46710) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 44213) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2383,6 +2398,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_forwarding_done() and 0xFFFF) != 56019) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_note_typed_otp() and 0xFFFF) != 40638) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_opened_forwarding_confirm() and 0xFFFF) != 30164) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_up_forwarding() and 0xFFFF) != 22862) {
@@ -2505,7 +2526,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_otp() and 0xFFFF) != 27852) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 11633) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_account() and 0xFFFF) != 34945) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_saved_password() and 0xFFFF) != 34201) {
@@ -5626,6 +5647,11 @@ public interface CoreInterface {
     suspend fun `checkForwarding`(`flow`: kotlin.String): Forwarding
     
     /**
+     * Hides the typed-OTP hint until the student types another OTP. No network.
+     */
+    fun `dismissForwardingHint`(`flow`: kotlin.String): Forwarding
+    
+    /**
      * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
      * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
      * prompt, which calls it every few seconds. Never logs the code.
@@ -5659,6 +5685,19 @@ public interface CoreInterface {
      * nothing before confirmation (or without an address). No network.
      */
     fun `markForwardingDone`(`flow`: kotlin.String): Forwarding
+    
+    /**
+     * VTOP took an OTP the student typed for the round VTOP issued at `at` (unix seconds,
+     * VTOP's clock) while forwarding was on: the sheet suggests a look at the filter until an
+     * OTP of that round or a later one is forwarded. Changes nothing else. No network.
+     */
+    fun `noteTypedOtp`(`flow`: kotlin.String, `at`: kotlin.Long): Forwarding
+    
+    /**
+     * The student opened Gmail's confirm link (from the sheet or the notification): Gmail
+     * sends nothing after the click, so this moves the sheet on to the filter. No network.
+     */
+    fun `openedForwardingConfirm`(`flow`: kotlin.String): Forwarding
     
     /**
      * Gives this phone a forwarding address. A student who already has one (made on another
@@ -5903,8 +5942,9 @@ public interface CoreInterface {
     suspend fun `resendOtp`(`flow`: kotlin.String): kotlin.ULong?
     
     /**
-     * The saved username, for the Gmail sign-in's registration number. The password is
-     * [`Core::saved_password`]'s, and whether VTOP rejected it the [`crate::AccountStatus`].
+     * The saved username and the registration number VTOP gave (the Gmail sign-in checks the
+     * college account against it). The password is [`Core::saved_password`]'s, and whether
+     * VTOP rejected it the [`crate::AccountStatus`].
      */
     fun `savedAccount`(`flow`: kotlin.String): SavedAccount?
     
@@ -7798,6 +7838,23 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Hides the typed-OTP hint until the student types another OTP. No network.
+     */override fun `dismissForwardingHint`(`flow`: kotlin.String): Forwarding {
+            return FfiConverterTypeForwarding.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_dismiss_forwarding_hint(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
      * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
      * prompt, which calls it every few seconds. Never logs the code.
@@ -7909,6 +7966,44 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_forwarding_done(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * VTOP took an OTP the student typed for the round VTOP issued at `at` (unix seconds,
+     * VTOP's clock) while forwarding was on: the sheet suggests a look at the filter until an
+     * OTP of that round or a later one is forwarded. Changes nothing else. No network.
+     */override fun `noteTypedOtp`(`flow`: kotlin.String, `at`: kotlin.Long): Forwarding {
+            return FfiConverterTypeForwarding.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_note_typed_otp(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterLong.lower(`at`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The student opened Gmail's confirm link (from the sheet or the notification): Gmail
+     * sends nothing after the click, so this moves the sheet on to the filter. No network.
+     */override fun `openedForwardingConfirm`(`flow`: kotlin.String): Forwarding {
+            return FfiConverterTypeForwarding.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_opened_forwarding_confirm(
         it,
         
         FfiConverterString.lower(`flow`),_status)
@@ -8982,8 +9077,9 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * The saved username, for the Gmail sign-in's registration number. The password is
-     * [`Core::saved_password`]'s, and whether VTOP rejected it the [`crate::AccountStatus`].
+     * The saved username and the registration number VTOP gave (the Gmail sign-in checks the
+     * college account against it). The password is [`Core::saved_password`]'s, and whether
+     * VTOP rejected it the [`crate::AccountStatus`].
      */override fun `savedAccount`(`flow`: kotlin.String): SavedAccount? {
             return FfiConverterOptionalTypeSavedAccount.lift(
     callWithHandle {
@@ -15909,10 +16005,10 @@ data class GmailConfirmation (
     val `sentAt`: kotlin.Long
     , 
     /**
-     * Whether `requester` is an address on the student's saved VTOP profile; None without a
-     * requester or a saved profile. Anyone who knows the address can make Gmail send one.
+     * Whose Gmail `requester` is. Anyone who knows the address can make Gmail send one, and
+     * VTOP mails its OTPs to the college inbox only.
      */
-    val `requesterKnown`: kotlin.Boolean?
+    val `from`: ConfirmFrom
     
 ){
     
@@ -15932,7 +16028,7 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
             FfiConverterTypeConfirmBy.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterLong.read(buf),
-            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterTypeConfirmFrom.read(buf),
         )
     }
 
@@ -15940,14 +16036,14 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
             FfiConverterTypeConfirmBy.allocationSize(value.`confirmBy`) +
             FfiConverterOptionalString.allocationSize(value.`requester`) +
             FfiConverterLong.allocationSize(value.`sentAt`) +
-            FfiConverterOptionalBoolean.allocationSize(value.`requesterKnown`)
+            FfiConverterTypeConfirmFrom.allocationSize(value.`from`)
     )
 
     override fun write(value: GmailConfirmation, buf: ByteBuffer) {
             FfiConverterTypeConfirmBy.write(value.`confirmBy`, buf)
             FfiConverterOptionalString.write(value.`requester`, buf)
             FfiConverterLong.write(value.`sentAt`, buf)
-            FfiConverterOptionalBoolean.write(value.`requesterKnown`, buf)
+            FfiConverterTypeConfirmFrom.write(value.`from`, buf)
     }
 }
 
@@ -22466,6 +22562,58 @@ public object FfiConverterTypeConfirmBy : FfiConverterRustBuffer<ConfirmBy>{
 
 
 
+/**
+ * Whose Gmail asked to forward, as far as the app can tell.
+ */
+
+enum class ConfirmFrom {
+    
+    /**
+     * The student's college mail (`@vitapstudent.ac.in` with their regno, or the profile's
+     * `vit_email`), where VTOP sends its OTPs.
+     */
+    COLLEGE_INBOX,
+    /**
+     * Another address on the student's saved profile: theirs, but VTOP's OTPs don't go there.
+     */
+    OWN_OTHER,
+    /**
+     * An address the app doesn't know.
+     */
+    UNKNOWN,
+    /**
+     * The mail named no address.
+     */
+    NOT_SAID;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeConfirmFrom: FfiConverterRustBuffer<ConfirmFrom> {
+    override fun read(buf: ByteBuffer) = try {
+        ConfirmFrom.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ConfirmFrom) = 4UL
+
+    override fun write(value: ConfirmFrom, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 
 enum class ContactKind {
     
@@ -23002,7 +23150,12 @@ sealed class Forwarding {
          */
         val `lastMailAt`: kotlin.Long?, 
         val `readiness`: vitapmate.core.ForwardingReadiness, 
-        val `uses`: vitapmate.core.ForwardingUses) : Forwarding()
+        val `uses`: vitapmate.core.ForwardingUses, 
+        val `step`: vitapmate.core.SetupStep, 
+        /**
+         * The student's college mail from their saved profile, where VTOP sends OTPs.
+         */
+        val `collegeMail`: kotlin.String?) : Forwarding()
         
     {
         
@@ -23023,7 +23176,9 @@ sealed class Forwarding {
         val `lastOtpAt`: kotlin.Long?, 
         val `lastMailAt`: kotlin.Long?, 
         val `readiness`: vitapmate.core.ForwardingReadiness, 
-        val `uses`: vitapmate.core.ForwardingUses) : Forwarding()
+        val `uses`: vitapmate.core.ForwardingUses, 
+        val `hint`: vitapmate.core.ForwardingHint?, 
+        val `collegeMail`: kotlin.String?) : Forwarding()
         
     {
         
@@ -23059,6 +23214,8 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalLong.read(buf),
                 FfiConverterTypeForwardingReadiness.read(buf),
                 FfiConverterTypeForwardingUses.read(buf),
+                FfiConverterTypeSetupStep.read(buf),
+                FfiConverterOptionalString.read(buf),
                 )
             3 -> Forwarding.On(
                 FfiConverterString.read(buf),
@@ -23067,6 +23224,8 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalLong.read(buf),
                 FfiConverterTypeForwardingReadiness.read(buf),
                 FfiConverterTypeForwardingUses.read(buf),
+                FfiConverterOptionalTypeForwardingHint.read(buf),
+                FfiConverterOptionalString.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
@@ -23092,6 +23251,8 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
                 + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
                 + FfiConverterTypeForwardingUses.allocationSize(value.`uses`)
+                + FfiConverterTypeSetupStep.allocationSize(value.`step`)
+                + FfiConverterOptionalString.allocationSize(value.`collegeMail`)
             )
         }
         is Forwarding.On -> {
@@ -23104,6 +23265,8 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterOptionalLong.allocationSize(value.`lastMailAt`)
                 + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
                 + FfiConverterTypeForwardingUses.allocationSize(value.`uses`)
+                + FfiConverterOptionalTypeForwardingHint.allocationSize(value.`hint`)
+                + FfiConverterOptionalString.allocationSize(value.`collegeMail`)
             )
         }
     }
@@ -23125,6 +23288,8 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
                 FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
                 FfiConverterTypeForwardingUses.write(value.`uses`, buf)
+                FfiConverterTypeSetupStep.write(value.`step`, buf)
+                FfiConverterOptionalString.write(value.`collegeMail`, buf)
                 Unit
             }
             is Forwarding.On -> {
@@ -23135,6 +23300,75 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterOptionalLong.write(value.`lastMailAt`, buf)
                 FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
                 FfiConverterTypeForwardingUses.write(value.`uses`, buf)
+                FfiConverterOptionalTypeForwardingHint.write(value.`hint`, buf)
+                FfiConverterOptionalString.write(value.`collegeMail`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Something worth a look on a working address. It never changes the state: VTOP may not send
+ * an OTP for weeks, so nothing waits for one.
+ */
+sealed class ForwardingHint {
+    
+    /**
+     * The student typed an OTP by hand at `at` (unix seconds) and none was forwarded since:
+     * the filter may not be forwarding.
+     */
+    data class TypedOtp(
+        val `at`: kotlin.Long) : ForwardingHint()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeForwardingHint : FfiConverterRustBuffer<ForwardingHint>{
+    override fun read(buf: ByteBuffer): ForwardingHint {
+        return when(buf.getInt()) {
+            1 -> ForwardingHint.TypedOtp(
+                FfiConverterLong.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ForwardingHint): ULong = when(value) {
+        is ForwardingHint.TypedOtp -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterLong.allocationSize(value.`at`)
+            )
+        }
+    }
+
+    override fun write(value: ForwardingHint, buf: ByteBuffer) {
+        when(value) {
+            is ForwardingHint.TypedOtp -> {
+                buf.putInt(1)
+                FfiConverterLong.write(value.`at`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -25190,6 +25424,57 @@ public object FfiConverterTypeSessionSource: FfiConverterRustBuffer<SessionSourc
 
 
 
+/**
+ * The step of the Gmail setup the student is on, while forwarding isn't on yet.
+ */
+
+enum class SetupStep {
+    
+    /**
+     * Add the address in Gmail; Gmail's confirmation hasn't reached it.
+     */
+    ADD_ADDRESS,
+    /**
+     * Confirm the forwarding in Gmail: its confirmation arrived and its link wasn't opened.
+     */
+    CONFIRM,
+    /**
+     * Create the filter.
+     */
+    FILTER,
+    /**
+     * Kept from before; reconnects once signed in, with nothing to do in Gmail.
+     */
+    REJOINING;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSetupStep: FfiConverterRustBuffer<SetupStep> {
+    override fun read(buf: ByteBuffer) = try {
+        SetupStep.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: SetupStep) = 4UL
+
+    override fun write(value: SetupStep, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 sealed class SignIn {
     
     object Done : SignIn()
@@ -25769,38 +26054,6 @@ public object FfiConverterOptionalDouble: FfiConverterRustBuffer<kotlin.Double?>
         } else {
             buf.put(1)
             FfiConverterDouble.write(value, buf)
-        }
-    }
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<kotlin.Boolean?> {
-    override fun read(buf: ByteBuffer): kotlin.Boolean? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterBoolean.read(buf)
-    }
-
-    override fun allocationSize(value: kotlin.Boolean?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterBoolean.allocationSize(value)
-        }
-    }
-
-    override fun write(value: kotlin.Boolean?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterBoolean.write(value, buf)
         }
     }
 }
@@ -27721,6 +27974,38 @@ public object FfiConverterOptionalTypeCoreError: FfiConverterRustBuffer<CoreExce
         } else {
             buf.put(1)
             FfiConverterTypeCoreError.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeForwardingHint: FfiConverterRustBuffer<ForwardingHint?> {
+    override fun read(buf: ByteBuffer): ForwardingHint? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeForwardingHint.read(buf)
+    }
+
+    override fun allocationSize(value: ForwardingHint?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeForwardingHint.allocationSize(value)
+        }
+    }
+
+    override fun write(value: ForwardingHint?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeForwardingHint.write(value, buf)
         }
     }
 }

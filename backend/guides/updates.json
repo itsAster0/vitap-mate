@@ -44,6 +44,10 @@
           "since": 3001010
         },
         "OTP auto-fill reads VTOP's code from your Gmail with your own Google key, or from a forwarding address.",
+        {
+          "text": "Mail forwarding walks you through Gmail in three steps with Gmail's own screens, opens the right Gmail in Chrome and warns you if you confirm it from a Gmail that isn't your college one.",
+          "since": 3002100
+        },
         "The home-screen widget shows the next class and today's timetable. Long-press the app icon for Timetable, Attendance and Outing.",
         {
           "text": "Widgets for attendance (the courses closest to 75% first), the next exam and the mess menu join the timetable widget. All four also work on the lock screen.",
@@ -115,6 +119,7 @@
         {
           "title": "New",
           "items": [
+            "Setting up mail forwarding is one list of three steps, each with Gmail's own screens under Show me. Gmail opens in Chrome on your college account, Gmail's confirmation is one tap, and the app warns you if you confirm it from a Gmail that isn't your college one. Turning forwarding off shows how to remove it from Gmail too.",
             "The Server page is gone: its settings are where you use them. Account has sharing your registration number, linked phones, signing out everywhere and deleting the server account; Connected apps has session handover and storage; Connection asks before the cookie leaves for server routes.",
             "When a connected app asks for your session, opening the app shows an approve sheet with the key's name and the IP it asked from (new IPs are marked), and a notification follows while your phone signs it in. The extension tells you to open the app instead of waiting for the notification.",
             "Name a key when you make it or pair a browser or AI app, and rename it any time from the key in Connected apps.",

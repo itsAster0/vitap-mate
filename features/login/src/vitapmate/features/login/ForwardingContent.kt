@@ -1,46 +1,28 @@
 package vitapmate.features.login
 
-import vitapmate.ui.OpenHaptic
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.Forwarding
-import vitapmate.data.OtpSource
-import vitapmate.observability.Log
-import vitapmate.observability.flow
-import vitapmate.ui.AppDialog
-import vitapmate.ui.AppTheme
-import vitapmate.ui.Space
-import vitapmate.ui.StatusChip
 import vitapmate.core.LiveTopic
 import vitapmate.data.LiveWake
+import vitapmate.observability.Log
+import vitapmate.observability.flow
+import vitapmate.ui.Space
 
 /** While the address waits for Gmail's confirmation, the inbox is checked this often. */
 private const val WAITING_POLL_MS = 5_000L
@@ -87,17 +69,20 @@ internal fun ForwardingContent() {
         )
     }
     if (confirmOff) {
-        AppDialog(
-            { confirmOff = false },
-            "Turn off mail forwarding?",
-            "Turn off",
-            {
+        ForwardingConfirmSheet(
+            onDismiss = { confirmOff = false },
+            icon = Lucide.Forward,
+            title = "Turn off forwarding?",
+            body = "This phone stops getting forwarded OTPs. If no other phone uses the address, it's deleted and mail sent to it is rejected.",
+            confirmLabel = "Turn off",
+            confirmTag = "forwarding.off.confirm",
+            dismissTag = "forwarding.off.cancel",
+            sheetTag = "forwarding.off.sheet",
+            target = status.cleanupTarget(),
+            onConfirm = {
                 confirmOff = false
                 MailForwarding.turnOff()
             },
-            icon = Lucide.Forward,
-            danger = true,
-            confirmTag = "forwarding.off.confirm",
-        ) { Text("This phone stops getting forwarded OTPs. If no other phone uses the address, it's deleted and mail sent to it is rejected; then also delete the Gmail filter.") }
+        )
     }
 }

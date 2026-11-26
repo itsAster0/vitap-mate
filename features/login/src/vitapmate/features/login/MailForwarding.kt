@@ -24,7 +24,7 @@ import vitapmate.observability.flow
 import vitapmate.ui.showToast
 
 /** An action the student starts on the address; [tag] names its flow, `forwarding.<tag>`. */
-enum class ForwardingOp(val tag: String) { Setup("setup"), Check("check"), MarkDone("done"), TurnOff("off"), Delete("delete") }
+enum class ForwardingOp(val tag: String) { Setup("setup"), Check("check"), MarkDone("done"), Confirm("confirm"), Dismiss("dismiss"), TurnOff("off"), Delete("delete") }
 
 /** The sheet's view of the address: the last status Rust gave, and the student's action running, if any. */
 sealed interface ForwardingPhase {
@@ -149,6 +149,16 @@ object MailForwarding {
     /** Marks setup done once Gmail's confirmation arrived; no network. */
     fun markDone() {
         AppScope.launch { run(ForwardingOp.MarkDone) { id -> AppCore.await().markForwardingDone(id) } }
+    }
+
+    /** The student opened Gmail's confirm link: the sheet moves on to the filter. No network. */
+    fun openedConfirm() {
+        AppScope.launch { run(ForwardingOp.Confirm) { id -> AppCore.await().openedForwardingConfirm(id) } }
+    }
+
+    /** Hides the typed-OTP hint until another OTP is typed. No network. */
+    fun dismissHint() {
+        AppScope.launch { run(ForwardingOp.Dismiss) { id -> AppCore.await().dismissForwardingHint(id) } }
     }
 
     /** Takes this phone off the address; runs on after the sheet closes. */

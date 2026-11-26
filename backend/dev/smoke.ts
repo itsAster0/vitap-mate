@@ -79,11 +79,11 @@ const demo = (await open.action(api.auth.token, await demoPhone.signed("auth:tok
 check("auth:token demo", demo.regno === "DEMO2026" && demo.jwt.split(".").length === 3);
 const demoClient = new ConvexHttpClient(base);
 demoClient.setAuth(demo.jwt);
-const info = (await demoClient.query(api.devices.info, { flow: "smoke" })) as { platform: string };
+const info = (await demoClient.query(api.devices.info, {})) as { platform: string };
 check("devices:info with the demo JWT", info.platform === "android");
-const view = (await demoClient.query(api.account.view, { flow: "smoke" })) as { registrationNumber: string };
+const view = (await demoClient.query(api.account.view, {})) as { registrationNumber: string };
 check("account:view demo", view.registrationNumber === "DEMO2026");
-check("sessions:pending demo", ((await demoClient.query(api.sessions.pending, { flow: "smoke" })) as unknown[]).length === 0);
+check("sessions:pending demo", ((await demoClient.query(api.sessions.pending, {})) as unknown[]).length === 0);
 check("demo refused a write", (await code(demoClient.mutation(api.mail.register, { flow: "smoke" }))) === "demo_unavailable");
 const refreshed = (await open.action(api.auth.token, await demoPhone.signed("auth:token", { refreshToken: demo.refreshToken }))) as { refreshToken: string };
 check("refresh rotates", refreshed.refreshToken !== demo.refreshToken);
@@ -91,7 +91,7 @@ check("refresh rotates", refreshed.refreshToken !== demo.refreshToken);
 await open.action(api.auth.token, await demoPhone.signed("auth:token", { refreshToken: refreshed.refreshToken }));
 check("reused refresh token", (await code(open.action(api.auth.token, await demoPhone.signed("auth:token", { refreshToken: demo.refreshToken })))) === "refresh_reused");
 check("chain is gone after reuse", (await code(open.action(api.auth.token, await demoPhone.signed("auth:token", { refreshToken: refreshed.refreshToken })))) === "refresh_invalid");
-check("no JWT", (await code(open.query(api.devices.info, { flow: "smoke" }))) === "unauthenticated");
+check("no JWT", (await code(open.query(api.devices.info, {}))) === "unauthenticated");
 
 // ---- a proof, as the engine would report it ----------------------------------------------
 async function proveAs(p: Awaited<ReturnType<typeof phone>>, regno: string, first: boolean) {
@@ -115,7 +115,7 @@ async function proveAs(p: Awaited<ReturnType<typeof phone>>, regno: string, firs
 const p = await phone();
 const { tokens: proved, client: me } = await proveAs(p, "smoke0001", true);
 check("auth:token with a proved ticket", proved.regno === "SMOKE0001");
-const acct = (await me.query(api.account.view, { flow: "smoke" })) as { thisPhone: boolean; phoneCount: number };
+const acct = (await me.query(api.account.view, {})) as { thisPhone: boolean; phoneCount: number };
 check("account:view linked", acct.thisPhone && acct.phoneCount === 1);
 
 const unsaved = (await me.action(api.account.saveCredentials, { flow: "smoke", credentials: { username: "u", password: "p" } })) as { savedCredentials: boolean };
@@ -128,7 +128,7 @@ const mailIn = await internalPost("/internal/mail", env.MAIL_TOKEN, { addressId:
 check("/internal/mail", mailIn.status === 200);
 check("/internal/mail wrong token", (await internalPost("/internal/mail", env.INTERNAL_TOKEN, { addressId: box.id })).status === 401);
 check("/internal/mail unknown address", (await internalPost("/internal/mail", env.MAIL_TOKEN, { addressId: "aaaaaaaaaa", receivedAt: Date.now(), otp: "123456" })).status === 404);
-const inbox = (await me.query(api.mail.inbox, { flow: "smoke", id: box.id })) as { sealed: string | null };
+const inbox = (await me.query(api.mail.inbox, { id: box.id })) as { sealed: string | null };
 check("mail:inbox has a sealed box", typeof inbox.sealed === "string");
 
 // ---- keys and the key routes ----------------------------------------------------------------
@@ -139,11 +139,11 @@ check("GET /v1/whoami", whoami.status === 200 && ((await whoami.json()) as { reg
 const asked = await fetch(`${base}/v1/session`, { method: "POST", headers: { authorization: `Bearer ${made.key}` } });
 const askedBody = (await asked.json()) as { requestId?: string; stage?: string };
 check("POST /v1/session asks the phone", asked.status === 202 && askedBody.stage === "phone", `${asked.status} ${askedBody.stage}`);
-const waiting = (await me.query(api.sessions.pending, { flow: "smoke" })) as Array<{ requestId: string }>;
+const waiting = (await me.query(api.sessions.pending, {})) as Array<{ requestId: string }>;
 check("sessions:pending shows it", waiting.some((r) => r.requestId === askedBody.requestId));
 await me.action(api.sessions.answer, { flow: "smoke", requestId: askedBody.requestId!, error: "smoke: declined" });
-check("sessions:answer with an error ends it", ((await me.query(api.sessions.pending, { flow: "smoke" })) as unknown[]).length === 0);
-const status = (await me.query(api.app.status, { flow: "smoke" })) as { phones: number; keys: Array<{ id: string }> };
+check("sessions:answer with an error ends it", ((await me.query(api.sessions.pending, {})) as unknown[]).length === 0);
+const status = (await me.query(api.app.status, {})) as { phones: number; keys: Array<{ id: string }> };
 check("app:status", status.phones === 1 && status.keys.some((k) => k.id === made.id));
 await me.mutation(api.keys.revoke, { flow: "smoke", id: made.id });
 check("revoked key", (await fetch(`${base}/v1/whoami`, { headers: { authorization: `Bearer ${made.key}` } })).status === 401);
@@ -151,13 +151,13 @@ check("revoked key", (await fetch(`${base}/v1/whoami`, { headers: { authorizatio
 // ---- a second phone joins, then removes itself; deleting the account ends the first ----------
 const p2 = await phone();
 const { client: other } = await proveAs(p2, "SMOKE0001", false);
-check("second phone joins the account", ((await other.query(api.account.view, { flow: "smoke" })) as { phoneCount: number }).phoneCount === 2);
+check("second phone joins the account", ((await other.query(api.account.view, {})) as { phoneCount: number }).phoneCount === 2);
 check("mail:register joins the same address", ((await other.mutation(api.mail.register, { flow: "smoke" })) as { id: string }).id === box.id);
 await other.mutation(api.devices.remove, { flow: "smoke", mailbox: box.id });
-check("removed device", (await code(other.query(api.account.view, { flow: "smoke" }))) === "device_removed");
-check("one phone left", ((await me.query(api.account.view, { flow: "smoke" })) as { phoneCount: number }).phoneCount === 1);
+check("removed device", (await code(other.query(api.account.view, {}))) === "device_removed");
+check("one phone left", ((await me.query(api.account.view, {})) as { phoneCount: number }).phoneCount === 1);
 await me.mutation(api.account.remove, { flow: "smoke" });
-check("deleted account", (await code(me.query(api.account.view, { flow: "smoke" }))) === "device_removed");
+check("deleted account", (await code(me.query(api.account.view, {}))) === "device_removed");
 
 console.log(failures === 0 ? "smoke: all ok" : `smoke: ${failures} failed`);
 if (failures) throw new Error("smoke failed");

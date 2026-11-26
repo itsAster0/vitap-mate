@@ -79,6 +79,9 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
     /** Codes VTOP turned down: auto-fill skips them. */
     private val rejected = mutableSetOf<String>()
 
+    /** Codes auto-fill put in: an accepted code not in here was typed by hand. */
+    private val autofilled = mutableSetOf<String>()
+
     /**
      * When this round's code was mailed (unix seconds), as Rust tells it: [resend] takes the new
      * one, and the fetch sheet passes on a fresh sign-in's under the same prompt. Auto-fill reads
@@ -178,6 +181,17 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
                 val flowId = lastFlow
                 // Gmail clean-up runs after the prompt has closed.
                 AppScope.launch { Gmail.tidyUp(otp, flowId) }
+            }
+            if (code !in autofilled && OtpAutofill.inUse() == OtpSource.Forwarding) {
+                val flowId = lastFlow
+                // VTOP's time for this round, so its forwarded copy (dated by VTOP) clears the hint.
+                val at = issuedAt
+                Log.info(src, "otp typed while forwarding", flowId)
+                // Runs off the main thread after the prompt has closed.
+                AppScope.launch {
+                    withContext(Dispatchers.IO) { core.noteTypedOtp(flowId, at) }
+                    MailForwarding.load("typed_otp")
+                }
             }
             return true
         } catch (e: CoreException.OtpRejected) {
@@ -297,6 +311,7 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
                     pulls++
                     if (found != null && found !in rejected && found !in filled && !submitting) {
                         filled += found
+                        autofilled += found
                         code = found
                         source = "From your $where"
                         Log.info(src, "otp filled from $where", id, mapOf("pulls" to "$pulls"))

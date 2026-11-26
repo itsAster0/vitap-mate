@@ -11,19 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.font.FontWeight
-import com.composables.icons.lucide.BookOpen
-import com.composables.icons.lucide.Check
-import vitapmate.ui.heroCookie
-import vitapmate.ui.neutralTone
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,7 +24,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,167 +31,139 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.ExternalLink
-import com.composables.icons.lucide.Forward
+import com.composables.icons.lucide.Funnel
+import com.composables.icons.lucide.GraduationCap
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
+import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.RefreshCw
-import vitapmate.core.Forwarding
+import com.composables.icons.lucide.Trash2
+import com.composables.icons.lucide.User
 import vitapmate.core.ConfirmBy
-import vitapmate.core.ForwardingReadiness
+import vitapmate.core.ConfirmFrom
+import vitapmate.core.Forwarding
+import vitapmate.core.ForwardingHint
 import vitapmate.core.GmailConfirmation
+import vitapmate.core.SetupStep
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
+import vitapmate.ui.ButtonVariant
 import vitapmate.ui.Dot
 import vitapmate.ui.Space
+import vitapmate.ui.heroCookie
+import vitapmate.ui.neutralTone
 import vitapmate.ui.showToast
 
-private const val GMAIL_FORWARDING = "https://mail.google.com/mail/u/0/#settings/fwdandpop"
-private const val GMAIL_FILTERS = "https://mail.google.com/mail/u/0/#settings/filters"
-
 /**
- * Mail forwarding with an address: the address (copy), the status, Gmail's confirmation (code
- * and link) once it arrives, the three Gmail steps with links, Check and Turn off, then the
- * phones on it and Delete everywhere ([ForwardingPhones]).
+ * Mail forwarding with an address: the address (copy) and its status, three Gmail steps driven by
+ * Rust's [SetupStep] (each with Gmail opened in Chrome on the college account and "Show me"
+ * screens, [GuideSheet]), Gmail's confirmation with whose Gmail sent it, the typed-OTP hint
+ * once on, Check and Turn off, then the phones on it ([ForwardingPhones]). Nothing here waits
+ * for VTOP to send an OTP.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: () -> Unit, onOff: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val context = LocalContext.current
-    val accent = tones.accentTone
     val address: String
     val sender: String
     val confirmation: GmailConfirmation?
-    val lastOtpAt: Long?
+    val step: SetupStep?
+    val collegeMail: String?
     when (status) {
         is Forwarding.Off -> return
         is Forwarding.Waiting -> {
             address = status.address
             sender = status.sender
             confirmation = status.confirmation
-            lastOtpAt = null
+            step = status.step
+            collegeMail = status.collegeMail
         }
         is Forwarding.On -> {
             address = status.address
             sender = status.sender
             confirmation = null
-            lastOtpAt = status.lastOtpAt
+            step = null
+            collegeMail = status.collegeMail
         }
     }
-    val readiness = status.readiness
-    val on = readiness == ForwardingReadiness.READY
-    Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(accent.subtle).heroCookie()
-            .padding(start = Space.lg, top = Space.md, bottom = Space.lg, end = Space.xs),
-    ) {
-        Text("Your address", style = MaterialTheme.typography.labelMedium, color = accent.onSubtle)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                address,
-                Modifier.weight(1f).testTag("forwarding.address"),
-                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold),
-                color = scheme.onSurface,
-            )
-            IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
-        }
-        // Waiting in the warning tone, the confirmation in the neutral one, working in success.
-        val (label, tone) = when (readiness) {
-            ForwardingReadiness.READY -> (if (lastOtpAt != null) "Working · last OTP ${ago(lastOtpAt)}" else "Working · no OTP forwarded yet") to tones.success
-            ForwardingReadiness.NEEDS_FILTER -> "Confirm in Gmail, then create the filter" to neutralTone
-            ForwardingReadiness.NEEDS_CONFIRMATION, ForwardingReadiness.OFF -> "Waiting for Gmail's confirmation mail…" to tones.warning
-        }
-        Row(
-            Modifier.padding(top = Space.xs).background(tone.subtle, CircleShape).padding(horizontal = Space.sm, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.xs),
-        ) {
-            Dot(size = 8.dp, color = if (on) tones.success.base else tones.warning.base)
-            Text(label, Modifier.testTag("forwarding.status"), style = MaterialTheme.typography.labelMedium, color = tone.onSubtle)
-        }
+    val label = statusLabel(status)
+    var guide by remember { mutableStateOf<Int?>(null) }
+    AddressCard(address, label, status is Forwarding.On)
+    // Done steps tick; the current one is filled; On and Rejoining have all three done.
+    val current = when (step) {
+        SetupStep.ADD_ADDRESS -> 1
+        SetupStep.CONFIRM -> 2
+        SetupStep.FILTER -> 3
+        SetupStep.REJOINING, null -> 4
     }
-    confirmation?.let { confirm ->
-        // Anyone who knows the address can make Gmail send one: say so when it names a Gmail
-        // address the student's VTOP profile doesn't have.
-        val unknown = confirm.requesterKnown == false
-        val said = when {
-            unknown -> "Gmail's confirmation for ${confirm.requester} arrived, but that address isn't on your VTOP profile. Confirm only if it's your Gmail."
-            confirm.requesterKnown == true -> "Gmail's confirmation for ${confirm.requester} arrived."
-            // No saved profile to check against, or no address in the mail.
-            confirm.requester != null -> "Gmail's confirmation for ${confirm.requester} arrived. Confirm only if it's your Gmail."
-            else -> "Gmail's confirmation arrived. Confirm only if you just added this address in Gmail."
-        }
-        Callout(Lucide.MailCheck, if (unknown) tones.warning else tones.success, said) {
-            val code = @Composable { code: String ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(code, Modifier.weight(1f).testTag("forwarding.confirm_code"), style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace))
-                    IconButton({ copy(context, "Gmail confirmation code", code) }) { Icon(Lucide.Copy, "Copy the code") }
-                }
-            }
-            val link = @Composable { link: String ->
-                val uri = LocalUriHandler.current
-                Button({ uri.openUri(link) }, Modifier.testTag("forwarding.confirm_link"), prefix = Lucide.ExternalLink) { Text("Confirm in Gmail") }
-            }
-            when (val by = confirm.confirmBy) {
-                is ConfirmBy.Code -> code(by.code)
-                is ConfirmBy.Link -> link(by.link)
-                is ConfirmBy.CodeAndLink -> {
-                    code(by.code)
-                    link(by.link)
-                }
-                ConfirmBy.Neither -> {}
+    Progress(current)
+    fun state(n: Int) = when {
+        n < current -> StepState.Done
+        n == current -> StepState.Current
+        else -> StepState.Plain
+    }
+    Step(1, "Add the address in Gmail", null, null, state = state(1), extra = {
+        if (current == 1) {
+            collegeMail?.let { AccountChip(it) }
+            Row(Modifier.padding(top = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Button({ openInChrome(context, gmailUrl(GmailPage.Forwarding, collegeMail)) }, Modifier.testTag("forwarding.step1.open"), size = vitapmate.ui.ButtonSize.Sm, prefix = Lucide.ExternalLink) { Text("Open in Chrome") }
+                ShowMe { guide = 1 }
             }
         }
+    }) {
+        "In the Gmail where VTOP's mail arrives: Settings → Forwarding → Add a forwarding address, paste yours, then Next → Proceed. " +
+            "Leave \"Disable forwarding\" selected."
     }
-    // Steps 1 and 2 are done once Gmail's confirmation arrives (or forwarding is ready); step 3 is
-    // done once an OTP comes through or the student marks setup done.
-    val (added, filtered) = when (readiness) {
-        ForwardingReadiness.READY -> true to true
-        ForwardingReadiness.NEEDS_FILTER -> true to false
-        ForwardingReadiness.NEEDS_CONFIRMATION, ForwardingReadiness.OFF -> false to false
+    Step(2, "Confirm it", null, null, state = state(2), extra = {
+        if (confirmation != null && current == 2) Confirmation(confirmation, collegeMail)
+        if (current == 2) ShowMe { guide = 2 }
+    }) {
+        if (current > 2) "Confirmed." else "One tap, here or from Gmail's confirmation. It shows up here on its own."
     }
-    fun state(done: Boolean, current: Boolean) = if (done) StepState.Done else if (current) StepState.Current else StepState.Plain
-    Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings", state = state(added, true)) {
-        "In the Gmail where VTOP's mail arrives (usually @vitapstudent.ac.in): Add a forwarding address, paste yours, then Next → Proceed → OK. " +
-            "On a phone, open the link in Chrome with ⋮ → Desktop site. Leave \"Disable forwarding\" selected."
+    Step(3, "Create the filter", null, null, state = state(3), last = true, extra = {
+        if (current == 3) {
+            Row(Modifier.padding(top = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Button({ openInChrome(context, gmailUrl(GmailPage.Filters, collegeMail)) }, Modifier.testTag("forwarding.step3.open"), size = vitapmate.ui.ButtonSize.Sm, prefix = Lucide.Funnel) { Text("Open filters") }
+                ShowMe { guide = 3 }
+            }
+            Button(
+                if (MailForwarding.busy != null) null else onDone,
+                Modifier.padding(top = Space.sm).testTag("forwarding.done"),
+                ButtonVariant.Outline,
+                vitapmate.ui.ButtonSize.Sm,
+                prefix = Lucide.Check,
+            ) { Text("I've created it") }
+        }
+    }) {
+        "Reload Gmail first. Then a new filter with From $sender, tick Forward it to and pick your address."
     }
-    Step(2, "Confirm it", null, null, state = state(added, false)) {
-        "Gmail's confirmation mail comes here, not to your inbox, and shows up above on its own. Confirm in Gmail, or type the code into Gmail's Verify box."
+    if (status is Forwarding.Waiting && status.step != SetupStep.REJOINING) {
+        Text(
+            "That's it after step 3: forwarding is on. Nothing waits for VTOP to send an OTP; when one comes through, you'll see it here.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
-    Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
-        "Reload Gmail first. Then create a new filter with From ${sender}, tick Forward it to and pick your address, then Create filter."
+    (status as? Forwarding.On)?.hint?.let { TypedOtpHint(it, sender, collegeMail) }
+    guide?.let { n ->
+        val titles = mapOf(1 to "Add the address", 2 to "Confirm it", 3 to "Create the filter")
+        GuideSheet(n, titles.getValue(n), address, sender, label) { guide = null }
     }
-    if (readiness == ForwardingReadiness.NEEDS_FILTER) {
-        Button(
-            if (MailForwarding.busy != null) null else onDone,
-            Modifier.fillMaxWidth().testTag("forwarding.done"),
-            prefix = Lucide.Check,
-        ) { Text("I've created the filter") }
-    }
-    var guide by remember { mutableStateOf(false) }
-    OutlinedButton({ guide = true }, Modifier.fillMaxWidth().testTag("forwarding.guide.open")) {
-        Icon(Lucide.BookOpen, null, Modifier.size(18.dp))
-        Spacer(Modifier.size(Space.sm))
-        Text("Step-by-step guide with screenshots")
-    }
-    if (guide) ForwardingGuide(sender) { guide = false }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("From", Modifier.padding(start = 40.dp, end = Space.sm), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-        Text(sender, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace))
-        IconButton({ copy(context, "VTOP sender", sender) }, Modifier.testTag("forwarding.copy_sender")) { Icon(Lucide.Copy, "Copy the sender") }
-    }
-    Text(
-        "Still asked to type the OTP? The filter's From must be exactly ${sender} and its action Forward to your address. Mail sent before the filter isn't forwarded.",
-        style = MaterialTheme.typography.bodySmall,
-        color = scheme.onSurfaceVariant,
-    )
     val checking = MailForwarding.busy == ForwardingOp.Check
     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
         Button(if (MailForwarding.busy != null) null else onCheck, Modifier.weight(1f).testTag("forwarding.check"), prefix = if (checking) null else Lucide.RefreshCw) {
@@ -220,6 +184,200 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
     ForwardingPhones()
 }
 
+/** The status line on the address card, as Rust's state says it. */
+private fun statusLabel(status: Forwarding): String = when (status) {
+    is Forwarding.Off -> "Off"
+    is Forwarding.On -> status.lastOtpAt?.let { "On · last OTP ${ago(it)}" } ?: "On · no OTP forwarded yet"
+    is Forwarding.Waiting -> when (status.step) {
+        SetupStep.ADD_ADDRESS -> "Waiting for Gmail's confirmation…"
+        SetupStep.CONFIRM -> "Confirm in Gmail"
+        SetupStep.FILTER -> "Create the filter"
+        SetupStep.REJOINING -> "Reconnecting once you're signed in"
+    }
+}
+
+@Composable
+private fun AddressCard(address: String, label: String, on: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
+    val context = LocalContext.current
+    val accent = tones.accentTone
+    Column(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(accent.subtle).heroCookie()
+            .padding(start = Space.lg, top = Space.md, bottom = Space.lg, end = Space.xs),
+    ) {
+        Text("Your address", style = MaterialTheme.typography.labelMedium, color = accent.onSubtle)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                address,
+                Modifier.weight(1f).testTag("forwarding.address"),
+                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold),
+                color = scheme.onSurface,
+            )
+            IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
+        }
+        val tone = if (on) tones.success else neutralTone
+        Row(
+            Modifier.padding(top = Space.xs).background(tone.subtle, CircleShape).padding(horizontal = Space.sm, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.xs),
+        ) {
+            Dot(size = 8.dp, color = if (on) tones.success.base else tones.warning.base)
+            Text(label, Modifier.testTag("forwarding.status"), style = MaterialTheme.typography.labelMedium, color = tone.onSubtle)
+        }
+    }
+}
+
+/** Three segments for the three steps, done ones in the success colour; [current] 4 is all done. */
+@Composable
+private fun Progress(current: Int) {
+    val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
+    Row(Modifier.testTag("forwarding.progress"), horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.CenterVertically) {
+        for (n in 1..3) {
+            val color = when {
+                n < current -> tones.success.base
+                n == current -> scheme.primary
+                else -> scheme.surfaceContainerHighest
+            }
+            Box(Modifier.weight(1f).height(6.dp).background(color, CircleShape))
+        }
+        Text("${current.coerceAtMost(3)} of 3", Modifier.padding(start = Space.sm), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun AccountChip(mail: String) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier.padding(top = Space.sm).background(scheme.surfaceContainerLow, CircleShape).padding(horizontal = Space.sm, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.xs),
+    ) {
+        Icon(Lucide.GraduationCap, null, Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+        Text(mail, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun ShowMe(onClick: () -> Unit) {
+    TextButton(onClick, Modifier.testTag("forwarding.guide.open")) {
+        Icon(Lucide.Play, null, Modifier.size(16.dp))
+        Spacer(Modifier.size(Space.xs))
+        Text("Show me")
+    }
+}
+
+/**
+ * Gmail's confirmation: who asked, and one tap to confirm (its link opens in Chrome and moves the
+ * sheet on). A Gmail that isn't the college one gets [WrongAccount] first, as VTOP's OTPs never
+ * reach it.
+ */
+@Composable
+private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?) {
+    val tones = AppTheme.tones
+    val context = LocalContext.current
+    var anyway by remember(confirm.sentAt) { mutableStateOf(false) }
+    var showCode by remember(confirm.sentAt) { mutableStateOf(false) }
+    val wrong = confirm.from == ConfirmFrom.UNKNOWN || confirm.from == ConfirmFrom.OWN_OTHER
+    if (wrong && !anyway) return WrongAccount(confirm.requester, collegeMail) { anyway = true }
+    val said = when (confirm.from) {
+        ConfirmFrom.COLLEGE_INBOX -> "From your college Gmail${confirm.requester?.let { "\n$it" } ?: ""}"
+        ConfirmFrom.NOT_SAID -> "Gmail's confirmation arrived. Confirm only if you just added this address in Gmail."
+        ConfirmFrom.OWN_OTHER, ConfirmFrom.UNKNOWN -> "Gmail's confirmation for ${confirm.requester ?: "an address"} arrived."
+    }
+    val tone = if (confirm.from == ConfirmFrom.COLLEGE_INBOX) tones.success else tones.warning
+    val link = when (val by = confirm.confirmBy) {
+        is ConfirmBy.Link -> by.link
+        is ConfirmBy.CodeAndLink -> by.link
+        is ConfirmBy.Code, ConfirmBy.Neither -> null
+    }
+    val code = when (val by = confirm.confirmBy) {
+        is ConfirmBy.Code -> by.code
+        is ConfirmBy.CodeAndLink -> by.code
+        is ConfirmBy.Link, ConfirmBy.Neither -> null
+    }
+    Box(Modifier.padding(top = Space.sm)) {
+        Callout(if (confirm.from == ConfirmFrom.COLLEGE_INBOX) Lucide.GraduationCap else Lucide.MailCheck, tone, said) {
+            if (code != null && (link == null || showCode)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(code, Modifier.weight(1f).testTag("forwarding.confirm_code"), style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace))
+                    IconButton({ copy(context, "Gmail confirmation code", code) }) { Icon(Lucide.Copy, "Copy the code") }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.CenterVertically) {
+                if (link != null) {
+                    Button(
+                        { if (openInChrome(context, link)) MailForwarding.openedConfirm() },
+                        Modifier.testTag("forwarding.confirm_link"),
+                        size = vitapmate.ui.ButtonSize.Sm,
+                        prefix = Lucide.Check,
+                    ) { Text("Confirm in Gmail") }
+                    if (code != null && !showCode) TextButton({ showCode = true }) { Text("Use the code") }
+                }
+                // With no link to open, the student says when they confirmed in Gmail.
+                if (link == null || showCode) TextButton({ MailForwarding.openedConfirm() }, Modifier.testTag("forwarding.confirmed")) { Text("I've confirmed") }
+            }
+        }
+    }
+}
+
+/** Gmail's confirmation came from a Gmail that isn't the college one: VTOP's OTPs never reach it. */
+@Composable
+private fun WrongAccount(requester: String?, collegeMail: String?, onAnyway: () -> Unit) {
+    val tones = AppTheme.tones
+    val context = LocalContext.current
+    Column(Modifier.padding(top = Space.sm).testTag("forwarding.wrong_account"), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+        Callout(Lucide.User, tones.warning, "That's not your college Gmail${requester?.let { ": $it" } ?: ""}. VTOP sends OTPs to your college mail, so this Gmail never gets them.") {
+            Button(
+                { openInChrome(context, gmailUrl(GmailPage.Forwarding, collegeMail)) },
+                Modifier.testTag("forwarding.wrong_account.open"),
+                size = vitapmate.ui.ButtonSize.Sm,
+                prefix = Lucide.ExternalLink,
+            ) { Text("Open college Gmail") }
+            TextButton(onAnyway, Modifier.testTag("forwarding.wrong_account.anyway")) { Text("It's right, confirm anyway") }
+        }
+        Callout(Lucide.Trash2, tones.lab, "Also remove the address from that Gmail's forwarding settings, so it doesn't sit there unused.")
+    }
+}
+
+/** The student typed an OTP by hand while forwarding was on: worth a look at the filter. Changes nothing. */
+@Composable
+private fun TypedOtpHint(hint: ForwardingHint, sender: String, collegeMail: String?) {
+    val tones = AppTheme.tones
+    val scheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val whenTyped = when (hint) {
+        is ForwardingHint.TypedOtp -> ago(hint.at)
+    }
+    Column(Modifier.testTag("forwarding.hint"), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+        Callout(Lucide.Funnel, tones.warning, "Typed the OTP yourself $whenTyped? It may not have been forwarded. Worth a quick look at the filter.") {
+            TextButton({ MailForwarding.dismissHint() }, Modifier.testTag("forwarding.hint.dismiss")) { Text("Dismiss") }
+        }
+        val checks = listOf(
+            Triple("The filter's From is exactly", sender, GmailPage.Filters),
+            Triple("It forwards to your address", "Forward it to → your address", GmailPage.Filters),
+            Triple("It's in your college Gmail", collegeMail ?: "The Gmail VTOP mails", GmailPage.Forwarding),
+            Triple("Forwarding is still verified", "Gmail drops it if the address changed", GmailPage.Forwarding),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            checks.forEach { (title, detail, page) ->
+                Row(
+                    Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(scheme.surfaceContainerLow)
+                        .padding(horizontal = Space.md, vertical = Space.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = MaterialTheme.typography.bodyMedium)
+                        Text(detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    }
+                    IconButton({ openInChrome(context, gmailUrl(page, collegeMail)) }) { Icon(Lucide.ChevronRight, "Open in Gmail") }
+                }
+            }
+        }
+    }
+}
+
 /** How far a setup step is, when the app can tell: [Done] shows a tick, [Current] a filled number. */
 internal enum class StepState { Done, Current, Plain }
 
@@ -236,6 +394,7 @@ internal fun Step(
     tag: String = "forwarding",
     state: StepState = StepState.Plain,
     last: Boolean = false,
+    extra: @Composable () -> Unit = {},
     body: () -> String,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -274,11 +433,12 @@ internal fun Step(
                     Text(linkLabel)
                 }
             }
+            extra()
         }
     }
 }
 
-private fun copy(context: Context, label: String, text: String) {
+internal fun copy(context: Context, label: String, text: String) {
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(label, text))
     showToast("Copied", label)
 }
