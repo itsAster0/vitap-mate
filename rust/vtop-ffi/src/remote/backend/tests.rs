@@ -125,7 +125,9 @@ async fn a_v2_account_token_is_traded_in_once() {
 #[tokio::test]
 async fn the_demo_account_asks_for_a_demo_jwt() {
     let (core, edge, _server) = setup("demo").await;
-    core.current().unwrap().write().await.account.username = crate::demo::USERNAME.into();
+    let slot = core.current().unwrap();
+    slot.write().await.account.username = crate::demo::USERNAME.into();
+    core.rename_student(&slot, crate::demo::USERNAME);
     // The session's own regno wins; the demo's has none.
     {
         let slot = core.current().unwrap();
@@ -139,10 +141,15 @@ async fn the_demo_account_asks_for_a_demo_jwt() {
         };
         session.client.resume_session(&state).unwrap();
     }
+    // A picked semester stays on the phone: the server refuses it for the demo.
+    fs::write(core.at(crate::SELECTED), r#""AP2026""#).unwrap();
     can(&edge, "account:view", 200, json!({}));
     view(&core, "f", false).await.unwrap().unwrap();
+    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
     assert_eq!(body(&edge, 0)["demo"], true);
     assert_eq!(core.device().refresh.unwrap().regno, "DEMO2026");
+    assert_eq!(core.send_server_semester("f".into()).await, Ok(()));
+    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
 }
 
 #[tokio::test]
@@ -291,6 +298,26 @@ async fn sign_out_everywhere_sent_offline_stays_everywhere() {
     assert_eq!(core.send_kept_sign_out("f").await, KeptAfter::Nothing);
     assert_eq!(paths(&edge), ["auth:token", "auth:signOut"]);
     assert_eq!(body(&edge, 1), json!({ "everywhere": true }));
+}
+
+#[tokio::test]
+async fn sign_out_stops_live_watches_first() {
+    let (core, edge, server) = setup("signout-watches").await;
+    let core = Arc::new(core);
+    keep_token(&core, &server);
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    let heard = Arc::new(Heard::default());
+    let watch = core
+        .clone()
+        .live_watch("f".into(), LiveTopic::Account, heard)
+        .await
+        .unwrap();
+    can(&edge, "auth:signOut", 200, json!(null));
+    core.sign_out_of_server("f".into(), false).await.unwrap();
+    assert_eq!(paths(&edge), ["auth:token", "account:view", "auth:signOut"]);
+    // Stopped before auth:signOut went.
+    assert_eq!(edge.lock().unwrap().unwatched, [2]);
+    drop(watch);
 }
 
 #[tokio::test]

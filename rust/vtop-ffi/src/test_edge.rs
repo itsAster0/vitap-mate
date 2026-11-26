@@ -50,6 +50,8 @@ pub(crate) struct Edge {
     pub(crate) issued: u32,
     /// Unreachable: every call fails as a closed socket does, and none is recorded.
     pub(crate) offline: bool,
+    /// For each watch stopped, how many requests had come in by then.
+    pub(crate) unwatched: Vec<usize>,
 }
 
 pub(crate) const ID: &str = "k3f9x2ab7q";
@@ -110,7 +112,11 @@ impl Backend for Fake {
         0
     }
 
-    fn unwatch(&self, _id: u64) {}
+    fn unwatch(&self, _id: u64) {
+        let mut edge = self.0.lock().unwrap();
+        let sent = edge.requests.len();
+        edge.unwatched.push(sent);
+    }
 }
 
 impl Fake {

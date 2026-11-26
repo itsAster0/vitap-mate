@@ -17,7 +17,7 @@ mod live;
 mod rpc;
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::Duration;
 
 use futures::channel::oneshot;
@@ -102,6 +102,8 @@ pub(crate) struct State {
     renewal: Renewal,
     /// The calls in [`Core::wait_server_identity`], woken when the identity may have come.
     identity_waiters: Vec<oneshot::Sender<()>>,
+    /// The live watches Kotlin holds, stopped at a server sign-out ([`Core::stop_live_watches`]).
+    live: Vec<Weak<LiveWatch>>,
 }
 
 impl Shared {
@@ -255,14 +257,30 @@ impl Core {
             };
             let id = backend.watch(path, args, Box::new(on_update));
             info!(path, "live watch");
-            Ok(Arc::new(LiveWatch {
+            let watch = Arc::new(LiveWatch {
                 backend,
                 id,
                 held: Mutex::new(Some(held)),
                 wake,
-            }))
+            });
+            let mut state = self.shared.backend_state();
+            state.live.retain(|live| live.strong_count() > 0);
+            state.live.push(Arc::downgrade(&watch));
+            Ok(watch)
         })
         .await
+    }
+}
+
+impl Core {
+    /// Stops every live watch before the server signs this install out, so the server doesn't
+    /// run them again for a phone it just dropped (each would fail `device_removed`, then
+    /// `unauthenticated`). Their listeners hear nothing more; the app is signing out.
+    pub(crate) fn stop_live_watches(&self) {
+        let live = std::mem::take(&mut self.shared.backend_state().live);
+        for watch in live.iter().filter_map(Weak::upgrade) {
+            watch.stop();
+        }
     }
 }
 

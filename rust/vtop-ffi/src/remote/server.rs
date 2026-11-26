@@ -518,8 +518,11 @@ impl Core {
     /// Tells the server the semester picked here, so connected apps read the same one. Does
     /// nothing while no semester is picked, or (it runs unasked, never proving) before this
     /// install has a server identity; the identity sends it once it comes
-    /// ([`Core::semester_to_server`]).
+    /// ([`Core::semester_to_server`]). The demo account has no semester there to set.
     pub async fn send_server_semester(&self, flow: String) -> Result<(), CoreError> {
+        if self.is_demo() {
+            return Ok(());
+        }
         let Some(semester) = self.read_kept::<String>(crate::SELECTED) else {
             return Ok(());
         };
@@ -631,8 +634,8 @@ impl Core {
         .map(drop)
     }
 
-    /// Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
-    /// address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
+    /// Signs this install out of the server, before [`Core::sign_out`]: stops its live watches,
+    /// takes it off its forwarding address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
     /// (for every phone on the account with `everywhere`), then forgets the identity here. Best
     /// effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
     /// later, the install listed on the account until it goes.
@@ -642,6 +645,7 @@ impl Core {
         everywhere: bool,
     ) -> Result<(), CoreError> {
         traced("sign_out_of_server", &flow, async {
+            self.stop_live_watches();
             self.leave_with_identity(&flow).await;
             if let Some((_, id, _)) = self.saved_mailbox() {
                 let body = json!({ "id": id });
@@ -830,8 +834,12 @@ impl Core {
 }
 impl Core {
     /// The picked semester, sent with a JWT just taken: a pick made before this install had a
-    /// server identity never reached it. Best effort; the demo account refuses it.
+    /// server identity never reached it. Best effort; skipped for the demo account, which the
+    /// server refuses.
     pub(crate) async fn semester_to_server(&self, flow: &str) {
+        if self.is_demo() {
+            return;
+        }
         let Some(semester) = self.read_kept::<String>(crate::SELECTED) else {
             return;
         };
