@@ -27,19 +27,22 @@ impl Core {
             .map(|saved| saved.username)
     }
 
-    /// The saved username, for the Gmail sign-in's registration number. The password is
-    /// [`Core::saved_password`]'s, and whether VTOP rejected it the [`crate::AccountStatus`].
+    /// The saved username and the registration number VTOP gave (the Gmail sign-in checks the
+    /// college account against it). The password is [`Core::saved_password`]'s, and whether
+    /// VTOP rejected it the [`crate::AccountStatus`].
     pub fn saved_account(&self, flow: String) -> Option<SavedAccount> {
         traced_sync("saved_account", &flow, || Ok(self.read_account()))
             .ok()
             .flatten()
             .map(|account| SavedAccount {
-                username: account.username,
-                // An account saved before this field: the saved session has it.
+                // An account saved before this field: the saved session has it, if it's this
+                // student's.
                 registration_number: account.registration_number.or_else(|| {
                     self.read::<PersistedVtopSession>(SESSION)
+                        .filter(|saved| saved.username.eq_ignore_ascii_case(&account.username))
                         .and_then(|saved| saved.registration_number)
                 }),
+                username: account.username,
             })
     }
 
@@ -83,10 +86,11 @@ impl Core {
                 self.keep_accepted_password(&session.account);
             }
             // VTOP took the password: a rejection the server reported for it is over.
-            if self
-                .read_account()
-                .is_some_and(|saved| saved.username == session.account.username)
-            {
+            if self.read_account().is_some_and(|saved| {
+                saved
+                    .username
+                    .eq_ignore_ascii_case(&session.account.username)
+            }) {
                 self.set_server_rejected(false);
             }
             // Accepted: its cookies become the app's (and the web view's).
@@ -378,6 +382,20 @@ impl Core {
         obs::set_regno(session.client.registration_number().ok());
         self.save(slot, session);
         Ok(())
+    }
+
+    /// Saves the regno VTOP gave `slot`'s session (on checking restored cookies, say) when the
+    /// account has none or another: it's the student's id wherever the regno counts, never the
+    /// username.
+    pub(crate) async fn keep_regno(&self, slot: &Arc<Slot>) {
+        let session = slot.read().await;
+        let Ok(regno) = session.client.registration_number() else {
+            return;
+        };
+        if self.saved_regno().as_deref() != Some(regno.as_str()) {
+            info!("saving the regno VTOP gave");
+            self.save(slot, &session);
+        }
     }
 
     pub(crate) fn save(&self, slot: &Arc<Slot>, session: &Session) {

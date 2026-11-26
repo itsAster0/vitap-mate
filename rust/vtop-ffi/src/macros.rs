@@ -38,6 +38,9 @@ macro_rules! signed_in {
             }
         };
         if core.is_current(&slot) {
+            // A session that checked its cookies with VTOP learned the regno: kept with the
+            // account if it had none.
+            core.keep_regno(&slot).await;
             Ok(data)
         } else {
             Err(CoreError::NotSignedIn)

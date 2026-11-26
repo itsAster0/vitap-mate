@@ -80,10 +80,11 @@ const SELECTED: &str = "semester.json";
 const PAGES: &str = "pages";
 /// The signed-in student's own files, forgotten (with every cached page) on sign-out and when
 /// another account signs in over the saved one.
-const STUDENT_FILES: [&str; 7] = [
+const STUDENT_FILES: [&str; 8] = [
     SEMESTERS,
     SELECTED,
     remote::forwarding::FILE,
+    remote::forwarding::PROGRESS_FILE,
     pages::changes::FILE,
     remote::consent::FILE,
     remote::account_token::FILE,
@@ -690,9 +691,20 @@ impl Core {
             store::account::SavedPassword::Gone => return Ok(Signed::Out),
             store::account::SavedPassword::Open(_) => saved.usable(),
         };
-        let Some(account) = account else {
+        let Some(mut account) = account else {
             return Ok(Signed::Out);
         };
+        // An account saved before it kept the regno: this student's saved session has the one
+        // VTOP gave, kept with the account from now on.
+        if account.registration_number.is_none()
+            && let Some(regno) = self
+                .read::<PersistedVtopSession>(SESSION)
+                .filter(|saved| saved.username.eq_ignore_ascii_case(&account.username))
+                .and_then(|saved| saved.registration_number)
+        {
+            account.registration_number = Some(regno);
+            self.write_account(&account, rejected);
+        }
         let session = Session::new(account, &self.shared)?.rejected(rejected);
         let saved = self
             .read::<PersistedVtopSession>(SESSION)

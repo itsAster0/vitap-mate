@@ -286,15 +286,29 @@ async fn an_old_install_with_an_identity_counts_as_shared() {
 async fn an_old_forwarding_address_counts_as_shared() {
     let (core, _edge, _) = setup("migrate-mail").await;
     core.remove_file(FILE);
+    fs::write(core.at(forwarding::FILE), "{}").unwrap();
+    // No regno saved from VTOP: the username is never taken for it.
     core.write_account(
         &crate::Account {
-            username: REGNO.into(),
+            username: "STUDENT314".into(),
             password: "pw".into(),
             registration_number: None,
         },
         false,
     );
-    fs::write(core.at(forwarding::FILE), "{}").unwrap();
+    core.regno_sharing("s".into()).await;
+    let kept = fs::read_to_string(core.at(FILE)).unwrap_or_default();
+    assert!(!kept.contains("STUDENT314"), "{kept}");
+    // The regno VTOP gave, saved with a username that isn't it, counts.
+    core.remove_file(FILE);
+    core.write_account(
+        &crate::Account {
+            username: "STUDENT314".into(),
+            password: "pw".into(),
+            registration_number: Some(REGNO.into()),
+        },
+        false,
+    );
     assert_eq!(core.regno_sharing("s".into()).await, RegnoSharing::Shared);
 }
 

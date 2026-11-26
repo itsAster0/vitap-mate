@@ -630,6 +630,7 @@ impl Core {
             return Err(ServerError::Expired);
         }
         session.mark_signed_in();
+        crate::obs::set_regno(session.client.registration_number().ok());
         self.save(slot, &session);
         info!("signed in on the server");
         Ok(())

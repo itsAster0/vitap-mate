@@ -450,6 +450,20 @@ async fn resume_replaces_the_previous_session() {
     assert_eq!(state.cookies, "JSESSIONID=new");
     assert_eq!(state.csrf_token.as_deref(), Some("csrf-2"));
     assert_eq!(state.logged_in_at, Some(2));
+
+    // Cookies and the regno without a CSRF token (a renewal from a cached session): the regno
+    // stays known, and the session is checked with VTOP before use.
+    client
+        .resume_session(&SessionState {
+            cookies: "JSESSIONID=newer".into(),
+            csrf_token: None,
+            registration_number: Some("22BCE0001".into()),
+            otp_issued_at: None,
+            logged_in_at: Some(3),
+        })
+        .unwrap();
+    assert_eq!(client.registration_number().as_deref(), Ok("22BCE0001"));
+    assert!(!client.is_authenticated());
 }
 
 fn cookie_client(base: &str, cookies: &str) -> VtopClient {

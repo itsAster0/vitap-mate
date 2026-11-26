@@ -669,11 +669,13 @@ impl VtopClient {
             state.auth_stage = AuthStage::AwaitingOtp {
                 issued_at_unix_seconds,
             };
-        } else if let Some(registration_number) = registration_number
-            && snapshot.csrf_token.is_some()
-        {
+        } else if let Some(registration_number) = registration_number {
             state.session.set_registration_number(registration_number);
-            state.session.set_authenticated(true);
+            // Without a CSRF token the cookies are checked with VTOP before use; the regno
+            // stays known either way.
+            if snapshot.csrf_token.is_some() {
+                state.session.set_authenticated(true);
+            }
         }
         Ok(())
     }

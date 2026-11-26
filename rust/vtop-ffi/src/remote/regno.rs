@@ -194,7 +194,7 @@ impl Core {
             self.device().refresh.map(|refresh| refresh.regno),
             self.read::<account_token::Saved>(account_token::FILE)
                 .map(|saved| saved.registration_number),
-            account.map(|saved| saved.registration_number.unwrap_or(saved.username)),
+            account.and_then(|saved| saved.registration_number),
         ];
         let stored = migrated(held.into_iter().flatten());
         info!(

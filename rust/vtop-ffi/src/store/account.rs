@@ -189,6 +189,11 @@ impl Sealed {
 }
 
 impl Core {
+    /// The saved account's regno, without opening its password.
+    pub(crate) fn saved_regno(&self) -> Option<String> {
+        self.read::<Stored>(ACCOUNT)?.registration_number
+    }
+
     /// The saved account. It only reads: a plain-text password is sealed once, by
     /// [`Core::upgrade_account`].
     pub(crate) fn read_account(&self) -> Option<Saved> {
@@ -305,7 +310,7 @@ impl Core {
     ) {
         let same = self
             .read::<Stored>(ACCOUNT)
-            .filter(|saved| saved.username == account.username);
+            .filter(|saved| saved.username.eq_ignore_ascii_case(&account.username));
         let mut account = account.clone();
         if account.registration_number.is_none() {
             account.registration_number = same
@@ -969,6 +974,51 @@ mod tests {
         assert!(core.read_account().unwrap().usable().is_none());
         core.upgrade_account();
         assert_eq!(file(&core), plain);
+        let _ = fs::remove_dir_all(&core.dir);
+    }
+
+    #[tokio::test]
+    async fn a_regno_vtop_gives_is_saved_with_the_account() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-keep-regno-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        // Signed in, VTOP's regno known to the session, an account saved without one.
+        let core = crate::test_edge::signed_in(&dir, "http://127.0.0.1:9".into());
+        let account = Account {
+            username: "22BCE0001".into(),
+            password: "pw".into(),
+            registration_number: None,
+        };
+        core.write_account(&account, false);
+        assert_eq!(core.saved_regno(), None);
+        let slot = core.current().unwrap();
+        core.keep_regno(&slot).await;
+        assert_eq!(core.saved_regno().as_deref(), Some("22BCE0001"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_restore_saves_the_regno_the_saved_session_has() {
+        let core = core("restore-regno", &Fake::new("phone-a"));
+        let account = Account {
+            username: "STUDENT314".into(),
+            password: "pw".into(),
+            registration_number: None,
+        };
+        let session = |username: &str| {
+            serde_json::json!({
+                "username": username, "saved_at_epoch_ms": 0, "cookies": null,
+                "csrf_token": null, "registration_number": "22BCE0001",
+            })
+        };
+        // Another student's saved session: its regno isn't this account's.
+        core.write_account(&account, false);
+        fs::write(core.at(crate::SESSION), session("OTHER1").to_string()).unwrap();
+        core.restore_saved().unwrap();
+        assert_eq!(core.saved_regno(), None);
+        fs::write(core.at(crate::SESSION), session("student314").to_string()).unwrap();
+        core.restore_saved().unwrap();
+        assert_eq!(core.saved_regno().as_deref(), Some("22BCE0001"));
         let _ = fs::remove_dir_all(&core.dir);
     }
 }
