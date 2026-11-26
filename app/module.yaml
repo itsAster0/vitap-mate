@@ -30,8 +30,8 @@ settings:
   android:
     signing: enabled
     applicationId: com.vitap_pal.app
-    versionCode: 3002200
-    versionName: "3.2.1"
+    versionCode: 3002290
+    versionName: "3.2.2"
     namespace: vitapmate
     minSdk: 28
     # Compose 1.13 needs Android 37.1 to compile against.

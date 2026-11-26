@@ -48,6 +48,10 @@
           "text": "Mail forwarding walks you through Gmail in three steps with Gmail's own screens, opens the right Gmail in Chrome and warns you if you confirm it from a Gmail that isn't your college one.",
           "since": 3002100
         },
+        {
+          "text": "Mail forwarding also lets you reopen Gmail's confirmation from step 2, handles a new confirmation while forwarding is on, and warns in Settings when you had to type an OTP by hand.",
+          "since": 3002290
+        },
         "The home-screen widget shows the next class and today's timetable. Long-press the app icon for Timetable, Attendance and Outing.",
         {
           "text": "Widgets for attendance (the courses closest to 75% first), the next exam and the mess menu join the timetable widget. All four also work on the lock screen.",
@@ -111,6 +115,41 @@
     }
   ],
   "releases": [
+    {
+      "version": "3.2.2",
+      "code": 3002290,
+      "summary": "3.2.2 makes mail forwarding setup more dependable end to end, surfaces forwarding warnings in Settings, refreshes the About screen, and fixes a hang when restoring an account.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "Reopen Gmail's confirmation link from step 2 if you left Gmail before tapping Confirm.",
+            "New Gmail confirmations that arrive while forwarding is already on now show in the sheet, where you can confirm or dismiss them.",
+            "Wrong-Gmail confirmations can be ignored so they no longer hold setup back, and Open college Gmail uses Google's account picker when your college address isn't cached yet.",
+            "Settings warns you when you had to type an OTP by hand or when a new Gmail confirmation is waiting.",
+            "Redesigned About screen with links moved out of the More footer."
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "Gmail links open in Chrome or your default browser instead of the Gmail app, and step 1 notes to turn on Chrome's Desktop site on a phone.",
+            "Copy notes, errors and check feedback now appear inside the mail forwarding sheet instead of behind it, and taps on local actions are never dropped while a check runs.",
+            "Returning from Chrome checks for Gmail's confirmation or filter right away, and the Show me guide keeps its header, caption and zoom bounds tidy on smaller screens."
+          ]
+        },
+        {
+          "title": "Fixed",
+          "items": [
+            "A phone joining an address more than 24 hours after confirmation no longer gets stuck on step 1 waiting for an OTP.",
+            "A phone removed from a forwarding address stays removed instead of rejoining on its next check.",
+            "Restoring a saved registration number no longer hangs on start, and sharing stays off until your registration number is known.",
+            "Toggling registration number sharing, deleting the server account or switching accounts refreshes forwarding right away.",
+            "Reconnecting phones show a reconnecting note instead of three ticks and no longer forget the address while waiting to sign in."
+          ]
+        }
+      ]
+    },
     {
       "version": "3.2.1",
       "code": 3002100,
