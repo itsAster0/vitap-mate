@@ -62,6 +62,15 @@ struct Stored {
     answers: BTreeMap<String, StoredAnswer>,
 }
 
+/// Only the fields [`Core::stored_locked`] needs from `account.json`, read without touching the
+/// Keystore cipher.
+#[derive(Deserialize)]
+struct AccountMeta {
+    username: String,
+    #[serde(default)]
+    registration_number: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum StoredAnswer {
@@ -187,14 +196,23 @@ impl Core {
         if let Some(stored) = self.read::<Stored>(FILE) {
             return stored;
         }
-        let account = (self.at(forwarding::FILE).exists())
-            .then(|| self.read_account())
-            .flatten();
+        let account_regno = self
+            .at(forwarding::FILE)
+            .exists()
+            .then(|| self.read::<AccountMeta>(crate::ACCOUNT))
+            .flatten()
+            .and_then(|saved| {
+                saved.registration_number.or_else(|| {
+                    self.read::<vtop_core::types::PersistedVtopSession>(crate::SESSION)
+                        .filter(|session| session.username.eq_ignore_ascii_case(&saved.username))
+                        .and_then(|session| session.registration_number)
+                })
+            });
         let held = [
             self.device().refresh.map(|refresh| refresh.regno),
             self.read::<account_token::Saved>(account_token::FILE)
                 .map(|saved| saved.registration_number),
-            account.and_then(|saved| saved.registration_number),
+            account_regno,
         ];
         let stored = migrated(held.into_iter().flatten());
         info!(
@@ -254,11 +272,13 @@ impl Core {
         to
     }
 
-    /// Whether a server identity may be used now, never asking: the student said Share, or no
-    /// registration number is known to share ([`Self::regno_allowed`] without its log line).
+    /// Whether a server identity may be used now, never asking: the student said Share, or
+    /// signed out (no registration number to share; signed in with no regno known fails closed).
     pub(crate) async fn identity_shared(&self) -> bool {
-        let regno = self.signed_in_regno().await;
-        regno.is_none_or(|regno| self.sharing_of(&regno) == RegnoSharing::Shared)
+        match self.signed_in_regno().await {
+            Some(regno) => self.sharing_of(&regno) == RegnoSharing::Shared,
+            None => !self.has_account(),
+        }
     }
 
     /// The signed-in student's answer; Unasked signed out.
@@ -339,8 +359,9 @@ impl Core {
     }
 
     /// The one check before a server identity is taken: Ok once the signed-in student said
-    /// Share (signed out: Ok, no number goes; only a kept identity is used, to leave). With
-    /// `may_ask`, a flow with the student on screen asks first. Else `RegnoNotShared`.
+    /// Share (signed out: Ok, no number goes; only a kept identity is used, to leave). Signed in
+    /// with no registration number known fails closed with `RegnoNotShared`. With `may_ask`, a
+    /// flow with the student on screen asks first. Else `RegnoNotShared`.
     pub(crate) async fn regno_allowed(
         &self,
         flow: &str,
@@ -348,7 +369,16 @@ impl Core {
         may_ask: bool,
     ) -> Result<(), CoreError> {
         let Some(regno) = regno else {
-            return Ok(());
+            if !self.has_account() {
+                return Ok(());
+            }
+            info!(
+                flow,
+                kind = "regno",
+                outcome = "regno_unknown",
+                "regno sharing"
+            );
+            return Err(CoreError::RegnoNotShared);
         };
         let sharing = if may_ask {
             self.ask_regno(flow, regno, RegnoAsk::ForFeature).await

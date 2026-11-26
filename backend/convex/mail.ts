@@ -6,6 +6,7 @@
 // address.
 
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import {
   type MutationCtx,
   internalMutation,
@@ -44,22 +45,25 @@ export const register = mutation({
 });
 
 /** Joins the student's address if they have one, else null: a phone whose address went looks for
- * where its phones moved, and an address the student deleted stays deleted. */
+ * where its phones moved, and an address the student deleted stays deleted. When `fromId` matches
+ * the account's current address, this install was removed from it on purpose and does not rejoin. */
 export const join = mutation({
-  args: { flow: v.string() },
-  handler: async (ctx, { flow }) => joinAddress(ctx, flow, false),
+  args: { flow: v.string(), fromId: v.optional(v.string()) },
+  handler: async (ctx, { flow, fromId }) => joinAddress(ctx, flow, false, fromId),
 });
 
 async function joinAddress(
   ctx: MutationCtx,
   flow: string,
   make: boolean,
+  fromId?: string,
 ): Promise<{ id: string; address: string } | null> {
   const me = await realCaller(ctx);
   const accountId = me.account._id;
   let mailbox = await mailboxOfAccount(ctx, accountId);
   const at = now();
   if (!mailbox && !make) return null;
+  if (mailbox && fromId !== undefined && mailbox.addressId === fromId) return null;
   if (!mailbox) {
     let id = newId();
     for (
@@ -75,6 +79,7 @@ async function joinAddress(
       accountId,
       confirmation: null,
       confirmationAt: null,
+      confirmedAt: null,
       lastOtpAt: null,
       createdAt: at,
       updatedAt: at,
@@ -232,10 +237,26 @@ export const inbox = query({
         ? { sealed: fresh.sealed, receivedAt: fresh.receivedAt }
         : { sealed: null }),
       confirmation: kept,
+      confirmedAt: confirmationSentAt(mailbox),
       lastOtpAt: mailbox.lastOtpAt,
     };
   },
 });
+
+/** Unix seconds (`sentAt`) of the mailbox's latest `gmail_confirm`, reading `confirmation` JSON
+ * on rows created before `confirmedAt` existed. */
+function confirmationSentAt(mailbox: Doc<"mailboxes">): number | null {
+  if (typeof mailbox.confirmedAt === "number") return mailbox.confirmedAt;
+  if (mailbox.confirmation !== null) {
+    try {
+      const parsed = JSON.parse(mailbox.confirmation) as { sentAt?: unknown };
+      if (typeof parsed.sentAt === "number") return parsed.sentAt;
+    } catch {
+      // Malformed legacy confirmation text has no usable sentAt.
+    }
+  }
+  return null;
+}
 
 // ---- mail in (http.ts) ------------------------------------------------------------------------
 
@@ -272,6 +293,11 @@ export const deliver = internalMutation({
     if (!mailbox) return false;
     // A retried mail older than the last OTP stored: the newer code stays.
     if (mailbox.lastOtpAt !== null && sentAt < mailbox.lastOtpAt) return true;
+    // An out-of-order older confirmation retry must not overwrite a newer confirmation.
+    if (kind === "gmail_confirm") {
+      const prevSentAt = confirmationSentAt(mailbox);
+      if (prevSentAt !== null && sentAt < prevSentAt) return true;
+    }
     log(
       { regno: (await ctx.db.get(mailbox.accountId))?.regno },
       `mail-otp: storing a ${kind} for ${boxes.length} device(s)`,
@@ -281,6 +307,7 @@ export const deliver = internalMutation({
       await ctx.db.patch(mailbox._id, {
         confirmation: plaintext,
         confirmationAt: at,
+        confirmedAt: sentAt,
         updatedAt: at,
       });
       await ctx.scheduler.runAt((at + CONFIRMATION_TTL_SECS) * 1000, internal.mail.dropConfirmation, {
@@ -343,13 +370,19 @@ export const dropBox = internalMutation({
   },
 });
 
-/** Clears Gmail's forwarding confirmation at expiry so subscribed `mail:inbox` queries re-run. */
+/** Clears Gmail's forwarding confirmation at expiry so subscribed `mail:inbox` queries re-run.
+ * `confirmedAt` stays for good so phones joining later know Gmail confirmed this address. */
 export const dropConfirmation = internalMutation({
   args: { mailboxId: v.id("mailboxes"), confirmationAt: v.number() },
   handler: async (ctx, { mailboxId, confirmationAt }) => {
     const mailbox = await ctx.db.get(mailboxId);
     if (!mailbox || mailbox.confirmationAt !== confirmationAt || now() < confirmationAt + CONFIRMATION_TTL_SECS) return;
-    await ctx.db.patch(mailboxId, { confirmation: null, confirmationAt: null });
+    const confirmedAt = confirmationSentAt(mailbox);
+    await ctx.db.patch(mailboxId, {
+      confirmation: null,
+      confirmationAt: null,
+      ...(mailbox.confirmedAt === undefined && confirmedAt !== null ? { confirmedAt } : {}),
+    });
     const rows = await ctx.db
       .query("otpInbox")
       .withIndex("by_account", (q) => q.eq("accountId", mailbox.accountId))
@@ -379,6 +412,11 @@ export const noteUnclaimed = internalMutation({
     if (kind === "otp")
       await ctx.db.patch(waiting._id, {
         lastOtpAt: Math.max(waiting.lastOtpAt ?? 0, sentAt),
+        updatedAt: now(),
+      });
+    else
+      await ctx.db.patch(waiting._id, {
+        confirmedAt: Math.max(waiting.confirmedAt ?? 0, sentAt),
         updatedAt: now(),
       });
     console.log(`mail-otp: a ${kind} for an address not claimed yet, dropped`);

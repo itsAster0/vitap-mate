@@ -66,7 +66,8 @@ pub enum ConfirmFrom {
     OwnOther,
     /// An address the app doesn't know.
     Unknown,
-    /// The mail named no address.
+    /// The mail named no address, or the app has nothing to tell the college mail by (no
+    /// regno, no saved profile).
     NotSaid,
 }
 
@@ -113,10 +114,15 @@ fn confirm_from(
             })
             .any(|word| word.eq_ignore_ascii_case(&address))
     });
+    let known = regno.is_some_and(|regno| !regno.trim().is_empty())
+        || profile.is_some_and(|profile| !profile.vit_email.trim().is_empty());
     if on_profile {
         ConfirmFrom::OwnOther
-    } else {
+    } else if known {
         ConfirmFrom::Unknown
+    } else {
+        // Nothing to tell the college mail by: saying it isn't would be a guess.
+        ConfirmFrom::NotSaid
     }
 }
 
@@ -292,6 +298,21 @@ pub(crate) struct Progress {
     /// The typed OTP whose hint the student dismissed.
     #[serde(default)]
     pub(crate) dismissed_at: Option<i64>,
+    /// The `sent_at` of the confirmation the student set aside (another Gmail's, say), so it
+    /// stops holding the sheet at Confirm.
+    #[serde(default)]
+    pub(crate) ignored_confirm_at: Option<i64>,
+    /// [`Setup::Active`]'s newer confirmation: here, as `forwarding.json` refuses new fields.
+    #[serde(default)]
+    newer_confirmation: Option<StoredConfirmation>,
+}
+
+impl Progress {
+    /// `confirmation` still asks the student to act: not opened, nor set aside.
+    fn shows(&self, confirmation: &GmailConfirmation) -> bool {
+        let at = Some(confirmation.sent_at);
+        at > self.confirm_opened_at && at > self.ignored_confirm_at
+    }
 }
 
 /// This phone's forwarding address and how far its setup got, for the app.
@@ -329,6 +350,9 @@ pub enum Forwarding {
         readiness: ForwardingReadiness,
         uses: ForwardingUses,
         hint: Option<ForwardingHint>,
+        /// A Gmail confirmation newer than every mail before it (Gmail asked again, perhaps for
+        /// another Gmail), not opened or set aside yet.
+        confirmation: Option<GmailConfirmation>,
         college_mail: Option<String>,
     },
 }
@@ -351,11 +375,13 @@ enum Setup {
         last_mail_at: Option<i64>,
     },
     /// Forwarding works: an OTP came through (now or, as the server says, before), or the
-    /// student marked setup done after Gmail's confirmation arrived. Gmail's confirmation is
-    /// only for setting up, so none is kept here.
+    /// student marked setup done after Gmail's confirmation arrived. `confirmation` is one that
+    /// came after every mail before it: Gmail asking again (the student skipped Confirm, or
+    /// confirmed another Gmail), so it is shown until opened or set aside.
     Active {
         last_mail_at: Option<i64>,
         last_otp_at: Option<i64>,
+        confirmation: Option<GmailConfirmation>,
     },
 }
 
@@ -365,18 +391,49 @@ impl Setup {
         last_mail_at: None,
     };
 
-    /// An OTP sent at `at` reached the address.
+    /// An OTP sent at `at` reached the address. A confirmation sent after it still asks for a
+    /// look: the server's `lastOtpAt` may be from long before Gmail asked again.
     fn otp_at(self, at: i64) -> Self {
-        let (last_mail_at, last_otp_at) = match self {
-            Self::Waiting { last_mail_at, .. } => (last_mail_at, None),
+        let (last_mail_at, last_otp_at, confirmation) = match self {
+            Self::Waiting {
+                last_mail_at,
+                confirmation,
+            } => (last_mail_at, None, confirmation),
             Self::Active {
                 last_mail_at,
                 last_otp_at,
-            } => (last_mail_at, last_otp_at),
+                confirmation,
+            } => (last_mail_at, last_otp_at, confirmation),
         };
+        let last_otp_at = last_otp_at.max(Some(at));
         Self::Active {
             last_mail_at: last_mail_at.max(Some(at)),
-            last_otp_at: last_otp_at.max(Some(at)),
+            last_otp_at,
+            confirmation: confirmation.filter(|c| Some(c.sent_at) > last_otp_at),
+        }
+    }
+
+    /// The server says Gmail's confirmation reached the address at `at` (`mail:inbox`'s
+    /// `confirmedAt`, kept after the confirmation itself is dropped), so a phone that joined
+    /// late isn't held at the first step until VTOP's next OTP.
+    fn confirmed_at(self, at: i64) -> Self {
+        match self {
+            Self::Waiting {
+                confirmation,
+                last_mail_at,
+            } => Self::Waiting {
+                confirmation,
+                last_mail_at: last_mail_at.max(Some(at)),
+            },
+            Self::Active {
+                last_mail_at,
+                last_otp_at,
+                confirmation,
+            } => Self::Active {
+                last_mail_at: last_mail_at.max(Some(at)),
+                last_otp_at,
+                confirmation,
+            },
         }
     }
 
@@ -391,24 +448,40 @@ impl Setup {
         else {
             return self.otp_at(payload.sent_at());
         };
+        let incoming = GmailConfirmation {
+            confirm_by: ConfirmBy::parse(code.clone(), link.as_deref()),
+            requester: requester.clone(),
+            sent_at: *sent_at,
+            from: ConfirmFrom::NotSaid,
+        };
         match self {
             // Gmail's confirmation mail only shows the address was added; forwarding works once
-            // Gmail forwards VTOP's mail or the student marks setup done.
-            Self::Waiting { last_mail_at, .. } => Self::Waiting {
-                confirmation: Some(GmailConfirmation {
-                    confirm_by: ConfirmBy::parse(code.clone(), link.as_deref()),
-                    requester: requester.clone(),
-                    sent_at: *sent_at,
-                    from: ConfirmFrom::NotSaid,
-                }),
+            // Gmail forwards VTOP's mail or the student marks setup done. A retried older mail
+            // doesn't replace a newer one.
+            Self::Waiting {
+                confirmation,
+                last_mail_at,
+            } => Self::Waiting {
+                confirmation: match confirmation {
+                    Some(kept) if kept.sent_at > *sent_at => Some(kept),
+                    _ => Some(incoming),
+                },
                 last_mail_at: last_mail_at.max(Some(*sent_at)),
             },
-            // Working already: the server keeps the confirmation 24 h until an OTP arrives, and
-            // it isn't shown again.
+            // Working already: the server keeps the setup's confirmation 24 h, and it isn't
+            // shown again; only one sent after every mail so far is Gmail asking again.
             Self::Active {
                 last_mail_at,
                 last_otp_at,
+                confirmation,
             } => Self::Active {
+                confirmation: if Some(*sent_at)
+                    > last_mail_at.max(confirmation.as_ref().map(|kept| kept.sent_at))
+                {
+                    Some(incoming)
+                } else {
+                    confirmation
+                },
                 last_mail_at: last_mail_at.max(Some(*sent_at)),
                 last_otp_at,
             },
@@ -437,6 +510,7 @@ impl Setup {
                 Self::Active {
                     last_mail_at,
                     last_otp_at: None,
+                    confirmation: None,
                 }
             }
             other => other,
@@ -472,6 +546,80 @@ impl MailboxState {
 
     fn id(&self) -> Option<&str> {
         self.mailbox().map(|mailbox| mailbox.id.as_str())
+    }
+
+    /// The confirmation the sheet may show: the setup's while waiting, a newer one once on.
+    fn confirmation(&self) -> Option<&GmailConfirmation> {
+        match self {
+            Self::Joined {
+                setup:
+                    Setup::Waiting {
+                        confirmation: Some(confirmation),
+                        ..
+                    }
+                    | Setup::Active {
+                        confirmation: Some(confirmation),
+                        ..
+                    },
+                ..
+            } => Some(confirmation),
+            _ => None,
+        }
+    }
+
+    /// [`Setup::Active`]'s newer confirmation, which [`Progress`] keeps.
+    fn newer_confirmation(&self) -> Option<StoredConfirmation> {
+        match self {
+            Self::NeedsRejoin {
+                kept: Setup::Active { confirmation, .. },
+                ..
+            }
+            | Self::Joined {
+                setup: Setup::Active { confirmation, .. },
+                ..
+            } => confirmation.as_ref().map(StoredConfirmation::from),
+            _ => None,
+        }
+    }
+
+    /// With `newer` (from [`Progress`]) as [`Setup::Active`]'s newer confirmation.
+    fn with_newer_confirmation(self, newer: Option<StoredConfirmation>) -> Self {
+        let newer = newer.map(GmailConfirmation::from);
+        match self {
+            Self::NeedsRejoin {
+                mailbox,
+                kept:
+                    Setup::Active {
+                        last_mail_at,
+                        last_otp_at,
+                        ..
+                    },
+            } => Self::NeedsRejoin {
+                mailbox,
+                kept: Setup::Active {
+                    last_mail_at,
+                    last_otp_at,
+                    confirmation: newer,
+                },
+            },
+            Self::Joined {
+                mailbox,
+                setup:
+                    Setup::Active {
+                        last_mail_at,
+                        last_otp_at,
+                        ..
+                    },
+            } => Self::Joined {
+                mailbox,
+                setup: Setup::Active {
+                    last_mail_at,
+                    last_otp_at,
+                    confirmation: newer,
+                },
+            },
+            other => other,
+        }
     }
 
     fn readiness(&self) -> ForwardingReadiness {
@@ -547,9 +695,11 @@ impl MailboxState {
                 confirmation,
                 last_mail_at,
             } => (false, *last_mail_at, None, confirmation.clone()),
+            // The newer confirmation goes in the progress file ([`Core::store_mailbox`]).
             Setup::Active {
                 last_mail_at,
                 last_otp_at,
+                ..
             } => (true, *last_mail_at, *last_otp_at, None),
         };
         Some(Stored {
@@ -605,9 +755,12 @@ impl TryFrom<Stored> for MailboxState {
         };
         // An OTP that came through shows forwarding works, whatever `ready` says.
         let setup = if stored.ready || stored.last_otp_at.is_some() {
+            // A confirmation left over from setup isn't shown; a newer one is in the progress
+            // file ([`Core::mailbox_state`]).
             Setup::Active {
                 last_mail_at: stored.last_mail_at,
                 last_otp_at: stored.last_otp_at,
+                confirmation: None,
             }
         } else {
             Setup::Waiting {
@@ -664,7 +817,7 @@ impl Payload {
             Self::Otp { code, sent_at }
                 if code.len() == 6
                     && code.bytes().all(|b| b.is_ascii_digit())
-                    && *sent_at >= since - slack =>
+                    && *sent_at >= since.saturating_sub(slack) =>
             {
                 Some(code)
             }
@@ -708,6 +861,8 @@ impl Core {
     pub async fn set_up_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("set_up_forwarding", &flow, async {
             let slot = self.current()?;
+            // The demo account has no address to forward to.
+            crate::demo::refuse(&slot.read().await.account)?;
             // A signed-out student's address first, as it may be the one this sign-in joins.
             self.leave_queued(&flow).await;
             if self.mailbox_state() != MailboxState::Off {
@@ -741,6 +896,17 @@ impl Core {
     /// setting up, or an OTP.
     pub async fn check_forwarding(&self, flow: String) -> Result<Forwarding, CoreError> {
         traced("check_forwarding", &flow, async {
+            // Kept to rejoin (the student shared their regno again since): the student asked,
+            // so it may prove who they are.
+            if matches!(self.mailbox_state(), MailboxState::NeedsRejoin { .. })
+                && self.identity_shared().await
+                && self.rejoin_kept(&flow, true).await? == Rejoined::NoAddress
+            {
+                return Err(CoreError::ForwardingOff {
+                    kind: ForwardingOffKind::AddressDeleted,
+                    reason: "Your forwarding address no longer exists. Set it up again.".into(),
+                });
+            }
             self.pull(&flow).await?;
             Ok(self.forwarding_view())
         })
@@ -753,6 +919,19 @@ impl Core {
     pub fn mark_forwarding_done(&self, flow: String) -> Forwarding {
         traced_sync("mark_forwarding_done", &flow, || {
             self.update_mailbox(|state| match state {
+                // Gmail's confirmation isn't opened yet: forwarding can't work before it is.
+                MailboxState::Joined { .. }
+                    if matches!(
+                        view_with(&state, &self.progress()),
+                        Forwarding::Waiting {
+                            step: SetupStep::Confirm,
+                            ..
+                        }
+                    ) =>
+                {
+                    info!("not marked done: confirmation not opened");
+                    state
+                }
                 MailboxState::Joined { mailbox, setup } => {
                     let setup = setup.mark_done();
                     if matches!(setup, Setup::Active { .. }) {
@@ -773,17 +952,26 @@ impl Core {
     pub fn opened_forwarding_confirm(&self, flow: String) -> Forwarding {
         traced_sync("opened_forwarding_confirm", &flow, || {
             self.update_progress(|state, progress| {
-                if let MailboxState::Joined {
-                    setup:
-                        Setup::Waiting {
-                            confirmation: Some(confirmation),
-                            ..
-                        },
-                    ..
-                } = state
-                {
-                    progress.confirm_opened_at = Some(confirmation.sent_at);
+                if let Some(confirmation) = state.confirmation() {
+                    progress.confirm_opened_at =
+                        progress.confirm_opened_at.max(Some(confirmation.sent_at));
                     info!("confirm link opened");
+                }
+            });
+            Ok(self.forwarding_view())
+        })
+        .unwrap_or_else(|_| view(&MailboxState::Off))
+    }
+
+    /// Sets the shown Gmail confirmation aside (another Gmail asked, say), so it stops holding
+    /// the sheet at Confirm; a later one shows again. No network.
+    pub fn ignore_forwarding_confirm(&self, flow: String) -> Forwarding {
+        traced_sync("ignore_forwarding_confirm", &flow, || {
+            self.update_progress(|state, progress| {
+                if let Some(confirmation) = state.confirmation() {
+                    progress.ignored_confirm_at =
+                        progress.ignored_confirm_at.max(Some(confirmation.sent_at));
+                    info!("confirmation set aside");
                 }
             });
             Ok(self.forwarding_view())
@@ -797,12 +985,14 @@ impl Core {
     pub fn note_typed_otp(&self, flow: String, at: i64) -> Forwarding {
         traced_sync("note_typed_otp", &flow, || {
             self.update_progress(|state, progress| {
-                if let MailboxState::Joined {
-                    setup: Setup::Active { .. },
-                    ..
-                } = state
+                // No time from VTOP; and a round older than one noted says nothing new.
+                if at > 0
+                    && let MailboxState::Joined {
+                        setup: Setup::Active { .. },
+                        ..
+                    } = state
                 {
-                    progress.typed_otp_at = Some(at);
+                    progress.typed_otp_at = progress.typed_otp_at.max(Some(at));
                     info!("typed otp noted");
                 }
             });
@@ -815,7 +1005,7 @@ impl Core {
     pub fn dismiss_forwarding_hint(&self, flow: String) -> Forwarding {
         traced_sync("dismiss_forwarding_hint", &flow, || {
             self.update_progress(|_, progress| {
-                progress.dismissed_at = progress.typed_otp_at;
+                progress.dismissed_at = progress.dismissed_at.max(progress.typed_otp_at);
                 info!("hint dismissed");
             });
             Ok(self.forwarding_view())
@@ -866,15 +1056,9 @@ impl Core {
     /// when the app opens signed in.
     pub async fn keep_forwarding(&self, flow: String) -> Result<(), CoreError> {
         traced("keep_forwarding", &flow, async {
-            let MailboxState::NeedsRejoin { mailbox, .. } = self.mailbox_state() else {
-                return Ok(());
-            };
-            if mailbox.server != self.forwarding_server() {
-                return Ok(());
-            }
             // At an open nobody asked for forwarding: no sheet, only an answer given already.
             let prove = self.identity_shared().await;
-            self.rejoin(&flow, &mailbox.id, true, prove).await.map(drop)
+            self.rejoin_kept(&flow, prove).await.map(drop)
         })
         .await
     }
@@ -893,6 +1077,7 @@ impl Core {
 }
 
 /// How [`Core::rejoin`] went.
+#[derive(Debug, PartialEq, Eq)]
 enum Rejoined {
     Joined,
     /// No identity to ask with, or forwarding changed meanwhile.
@@ -907,21 +1092,57 @@ impl Core {
         let Some(stored) = self.read::<Stored>(FILE) else {
             return MailboxState::Off;
         };
-        MailboxState::try_from(stored).unwrap_or_else(|error| {
+        let state = MailboxState::try_from(stored).unwrap_or_else(|error| {
             warn!(error, "forwarding.json not used");
             MailboxState::Off
-        })
+        });
+        let progress = self.progress();
+        let newer = (state.id() == Some(progress.id.as_str()))
+            .then_some(progress.newer_confirmation)
+            .flatten();
+        state.with_newer_confirmation(newer)
     }
 
     /// Saves `state`; Off removes the file. The caller holds the forwarding lock (`Locks::forwarding`).
     fn store_mailbox(&self, state: &MailboxState) {
-        match state.stored() {
-            Some(stored) => self.write(FILE, &stored),
-            None => {
-                self.remove_file(FILE);
-                self.remove_file(PROGRESS_FILE);
+        let Some(stored) = state.stored() else {
+            self.remove_file(FILE);
+            self.remove_file(PROGRESS_FILE);
+            return;
+        };
+        self.write(FILE, &stored);
+        let newer = state.newer_confirmation();
+        let mut progress = self.progress();
+        if progress.id != stored.id {
+            if newer.is_none() {
+                return;
             }
+            progress = Progress {
+                id: stored.id,
+                ..Progress::default()
+            };
         }
+        if progress.newer_confirmation != newer {
+            progress.newer_confirmation = newer;
+            self.write(PROGRESS_FILE, &progress);
+        }
+    }
+
+    /// Rejoins the address kept to rejoin ([`MailboxState::NeedsRejoin`]), proving who the
+    /// student is with `prove`. Nothing once joined, without an address, or for one on another
+    /// server. Forgotten when the student has no address any more: nothing forwards to it.
+    async fn rejoin_kept(&self, flow: &str, prove: bool) -> Result<Rejoined, CoreError> {
+        let MailboxState::NeedsRejoin { mailbox, .. } = self.mailbox_state() else {
+            return Ok(Rejoined::Later);
+        };
+        if mailbox.server != self.forwarding_server() {
+            return Ok(Rejoined::Later);
+        }
+        let outcome = self.rejoin(flow, &mailbox.id, false, prove).await?;
+        if outcome == Rejoined::NoAddress {
+            self.forget_forwarding(&mailbox.id);
+        }
+        Ok(outcome)
     }
 
     /// The saved state through `next`, under the forwarding lock; written only when it changed.
@@ -960,6 +1181,8 @@ impl Core {
             info!("set up meanwhile");
             return Ok(());
         }
+        // A progress file left for this id (a crash, or an older app) isn't this setup's.
+        self.remove_file(PROGRESS_FILE);
         // Even a joined address may never have been confirmed in Gmail: the next pull brings
         // Gmail's confirmation or the latest OTP, which tells.
         self.store_mailbox(&MailboxState::Joined {
@@ -973,23 +1196,29 @@ impl Core {
     /// Joins the student's address from this install, which was on `from`, with the identity it
     /// has (a v2 account token is traded in). With `prove`, an install with none proves who the
     /// student is first (the proof sends no cookie, so nothing is asked); without, it waits for
-    /// an identity.
+    /// an identity. `mail:join` never makes an address: one deleted elsewhere stays deleted.
+    /// `joined`: this install was on `from` as the server knew it, so the server can tell a
+    /// phone removed from it on purpose (no rejoin) from one whose address moved.
     async fn rejoin(
         &self,
         flow: &str,
         from: &str,
-        make: bool,
+        joined: bool,
         prove: bool,
     ) -> Result<Rejoined, CoreError> {
-        let path = if make { "mail:register" } else { "mail:join" };
+        let args = if joined {
+            json!({ "fromId": from })
+        } else {
+            json!({})
+        };
         let body = match self
             .account_call(
                 flow,
                 Kind::Mutation,
-                path,
+                "mail:join",
                 "Keep mail forwarding",
                 prove,
-                json!({}),
+                args,
             )
             .await
         {
@@ -1127,6 +1356,26 @@ impl Core {
         }
     }
 
+    /// The address is kept to rejoin: the server doesn't know this install on it yet.
+    pub(crate) fn forwarding_rejoining(&self) -> bool {
+        matches!(self.mailbox_state(), MailboxState::NeedsRejoin { .. })
+    }
+
+    /// Promotes a `NeedsRejoin` address `id` to `Joined` (keeping its setup) once the server
+    /// answers a call for it, proving this install is already on it.
+    pub(crate) fn promote_joined(&self, id: &str) {
+        self.update_mailbox(|state| match state {
+            MailboxState::NeedsRejoin { mailbox, kept } if mailbox.id == id => {
+                info!("on the address: rejoined");
+                MailboxState::Joined {
+                    mailbox,
+                    setup: kept,
+                }
+            }
+            other => other,
+        });
+    }
+
     /// This phone's address as `(server, mailbox id, address)`, if it has one.
     pub(crate) fn saved_mailbox(&self) -> Option<(String, String, String)> {
         self.mailbox_state().mailbox().map(|mailbox| {
@@ -1145,9 +1394,11 @@ impl Core {
         flow: &str,
         everywhere: bool,
     ) -> Result<(), CoreError> {
-        let Some(id) = self.mailbox_state().id().map(str::to_string) else {
+        let state = self.mailbox_state();
+        let Some(id) = state.id().map(str::to_string) else {
             return Ok(());
         };
+        let rejoining = matches!(state, MailboxState::NeedsRejoin { .. });
         let body = json!({ "id": id, "everywhere": everywhere });
         match self
             .device_call(flow, Kind::Mutation, "mail:remove", body)
@@ -1162,6 +1413,12 @@ impl Core {
                     || error.is(&ServerCode::DeviceRemoved) =>
             {
                 info!(code = error.code(), "address already gone");
+            }
+            // Kept to rejoin with no identity (the regno no longer shared): this install isn't
+            // on the address as the server knows it, so leaving is only forgetting it here.
+            // Deleting it everywhere needs the server.
+            Err(error) if rejoining && !everywhere && error.is(&ServerCode::Unauthenticated) => {
+                info!("not on the address: forgotten here");
             }
             Err(error) => return Err(error.into()),
         }
@@ -1182,29 +1439,75 @@ impl Core {
                 confirmation,
                 college_mail,
                 ..
+            }
+            | Forwarding::On {
+                confirmation,
+                college_mail,
+                ..
             } => {
                 if let Some(confirmation) = confirmation {
+                    let regno = self.mail_regno(profile.as_ref());
                     confirmation.from = confirm_from(
                         confirmation.requester.as_deref(),
-                        self.mail_regno().as_deref(),
+                        regno.as_deref(),
                         profile.as_ref(),
                     );
                 }
                 *college_mail = mail;
             }
-            Forwarding::On { college_mail, .. } => *college_mail = mail,
         }
         forwarding
     }
 
-    /// The regno the college mail is named after: the one VTOP gave at sign-in, saved with the
-    /// account. Never the username, which can be something else; without it only the profile's
-    /// college mail matches.
-    fn mail_regno(&self) -> Option<String> {
+    /// The regno the college mail is named after, as VTOP gave it: saved with the account, in
+    /// the saved session, on the saved profile, or in this install's server identity. Never
+    /// the username, which can be something else. Read without opening the Keystore, as the
+    /// status is read often.
+    fn mail_regno(&self, profile: Option<&StudentProfile>) -> Option<String> {
+        /// The regno fields of `account.json` and `session.json`, with whose they are.
+        #[derive(Deserialize)]
+        struct Named {
+            username: String,
+            #[serde(default)]
+            registration_number: Option<String>,
+        }
         let username = self.student()?;
-        self.read_account()
-            .filter(|saved| saved.username.eq_ignore_ascii_case(&username))
-            .and_then(|saved| saved.registration_number)
+        let account = self.read::<Named>(crate::ACCOUNT);
+        // Another student is signing in (awaiting OTP) over the saved one: disk files and the
+        // refresh token still belong to the saved student, not this one.
+        if account
+            .as_ref()
+            .is_some_and(|saved| !saved.username.eq_ignore_ascii_case(&username))
+        {
+            return None;
+        }
+        let session = self
+            .read::<Named>(crate::SESSION)
+            .filter(|named| named.username.eq_ignore_ascii_case(&username))
+            .and_then(|named| named.registration_number);
+        fn normalize(url: &str) -> &str {
+            url.trim().trim_end_matches('/')
+        }
+        let server = self.forwarding_server();
+        let is_demo = username.eq_ignore_ascii_case(crate::demo::USERNAME);
+        let refresh = self
+            .device()
+            .refresh
+            .filter(|refresh| {
+                normalize(&refresh.server) == normalize(&server)
+                    && (is_demo || !refresh.regno.eq_ignore_ascii_case(crate::demo::USERNAME))
+            })
+            .map(|refresh| refresh.regno);
+        [
+            account.and_then(|saved| saved.registration_number),
+            session,
+            profile.map(|profile| profile.registration_number.clone()),
+            refresh,
+        ]
+        .into_iter()
+        .flatten()
+        .map(|regno| regno.trim().to_string())
+        .find(|regno| !regno.is_empty())
     }
 
     /// [`PROGRESS_FILE`]; empty without one.
@@ -1259,25 +1562,33 @@ impl Core {
                 .device_call(flow, Kind::Query, "mail:inbox", body)
                 .await
             {
-                Ok(inbox) => return Ok(self.open_inbox(&id, &inbox)),
+                Ok(inbox) => {
+                    // The server knows this install on the address: it's joined, whatever
+                    // the file said.
+                    if !joined {
+                        self.promote_joined(&id);
+                    }
+                    return Ok(self.open_inbox(&id, &inbox));
+                }
                 Err(error) => error,
             };
             return Err(match error.server_code() {
                 // Not on this address (any more): kept from v2 and not rejoined yet, or the
                 // server moved the student's phones to their old address. Joined where the
                 // student's address is, then read there; forgotten only when they have none
-                // (deleted) or it can't be asked.
+                // (deleted, or this phone was removed from it on purpose), never while it can't
+                // be asked.
                 Some(ServerCode::MailboxNotFound) if !rejoined => {
-                    match Box::pin(self.rejoin(flow, &id, !joined, false)).await {
+                    match Box::pin(self.rejoin(flow, &id, joined, false)).await {
                         Ok(Rejoined::Joined) => {
                             rejoined = true;
                             continue;
                         }
-                        Ok(Rejoined::Later) if !joined => CoreError::ForwardingOff {
+                        Ok(Rejoined::Later) => CoreError::ForwardingOff {
                             kind: ForwardingOffKind::NeedsSignIn,
                             reason: "Mail forwarding reconnects once you're signed in.".into(),
                         },
-                        Ok(Rejoined::Later | Rejoined::NoAddress) => {
+                        Ok(Rejoined::NoAddress) => {
                             self.forget_forwarding(&id);
                             CoreError::ForwardingOff {
                                 kind: ForwardingOffKind::AddressDeleted,
@@ -1326,25 +1637,29 @@ impl Core {
             debug!("gmail confirmation kept on the edge");
             self.record(id, &confirmation);
         }
-        if let Some(at) = inbox.get("lastOtpAt").and_then(Value::as_i64) {
-            self.update_mailbox(|state| state.with_setup(id, |setup| setup.otp_at(at)));
-        }
-        let Some(sealed) = inbox
+        let payload = inbox
             .get("sealed")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty())
-        else {
+            .and_then(|sealed| open(seal_secret, id, sealed));
+        if let Some(payload) = &payload {
+            info!(
+                kind = payload.kind(),
+                sent_at = payload.sent_at(),
+                "forwarded mail"
+            );
+            self.record(id, payload);
+        } else {
             debug!("inbox empty");
-            return None;
-        };
-        let payload = open(seal_secret, id, sealed)?;
-        info!(
-            kind = payload.kind(),
-            sent_at = payload.sent_at(),
-            "forwarded mail"
-        );
-        self.record(id, &payload);
-        Some(payload)
+        }
+        // After both sealed boxes: a time raised first would make a newer confirmation look old.
+        if let Some(at) = inbox.get("confirmedAt").and_then(Value::as_i64) {
+            self.update_mailbox(|state| state.with_setup(id, |setup| setup.confirmed_at(at)));
+        }
+        if let Some(at) = inbox.get("lastOtpAt").and_then(Value::as_i64) {
+            self.update_mailbox(|state| state.with_setup(id, |setup| setup.otp_at(at)));
+        }
+        payload
     }
 
     /// Notes that `payload` reached the address `id` (if it is still this phone's).
@@ -1429,7 +1744,7 @@ fn view_with(state: &MailboxState, progress: &Progress) -> Forwarding {
             uses,
             step: match (readiness, confirmation) {
                 (ForwardingReadiness::NeedsFilter, Some(confirmation))
-                    if Some(confirmation.sent_at) > progress.confirm_opened_at =>
+                    if progress.shows(confirmation) =>
                 {
                     SetupStep::Confirm
                 }
@@ -1444,6 +1759,7 @@ fn view_with(state: &MailboxState, progress: &Progress) -> Forwarding {
                 Setup::Active {
                     last_mail_at,
                     last_otp_at,
+                    confirmation,
                 },
         } => Forwarding::On {
             address: mailbox.address.clone(),
@@ -1458,10 +1774,13 @@ fn view_with(state: &MailboxState, progress: &Progress) -> Forwarding {
                 .filter(|at| {
                     Some(*at)
                         > last_otp_at
-                            .map(|otp| otp + VTOP_SLACK_SECS)
+                            .map(|otp| otp.saturating_add(VTOP_SLACK_SECS))
                             .max(progress.dismissed_at)
                 })
                 .map(|at| ForwardingHint::TypedOtp { at }),
+            confirmation: confirmation
+                .clone()
+                .filter(|c| progress.shows(c) && Some(c.sent_at) > *last_otp_at),
             college_mail: None,
         },
     }

@@ -339,4 +339,100 @@ describe("mail in", () => {
     expect(row?.confirmation).toBeNull();
     expect(await t.run((ctx) => ctx.db.query("otpInbox").collect())).toEqual([]);
   });
+
+  it("join with fromId returns null when the account still uses that same address, and joins when it moved", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const b = await phone(2);
+    const ta = await prove(t, a);
+    advance(10);
+    const tb = await prove(t, b);
+    const box1 = await ta.as.mutation(api.mail.register, { flow: "f" });
+    await tb.as.mutation(api.mail.register, { flow: "f" });
+    await ta.as.mutation(api.mail.removeDevice, { flow: "f", id: box1.id, removeDevice: b.deviceId });
+    // Removed from box1 on purpose: passing fromId=box1.id must not rejoin it.
+    expect(await tb.as.mutation(api.mail.join, { flow: "f", fromId: box1.id })).toBeNull();
+    const afterRefused = await ta.as.query(api.mail.devices, { id: box1.id });
+    expect(afterRefused.devices.map((d) => d.deviceId)).toEqual([a.deviceId]);
+    // Without fromId (older apps or NeedsRejoin), join still joins box1.
+    expect(await tb.as.mutation(api.mail.join, { flow: "f" })).toEqual(box1);
+    // When the student deletes box1 and registers a new address box2, fromId=box1.id joins box2.
+    await ta.as.mutation(api.mail.remove, { flow: "f", id: box1.id, everywhere: true });
+    const box2 = await ta.as.mutation(api.mail.register, { flow: "f" });
+    expect(box2.id).not.toBe(box1.id);
+    expect(await tb.as.mutation(api.mail.join, { flow: "f", fromId: box1.id })).toEqual(box2);
+  });
+
+  it("keeps confirmedAt past dropConfirmation and returns it from mail:inbox", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const b = await phone(2);
+    const ta = await prove(t, a);
+    const box = await ta.as.mutation(api.mail.register, { flow: "f" });
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmedAt).toBeNull();
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date", "setTimeout", "clearTimeout"] });
+    const confirmMs = Date.now() - 2000;
+    const confirmSec = Math.floor(confirmMs / 1000);
+    const confirm = { code: "123456789", link: "https://mail-settings.google.com/mail/vf-abc", requester: "s@gmail.com" };
+    expect((await mail(t, { addressId: box.id, receivedAt: confirmMs, otp: null, gmailConfirm: confirm })).status).toBe(200);
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmedAt).toBe(confirmSec);
+    // After 24h, dropConfirmation clears confirmation but keeps confirmedAt.
+    vi.advanceTimersByTime(CONFIRMATION_TTL_SECS * 1000);
+    await t.finishInProgressScheduledFunctions();
+    const afterExpiry = await ta.as.query(api.mail.inbox, { id: box.id });
+    expect(afterExpiry.confirmation).toBeNull();
+    expect(afterExpiry.confirmedAt).toBe(confirmSec);
+    // A second phone joining after 24h still sees confirmedAt.
+    const tb = await prove(t, b);
+    await tb.as.mutation(api.mail.join, { flow: "f" });
+    const bInbox = await tb.as.query(api.mail.inbox, { id: box.id });
+    expect(bInbox.confirmation).toBeNull();
+    expect(bInbox.confirmedAt).toBe(confirmSec);
+    // An OTP clears confirmation but keeps confirmedAt.
+    await mail(t, { addressId: box.id, receivedAt: Date.now(), otp: "987654" });
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmedAt).toBe(confirmSec);
+    // Legacy rows written before confirmedAt existed remain valid.
+    await t.run(async (ctx) => {
+      const row = (await ctx.db.query("mailboxes").collect())[0];
+      await ctx.db.patch(row._id, { confirmedAt: undefined });
+    });
+    expect((await ta.as.query(api.mail.inbox, { id: box.id })).confirmedAt).toBeNull();
+  });
+
+  it("ignores a gmail_confirm older than the stored confirmation's sentAt", async () => {
+    const t = await setup();
+    const a = await phone(1);
+    const ta = await prove(t, a);
+    const box = await ta.as.mutation(api.mail.register, { flow: "f" });
+    const newerMs = Date.now();
+    const newerSec = Math.floor(newerMs / 1000);
+    await mail(t, {
+      addressId: box.id,
+      receivedAt: newerMs,
+      otp: null,
+      gmailConfirm: { code: "222222222", link: "https://mail-settings.google.com/mail/vf-new", requester: "s@gmail.com" },
+    });
+    // An older retried gmail_confirm arrives later: must not replace the newer one.
+    await mail(t, {
+      addressId: box.id,
+      receivedAt: newerMs - 60_000,
+      otp: null,
+      gmailConfirm: { code: "111111111", link: "https://mail-settings.google.com/mail/vf-old", requester: "old@gmail.com" },
+    });
+    const inbox = await ta.as.query(api.mail.inbox, { id: box.id });
+    expect(JSON.parse(await text(a.sealSecret, box.id, inbox.confirmation)).code).toBe("222222222");
+    expect(inbox.confirmedAt).toBe(newerSec);
+    // A newer gmail_confirm still replaces it.
+    advance(30);
+    const newestMs = Date.now();
+    await mail(t, {
+      addressId: box.id,
+      receivedAt: newestMs,
+      otp: null,
+      gmailConfirm: { code: "333333333", link: "https://mail-settings.google.com/mail/vf-newest", requester: "s@gmail.com" },
+    });
+    const latest = await ta.as.query(api.mail.inbox, { id: box.id });
+    expect(JSON.parse(await text(a.sealSecret, box.id, latest.confirmation)).code).toBe("333333333");
+    expect(latest.confirmedAt).toBe(Math.floor(newestMs / 1000));
+  });
 });

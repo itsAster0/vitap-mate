@@ -445,3 +445,131 @@ async fn waiting_for_an_identity_ends_at_share() {
         .unwrap();
     assert!(futures::poll!(wait.as_mut()).is_ready());
 }
+
+#[tokio::test]
+async fn signed_in_without_known_regno_fails_closed_while_signed_out_stays_open() {
+    let (core, edge, server) = setup("no-regno").await;
+    keep_token(&core, &server);
+    // Signed in with no regno known from VTOP (neither session nor account.json has it).
+    let slot = core.current().unwrap();
+    {
+        let mut session = slot.write().await;
+        session.account.registration_number = None;
+        let state = vtop_core::SessionState {
+            cookies: String::new(),
+            csrf_token: None,
+            registration_number: None,
+            otp_issued_at: None,
+            logged_in_at: None,
+        };
+        session.client.resume_session(&state).unwrap();
+    }
+    core.write_account(
+        &crate::Account {
+            username: "STUDENT314".into(),
+            password: "pw".into(),
+            registration_number: None,
+        },
+        false,
+    );
+    core.rename_student(&slot, "STUDENT314");
+    assert_eq!(core.signed_in_regno().await, None);
+    let gate = install(&core, true, false);
+    assert!(!core.identity_shared().await);
+    assert_eq!(
+        core.regno_allowed("f", None, false).await,
+        Err(CoreError::RegnoNotShared)
+    );
+    assert_eq!(
+        core.regno_allowed("f", None, true).await,
+        Err(CoreError::RegnoNotShared)
+    );
+    assert_eq!(gate.regno_asks.load(Ordering::SeqCst), 0);
+    assert!(!core.has_server_identity("f".into()).await);
+    assert!(matches!(
+        view(&core, "f", false).await,
+        Err(CoreError::RegnoNotShared)
+    ));
+    assert!(paths(&edge).is_empty(), "nothing reached the server");
+
+    // Signed out keeps today's behaviour so a kept token can still leave an old address.
+    core.sign_out_here("out");
+    assert!(core.identity_shared().await);
+    assert_eq!(core.regno_allowed("f", None, false).await, Ok(()));
+    can(&edge, "account:view", json!({ "thisPhone": true }));
+    assert!(view(&core, "f", false).await.unwrap().is_ok());
+    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
+}
+
+struct CountingCipher(std::sync::atomic::AtomicUsize);
+
+impl crate::PasswordCipher for CountingCipher {
+    fn seal(&self, plain: String) -> crate::Sealing {
+        crate::Sealing::Sealed {
+            sealed: format!("s:{plain}"),
+        }
+    }
+    fn open(&self, sealed: String) -> crate::Opening {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        crate::Opening::Opened {
+            plain: sealed.trim_start_matches("s:").to_string(),
+        }
+    }
+}
+
+#[test]
+fn migration_uses_session_regno_for_same_username_without_opening_keystore() {
+    let dir = std::env::temp_dir().join(format!(
+        "vtop-ffi-regno-migrate-session-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let cipher = Arc::new(CountingCipher(std::sync::atomic::AtomicUsize::new(0)));
+    let core = Core::for_test_on(
+        &dir,
+        crate::Shared {
+            cipher: Some(cipher.clone()),
+            ..crate::Shared::default()
+        },
+    );
+    fs::write(core.at(forwarding::FILE), "{}").unwrap();
+    fs::write(
+        core.at(crate::ACCOUNT),
+        json!({ "username": "STUDENT314", "sealed": "s:secret" }).to_string(),
+    )
+    .unwrap();
+    // Different username in session.json: never migrated.
+    fs::write(
+        core.at(crate::SESSION),
+        json!({
+            "username": "OTHER",
+            "saved_at_epoch_ms": 0,
+            "cookies": null,
+            "csrf_token": null,
+            "registration_number": "22BCE9999",
+        })
+        .to_string(),
+    )
+    .unwrap();
+    assert_eq!(core.sharing_of("22BCE9999"), RegnoSharing::Unasked);
+    assert_eq!(cipher.0.load(Ordering::SeqCst), 0, "keystore never opened");
+
+    // Matching username (case-insensitive) in session.json: migrated without opening keystore.
+    core.remove_file(FILE);
+    fs::write(
+        core.at(crate::SESSION),
+        json!({
+            "username": "student314",
+            "saved_at_epoch_ms": 0,
+            "cookies": null,
+            "csrf_token": null,
+            "registration_number": REGNO,
+        })
+        .to_string(),
+    )
+    .unwrap();
+    assert_eq!(core.sharing_of(REGNO), RegnoSharing::Shared);
+    assert_eq!(cipher.0.load(Ordering::SeqCst), 0, "keystore never opened");
+    let _ = fs::remove_dir_all(&dir);
+}

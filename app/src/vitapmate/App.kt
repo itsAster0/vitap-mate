@@ -101,10 +101,12 @@ fun App() {
         LocalUser provides session.user,
     ) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).semantics { testTagsAsResourceId = true }) {
-            if (signedIn) {
-                // After a sign-in or on opening signed in, while the session is likely live.
-                // The address may have moved: what Settings shows is read again after.
-                LaunchedEffect(Unit) {
+            val user = session.user
+            if (user != null) {
+                // After a sign-in, an account switch, or on opening signed in, while the session is
+                // likely live. The address may have moved: what Settings shows is read again after.
+                LaunchedEffect(user) {
+                    AccountTeardown.settled.first { it.equals(user, ignoreCase = true) }
                     AppCore.keepForwarding { MailForwarding.load("keep") }
                     AppCore.proveInBackground()
                 }

@@ -165,6 +165,8 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
     /** True once VTOP accepts the code; false when it turned it down or couldn't be reached. */
     suspend fun submit(core: CoreInterface): Boolean {
         if (!canSubmit) return false
+        // The code as sent: auto-fill (or a late keystroke) may change [code] while VTOP answers.
+        val sent = code
         transition(OtpPhase.Submitting(remaining))
         error = null
         var accepted = false
@@ -172,17 +174,19 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
         try {
             flow("$prefix.submit_otp") { id ->
                 lastFlow = id
-                core.submitOtp(id, code)
+                core.submitOtp(id, sent)
             }
             Log.info(src, "otp accepted", lastFlow)
             accepted = true
             transition(OtpPhase.Done)
-            gmailOtp?.takeIf { it.code == code }?.let { otp ->
+            gmailOtp?.takeIf { it.code == sent }?.let { otp ->
                 val flowId = lastFlow
                 // Gmail clean-up runs after the prompt has closed.
                 AppScope.launch { Gmail.tidyUp(otp, flowId) }
             }
-            if (code !in autofilled && OtpAutofill.inUse() == OtpSource.Forwarding) {
+            // Not gated on forwarding's status, which may not have loaded on a cold start: Rust
+            // notes it only while this phone's address is set up.
+            if (typedForForwarding(sent, autofilled, Settings.otpSource)) {
                 val flowId = lastFlow
                 // VTOP's time for this round, so its forwarded copy (dated by VTOP) clears the hint.
                 val at = issuedAt
@@ -198,7 +202,7 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
             val reason = e.reason.trim().ifEmpty { "VTOP didn't accept this code." }
             val expired = e.kind == OtpRejection.EXPIRED
             Log.info(src, "otp rejected", lastFlow, mapOf("kind" to e.kind.name.lowercase()))
-            rejected += code
+            rejected += sent
             minimized = false // the student sees why and can type a code
             if (expired) {
                 forceExpired = true
@@ -334,3 +338,7 @@ class OtpChallenge(vtopMessage: String, issuedAt: Long, val prefix: String, priv
 }
 
 private const val PULL_TIMEOUT_MS = 8_000L
+
+/** Whether an accepted [sent] code was typed by hand with mail forwarding as the pick ([pick] null: none made yet). */
+internal fun typedForForwarding(sent: String, autofilled: Set<String>, pick: OtpSource?): Boolean =
+    sent !in autofilled && pick != OtpSource.Gmail

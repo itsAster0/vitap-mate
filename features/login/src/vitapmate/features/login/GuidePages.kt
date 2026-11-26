@@ -45,3 +45,6 @@ internal fun guidePages(json: JSONObject, sender: String): List<GuidePage> {
         )
     }
 }
+
+/** The page [index] shows of [count]: a refreshed guide may have fewer; 0 when there are none. */
+internal fun shownPage(index: Int, count: Int): Int = index.coerceIn(0, (count - 1).coerceAtLeast(0))

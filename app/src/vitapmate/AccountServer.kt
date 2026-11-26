@@ -39,10 +39,12 @@ import vitapmate.core.RegnoSharing
 import vitapmate.core.ServerAccount
 import vitapmate.core.ServerLink
 import vitapmate.data.AccountWatch
+import vitapmate.data.AppScope
 import vitapmate.data.RegnoConsent
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.data.rememberLive
+import vitapmate.features.login.MailForwarding
 import vitapmate.features.login.ago
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ProblemView
@@ -83,9 +85,15 @@ internal class AccountServer(private val scope: CoroutineScope, val actions: Ser
         load()
     }
 
-    /** After a confirmed change: a deleted account stops sharing, anything else reads again. */
+    /** After a confirmed change: a deleted account stops sharing and clears forwarding, anything else reads again. */
     fun done(confirm: ServerConfirm) {
-        if (confirm.name == "delete") readSharing() else load()
+        if (confirm.name == "delete") {
+            readSharing()
+            // Deleting the server account clears forwarding.json in Rust; drop the stale status.
+            AppScope.launch { MailForwarding.load("account_delete") }
+        } else {
+            load()
+        }
     }
 
     /** The header's chip: linked to the server or not, once loaded. */

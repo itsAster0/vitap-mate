@@ -20,6 +20,7 @@ import vitapmate.data.PageFetches
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
 import vitapmate.data.attempt
+import vitapmate.features.login.MailForwarding
 import vitapmate.features.vtop.forgetRecentVtopPages
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -99,6 +100,8 @@ object AccountTeardown {
         AvatarPhoto.remove()
         attempt { Gmail.disconnect(flow) }.onFailure { Log.warn("ui.account", "gmail not disconnected: ${it::class.simpleName}", flow) }
         Settings.forgetStudent()
+        // Rust already cleared forwarding.json on sign-out or switch; refresh before sync or the next student reads it.
+        MailForwarding.load("forget_student")
         BackgroundSync.apply(context)
         forgetRecentVtopPages(context)
     }

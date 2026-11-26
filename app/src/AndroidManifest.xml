@@ -24,6 +24,12 @@
     <intent>
       <action android:name="com.google.android.gms.mlkit.ACTION_SCAN_BARCODE" />
     </intent>
+    <!-- Mail forwarding's Gmail links (GmailLinks.kt): the default browser, so they skip the Gmail app. -->
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.BROWSABLE" />
+      <data android:scheme="https" />
+    </intent>
   </queries>
   <application
       android:label="Vitap Mate"

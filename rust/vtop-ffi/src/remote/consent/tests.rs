@@ -136,7 +136,7 @@ pub(crate) fn signed_in(core: &Core) {
     let account = Account {
         username: "22BCE0001".into(),
         password: "pw".into(),
-        registration_number: None,
+        registration_number: Some("22BCE0001".into()),
     };
     let session = Session::new(account, &core.shared).unwrap();
     core.install(session);

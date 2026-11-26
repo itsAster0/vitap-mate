@@ -471,10 +471,22 @@ impl Core {
                     kind: ForwardingOffKind::NotSetUp,
                     reason: "Mail forwarding is off.".into(),
                 })?;
+            let rejoining = self.forwarding_rejoining();
             let answer = self
                 .device_call(&flow, Kind::Query, "mail:devices", json!({ "id": id }))
                 .await;
             let view: MailDevicesView = match answer {
+                // Kept to rejoin: the server doesn't know this install on it yet, and the
+                // rejoin (`keep_forwarding`, a check) tells whether it still exists.
+                Err(error)
+                    if error.is(&ServerCode::MailboxNotFound)
+                        && (rejoining || self.forwarding_rejoining()) =>
+                {
+                    return Err(CoreError::ForwardingOff {
+                        kind: ForwardingOffKind::NeedsSignIn,
+                        reason: "Mail forwarding reconnects once you're signed in.".into(),
+                    });
+                }
                 Err(error) if error.is(&ServerCode::MailboxNotFound) => {
                     self.forget_forwarding(&id);
                     return Err(CoreError::ForwardingOff {
@@ -484,6 +496,9 @@ impl Core {
                 }
                 answer => serde_json::from_value(answer.map_err(refused)?).map_err(unexpected)?,
             };
+            if rejoining && view.devices.iter().any(|p| p.this_device) {
+                self.promote_joined(&id);
+            }
             info!(count = view.devices.len(), "forwarding phones");
             Ok(view
                 .devices

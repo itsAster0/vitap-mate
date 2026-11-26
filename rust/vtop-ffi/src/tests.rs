@@ -804,6 +804,7 @@ fn sign_out_leaves_only_the_phone_files() {
         SEMESTERS,
         SELECTED,
         forwarding::FILE,
+        forwarding::PROGRESS_FILE,
         changes::FILE,
         consent::FILE,
         account_token::FILE,

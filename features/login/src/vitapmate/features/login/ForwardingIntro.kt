@@ -13,6 +13,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -22,9 +23,11 @@ import com.composables.icons.lucide.AtSign
 import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Funnel
+import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lock
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Smartphone
+import kotlinx.coroutines.delay
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.Space
@@ -52,14 +55,31 @@ internal fun ForwardingIntro(onSetUp: () -> Unit) {
         style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
-    MailForwarding.error?.let { (title, message) ->
-        Box(Modifier.testTag("forwarding.error")) { Callout(Lucide.CircleAlert, AppTheme.tones.danger, "$title. $message") }
-    }
+    ForwardingFeedbackNote()
     val busy = MailForwarding.busy == ForwardingOp.Setup
     Button(if (busy) null else onSetUp, Modifier.fillMaxWidth().testTag("forwarding.setup"), prefix = if (busy) null else Lucide.Forward) {
         if (busy) LoadingIndicator(Modifier.size(20.dp))
         Text(if (busy) proofStage() else "Set up my address")
     }
+}
+
+/** How long a note ("Copied", "Nothing yet") stays in the sheet; a failure stays until the next action. */
+private const val NOTE_MS = 5_000L
+
+/** [MailForwarding.feedback] in the sheet: the toast host sits under it. Test tags `forwarding.error`, `forwarding.note`. */
+@Composable
+internal fun ForwardingFeedbackNote() {
+    val shown = MailForwarding.feedback ?: return
+    LaunchedEffect(shown) {
+        if (shown !is ForwardingFeedback.Note) return@LaunchedEffect
+        delay(NOTE_MS)
+        if (MailForwarding.feedback === shown) MailForwarding.feedback = null
+    }
+    val (icon, tone, tag) = when (shown) {
+        is ForwardingFeedback.Failed -> Triple(Lucide.CircleAlert, AppTheme.tones.danger, "forwarding.error")
+        is ForwardingFeedback.Note -> Triple(Lucide.Info, AppTheme.tones.accentTone, "forwarding.note")
+    }
+    Box(Modifier.testTag(tag)) { Callout(icon, tone, "${shown.title}. ${shown.message}") }
 }
 
 @Composable

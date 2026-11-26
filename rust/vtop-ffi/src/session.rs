@@ -389,6 +389,10 @@ impl Core {
     /// username.
     pub(crate) async fn keep_regno(&self, slot: &Arc<Slot>) {
         let session = slot.read().await;
+        // Don't persist or announce a half-done sign-in before VTOP accepts its OTP.
+        if session.is_awaiting_otp() {
+            return;
+        }
         let Some(regno) = (session.client.registration_number().ok())
             .or_else(|| session.account.registration_number.clone())
         else {
@@ -503,5 +507,41 @@ impl Core {
         warn!("VTOP rejected the saved password; no more sign-ins with it");
         session.mark_password_rejected();
         self.write_account_of(slot, &session.account, true);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn keep_regno_skips_saving_while_session_awaits_otp() {
+        let dir =
+            std::env::temp_dir().join(format!("vtop-ffi-keep-regno-otp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let core = crate::test_edge::signed_in(&dir, "http://127.0.0.1:9".into());
+        core.write_account(
+            &Account {
+                username: "22BCE0001".into(),
+                password: "pw".into(),
+                registration_number: None,
+            },
+            false,
+        );
+        assert_eq!(core.saved_regno(), None);
+        let slot = core.current().unwrap();
+        slot.write()
+            .await
+            .begin_otp(OtpVia::Phone, "Enter OTP".into(), 100);
+        core.keep_regno(&slot).await;
+        assert_eq!(core.saved_regno(), None);
+
+        slot.write().await.mark_signed_in();
+        core.keep_regno(&slot).await;
+        assert_eq!(core.saved_regno().as_deref(), Some("22BCE0001"));
+        let _ = fs::remove_dir_all(&dir);
     }
 }

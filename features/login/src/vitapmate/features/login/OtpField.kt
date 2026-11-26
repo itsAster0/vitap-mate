@@ -46,7 +46,7 @@ import vitapmate.ui.rememberSyncedTextFieldState
 /**
  * Six digit cells over one hidden text field (digits only, at most six; SMS/email OTP autofill).
  * The next empty cell is outlined in primary with a blinking caret while focused; all cells
- * turn error-coloured with [isError]. Done runs [onDone].
+ * turn error-coloured with [isError]. Done runs [onDone]. [readOnly] while the code is being sent.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -57,6 +57,7 @@ internal fun OtpField(
     onDone: () -> Unit,
     focus: FocusRequester,
     modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -68,6 +69,7 @@ internal fun OtpField(
     BasicTextField(
         state,
         modifier.focusRequester(focus).testTag("otp.code").semantics { contentType = ContentType.SmsOtpCode },
+        readOnly = readOnly,
         inputTransformation = DigitsOnly,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Transparent),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
@@ -80,7 +82,7 @@ internal fun OtpField(
                 Box(Modifier.matchParentSize().alpha(0f)) { input() }
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                     val text = state.text
-                    val current = if (focused) text.length.coerceAtMost(5) else -1
+                    val current = if (focused && !readOnly) text.length.coerceAtMost(5) else -1
                     for (i in 0 until 6) Cell(text.getOrNull(i), focused = i == current, isError = isError)
                 }
             }

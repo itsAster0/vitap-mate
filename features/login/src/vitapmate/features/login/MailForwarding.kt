@@ -23,8 +23,31 @@ import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
 import vitapmate.ui.showToast
 
-/** An action the student starts on the address; [tag] names its flow, `forwarding.<tag>`. */
-enum class ForwardingOp(val tag: String) { Setup("setup"), Check("check"), MarkDone("done"), Confirm("confirm"), Dismiss("dismiss"), TurnOff("off"), Delete("delete") }
+/**
+ * An action the student starts on the address; [tag] names its flow, `forwarding.<tag>`. A [local]
+ * one only writes the phone's own progress file (Rust orders it with the rest), so it never waits
+ * for, or is turned away by, an action on the network.
+ */
+enum class ForwardingOp(val tag: String, val local: Boolean = false) {
+    Setup("setup"),
+    Check("check"),
+    MarkDone("done", local = true),
+    Confirm("confirm", local = true),
+    IgnoreConfirm("ignore", local = true),
+    Dismiss("dismiss", local = true),
+    TurnOff("off"),
+    Delete("delete"),
+}
+
+/** What the sheet says about the last action, in the sheet itself (the toasts sit under it). */
+sealed interface ForwardingFeedback {
+    val title: String
+    val message: String
+
+    data class Failed(override val title: String, override val message: String) : ForwardingFeedback
+
+    data class Note(override val title: String, override val message: String) : ForwardingFeedback
+}
 
 /** The sheet's view of the address: the last status Rust gave, and the student's action running, if any. */
 sealed interface ForwardingPhase {
@@ -34,11 +57,15 @@ sealed interface ForwardingPhase {
 
     data class Busy(val op: ForwardingOp, override val status: Forwarding?) : ForwardingPhase
 
-    /** [op] starting; null while another runs (one at a time). */
-    fun start(op: ForwardingOp): Busy? = when (this) {
-        is Idle -> Busy(op, status)
-        is Busy -> null
+    /** Network [op] starting; null while another runs (one at a time), and for a local one, which never marks the sheet busy. */
+    fun start(op: ForwardingOp): Busy? = when {
+        op.local -> null
+        this is Idle -> Busy(op, status)
+        else -> null
     }
+
+    /** Whether [op] may run now: a local one always does. */
+    fun admits(op: ForwardingOp): Boolean = op.local || this is Idle
 
     /** [value] read from Rust, keeping the action running. */
     fun shown(value: Forwarding): ForwardingPhase = when (this) {
@@ -93,9 +120,12 @@ object MailForwarding {
     /** The student's action running, if any. */
     val busy get() = (phase as? ForwardingPhase.Busy)?.op
 
-    /** The last action's failure (title, message), shown in the sheet, which covers the toasts. */
-    var error by mutableStateOf<Pair<String, String>?>(null)
+    /** The last action's failure or note, shown in the sheet, which covers the toasts. */
+    var feedback by mutableStateOf<ForwardingFeedback?>(null)
         internal set
+
+    /** Bumped on every local write, so an older in-flight read/poll/action never stomps its result. */
+    private var writeSeq = 0
 
     val readiness get() = status.readiness
 
@@ -107,15 +137,19 @@ object MailForwarding {
 
     val isOn get() = status.hasAddress
 
-    /** Held by each call into Rust that changes the address: a quiet check never runs beside an action. */
+    /** Held by each call into Rust that hits the network: a quiet check never runs beside an action. */
     private val calls = Mutex()
+
+    /** Orders local progress writes with each other without ever waiting behind network [calls]. */
+    private val writes = Mutex()
 
     /** Reads the saved status (no network); while an action runs, its own result shows instead. */
     suspend fun load(trigger: String): Unit = withContext(Dispatchers.Main.immediate) {
+        val seq = writeSeq
         try {
             flow("forwarding.status") { id ->
                 val value = withContext(Dispatchers.IO) { AppCore.await().forwardingStatus(id) }
-                if (phase is ForwardingPhase.Idle) show(value, id, "trigger" to trigger)
+                if (phase is ForwardingPhase.Idle && writeSeq == seq) show(value, id, "trigger" to trigger)
             }
         } catch (e: CancellationException) {
             throw e
@@ -142,23 +176,28 @@ object MailForwarding {
         val before = status?.lastMailAt
         val after = run(ForwardingOp.Check) { id -> AppCore.await().checkForwarding(id) } ?: return
         if (after is Forwarding.Waiting && after.lastMailAt == before) {
-            showToast("Nothing yet", "No mail has reached your address in the last 5 minutes. Gmail can take a minute.")
+            note("Nothing yet", "No mail has reached your address in the last 5 minutes. Gmail can take a minute.")
         }
     }
 
     /** Marks setup done once Gmail's confirmation arrived; no network. */
     fun markDone() {
-        AppScope.launch { run(ForwardingOp.MarkDone) { id -> AppCore.await().markForwardingDone(id) } }
+        AppScope.launch { write(ForwardingOp.MarkDone) { id -> AppCore.await().markForwardingDone(id) } }
     }
 
     /** The student opened Gmail's confirm link: the sheet moves on to the filter. No network. */
     fun openedConfirm() {
-        AppScope.launch { run(ForwardingOp.Confirm) { id -> AppCore.await().openedForwardingConfirm(id) } }
+        AppScope.launch { write(ForwardingOp.Confirm) { id -> AppCore.await().openedForwardingConfirm(id) } }
+    }
+
+    /** Sets the shown Gmail confirmation aside (another Gmail asked, say). No network. */
+    fun ignoreConfirm() {
+        AppScope.launch { write(ForwardingOp.IgnoreConfirm) { id -> AppCore.await().ignoreForwardingConfirm(id) } }
     }
 
     /** Hides the typed-OTP hint until another OTP is typed. No network. */
     fun dismissHint() {
-        AppScope.launch { run(ForwardingOp.Dismiss) { id -> AppCore.await().dismissForwardingHint(id) } }
+        AppScope.launch { write(ForwardingOp.Dismiss) { id -> AppCore.await().dismissForwardingHint(id) } }
     }
 
     /** Takes this phone off the address; runs on after the sheet closes. */
@@ -183,37 +222,82 @@ object MailForwarding {
 
     private suspend fun poll(): Unit = withContext(Dispatchers.Main.immediate) {
         if (phase is ForwardingPhase.Busy || !calls.tryLock()) return@withContext
+        val seq = writeSeq
         var flowId = ""
+        var reread = false
         try {
             flow("forwarding.check") { id ->
                 flowId = id
                 val value = withContext(Dispatchers.IO) { AppCore.await().checkForwarding(id) }
-                // An action started meanwhile waits for this call, then shows its own result.
-                if (phase is ForwardingPhase.Idle) show(value, id, "action" to ForwardingOp.Check.tag)
+                // An action started meanwhile waits for this call, then shows its own result;
+                // a local write landed meanwhile needs the merged status reread instead of this older one.
+                if (phase is ForwardingPhase.Idle) {
+                    if (writeSeq == seq) show(value, id, "action" to ForwardingOp.Check.tag) else reread = true
+                }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             Log.warn("ui.forwarding", "check failed: ${e::class.simpleName}", flowId)
             askedOtp(e)
-            load("after_check")
+            reread = true
         } finally {
             calls.unlock()
+        }
+        if (reread) load("after_check")
+    }
+
+    /** A note for the sheet (and a toast for when it's closed). */
+    internal fun note(title: String, message: String) {
+        feedback = ForwardingFeedback.Note(title, message)
+        showToast(title, message)
+    }
+
+    /** A failure for the sheet (and a toast for when it's closed). */
+    internal fun failed(title: String, message: String) {
+        feedback = ForwardingFeedback.Failed(title, message)
+        showToast(title, message)
+    }
+
+    /**
+     * Local [op] as flow `forwarding.<tag>`: never dropped or queued behind [calls], as Rust orders
+     * it with the network calls itself.
+     */
+    private suspend fun write(op: ForwardingOp, call: suspend (String) -> Forwarding): Unit = withContext(Dispatchers.Main.immediate) {
+        var flowId = ""
+        try {
+            writes.withLock {
+                flow("forwarding.${op.tag}") { id ->
+                    flowId = id
+                    val value = withContext(Dispatchers.IO) { call(id) }
+                    writeSeq++
+                    show(value, id, "action" to op.tag)
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Log.warn("ui.forwarding", "${op.tag} failed: ${e::class.simpleName}", flowId)
+            problem(e).let { failed(it.first, it.second) }
+            load("after_${op.tag}")
         }
     }
 
     /** [op] as flow `forwarding.<tag>`, after any quiet check; a failure is a toast, and the status is read again. */
     private suspend fun run(op: ForwardingOp, call: suspend (String) -> Forwarding): Forwarding? = withContext(Dispatchers.Main.immediate) {
         phase = phase.start(op) ?: return@withContext null
-        error = null
+        feedback = null
+        val seq = writeSeq
         report()
         var flowId = ""
-        var failed = false
+        var broke = false
         val value = try {
             calls.withLock {
                 flow("forwarding.${op.tag}") { id ->
                     flowId = id
-                    withContext(Dispatchers.IO) { call(id) }.also { show(it, id, "action" to op.tag) }
+                    withContext(Dispatchers.IO) { call(id) }.also {
+                        if (writeSeq == seq) show(it, id, "action" to op.tag)
+                    }
                 }
             }
         } catch (e: CancellationException) {
@@ -221,15 +305,16 @@ object MailForwarding {
         } catch (e: Throwable) {
             Log.warn("ui.forwarding", "${op.tag} failed: ${e::class.simpleName}", flowId)
             askedOtp(e)
-            problem(e).let { error = it; showToast(it.first, it.second) }
-            failed = true
+            problem(e).let { failed(it.first, it.second) }
+            broke = true
             null
         } finally {
             phase = phase.finish()
             report()
         }
-        if (failed) load("after_${op.tag}")
-        value
+        val wroteDuring = writeSeq != seq
+        if (broke || wroteDuring) load("after_${op.tag}")
+        value?.let { if (wroteDuring) status ?: it else it }
     }
 
     private fun show(value: Forwarding, flow: String, vararg extra: Pair<String, String>) {
@@ -237,7 +322,7 @@ object MailForwarding {
         val (state, fields) = when (value) {
             is Forwarding.Off -> "off" to mapOf()
             is Forwarding.Waiting -> "waiting" to mapOf("confirmation" to "${value.confirmation != null}", "last_mail_at" to "${value.lastMailAt}")
-            is Forwarding.On -> "on" to mapOf("last_mail_at" to "${value.lastMailAt}", "last_otp_at" to "${value.lastOtpAt}")
+            is Forwarding.On -> "on" to mapOf("confirmation" to "${value.confirmation != null}", "last_mail_at" to "${value.lastMailAt}", "last_otp_at" to "${value.lastOtpAt}")
         }
         Log.info("ui.forwarding", state, flow, fields + extra)
         report()
@@ -250,7 +335,7 @@ object MailForwarding {
             mapOf(
                 "state" to s?.let { it::class.simpleName?.uppercase() },
                 "hasAddress" to s.hasAddress,
-                "confirmation" to ((s as? Forwarding.Waiting)?.confirmation != null),
+                "confirmation" to ((s as? Forwarding.Waiting)?.confirmation != null || (s as? Forwarding.On)?.confirmation != null),
                 "lastMailAt" to s?.lastMailAt,
                 "lastOtpAt" to (s as? Forwarding.On)?.lastOtpAt,
                 "busy" to busy?.tag,

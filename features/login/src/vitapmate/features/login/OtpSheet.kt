@@ -158,6 +158,7 @@ internal fun OtpSheet(
                 isError = challenge.error != null,
                 onDone = { if (challenge.canSubmit) onSubmit() },
                 focus = focus,
+                readOnly = challenge.submitting,
             )
             challenge.error?.let {
                 Text(

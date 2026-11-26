@@ -157,7 +157,7 @@ echo "wrote app/keystore.properties (keystore $store)"
 
 [tasks.release]
 description = "Signed, minified release APK for 64-bit phones: build/vitapmate-release.apk (--both: also build/vitapmate-release-32bit.apk)"
-depends = ["signing"]
+depends = ["rust-android", "signing"]
 usage = 'flag "--both" help="Also build build/vitapmate-release-32bit.apk, for phones on 32-bit Android"'
 run = '''
 set -eu

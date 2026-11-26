@@ -22,7 +22,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,7 @@ import com.composables.icons.lucide.Smartphone
 import com.composables.icons.lucide.Trash2
 import kotlinx.coroutines.launch
 import vitapmate.core.MailPhone
+import vitapmate.data.AppScope
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.ui.AppDialog
@@ -42,7 +44,6 @@ import vitapmate.ui.Pips
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip
 import vitapmate.ui.rememberHaptics
-import vitapmate.ui.showToast
 
 /** The most phones one address forwards to (the server's limit). */
 private const val MAX_PHONES = 5
@@ -56,8 +57,32 @@ private sealed interface PhonesPhase {
     data class Ready(val phones: List<MailPhone>) : PhonesPhase
 }
 
-/** A change waiting for its confirm dialog: taking [phone] off, or deleting the address ([phone] null). */
-private class PhonesConfirm(val phone: MailPhone?)
+/** A change waiting for its confirm dialog: deleting the address, or taking one phone off it. */
+internal sealed interface PhonesConfirm {
+    data object Delete : PhonesConfirm
+
+    data class Remove(val id: String) : PhonesConfirm
+
+    companion object {
+        /** Kept across process death as `delete` or `remove:<id>` (Stored), so the dialog comes back. */
+        val Saver: Saver<PhonesConfirm?, String> = Saver(
+            save = { c ->
+                when (c) {
+                    Delete -> "delete"
+                    is Remove -> "remove:${c.id}"
+                    null -> null
+                }
+            },
+            restore = { s ->
+                when {
+                    s == "delete" -> Delete
+                    s.startsWith("remove:") -> Remove(s.removePrefix("remove:"))
+                    else -> null
+                }
+            },
+        )
+    }
+}
 
 /**
  * The phones on this phone's address ("N of 5"), each other one with Remove, and Delete the
@@ -67,11 +92,10 @@ private class PhonesConfirm(val phone: MailPhone?)
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ForwardingPhones() {
-    val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val scheme = MaterialTheme.colorScheme
     var phase by remember { mutableStateOf<PhonesPhase>(PhonesPhase.Loading) }
-    var confirm by remember { mutableStateOf<PhonesConfirm?>(null) }
+    var confirm by rememberSaveable(stateSaver = PhonesConfirm.Saver) { mutableStateOf<PhonesConfirm?>(null) }
     var removing by remember { mutableStateOf(false) }
     suspend fun load() {
         val phones = orNull { coreFlow("forwarding.phones") { c, f -> c.forwardingPhones(f) } }
@@ -105,8 +129,12 @@ internal fun ForwardingPhones() {
                         if (phone.thisPhone) {
                             StatusChip("This phone", AppTheme.tones.accentTone, solid = true)
                         } else {
-                            IconButton({ confirm = PhonesConfirm(phone) }, Modifier.testTag("forwarding.phone.${phone.id.take(8)}.remove"), enabled = !removing) {
-                                Icon(Lucide.Trash2, "Remove")
+                            IconButton(
+                                { confirm = PhonesConfirm.Remove(phone.id) },
+                                Modifier.testTag("forwarding.phone.${phone.id.take(8)}.remove"),
+                                enabled = !removing && MailForwarding.busy == null,
+                            ) {
+                                Icon(Lucide.Trash2, "Remove ${phone.label ?: "this phone"}")
                             }
                         }
                     }
@@ -115,7 +143,7 @@ internal fun ForwardingPhones() {
         }
         val danger = AppTheme.tones.danger
         androidx.compose.material3.Button(
-            onClick = { confirm = PhonesConfirm(null) },
+            onClick = { confirm = PhonesConfirm.Delete },
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 44.dp).testTag("forwarding.delete"),
             enabled = MailForwarding.busy == null,
             shapes = ButtonDefaults.shapes(),
@@ -125,28 +153,33 @@ internal fun ForwardingPhones() {
         }
     }
 
-    confirm?.let { c ->
-        val phone = c.phone
-        val count = (phase as? PhonesPhase.Ready)?.phones?.size
-        if (phone != null) {
+    val ready = (phase as? PhonesPhase.Ready)?.phones
+    when (val c = confirm) {
+        null -> Unit
+        is PhonesConfirm.Remove -> {
+            val label = ready?.firstOrNull { it.id == c.id }?.label ?: "this phone"
             AppDialog(
                 { confirm = null },
-                "Take ${phone.label ?: "this phone"} off the address?",
+                "Take $label off the address?",
                 "Remove",
                 {
                     confirm = null
-                    scope.launch {
+                    // On the app's scope: closing the sheet mid-way mustn't drop the server's answer.
+                    AppScope.launch {
                         removing = true
-                        val done = orNull { coreFlow("forwarding.remove_phone") { co, f -> co.removeForwardingPhone(f, phone.id) } } != null
-                        if (done) {
-                            haptics.confirm()
-                            showToast("Mail forwarding", "It no longer gets forwarded OTPs.")
-                            load()
-                        } else {
-                            haptics.reject()
-                            showToast("Mail forwarding", "Couldn't remove it; try again.")
+                        try {
+                            val done = orNull { coreFlow("forwarding.remove_phone") { co, f -> co.removeForwardingPhone(f, c.id) } } != null
+                            if (done) {
+                                haptics.confirm()
+                                MailForwarding.note("Phone removed", "It no longer gets forwarded OTPs.")
+                                load()
+                            } else {
+                                haptics.reject()
+                                MailForwarding.failed("Couldn't remove the phone", "Check your connection and try again.")
+                            }
+                        } finally {
+                            removing = false
                         }
-                        removing = false
                     }
                 },
                 icon = Lucide.Smartphone,
@@ -155,7 +188,9 @@ internal fun ForwardingPhones() {
             ) {
                 Text("It stops getting forwarded OTPs. The address keeps working on the other phones.")
             }
-        } else {
+        }
+        PhonesConfirm.Delete -> {
+            val count = ready?.size
             ForwardingConfirmSheet(
                 onDismiss = { confirm = null },
                 icon = Lucide.Trash2,

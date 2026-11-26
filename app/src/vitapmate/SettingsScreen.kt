@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,7 +95,7 @@ fun SettingsScreen() {
     }
     val context = LocalContext.current
     val list = rememberLazyListState()
-    var otpSheet by remember { mutableStateOf(false) }
+    var otpSheet by rememberSaveable { mutableStateOf(false) }
     // What already shows as a warning on a row, repeated at the top; each does what its row does.
     val needs = buildList {
         if (AccountWatch.rejected) add(Need("Your account", "VTOP rejected the saved password", "account") { nav.push(Route.Screen(ACCOUNT)) })

@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -27,7 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +66,6 @@ import vitapmate.ui.Dot
 import vitapmate.ui.Space
 import vitapmate.ui.heroCookie
 import vitapmate.ui.neutralTone
-import vitapmate.ui.showToast
 
 /**
  * Mail forwarding with an address: the address (copy) and its status, three Gmail steps driven by
@@ -77,7 +77,6 @@ import vitapmate.ui.showToast
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: () -> Unit, onOff: () -> Unit) {
-    val tones = AppTheme.tones
     val context = LocalContext.current
     val address: String
     val sender: String
@@ -96,15 +95,26 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
         is Forwarding.On -> {
             address = status.address
             sender = status.sender
-            confirmation = null
+            confirmation = status.confirmation
             step = null
             collegeMail = status.collegeMail
         }
     }
     val label = statusLabel(status)
-    var guide by remember { mutableStateOf<Int?>(null) }
+    var guide by rememberSaveable { mutableStateOf<Int?>(null) }
     AddressCard(address, label, status is Forwarding.On)
-    // Done steps tick; the current one is filled; On and Rejoining have all three done.
+    // Rejoining: the app can't tell which steps the kept setup had done, so it shows none of them.
+    if (step == SetupStep.REJOINING) {
+        Callout(
+            Lucide.RefreshCw,
+            neutralTone,
+            "Reconnecting: this phone rejoins your address the next time you're signed in to VTOP. The steps show again if anything is left to do in Gmail.",
+        )
+        ForwardingFeedbackNote()
+        CheckAndOff(onCheck, onOff)
+        return
+    }
+    // Done steps tick; the current one is filled; On has all three done.
     val current = when (step) {
         SetupStep.ADD_ADDRESS -> 1
         SetupStep.CONFIRM -> 2
@@ -120,18 +130,18 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
     Step(1, "Add the address in Gmail", null, null, state = state(1), extra = {
         if (current == 1) {
             collegeMail?.let { AccountChip(it) }
-            Row(Modifier.padding(top = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            ActionRow {
                 Button({ openInChrome(context, gmailUrl(GmailPage.Forwarding, collegeMail)) }, Modifier.testTag("forwarding.step1.open"), size = vitapmate.ui.ButtonSize.Sm, prefix = Lucide.ExternalLink) { Text("Open in Chrome") }
                 ShowMe { guide = 1 }
             }
         }
     }) {
         "In the Gmail where VTOP's mail arrives: Settings → Forwarding → Add a forwarding address, paste yours, then Next → Proceed. " +
-            "Leave \"Disable forwarding\" selected."
+            "Leave \"Disable forwarding\" selected. $DESKTOP_SITE"
     }
     // Opening the link is all the app sees: while Gmail's mail is kept, it can be opened again in
     // case the student left Gmail before tapping Confirm.
-    val reopen = confirmation.link()?.takeIf { current > 2 }
+    val reopen = confirmation.link()?.takeIf { status is Forwarding.Waiting && current > 2 }
     Step(2, "Confirm it", null, null, state = state(2), trailing = reopen?.let { link ->
         {
             IconButton({ openInChrome(context, link) }, Modifier.testTag("forwarding.confirm_again")) {
@@ -142,20 +152,22 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
         if (confirmation != null && current == 2) Confirmation(confirmation, collegeMail)
         if (current == 2) ShowMe { guide = 2 }
     }) {
+        // Says what the app saw: the link opened, not that Gmail took it.
         when {
-            current <= 2 -> "One tap, here or from Gmail's confirmation. It shows up here on its own."
-            reopen != null -> "Confirmed. Left Gmail before tapping Confirm? Open it again."
-            else -> "Confirmed."
+            current <= 2 -> "Gmail mails a confirmation to your address. It shows up here on its own, then it's one tap."
+            reopen != null -> "Link opened. Left Gmail before tapping Confirm? Open it again."
+            else -> "Link opened."
         }
     }
     Step(3, "Create the filter", null, null, state = state(3), last = true, extra = {
         if (current == 3) {
-            Row(Modifier.padding(top = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+            ActionRow {
                 Button({ openInChrome(context, gmailUrl(GmailPage.Filters, collegeMail)) }, Modifier.testTag("forwarding.step3.open"), size = vitapmate.ui.ButtonSize.Sm, prefix = Lucide.Funnel) { Text("Open filters") }
                 ShowMe { guide = 3 }
             }
+            // A local write: it never waits for a check running.
             Button(
-                if (MailForwarding.busy != null) null else onDone,
+                onDone,
                 Modifier.padding(top = Space.sm).testTag("forwarding.done"),
                 ButtonVariant.Outline,
                 vitapmate.ui.ButtonSize.Sm,
@@ -172,11 +184,36 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    (status as? Forwarding.On)?.hint?.let { TypedOtpHint(it, sender, collegeMail) }
+    (status as? Forwarding.On)?.confirmation?.let { Confirmation(it, collegeMail, canIgnore = true) }
+    (status as? Forwarding.On)?.hint?.let { TypedOtpHint(it, sender, collegeMail) { guide = 3 } }
     guide?.let { n ->
         val titles = mapOf(1 to "Add the address", 2 to "Confirm it", 3 to "Create the filter")
         GuideSheet(n, titles.getValue(n), address, sender, label) { guide = null }
     }
+    ForwardingFeedbackNote()
+    CheckAndOff(onCheck, onOff)
+    ForwardingPhones()
+}
+
+/** On a phone, Gmail opens its mobile site, which has no Settings. */
+private const val DESKTOP_SITE = "On a phone, first turn on Chrome ⋮ → Desktop site: Gmail's mobile site has no Settings."
+
+/** A step's buttons, wrapping onto a second line on a narrow screen or with large text. */
+@Composable
+private fun ActionRow(content: @Composable () -> Unit) {
+    FlowRow(
+        Modifier.padding(top = Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+        verticalArrangement = Arrangement.spacedBy(Space.xs),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) { content() }
+}
+
+/** Check and Turn off, side by side. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CheckAndOff(onCheck: () -> Unit, onOff: () -> Unit) {
+    val tones = AppTheme.tones
     val checking = MailForwarding.busy == ForwardingOp.Check
     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
         Button(if (MailForwarding.busy != null) null else onCheck, Modifier.weight(1f).testTag("forwarding.check"), prefix = if (checking) null else Lucide.RefreshCw) {
@@ -194,7 +231,6 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onDone: ()
             Text(if (MailForwarding.busy == ForwardingOp.TurnOff) "Turning off…" else "Turn off")
         }
     }
-    ForwardingPhones()
 }
 
 /** The status line on the address card, as Rust's state says it. */
@@ -287,13 +323,15 @@ private fun ShowMe(onClick: () -> Unit) {
  * reach it.
  */
 @Composable
-private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?) {
+private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?, canIgnore: Boolean = false) {
     val tones = AppTheme.tones
     val context = LocalContext.current
-    var anyway by remember(confirm.sentAt) { mutableStateOf(false) }
-    var showCode by remember(confirm.sentAt) { mutableStateOf(false) }
+    var anyway by rememberSaveable(confirm.sentAt) { mutableStateOf(false) }
+    var showCode by rememberSaveable(confirm.sentAt) { mutableStateOf(false) }
+    // No browser took the link: it was copied, and the student says when they confirmed.
+    var noBrowser by rememberSaveable(confirm.sentAt) { mutableStateOf(false) }
     val wrong = confirm.from == ConfirmFrom.UNKNOWN || confirm.from == ConfirmFrom.OWN_OTHER
-    if (wrong && !anyway) return WrongAccount(confirm.requester, collegeMail) { anyway = true }
+    if (wrong && !anyway) return WrongAccount(confirm.requester, collegeMail, onAnyway = { anyway = true }, onIgnore = MailForwarding::ignoreConfirm)
     val said = when (confirm.from) {
         ConfirmFrom.COLLEGE_INBOX -> "From your college Gmail${confirm.requester?.let { "\n$it" } ?: ""}"
         ConfirmFrom.NOT_SAID -> "Gmail's confirmation arrived. Confirm only if you just added this address in Gmail."
@@ -314,10 +352,18 @@ private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?) {
                     IconButton({ copy(context, "Gmail confirmation code", code) }) { Icon(Lucide.Copy, "Copy the code") }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            if (noBrowser) {
+                Text(
+                    "No browser opened, so the link was copied. Paste it into a browser, confirm there, then tap I've confirmed.",
+                    Modifier.testTag("forwarding.confirm_copied"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tone.onSubtle,
+                )
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), itemVerticalAlignment = Alignment.CenterVertically) {
                 if (link != null) {
                     Button(
-                        { if (openInChrome(context, link)) MailForwarding.openedConfirm() },
+                        { if (openInChrome(context, link)) MailForwarding.openedConfirm() else noBrowser = true },
                         Modifier.testTag("forwarding.confirm_link"),
                         size = vitapmate.ui.ButtonSize.Sm,
                         prefix = Lucide.Check,
@@ -325,7 +371,8 @@ private fun Confirmation(confirm: GmailConfirmation, collegeMail: String?) {
                     if (code != null && !showCode) TextButton({ showCode = true }) { Text("Use the code") }
                 }
                 // With no link to open, the student says when they confirmed in Gmail.
-                if (link == null || showCode) TextButton({ MailForwarding.openedConfirm() }, Modifier.testTag("forwarding.confirmed")) { Text("I've confirmed") }
+                if (link == null || showCode || noBrowser) TextButton({ MailForwarding.openedConfirm() }, Modifier.testTag("forwarding.confirmed")) { Text("I've confirmed") }
+                if (canIgnore) TextButton({ MailForwarding.ignoreConfirm() }, Modifier.testTag("forwarding.confirm_ignore")) { Text("Dismiss") }
             }
         }
     }
@@ -340,18 +387,21 @@ internal fun GmailConfirmation?.link(): String? = when (val by = this?.confirmBy
 
 /** Gmail's confirmation came from a Gmail that isn't the college one: VTOP's OTPs never reach it. */
 @Composable
-private fun WrongAccount(requester: String?, collegeMail: String?, onAnyway: () -> Unit) {
+private fun WrongAccount(requester: String?, collegeMail: String?, onAnyway: () -> Unit, onIgnore: () -> Unit) {
     val tones = AppTheme.tones
     val context = LocalContext.current
     Column(Modifier.padding(top = Space.sm).testTag("forwarding.wrong_account"), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
         Callout(Lucide.User, tones.warning, "That's not your college Gmail${requester?.let { ": $it" } ?: ""}. VTOP sends OTPs to your college mail, so this Gmail never gets them.") {
-            Button(
-                { openInChrome(context, gmailUrl(GmailPage.Forwarding, collegeMail)) },
-                Modifier.testTag("forwarding.wrong_account.open"),
-                size = vitapmate.ui.ButtonSize.Sm,
-                prefix = Lucide.ExternalLink,
-            ) { Text("Open college Gmail") }
-            TextButton(onAnyway, Modifier.testTag("forwarding.wrong_account.anyway")) { Text("It's right, confirm anyway") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), itemVerticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    { openInChrome(context, collegeGmailUrl(GmailPage.Forwarding, collegeMail)) },
+                    Modifier.testTag("forwarding.wrong_account.open"),
+                    size = vitapmate.ui.ButtonSize.Sm,
+                    prefix = Lucide.ExternalLink,
+                ) { Text("Open college Gmail") }
+                TextButton(onAnyway, Modifier.testTag("forwarding.wrong_account.anyway")) { Text("It's right, confirm anyway") }
+                TextButton(onIgnore, Modifier.testTag("forwarding.wrong_account.ignore")) { Text("Ignore") }
+            }
         }
         Callout(Lucide.Trash2, tones.lab, "Also remove the address from that Gmail's forwarding settings, so it doesn't sit there unused.")
     }
@@ -359,7 +409,7 @@ private fun WrongAccount(requester: String?, collegeMail: String?, onAnyway: () 
 
 /** The student typed an OTP by hand while forwarding was on: worth a look at the filter. Changes nothing. */
 @Composable
-private fun TypedOtpHint(hint: ForwardingHint, sender: String, collegeMail: String?) {
+private fun TypedOtpHint(hint: ForwardingHint, sender: String, collegeMail: String?, onShowMe: () -> Unit) {
     val tones = AppTheme.tones
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
@@ -368,31 +418,42 @@ private fun TypedOtpHint(hint: ForwardingHint, sender: String, collegeMail: Stri
     }
     Column(Modifier.testTag("forwarding.hint"), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
         Callout(Lucide.Funnel, tones.warning, "Typed the OTP yourself $whenTyped? It may not have been forwarded. Worth a quick look at the filter.") {
-            TextButton({ MailForwarding.dismissHint() }, Modifier.testTag("forwarding.hint.dismiss")) { Text("Dismiss") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), itemVerticalAlignment = Alignment.CenterVertically) {
+                ShowMe(onShowMe)
+                TextButton({ MailForwarding.dismissHint() }, Modifier.testTag("forwarding.hint.dismiss")) { Text("Dismiss") }
+            }
         }
         val checks = listOf(
-            Triple("The filter's From is exactly", sender, GmailPage.Filters),
-            Triple("It forwards to your address", "Forward it to → your address", GmailPage.Filters),
-            Triple("It's in your college Gmail", collegeMail ?: "The Gmail VTOP mails", GmailPage.Forwarding),
-            Triple("Forwarding is still verified", "Gmail drops it if the address changed", GmailPage.Forwarding),
+            HintCheck("The filter's From is exactly", sender, GmailPage.Filters, "sender", copyText = sender),
+            HintCheck("It forwards to your address", "Forward it to → your address", GmailPage.Filters, "forward_to"),
+            HintCheck("It's in your college Gmail", collegeMail ?: "The Gmail VTOP mails", GmailPage.Forwarding, "account"),
+            HintCheck("Forwarding is still verified", "Gmail drops it if the address changed", GmailPage.Forwarding, "verified"),
         )
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            checks.forEach { (title, detail, page) ->
+            checks.forEach { check ->
                 Row(
                     Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(scheme.surfaceContainerLow)
                         .padding(horizontal = Space.md, vertical = Space.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title, style = MaterialTheme.typography.bodyMedium)
-                        Text(detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text(check.title, style = MaterialTheme.typography.bodyMedium)
+                        Text(check.detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                     }
-                    IconButton({ openInChrome(context, gmailUrl(page, collegeMail)) }) { Icon(Lucide.ChevronRight, "Open in Gmail") }
+                    check.copyText?.let { text ->
+                        IconButton({ copy(context, "VTOP's sender", text) }, Modifier.testTag("forwarding.hint.${check.tag}.copy")) { Icon(Lucide.Copy, "Copy VTOP's sender") }
+                    }
+                    IconButton({ openInChrome(context, gmailUrl(check.page, collegeMail)) }, Modifier.testTag("forwarding.hint.${check.tag}.open")) {
+                        Icon(Lucide.ChevronRight, "Open in Gmail: ${check.title}")
+                    }
                 }
             }
         }
     }
 }
+
+/** One thing to look at in Gmail for the typed-OTP hint, with the page that shows it and a value to copy. */
+private data class HintCheck(val title: String, val detail: String, val page: GmailPage, val tag: String, val copyText: String? = null)
 
 /** How far a setup step is, when the app can tell: [Done] shows a tick, [Current] a filled number. */
 internal enum class StepState { Done, Current, Plain }
@@ -460,7 +521,7 @@ internal fun Step(
 
 internal fun copy(context: Context, label: String, text: String) {
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(label, text))
-    showToast("Copied", label)
+    MailForwarding.note("Copied", label)
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 d ago" for unix seconds [at]. */

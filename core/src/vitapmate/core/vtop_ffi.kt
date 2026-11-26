@@ -1296,6 +1296,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_forwarding_status(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_ignore_forwarding_confirm(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_keep_forwarding(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_leave_old_forwarding(
@@ -1672,6 +1674,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_fetch_forwarded_otp(`ptr`: Long,`flow`: RustBuffer.ByValue,`since`: Long,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_forwarding_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_ignore_forwarding_confirm(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_keep_forwarding(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -2391,6 +2395,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 46814) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_ignore_forwarding_confirm() and 0xFFFF) != 32228) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_keep_forwarding() and 0xFFFF) != 50119) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -2496,7 +2503,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 38309) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 12129) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 30898) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_server_account() and 0xFFFF) != 6718) {
@@ -2514,7 +2521,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_set_vault_options() and 0xFFFF) != 40190) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 23732) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out_of_server() and 0xFFFF) != 23075) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cancel_otp() and 0xFFFF) != 57187) {
@@ -5664,6 +5671,12 @@ public interface CoreInterface {
     fun `forwardingStatus`(`flow`: kotlin.String): Forwarding
     
     /**
+     * Sets the shown Gmail confirmation aside (another Gmail asked, say), so it stops holding
+     * the sheet at Confirm; a later one shows again. No network.
+     */
+    fun `ignoreForwardingConfirm`(`flow`: kotlin.String): Forwarding
+    
+    /**
      * Rejoins an address kept from the v2 edge, proving who the student is once (the proof sends
      * no cookie): the backfill kept the address, but mail is sealed only to the installs on it,
      * so without this the OTPs stop after the update. Does nothing once joined, without an
@@ -5877,7 +5890,7 @@ public interface CoreInterface {
      * Tells the server the semester picked here, so connected apps read the same one. Does
      * nothing while no semester is picked, or (it runs unasked, never proving) before this
      * install has a server identity; the identity sends it once it comes
-     * ([`Core::semester_to_server`]).
+     * ([`Core::semester_to_server`]). The demo account has no semester there to set.
      */
     suspend fun `sendServerSemester`(`flow`: kotlin.String)
     
@@ -5912,8 +5925,8 @@ public interface CoreInterface {
     suspend fun `setVaultOptions`(`flow`: kotlin.String, `options`: VaultOptions)
     
     /**
-     * Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
-     * address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
+     * Signs this install out of the server, before [`Core::sign_out`]: stops its live watches,
+     * takes it off its forwarding address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
      * (for every phone on the account with `everywhere`), then forgets the identity here. Best
      * effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
      * later, the install listed on the account until it goes.
@@ -7900,6 +7913,24 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Sets the shown Gmail confirmation aside (another Gmail asked, say), so it stops holding
+     * the sheet at Confirm; a later one shows again. No network.
+     */override fun `ignoreForwardingConfirm`(`flow`: kotlin.String): Forwarding {
+            return FfiConverterTypeForwarding.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_ignore_forwarding_confirm(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Rejoins an address kept from the v2 edge, proving who the student is once (the proof sends
      * no cookie): the backfill kept the address, but mail is sealed only to the installs on it,
      * so without this the OTPs stop after the update. Does nothing once joined, without an
@@ -8802,7 +8833,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
      * Tells the server the semester picked here, so connected apps read the same one. Does
      * nothing while no semester is picked, or (it runs unasked, never proving) before this
      * install has a server identity; the identity sends it once it comes
-     * ([`Core::semester_to_server`]).
+     * ([`Core::semester_to_server`]). The demo account has no semester there to set.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8962,8 +8993,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Signs this install out of the server, before [`Core::sign_out`]: off its forwarding
-     * address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
+     * Signs this install out of the server, before [`Core::sign_out`]: stops its live watches,
+     * takes it off its forwarding address and the ones queued to be left (leaving needs the identity), then `auth:signOut`
      * (for every phone on the account with `everywhere`), then forgets the identity here. Best
      * effort: offline, an address stays queued and the sign-out (with `everywhere`) is kept for
      * later, the install listed on the account until it goes.
@@ -22582,7 +22613,8 @@ enum class ConfirmFrom {
      */
     UNKNOWN,
     /**
-     * The mail named no address.
+     * The mail named no address, or the app has nothing to tell the college mail by (no
+     * regno, no saved profile).
      */
     NOT_SAID;
 
@@ -23178,6 +23210,11 @@ sealed class Forwarding {
         val `readiness`: vitapmate.core.ForwardingReadiness, 
         val `uses`: vitapmate.core.ForwardingUses, 
         val `hint`: vitapmate.core.ForwardingHint?, 
+        /**
+         * A Gmail confirmation newer than every mail before it (Gmail asked again, perhaps for
+         * another Gmail), not opened or set aside yet.
+         */
+        val `confirmation`: vitapmate.core.GmailConfirmation?, 
         val `collegeMail`: kotlin.String?) : Forwarding()
         
     {
@@ -23225,6 +23262,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterTypeForwardingReadiness.read(buf),
                 FfiConverterTypeForwardingUses.read(buf),
                 FfiConverterOptionalTypeForwardingHint.read(buf),
+                FfiConverterOptionalTypeGmailConfirmation.read(buf),
                 FfiConverterOptionalString.read(buf),
                 )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
@@ -23266,6 +23304,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 + FfiConverterTypeForwardingReadiness.allocationSize(value.`readiness`)
                 + FfiConverterTypeForwardingUses.allocationSize(value.`uses`)
                 + FfiConverterOptionalTypeForwardingHint.allocationSize(value.`hint`)
+                + FfiConverterOptionalTypeGmailConfirmation.allocationSize(value.`confirmation`)
                 + FfiConverterOptionalString.allocationSize(value.`collegeMail`)
             )
         }
@@ -23301,6 +23340,7 @@ public object FfiConverterTypeForwarding : FfiConverterRustBuffer<Forwarding>{
                 FfiConverterTypeForwardingReadiness.write(value.`readiness`, buf)
                 FfiConverterTypeForwardingUses.write(value.`uses`, buf)
                 FfiConverterOptionalTypeForwardingHint.write(value.`hint`, buf)
+                FfiConverterOptionalTypeGmailConfirmation.write(value.`confirmation`, buf)
                 FfiConverterOptionalString.write(value.`collegeMail`, buf)
                 Unit
             }

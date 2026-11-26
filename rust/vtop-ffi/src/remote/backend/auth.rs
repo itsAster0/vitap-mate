@@ -185,6 +185,9 @@ pub(crate) struct AuthMachine {
     generation: u64,
     jwt_epoch: u64,
     proved: Option<ProvedTicket>,
+    /// Generation and server message when this install was removed on the server, so a caller
+    /// whose refresh was refused with `DeviceRemoved` reports that instead of `Unauthenticated`.
+    removed: Option<(u64, String)>,
 }
 
 impl Default for AuthMachine {
@@ -200,6 +203,7 @@ impl AuthMachine {
             generation: 1,
             jwt_epoch: 0,
             proved: None,
+            removed: None,
         }
     }
 
@@ -208,6 +212,14 @@ impl AuthMachine {
             generation: self.generation,
             jwt_epoch: self.jwt_epoch,
         }
+    }
+
+    /// The server's message if this install was removed after `since_generation`.
+    pub(crate) fn removed_since(&self, since_generation: u64) -> Option<String> {
+        self.removed
+            .as_ref()
+            .filter(|(generation, _)| *generation > since_generation)
+            .map(|(_, message)| message.clone())
     }
 
     /// The JWT currently set on the socket, if any (for restoring socket auth after a
@@ -307,6 +319,15 @@ impl AuthMachine {
             Step::FetchToken(Grant::Demo)
         } else if let Some(refresh) = matching_refresh(&server, input.regno, input.refresh) {
             Step::FetchToken(Grant::Refresh(refresh.clone()))
+        } else if input.regno.is_none()
+            && let Some(refresh) = input
+                .refresh
+                .filter(|kept| normalize_server(&kept.server) == server)
+        {
+            // Signed out (`regno_allowed` already refused any signed-in caller whose regno is
+            // unknown, so `None` here is signed out): a kept refresh token still works to leave
+            // an old address or finish an answer.
+            Step::FetchToken(Grant::Refresh(refresh.clone()))
         } else if let Some(v2) = input.v2_token.filter(|_| input.regno.is_some()) {
             Step::FetchToken(Grant::V2(v2.to_string()))
         } else if let Some(ticket) = ticket {
@@ -350,6 +371,7 @@ impl AuthMachine {
             self.generation += 1;
         }
         self.proved = None;
+        self.removed = None;
         self.jwt_epoch += 1;
         self.phase = Phase::Ready(Jwt {
             server: server.clone(),
@@ -425,7 +447,9 @@ impl AuthMachine {
                 );
             }
             (_, true) => {
+                let message = error.message().to_string();
                 self.clear_identity("token_refused", code, true, &mut effects);
+                self.removed = Some((self.generation, message));
             }
             _ => {
                 self.clear_identity("token_refused", code, false, &mut effects);
@@ -464,6 +488,10 @@ impl AuthMachine {
         }
         let mut effects = Vec::new();
         self.clear_identity("device_removed", "device_removed", true, &mut effects);
+        self.removed = Some((
+            self.generation,
+            "This phone was removed from your account. Sign in again.".into(),
+        ));
         (true, effects)
     }
 
@@ -506,6 +534,7 @@ impl AuthMachine {
         self.jwt_epoch += 1;
         self.phase = Phase::Unauthenticated;
         self.proved = None;
+        self.removed = None;
         info!(
             from,
             to = self.phase.name(),
@@ -555,6 +584,7 @@ impl AuthMachine {
         self.jwt_epoch += 1;
         self.phase = Phase::Unauthenticated;
         self.proved = None;
+        self.removed = None;
         info!(
             from,
             to = self.phase.name(),
@@ -579,10 +609,10 @@ pub(crate) fn matching_refresh<'a>(
     regno: Option<&str>,
     refresh: Option<&'a Refresh>,
 ) -> Option<&'a Refresh> {
+    let regno = regno?;
     let server = normalize_server(server);
     refresh.filter(|kept| {
-        normalize_server(&kept.server) == server
-            && regno.is_none_or(|r| r.eq_ignore_ascii_case(&kept.regno))
+        normalize_server(&kept.server) == server && regno.eq_ignore_ascii_case(&kept.regno)
     })
 }
 
@@ -871,5 +901,45 @@ mod tests {
         machine.on_proved(SERVER, REGNO, "t3".into(), 0);
         assert_eq!(ticket(&mut machine, PROVED_TICKET_MS), None);
         assert!(!machine.has_usable_identity(SERVER, Some(REGNO), None, false));
+    }
+
+    #[test]
+    fn matching_refresh_requires_a_known_regno() {
+        let refresh = kept("vrt_1");
+        assert!(matching_refresh(SERVER, None, Some(&refresh)).is_none());
+        assert!(matching_refresh(SERVER, Some(REGNO), Some(&refresh)).is_some());
+        assert!(matching_refresh(SERVER, Some("22BCE9999"), Some(&refresh)).is_none());
+        let machine = AuthMachine::new();
+        assert!(!machine.has_usable_identity(SERVER, None, Some(&refresh), false));
+    }
+
+    #[test]
+    fn device_removed_on_refresh_is_reported_only_for_generations_before_it() {
+        let mut machine = AuthMachine::new();
+        let before = machine.stamp().generation;
+        let refused = EdgeError::Status {
+            code: ServerCode::DeviceRemoved,
+            message: "Removed on another phone.".into(),
+        };
+        let (retry, effects) = machine.on_token_refused(GrantKind::Refresh, &refused);
+        assert!(retry);
+        assert!(effects.contains(&Effect::ForgetForwarding));
+        assert_eq!(
+            machine.removed_since(before).as_deref(),
+            Some("Removed on another phone.")
+        );
+        // Calls started after the removal don't inherit the old removal.
+        let after = machine.stamp().generation;
+        assert_eq!(machine.removed_since(after), None);
+        // A later sign-in or forget clears it.
+        machine.on_issued(
+            GrantKind::Proof,
+            SERVER,
+            REGNO,
+            "jwt-new".into(),
+            1_000_000,
+            "vrt_new".into(),
+        );
+        assert_eq!(machine.removed_since(before), None);
     }
 }

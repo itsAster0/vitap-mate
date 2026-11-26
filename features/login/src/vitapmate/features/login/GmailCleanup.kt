@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Lucide
@@ -71,7 +72,11 @@ internal fun GmailCleanup(sender: String, address: String, account: String? = nu
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(scheme.surfaceContainerHigh).padding(Space.lg).testTag("forwarding.cleanup"),
         verticalArrangement = Arrangement.spacedBy(Space.md),
     ) {
-        Text("Clean up Gmail", style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
+        Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+            Text("Clean up Gmail", style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
+            // Gmail's mobile site, which a phone gets, has no Settings.
+            Text("On a phone, first turn on Chrome ⋮ → Desktop site.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        }
         CleanupStep(
             number = 1,
             title = "Delete the filter",
@@ -114,7 +119,7 @@ private fun CleanupStep(number: Int, title: String, body: String, linkLabel: Str
             TextButton({ openInChrome(context, url) }, Modifier.testTag("forwarding.cleanup.step$number.link")) {
                 Icon(Lucide.ExternalLink, null, Modifier.size(16.dp))
                 Spacer(Modifier.size(Space.xs))
-                Text(linkLabel)
+                Text(linkLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -179,13 +184,13 @@ internal fun ForwardingConfirmSheet(
                     modifier = side.testTag(dismissTag),
                     shapes = ButtonDefaults.shapes(RoundedCornerShape(24.dp, 10.dp, 10.dp, 24.dp)),
                     colors = ButtonDefaults.filledTonalButtonColors(scheme.surfaceContainerHighest, scheme.onSurface),
-                ) { Text("Cancel", maxLines = 1) }
+                ) { Text("Cancel", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 Button(
                     onClick = onConfirm,
                     modifier = side.testTag(confirmTag),
                     shapes = ButtonDefaults.shapes(RoundedCornerShape(10.dp, 24.dp, 24.dp, 10.dp)),
                     colors = ButtonDefaults.buttonColors(scheme.error, scheme.onError),
-                ) { Text(confirmLabel, maxLines = 1) }
+                ) { Text(confirmLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }

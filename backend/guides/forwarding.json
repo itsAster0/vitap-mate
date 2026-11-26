@@ -54,7 +54,7 @@
       "type": "step",
       "step": 3,
       "title": "Done",
-      "body": "The filter shows in the list. Back in the app, tap Check: the next VTOP OTP fills in by itself. Mail sent before the filter isn't forwarded.",
+      "body": "The filter shows in the list. Back in the app, tap I've created it: the next VTOP OTP fills in by itself. Mail sent before the filter isn't forwarded.",
       "image": "forwarding/6-done.webp"
     }
   ]

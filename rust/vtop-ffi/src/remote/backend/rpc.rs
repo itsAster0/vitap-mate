@@ -261,8 +261,22 @@ impl Core {
         ask: bool,
         args: Value,
     ) -> Result<Result<Value, EdgeError>, CoreError> {
+        let start_gen = self.shared.backend_state().auth.stamp().generation;
         for attempt in 0..2 {
-            let stamp = self.ensure_identity(flow, action, ask).await?;
+            let stamp = match self.ensure_identity(flow, action, ask).await {
+                Ok(stamp) => stamp,
+                Err(CoreError::ConsentDenied) => {
+                    if let Some(message) = self.shared.backend_state().auth.removed_since(start_gen)
+                    {
+                        return Ok(Err(EdgeError::Status {
+                            code: ServerCode::DeviceRemoved,
+                            message,
+                        }));
+                    }
+                    return Err(CoreError::ConsentDenied);
+                }
+                Err(error) => return Err(error),
+            };
             let answer = self.run(flow, kind, path, args.clone()).await;
             let code = match &answer {
                 Err(CallError::Convex { data, .. }) => data
@@ -336,5 +350,63 @@ mod tests {
             edge_error("x:y", CallError::Closed),
             EdgeError::Offline
         ));
+    }
+
+    #[tokio::test]
+    async fn refresh_refused_with_device_removed_reaches_caller_as_device_removed() {
+        let dir = std::env::temp_dir().join(format!(
+            "vtop-ffi-rpc-device-removed-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let edge = Arc::new(std::sync::Mutex::new(crate::test_edge::Edge::default()));
+        let server = crate::test_edge::serve(edge.clone()).await;
+        let core = crate::test_edge::signed_in(&dir, server.clone());
+        crate::test_edge::keep_token(&core, &server);
+        let address = json!({
+            "server": server,
+            "id": crate::test_edge::ID,
+            "address": format!("otp+{}@vmate.test", crate::test_edge::ID),
+            "joined": true,
+        });
+        core.write(crate::remote::forwarding::FILE, &address);
+        edge.lock()
+            .unwrap()
+            .canned
+            .entry("auth:token".into())
+            .or_default()
+            .push_back((
+                403,
+                json!({
+                    "code": "device_removed",
+                    "error": "This phone was removed on another device.",
+                }),
+            ));
+        let err = core
+            .device_call(
+                "f",
+                Kind::Query,
+                "mail:inbox",
+                json!({ "id": crate::test_edge::ID }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err.server_code(), Some(&ServerCode::DeviceRemoved));
+        assert!(core.device().refresh.is_none());
+        assert!(core.saved_mailbox().is_none());
+
+        // A later call with no identity is Unauthenticated, not stuck on DeviceRemoved.
+        let later = core
+            .device_call(
+                "f2",
+                Kind::Query,
+                "mail:inbox",
+                json!({ "id": crate::test_edge::ID }),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(later.server_code(), Some(&ServerCode::Unauthenticated));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

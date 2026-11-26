@@ -195,9 +195,9 @@ impl Core {
         self.regno_allowed(flow, asked_for.as_deref(), may_ask)
             .await?;
         let _turn = self.shared.identity_turn.lock().await;
-        // Another student may have signed in while this one waited.
+        // Another student may have signed in while this one waited (including with an unknown regno).
         let regno = self.signed_in_regno().await;
-        if regno != asked_for {
+        if regno != asked_for || regno.is_none() {
             self.regno_allowed(flow, regno.as_deref(), false).await?;
         }
         let server = self.forwarding_server();

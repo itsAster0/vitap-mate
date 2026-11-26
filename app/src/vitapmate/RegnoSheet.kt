@@ -44,9 +44,11 @@ import kotlinx.coroutines.launch
 import vitapmate.core.RegnoAnswer
 import vitapmate.core.RegnoSharing
 import vitapmate.data.AppCore
+import vitapmate.data.AppScope
 import vitapmate.data.RegnoConsent
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
+import vitapmate.features.login.MailForwarding
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 import vitapmate.ui.rememberHaptics
@@ -136,7 +138,10 @@ fun RegnoSharingSetting(sharing: RegnoSharing, onChanged: () -> Unit) {
             val answer = if (share) RegnoAnswer.SHARE else RegnoAnswer.NOT_NOW
             val now = orNull { coreFlow("account.regno_set") { c, f -> c.setRegnoSharing(f, answer) } } ?: return@launch
             onChanged()
+            // Turning sharing off moves forwarding to NeedsRejoin on disk; refresh the singleton now.
+            AppScope.launch { MailForwarding.load("regno_set") }
             if (now == RegnoSharing.SHARED) {
+                AppCore.keepForwarding { MailForwarding.load("keep") }
                 AppCore.proveInBackground()
             } else {
                 showToast("Not shared", "Server features stop on this phone until you share it again.")

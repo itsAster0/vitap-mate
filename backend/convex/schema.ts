@@ -249,6 +249,9 @@ export default defineSchema({
     accountId: v.id("accounts"),
     confirmation: nullable(v.string()),
     confirmationAt: nullable(v.number()),
+    /** Unix seconds of the latest `gmail_confirm` (`sentAt`), kept past `confirmation`'s 24h TTL
+     * so phones joining later know Gmail already confirmed this address. */
+    confirmedAt: v.optional(nullable(v.number())),
     lastOtpAt: nullable(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -265,6 +268,7 @@ export default defineSchema({
     ownerHash: v.string(),
     confirmation: nullable(v.string()),
     confirmationAt: nullable(v.number()),
+    confirmedAt: v.optional(nullable(v.number())),
     lastOtpAt: nullable(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
