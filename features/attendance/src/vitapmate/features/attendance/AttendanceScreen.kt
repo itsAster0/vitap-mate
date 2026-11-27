@@ -67,13 +67,14 @@ fun AttendanceScreen() {
     var filter by rememberSaveable { mutableStateOf(Kind.All) }
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     var skipDay by rememberSaveable { mutableStateOf(false) }
+    val insights = Settings.calculatedInsights
     // After each fetch of the summary, histories that fell behind it are fetched again in the
     // background, and the calendar when a day old; the refresh spinner doesn't wait. A newer
     // refresh cancels the last run.
     val fresh = (page.state as? PageState.Ready)?.takeIf { it.activity !is PageActivity.Refreshing }?.updatedAt
     var seen by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(fresh) {
-        if (fresh == null) return@LaunchedEffect
+    LaunchedEffect(fresh, insights) {
+        if (fresh == null || !insights) return@LaunchedEffect
         val before = seen
         seen = fresh
         if (before == null || before == fresh) return@LaunchedEffect
@@ -87,7 +88,7 @@ fun AttendanceScreen() {
         empty = { EmptyView(Lucide.ClipboardList, "No attendance yet", Modifier.testTag("attendance.empty")) },
     ) { data ->
         // Read again when a history lands too: what is held but not posted yet counts from it.
-        val outlook = rememberOutlook(data to Histories.arrived.values.sum())
+        val outlook = if (insights) rememberOutlook(data to Histories.arrived.values.sum()) else emptyMap()
         val labs = data.courses.count { it.isLab }
         // With one kind only there is no filter and no pager.
         val pages = if (labs in 1..<data.courses.size) Kind.entries else listOf(Kind.All)
@@ -103,7 +104,8 @@ fun AttendanceScreen() {
             val kind = pages.getOrNull(pager.settledPage) ?: return@LaunchedEffect
             StateRegistry.report("ui.attendance", mapOf("filter" to kind.name.lowercase(), "shown" to data.courses.of(kind).size, "debarred" to data.courses.count { it.debarred }))
         }
-        val canSkipDay = outlook.values.any { it.days.isNotEmpty() }
+        val canSkipDay = insights && outlook.values.any { it.days.isNotEmpty() }
+        if (!insights && skipDay) skipDay = false
         Column(Modifier.fillMaxSize()) {
             if (pages.size > 1 || canSkipDay) Row(
                 Modifier.padding(start = Space.sm, top = Space.xs, end = Space.sm, bottom = Space.sm),
@@ -158,7 +160,8 @@ private fun List<AttendanceCourse>.of(kind: Kind) = when (kind) {
 @Composable
 private fun CourseList(courses: List<AttendanceCourse>, state: LazyListState, outlook: Map<String, AttendancePlan>, onOpen: (String) -> Unit, modifier: Modifier) {
     val scope = rememberCoroutineScope()
-    val showSkip = Settings.showSkipAdvice
+    val insights = Settings.calculatedInsights
+    val showSkip = Settings.effectiveSkipAdvice
     LazyColumn(
         modifier.fillMaxSize(),
         state,
@@ -173,7 +176,8 @@ private fun CourseList(courses: List<AttendanceCourse>, state: LazyListState, ou
         items(courses, key = { it.key }) { course ->
             CourseCard(
                 course,
-                outlook[course.key],
+                if (insights) outlook[course.key] else null,
+                insights,
                 showSkip,
                 onClick = {
                     onOpen(course.key)

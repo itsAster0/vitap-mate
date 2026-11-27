@@ -30,10 +30,10 @@ import vitapmate.ui.nums
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun CgpaCard(history: GradeHistory, modifier: Modifier = Modifier) {
+internal fun CgpaCard(history: GradeHistory, insights: Boolean = true, modifier: Modifier = Modifier) {
     val muted = AppTheme.tones.accentTone.onSubtle
     val label = MaterialTheme.typography.labelMedium
-    val trend = history.sessions.mapNotNull { s -> s.gpa?.let { s.short to it } }
+    val trend = if (insights) history.sessions.mapNotNull { s -> s.gpa?.let { s.short to it } } else emptyList()
     val blocks = if (trend.size >= 2) 2 else 1
     Column(modifier.fillMaxWidth().testTag("grades.cgpa"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         AccentBlock(Modifier.fillMaxWidth(), attached(0, blocks)) {

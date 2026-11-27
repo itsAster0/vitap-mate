@@ -54,6 +54,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendanceDetail
+import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -124,12 +125,9 @@ internal fun CourseDetail(key: String, title: String? = null) {
     }
     PageScaffold(state, { page.refresh(if (title != null) "retry" else "pull") }, isEmpty = { false }, empty = {}, pullToRefresh = title == null) { detail ->
         val course = detail.course
-        // A swipe that lands on the other tab selects it.
-        val pager = rememberSyncedPager(DetailTab.entries, tab) { landed ->
-            tab = landed
-            flow("attendance.detail.tab") { id -> Log.info("ui.attendance", "tab ${landed.name.lowercase()} (swipe)", id, mapOf("tab" to landed.name.lowercase(), "by" to "swipe", "course" to course.key)) }
-        }
-        LaunchedEffect(detail, tab) {
+        val insights = Settings.calculatedInsights
+        if (!insights && tab != DetailTab.Overview) tab = DetailTab.Overview
+        LaunchedEffect(detail, tab, insights) {
             StateRegistry.report(
                 "ui.attendance.detail",
                 mapOf(
@@ -138,31 +136,40 @@ internal fun CourseDetail(key: String, title: String? = null) {
                     "standing" to course.standing.name,
                     "classes" to detail.classes.size,
                     "notPosted" to detail.classes.count { it.status == null },
-                    "plans" to detail.plans.size,
+                    "plans" to if (insights) detail.plans.size else 0,
                 ),
             )
         }
         Column(Modifier.fillMaxSize().testTag("attendance.detail")) {
-            ConnectedChoice(
-                DetailTab.entries,
-                DetailTab.entries[pager.targetPage],
-                { t ->
-                    tab = t
-                    scope.launch { pager.animateScrollToPage(t.ordinal) }
-                    scope.launch {
-                        flow("attendance.detail.tab") { id -> Log.info("ui.attendance", "tab ${t.name.lowercase()}", id, mapOf("tab" to t.name.lowercase(), "by" to "tap", "course" to course.key)) }
+            if (!insights) {
+                Overview(detail, insights = false)
+            } else {
+                // A swipe that lands on the other tab selects it.
+                val pager = rememberSyncedPager(DetailTab.entries, tab) { landed ->
+                    tab = landed
+                    flow("attendance.detail.tab") { id -> Log.info("ui.attendance", "tab ${landed.name.lowercase()} (swipe)", id, mapOf("tab" to landed.name.lowercase(), "by" to "swipe", "course" to course.key)) }
+                }
+                ConnectedChoice(
+                    DetailTab.entries,
+                    DetailTab.entries[pager.targetPage],
+                    { t ->
+                        tab = t
+                        scope.launch { pager.animateScrollToPage(t.ordinal) }
+                        scope.launch {
+                            flow("attendance.detail.tab") { id -> Log.info("ui.attendance", "tab ${t.name.lowercase()}", id, mapOf("tab" to t.name.lowercase(), "by" to "tap", "course" to course.key)) }
+                        }
+                    },
+                    tag = "attendance.detail.tab",
+                    key = { it.name.lowercase() },
+                    label = { it.label },
+                    icon = { if (it == DetailTab.Overview) Lucide.List else Lucide.Calculator },
+                    modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.xs),
+                )
+                HorizontalPager(pager, Modifier.weight(1f), key = { DetailTab.entries[it].name }) { i ->
+                    when (DetailTab.entries[i]) {
+                        DetailTab.Overview -> Overview(detail, insights = true)
+                        DetailTab.Calculator -> Calculator(course, detail.plans)
                     }
-                },
-                tag = "attendance.detail.tab",
-                key = { it.name.lowercase() },
-                label = { it.label },
-                icon = { if (it == DetailTab.Overview) Lucide.List else Lucide.Calculator },
-                modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.xs),
-            )
-            HorizontalPager(pager, Modifier.weight(1f), key = { DetailTab.entries[it].name }) { i ->
-                when (DetailTab.entries[i]) {
-                    DetailTab.Overview -> Overview(detail)
-                    DetailTab.Calculator -> Calculator(course, detail.plans)
                 }
             }
         }
@@ -171,7 +178,7 @@ internal fun CourseDetail(key: String, title: String? = null) {
 
 /** The Overview tab: hero, counts, every class by month, the data's age. */
 @Composable
-private fun Overview(detail: AttendanceDetail) {
+private fun Overview(detail: AttendanceDetail, insights: Boolean) {
     val course = detail.course
     LazyColumn(
         Modifier.fillMaxSize().testTag("attendance.detail.overview"),
@@ -183,10 +190,10 @@ private fun Overview(detail: AttendanceDetail) {
         ),
         verticalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
-        item("hero") { Hero(course) }
-        if (detail.classes.any { it.status != null }) item("insights") { Insights(detail) }
-        if (detail.classes.isNotEmpty()) item("calendar") { ClassCalendar(detail.classes) }
-        classHistory(detail.classes)
+        item("hero") { Hero(course, insights) }
+        if (insights && detail.classes.any { it.status != null }) item("insights") { Insights(detail) }
+        if (detail.classes.isNotEmpty()) item("calendar") { ClassCalendar(detail.classes, showTally = insights) }
+        classHistory(detail.classes, showCounts = insights)
         item("updated") { UpdatedFooter() }
     }
 }
@@ -198,11 +205,19 @@ private fun Overview(detail: AttendanceDetail) {
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun Hero(course: AttendanceCourse) {
+private fun Hero(course: AttendanceCourse, insights: Boolean) {
     val standing = course.standing
-    val tone = standing.tone()
+    val tone = when {
+        insights -> standing.tone()
+        course.debarred -> AppTheme.tones.danger
+        course.total == 0 -> Standing.NoClasses.tone()
+        else -> AppTheme.tones.accentTone
+    }
     val ink = tone.onSubtle
     val card = AppTheme.colors.card
+    val percentLabel = if (insights) course.percentLabel else course.reportedPercentLabel
+    val hasPercent = if (insights) course.total > 0 else course.reportedPercent != null
+    val barPercent = if (insights) course.percent else (course.reportedPercent ?: 0.0)
     Column(
         Modifier.fillMaxWidth().background(tone.subtle, RoundedCornerShape(32.dp)).padding(start = 6.dp, end = 6.dp, top = 18.dp, bottom = Space.md)
             .testTag("attendance.detail.hero"),
@@ -224,36 +239,56 @@ private fun Hero(course: AttendanceCourse) {
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
                 Text(
                     buildAnnotatedString {
-                        append(course.percentLabel.removeSuffix("%"))
-                        if (course.total > 0) withStyle(SpanStyle(fontSize = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp)) { append("%") }
+                        append(percentLabel.removeSuffix("%"))
+                        if (hasPercent) withStyle(SpanStyle(fontSize = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp)) { append("%") }
                     },
                     style = MaterialTheme.typography.displayLargeEmphasized.nums(fontSize = 76.sp, lineHeight = 72.sp, letterSpacing = (-4).sp),
                     color = ink,
                     maxLines = 1,
                 )
                 Column(Modifier.weight(1f).padding(start = Space.md, bottom = Space.sm), horizontalAlignment = Alignment.End) {
-                    (course.debarLine ?: course.advice(showSkip = true))?.let {
-                        Text(it, style = MaterialTheme.typography.titleSmallEmphasized.nums(fontWeight = FontWeight.Bold), color = ink, textAlign = TextAlign.End)
+                    if (insights) {
+                        (course.debarLine ?: course.advice(showSkip = Settings.effectiveSkipAdvice))?.let {
+                            Text(it, style = MaterialTheme.typography.titleSmallEmphasized.nums(fontWeight = FontWeight.Bold), color = ink, textAlign = TextAlign.End)
+                        }
+                        Text(standing.label, style = MaterialTheme.typography.labelMedium, color = ink.copy(alpha = 0.8f), textAlign = TextAlign.End)
+                    } else {
+                        course.verbatimDebar?.let {
+                            Text(it, style = MaterialTheme.typography.titleSmallEmphasized.nums(fontWeight = FontWeight.Bold), color = ink, textAlign = TextAlign.End)
+                        }
                     }
-                    Text(standing.label, style = MaterialTheme.typography.labelMedium, color = ink.copy(alpha = 0.8f), textAlign = TextAlign.End)
                 }
             }
-            AttendanceLine(course.percent, tone.base, Modifier.padding(top = 18.dp), thickness = 14.dp, track = ink.copy(alpha = 0.14f), halo = tone.subtle)
-            // "75%" centred under the tick.
-            Text(
-                "75%",
-                Modifier.fillMaxWidth().padding(top = 2.dp, bottom = Space.lg).layout { m, c ->
-                    val p = m.measure(c.copy(minWidth = 0))
-                    layout(c.maxWidth, p.height) { p.place((c.maxWidth * 0.75f - p.width / 2f).roundToInt(), 0) }
-                },
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = ink.copy(alpha = 0.75f),
+            AttendanceLine(
+                barPercent,
+                tone.base,
+                Modifier.padding(top = 18.dp, bottom = if (insights) 0.dp else Space.lg),
+                thickness = 14.dp,
+                track = ink.copy(alpha = 0.14f),
+                halo = tone.subtle,
+                showThreshold = insights,
             )
+            if (insights) {
+                // "75%" centred under the tick.
+                Text(
+                    "75%",
+                    Modifier.fillMaxWidth().padding(top = 2.dp, bottom = Space.lg).layout { m, c ->
+                        val p = m.measure(c.copy(minWidth = 0))
+                        layout(c.maxWidth, p.height) { p.place((c.maxWidth * 0.75f - p.width / 2f).roundToInt(), 0) }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ink.copy(alpha = 0.75f),
+                )
+            }
         }
-        val attended = course.sessionsAttended
-        val held = course.sessionsHeld
-        val stats = listOf("$attended" to "Attended", "${held - attended}" to "Missed", "$held" to if (course.isLab) "Sessions" else "Classes")
+        val stats = if (insights) {
+            val attended = course.sessionsAttended
+            val held = course.sessionsHeld
+            listOf("$attended" to "Attended", "${held - attended}" to "Missed", "$held" to if (course.isLab) "Sessions" else "Classes")
+        } else {
+            listOf("${course.attended}" to "Attended", "${course.total}" to "Total")
+        }
         Row(Modifier.fillMaxWidth().testTag("attendance.detail.stats"), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             stats.forEachIndexed { i, (value, label) ->
                 Column(Modifier.weight(1f).background(card, connected(i, stats.size, 22.dp, 8.dp)).padding(horizontal = Space.md, vertical = 10.dp)) {

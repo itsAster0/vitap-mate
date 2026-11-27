@@ -39,6 +39,7 @@ import vitapmate.core.GradeCourse
 import vitapmate.core.GradeCutoff
 import vitapmate.core.GradeDetails
 import vitapmate.core.GradeMark
+import vitapmate.data.Settings
 import vitapmate.ui.ProgressBar
 import vitapmate.ui.Skeleton
 import vitapmate.ui.Space
@@ -72,16 +73,25 @@ internal fun GradeDetailsPanel(course: GradeCourse, details: GradeDetails?, load
                 details.cutoffs.forEach { Cutoff(it, achieved = it.grade == course.grade) }
             }
         }
+        val insights = Settings.calculatedInsights
+        if (!insights && details.grandTotal.isNotEmpty() && details.sections.size > 1) {
+            Row(Modifier.fillMaxWidth().padding(top = Space.md), verticalAlignment = Alignment.CenterVertically) {
+                Label("Grand total", Modifier.weight(1f))
+                Text(details.grandTotal, style = MaterialTheme.typography.labelMedium.nums(), fontWeight = FontWeight.SemiBold)
+            }
+        }
         details.sections.forEach { section ->
             Row(Modifier.fillMaxWidth().padding(top = Space.lg, bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
                 Label(section.title, Modifier.weight(1f))
-                if (section.total.isNotEmpty()) {
+                if (insights && section.total.isNotEmpty()) {
                     Text("${section.total} weighted", style = MaterialTheme.typography.labelMedium.nums(), fontWeight = FontWeight.SemiBold)
+                } else if (!insights && details.sections.size == 1 && details.grandTotal.isNotEmpty()) {
+                    Text("Total ${details.grandTotal}", style = MaterialTheme.typography.labelMedium.nums(), fontWeight = FontWeight.SemiBold)
                 }
             }
             section.marks.forEachIndexed { i, mark ->
                 if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.6f))
-                MarkRow(mark)
+                MarkRow(mark, insights)
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = Space.xs), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -123,7 +133,7 @@ private fun Cutoff(cutoff: GradeCutoff, achieved: Boolean) {
 
 /** A mark: title, scored / max, a bar of the score in its band's tone, weighted of weightage. */
 @Composable
-private fun MarkRow(mark: GradeMark) {
+private fun MarkRow(mark: GradeMark, insights: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().padding(vertical = Space.sm)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -139,8 +149,10 @@ private fun MarkRow(mark: GradeMark) {
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ProgressBar(((mark.percent ?: 0.0) / 100).toFloat(), mark.band.tone().base, Modifier.weight(1f), height = 8.dp)
-            Spacer(Modifier.width(Space.md))
+            if (insights) {
+                ProgressBar(((mark.percent ?: 0.0) / 100).toFloat(), mark.band.tone().base, Modifier.weight(1f), height = 8.dp)
+                Spacer(Modifier.width(Space.md))
+            }
             Text("${mark.weighted.ifEmpty { "–" }} of ${mark.weightage}", style = MaterialTheme.typography.labelMedium.nums(), color = scheme.onSurfaceVariant)
         }
     }

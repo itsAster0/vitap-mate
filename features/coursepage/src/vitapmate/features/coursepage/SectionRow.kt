@@ -31,6 +31,7 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import vitapmate.core.CourseSection
+import vitapmate.data.Settings
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 import vitapmate.ui.ToneBadge
@@ -45,6 +46,7 @@ import vitapmate.ui.tappable
 internal fun SectionRow(section: CourseSection, selected: Boolean, onPress: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val accent = AppTheme.tones.accentTone
+    val mine = Settings.calculatedInsights && section.mine
     Card(
         modifier.fillMaxWidth()
             .tappable(onPress, section.faculty, Role.Button, haptic = true, pressedScale = 0.98f)
@@ -55,15 +57,15 @@ internal fun SectionRow(section: CourseSection, selected: Boolean, onPress: () -
         Row(Modifier.padding(horizontal = Space.lg, vertical = Space.md), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(42.dp).background(
-                    if (section.mine) AppTheme.tones.accent else scheme.secondaryContainer,
-                    if (section.mine) MaterialShapes.Cookie9Sided.toShape() else CircleShape,
+                    if (mine) AppTheme.tones.accent else scheme.secondaryContainer,
+                    if (mine) MaterialShapes.Cookie9Sided.toShape() else CircleShape,
                 ),
                 Alignment.Center,
             ) {
                 Text(
                     initials(section.faculty),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.W700),
-                    color = if (section.mine) AppTheme.tones.onAccent else scheme.onSecondaryContainer,
+                    color = if (mine) AppTheme.tones.onAccent else scheme.onSecondaryContainer,
                 )
             }
             Spacer(Modifier.width(Space.md))
@@ -76,7 +78,7 @@ internal fun SectionRow(section: CourseSection, selected: Boolean, onPress: () -
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (section.mine) {
+                    if (mine) {
                         Spacer(Modifier.width(Space.sm))
                         ToneBadge("YOURS", tone = accent)
                     }

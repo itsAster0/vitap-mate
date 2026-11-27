@@ -48,7 +48,7 @@ fn att(attended: &str, total: &str, percent: &str) -> AttendanceData {
 }
 
 #[test]
-fn attendance_posted_and_crossings() {
+fn attendance_posted_is_verbatim() {
     let posted = dt(
         ATTENDANCE,
         &json(&att("30", "36", "84%")),
@@ -56,31 +56,29 @@ fn attendance_posted_and_crossings() {
     );
     assert_eq!(posted.len(), 1);
     assert_eq!(posted[0].title, "Digital Image Processing (Theory)");
-    assert!(
-        posted[0].body.starts_with("Attendance posted · "),
-        "{}",
-        posted[0].body
+    assert_eq!(
+        posted[0].body,
+        "Attendance posted · 1 class present, 1 class absent, now 82%"
     );
     assert_eq!(posted[0].course_key.as_deref(), Some("CSE4007.theory"));
-    assert!(
-        posted[0].body.contains("1 class present, 1 class absent"),
-        "{}",
-        posted[0].body
-    );
+    assert!(!posted[0].urgent);
+
+    // Dropping below 75% still reports the raw posted change with no derived threshold alert.
     let down = dt(
         ATTENDANCE,
         &json(&att("27", "36", "75%")),
         &json(&att("27", "37", "73%")),
     );
-    assert!(down[0].body.starts_with("Attendance below 75%"));
-    assert!(down[0].urgent);
-    let up = dt(
-        ATTENDANCE,
-        &json(&att("27", "37", "73%")),
-        &json(&att("28", "37", "76%")),
-    );
-    assert!(up[0].body.starts_with("Attendance back at 75%"));
-    assert!(!up[0].urgent);
+    assert_eq!(down[0].body, "Attendance posted · 1 class absent, now 73%");
+    assert!(!down[0].urgent);
+
+    // Lab counts stay raw (not halved into sessions) and missing percentages stay omitted.
+    let mut lab_old = att("18", "20", "");
+    lab_old.records[0].course_type = "ELA".into();
+    let mut lab_new = att("20", "22", "");
+    lab_new.records[0].course_type = "ELA".into();
+    let lab = dt(ATTENDANCE, &json(&lab_old), &json(&lab_new));
+    assert_eq!(lab[0].body, "Attendance posted · 2 classes present");
 }
 
 #[test]
@@ -89,10 +87,10 @@ fn debarred_is_its_own_change() {
     debarred.records[0].debar_status = "FAT : Debarred".into();
     let out = dt(ATTENDANCE, &json(&att("20", "36", "56%")), &json(&debarred));
     assert_eq!(out.len(), 1);
-    assert!(out[0].body.starts_with("Debarred"), "{}", out[0].body);
+    assert_eq!(out[0].body, "Debarred · FAT : Debarred");
     assert!(out[0].urgent);
     let back = dt(ATTENDANCE, &json(&debarred), &json(&att("20", "36", "56%")));
-    assert!(back[0].body.starts_with("No longer debarred"));
+    assert_eq!(back[0].body, "No longer debarred");
 }
 
 #[test]

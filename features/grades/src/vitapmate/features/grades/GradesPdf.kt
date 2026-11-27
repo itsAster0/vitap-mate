@@ -5,10 +5,12 @@ import java.io.File
 import vitapmate.data.AppCore
 import vitapmate.data.PdfExport
 import vitapmate.data.PdfTable
+import vitapmate.data.Settings
 
 /** The saved grade history as a PDF: CGPA and credits, then a table for each exam session. Null without a history. */
 internal suspend fun gradesPdf(context: Context, flow: String): File? {
     val h = AppCore.await().cachedGradeHistory(flow) ?: return null
+    val insights = Settings.calculatedInsights
     return PdfExport.write(
         context,
         "grade-history",
@@ -19,7 +21,7 @@ internal suspend fun gradesPdf(context: Context, flow: String): File? {
         ),
         h.sessions.map { s ->
             PdfTable(
-                listOfNotNull(s.label, s.gpa?.let { "GPA ${it.fixed2()}" }).joinToString("  ·  "),
+                listOfNotNull(s.label, if (insights) s.gpa?.let { "GPA ${it.fixed2()}" } else null).joinToString("  ·  "),
                 listOf("CODE", "COURSE", "TYPE", "CREDITS", "GRADE"),
                 listOf(1.3f, 5f, 0.8f, 1f, 0.8f),
                 s.courses.map { c -> listOf(c.code, c.title, c.distribution, c.credits?.let { "%.1f".format(it) }.orEmpty(), c.grade) },

@@ -20,12 +20,15 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import vitapmate.core.ClassKind
 import vitapmate.core.ClassSlot
+import vitapmate.core.Core
+import vitapmate.data.Settings
 import vitapmate.data.istDay
 import vitapmate.data.istMinute
 import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.ui.clock
 import vitapmate.ui.dayLabel
+import vitapmate.ui.isoWeekday
 
 /**
  * Home-screen widget from the cached timetable: the class on now or next, and at 2+ rows high
@@ -58,8 +61,8 @@ object TimetableWidget : GlanceAppWidget() {
         val today = istDay(ms)
         val now = istMinute(ms)
         return Widgets.cached(context, "timetable") { c, f ->
-            val days = c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8) } ?: return@cached null
-            val meet = days.map { d -> d.day to meeting(d).map { it.slot } }
+            Settings.load(context)
+            val meet = c.scheduledDays(f, today, 8) ?: return@cached null
             val todays = meet.firstOrNull { it.first == today }?.second.orEmpty()
             val later = todays.firstOrNull { it.end > now }?.let { today to it }
                 ?: meet.firstOrNull { it.first > today && it.second.isNotEmpty() }?.let { it.first to it.second.first() }
@@ -104,6 +107,22 @@ object TimetableWidget : GlanceAppWidget() {
                     if (s.room.isNotEmpty()) Text(s.room, GlanceModifier.padding(start = 10.dp), TextStyle(muted, 12.sp, if (cur) FontWeight.Bold else FontWeight.Normal), maxLines = 1)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Classes per day from [from] for [count] days, in start order; null without a cached timetable.
+ * Merges the academic calendar when [Settings.calculatedInsights] is on, else uses raw weekday slots.
+ */
+internal fun Core.scheduledDays(flow: String, from: Int, count: Int): List<Pair<Int, List<ClassSlot>>>? {
+    val tt = cachedTimetable(flow) ?: return null
+    return if (Settings.calculatedInsights) {
+        timetableDays(flow, from, count).map { d -> d.day to meeting(d).map { it.slot }.sortedBy { it.start } }
+    } else {
+        (0 until count).map { i ->
+            val day = from + i
+            day to tt.slots.filter { it.day + 1 == isoWeekday(day) }.sortedBy { it.start }
         }
     }
 }

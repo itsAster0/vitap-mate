@@ -39,14 +39,14 @@ private sealed interface Line {
  * between them; past days without headers, their papers carrying the date. Papers without a
  * date close the list, then the data's age. The first paper still to come is [Line.Paper.next].
  */
-private fun lines(papers: List<ScheduledPaper>, today: Int, minute: Int): List<Line> {
+private fun lines(papers: List<ScheduledPaper>, today: Int, minute: Int, showGaps: Boolean): List<Line> {
     val next = papers.firstOrNull { it.day != null && !it.done(today, minute) }
     val days = papers.mapNotNull { it.day }.distinct().sorted()
     val out = mutableListOf<Line>()
     days.forEachIndexed { i, day ->
         if (day >= today) {
             val prev = days.getOrNull(i - 1)
-            if (prev != null && prev >= today && day - prev > 1) out += Line.Gap(day, day - prev - 1)
+            if (showGaps && prev != null && prev >= today && day - prev > 1) out += Line.Gap(day, day - prev - 1)
             out += Line.Header(day, papers.count { it.day == day })
         }
         papers.filter { it.day == day }.forEach { out += Line.Paper(it, it == next) }
@@ -61,10 +61,11 @@ internal fun ExamTimeline(
     today: Int,
     minute: Int,
     expanded: List<String>,
+    showGaps: Boolean = true,
     onToggle: (ScheduledPaper) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val lines = lines(group.papers, today, minute)
+    val lines = lines(group.papers, today, minute, showGaps)
     val undated = group.papers.filter { it.day == null }
     LazyColumn(
         modifier.fillMaxSize(),

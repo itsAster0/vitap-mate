@@ -307,7 +307,7 @@ fn details_split_sections_and_shorten_cutoffs() {
         course_id: "C1".into(),
         class_number: String::new(),
         class_course_type: "TH".into(),
-        grand_total: String::new(),
+        grand_total: " 88.5 ".into(),
         marks: vec![
             mark("ETH • CAT-1", "15", "12.30"),
             mark("ETH • CAT-1 Re-Evaluation", "15", "13.5"),
@@ -335,6 +335,7 @@ fn details_split_sections_and_shorten_cutoffs() {
             ("TH", "", 1)
         ]
     );
+    assert_eq!(details.grand_total, "88.5");
     assert_eq!(details.sections[0].marks[1].title, "CAT-1 Re-Evaluation");
     assert_eq!(details.sections[0].marks[0].band, ScoreBand::Strong);
     let cutoffs: Vec<_> = details

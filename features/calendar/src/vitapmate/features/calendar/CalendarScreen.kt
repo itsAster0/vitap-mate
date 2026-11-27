@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import vitapmate.core.AcademicCalendar
 import vitapmate.core.CalendarDay
+import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -132,6 +133,7 @@ private fun CalendarContent(cal: AcademicCalendar) {
     }
 
     val list = rememberLazyListState()
+    val insights = Settings.calculatedInsights
     ScrollToTopOnReselect(list)
     LazyColumn(
         Modifier.fillMaxSize().testTag("calendar.list"),
@@ -143,7 +145,7 @@ private fun CalendarContent(cal: AcademicCalendar) {
             bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg,
         ),
     ) {
-        item("outlook") { Outlook(cal, Modifier.padding(horizontal = Space.xs, vertical = Space.sm)) }
+        if (insights) item("outlook") { Outlook(cal, Modifier.padding(horizontal = Space.xs, vertical = Space.sm)) }
         item("month") { MonthCard(months, pager, cal.today, selected, ::tapDay, ::step) }
         item("events") {
             val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()

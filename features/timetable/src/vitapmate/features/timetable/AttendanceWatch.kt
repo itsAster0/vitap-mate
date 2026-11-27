@@ -34,7 +34,7 @@ private const val MAX = 4
 fun AttendanceWatch(records: List<AttendanceCourse>) {
     val counted = records.filter { it.total > 0 }.sortedBy { it.percent }
     if (counted.isEmpty()) return
-    val skips = Settings.showSkipAdvice
+    val skips = Settings.effectiveSkipAdvice
     val watch = counted.filter { !it.safe || (skips && it.canSkip == 0) }
     val scheme = MaterialTheme.colorScheme
 

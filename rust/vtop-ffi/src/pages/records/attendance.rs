@@ -412,6 +412,10 @@ impl From<AttendanceData> for Attendance {
             let (code, name) = split_course_name(&record.course_name, &record.course_code);
             let debar = Debar::parse(&record.debar_status);
             let debar_line = debar.as_ref().map(|debar| debar.line(&plan, lab));
+            let raw_debar_status = match record.debar_status.trim() {
+                "" | "-" => String::new(),
+                text => text.to_string(),
+            };
             AttendanceCourse {
                 key: format!("{code}.{}", if lab { "lab" } else { "theory" }),
                 code,
@@ -430,6 +434,7 @@ impl From<AttendanceData> for Attendance {
                 sessions_held,
                 sessions_unposted,
                 percent: reported.unwrap_or(computed),
+                reported_percent: reported,
                 safe: plan.safe,
                 can_skip: plan.can_skip,
                 must_attend: plan.must_attend,
@@ -437,6 +442,7 @@ impl From<AttendanceData> for Attendance {
                 debarred: debar.is_some(),
                 debar,
                 debar_line,
+                raw_debar_status,
                 course_id: record.course_id,
                 course_type: record.course_type,
             }

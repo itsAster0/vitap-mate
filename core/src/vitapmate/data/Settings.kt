@@ -45,6 +45,12 @@ object Settings {
     /** Whether attendance shows how many classes can be skipped. */
     var showSkipAdvice by flag("settings_show_skip_advice", false)
 
+    /** Whether app-computed totals, GPAs, projections, cross-page joins and calculators are shown. */
+    var calculatedInsights by flag("settings_calculated_insights", false)
+
+    /** Whether skip advice is active: requires [calculatedInsights] to be on too. */
+    val effectiveSkipAdvice: Boolean get() = calculatedInsights && showSkipAdvice
+
     /**
      * Whether Connected apps' note "storage stayed on because you saved your password" was read
      * (or the student chose storage there): it shows once.
@@ -250,7 +256,7 @@ object Settings {
 
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
-        mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "timetableView" to timetableView.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
+        mapOf("calculatedInsights" to calculatedInsights, "showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "timetableView" to timetableView.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
             mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncHealth is SyncHealth.Paused), "notifyOff" to notifyOff.keys.map { it.name.lowercase() }.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }

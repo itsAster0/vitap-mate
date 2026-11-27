@@ -17,6 +17,8 @@ internal fun course(
     canSkip: Int = 0,
     advice: String = "",
     debarred: Boolean = false,
+    reportedPercent: Double? = if (total == 0) null else percent,
+    rawDebarStatus: String = "",
 ): AttendanceCourse {
     val lab = kind == ClassKind.LAB
     val sessionsAttended = if (lab) attended / 2 else attended
@@ -25,7 +27,7 @@ internal fun course(
     return AttendanceCourse(
         "CSE1001.theory", "AP2026", "ETH", "CSE1001", "Course", kind, "PC", "Faculty",
         attended, total, counted, sessionsAttended, sessionsHeld, sessionsUnposted,
-        percent, safe, canSkip, 0, advice, debarred, null, null,
+        percent, reportedPercent, safe, canSkip, 0, advice, debarred, null, null, rawDebarStatus,
     )
 }
 
@@ -64,6 +66,10 @@ class CalculatorTest {
         assertEquals("Attend 2", course(2, 4, safe = false, advice = "Attend 2").advice(showSkip = false))
         assertNull(course(9, 10, advice = "Can skip 2").advice(showSkip = false))
         assertEquals("Can skip 2", course(9, 10, advice = "Can skip 2").advice(showSkip = true))
+        assertEquals("–", course(2, 4, percent = 50.0, reportedPercent = null).reportedPercentLabel)
+        assertEquals("75%", course(3, 4, percent = 75.0, reportedPercent = 75.0).reportedPercentLabel)
+        assertNull(course(2, 4, rawDebarStatus = "  ").verbatimDebar)
+        assertEquals("Permitted", course(2, 4, rawDebarStatus = "Permitted").verbatimDebar)
     }
 
     @Test

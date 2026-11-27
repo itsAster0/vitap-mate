@@ -121,6 +121,8 @@ pub struct AttendanceCourse {
     pub sessions_unposted: i32,
     /// VTOP's rounded figure when it sends one, else computed.
     pub percent: f64,
+    /// VTOP's own percentage when it sends one; none when omitted.
+    pub reported_percent: Option<f64>,
     pub safe: bool,
     pub can_skip: i32,
     pub must_attend: i32,
@@ -132,6 +134,8 @@ pub struct AttendanceCourse {
     /// The debarment in one line: "Debarred for CAT-II · Permitted · Clear
     /// for FAT", or "… · Clear for FAT at 3 more" while below 75%.
     pub debar_line: Option<String>,
+    /// VTOP's trimmed debar status text; empty when blank or "-".
+    pub raw_debar_status: String,
 }
 
 /// A debarment, which holds for one exam: attendance is checked again

@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.CalendarX
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
+import vitapmate.data.Settings
 import vitapmate.data.epochDayOf
 import vitapmate.data.minuteOf
 import vitapmate.data.rememberPage
@@ -107,8 +108,9 @@ fun ExamsScreen() {
                 )
             }
             // How far through the shown exam: one segment per dated paper, written ones filled.
+            val insights = Settings.calculatedInsights
             val shown = groups[pager.targetPage.coerceIn(0, groups.lastIndex)].papers.filter { it.day != null }
-            if (shown.isNotEmpty()) {
+            if (insights && shown.isNotEmpty()) {
                 val written = shown.count { it.done(today, minute) }
                 Column(Modifier.padding(start = Space.lg, end = Space.lg, bottom = Space.sm).testTag("exams.progress")) {
                     Text(
@@ -127,6 +129,7 @@ fun ExamsScreen() {
                     today,
                     minute,
                     expanded,
+                    showGaps = insights,
                     onToggle = { paper ->
                         val id = "${g.name}/${paper.key}"
                         val open = id !in expanded

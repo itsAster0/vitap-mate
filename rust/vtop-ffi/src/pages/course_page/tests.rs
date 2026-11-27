@@ -137,14 +137,19 @@ fn view_picks_the_asked_then_mine_then_the_only_one() {
             class("C2", "Dr. Iyer", "B1"),
         ])
     };
-    assert_eq!(core.view("X1", two(), None).selected, None);
+    assert_eq!(core.view("X1", two(), None, true).selected, None);
     assert_eq!(
-        core.view("X1", two(), Some("C2")).selected.as_deref(),
+        core.view("X1", two(), Some("C2"), true).selected.as_deref(),
         Some("C2")
     );
     // An id VTOP no longer lists is ignored.
-    assert_eq!(core.view("X1", two(), Some("C9")).selected, None);
-    let one = core.view("X1", classes(vec![class("C1", "Dr. Rao", "A1")]), None);
+    assert_eq!(core.view("X1", two(), Some("C9"), true).selected, None);
+    let one = core.view(
+        "X1",
+        classes(vec![class("C1", "Dr. Rao", "A1")]),
+        None,
+        true,
+    );
     assert_eq!(one.selected.as_deref(), Some("C1"));
     assert_eq!(
         (one.course.code.as_str(), one.course.label.as_str()),
@@ -152,18 +157,28 @@ fn view_picks_the_asked_then_mine_then_the_only_one() {
     );
     let tt = timetable(&[("CSE2001", "Dr. Iyer - SCOPE", "B1")]);
     core.write(&format!("pages/AP1/{TIMETABLE}"), &tt);
-    let view = core.view("X1", two(), None);
+    let view = core.view("X1", two(), None, true);
     assert_eq!(view.selected.as_deref(), Some("C2"));
     assert_eq!(view.sections.iter().filter(|s| s.mine).count(), 1);
+    // Without timetable matching, multi-section courses stay unselected and none are marked mine.
+    let raw = core.view("X1", two(), None, false);
+    assert_eq!(raw.selected, None);
+    assert!(raw.sections.iter().all(|s| !s.mine));
 
     // Cached: none until the shown section's plan is saved.
     fs::create_dir_all(dir.join("pages/AP1/course_page/classes")).unwrap();
     fs::create_dir_all(dir.join("pages/AP1/course_page/plan")).unwrap();
     core.write(&format!("pages/AP1/{}", classes_file("X1")), &two());
     assert!(
-        core.cached_course_view("f".into(), "X1".into(), None)
+        core.cached_course_view("f".into(), "X1".into(), None, true)
             .is_none()
     );
+    // Without timetable matching, no section is selected so classes alone are enough for the picker.
+    let picker = core
+        .cached_course_view("f".into(), "X1".into(), None, false)
+        .unwrap();
+    assert_eq!(picker.selected, None);
+    assert!(picker.plan.is_none());
     core.write(
         &format!("pages/AP1/{}", plan_file("C2")),
         &CoursePageDetail {
@@ -188,7 +203,7 @@ fn view_picks_the_asked_then_mine_then_the_only_one() {
         },
     );
     let view = core
-        .cached_course_view("f".into(), "X1".into(), None)
+        .cached_course_view("f".into(), "X1".into(), None, true)
         .unwrap();
     let plan = view.plan.unwrap();
     assert_eq!(view.updated_at, 3);
@@ -196,7 +211,7 @@ fn view_picks_the_asked_then_mine_then_the_only_one() {
     assert_eq!(plan.lectures[0].topic, "Arrays");
     assert_eq!(plan.lectures[0].materials[0].label, "Material I");
     assert!(
-        core.cached_course_view("f".into(), "../x".into(), None)
+        core.cached_course_view("f".into(), "../x".into(), None, true)
             .is_none()
     );
     let _ = fs::remove_dir_all(&dir);

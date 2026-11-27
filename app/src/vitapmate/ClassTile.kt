@@ -15,7 +15,6 @@ import vitapmate.data.Settings
 import vitapmate.data.attempt
 import vitapmate.data.istDay
 import vitapmate.data.istMinute
-import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.clock
@@ -62,8 +61,8 @@ class ClassTile : TileService() {
         val c = AppCore.await()
         val ms = System.currentTimeMillis()
         val now = istMinute(ms)
-        val day = c.cachedTimetable(f)?.let { c.timetableDays(f, istDay(ms), 1).firstOrNull() } ?: return null
-        val s = meeting(day).map { it.slot }.sortedBy { it.start }.firstOrNull { it.end > now } ?: return null
+        val slots = c.scheduledDays(f, istDay(ms), 1)?.firstOrNull()?.second ?: return null
+        val s = slots.firstOrNull { it.end > now } ?: return null
         val h24 = DateFormat.is24HourFormat(applicationContext)
         val time = if (s.start <= now) "until ${clock(s.end, h24)}" else clock(s.start, h24)
         return listOf(s.name, listOf(s.block, s.room).filter { it.isNotEmpty() }.joinToString(" "), time).filter { it.isNotEmpty() }.joinToString(" · ")

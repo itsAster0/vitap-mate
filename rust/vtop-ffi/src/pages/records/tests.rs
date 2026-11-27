@@ -135,9 +135,14 @@ fn lab_standing_counts_sessions() {
 #[test]
 fn standing_follows_vtops_percentage() {
     let lab = &courses(vec![record("ELA", "22", "32", "79%")])[0];
-    assert_eq!((lab.percent, lab.counted), (79.0, 28));
+    assert_eq!(
+        (lab.percent, lab.reported_percent, lab.counted),
+        (79.0, Some(79.0), 28)
+    );
     assert!(lab.safe);
     assert_eq!((lab.must_attend, lab.advice.as_str()), (0, "Don't skip"));
+    let omitted = &courses(vec![record("ETH", "3", "4", "")])[0];
+    assert_eq!((omitted.percent, omitted.reported_percent), (75.0, None));
     // Below VTOP's line: always something to attend, even when the
     // counts alone would say safe.
     let short = &courses(vec![record("ETH", "30", "40", "74%")])[0];
@@ -441,17 +446,21 @@ fn debar_line_matches_kotlin() {
         r.debar_status = status.into();
         courses(vec![r]).remove(0)
     };
-    let c = debarred("CAT - II : Debarred & Permitted", "67%");
+    let c = debarred(" CAT - II : Debarred & Permitted ", "67%");
     assert_eq!(
         c.debar_line.as_deref(),
         Some("Debarred for CAT-II · Permitted · Clear for FAT at 3 more")
     );
+    assert_eq!(c.raw_debar_status, "CAT - II : Debarred & Permitted");
     let c = debarred("CAT - I : Debarred", "80%");
     assert_eq!(
         c.debar_line.as_deref(),
         Some("Debarred for CAT-I · Clear for CAT-II")
     );
-    assert_eq!(debarred("-", "67%").debar_line, None);
+    let none = debarred("-", "67%");
+    assert_eq!(none.debar_line, None);
+    assert_eq!(none.raw_debar_status, "");
+    assert_eq!(debarred("  ", "67%").raw_debar_status, "");
 }
 
 /// A history of `statuses`, newest first, one class a day.
@@ -786,6 +795,7 @@ fn synthetic_course(attended: i32, total: i32, counted: i32, kind: ClassKind) ->
         sessions_held,
         sessions_unposted,
         percent: 0.0,
+        reported_percent: None,
         safe: true,
         can_skip: 0,
         must_attend: 0,
@@ -793,6 +803,7 @@ fn synthetic_course(attended: i32, total: i32, counted: i32, kind: ClassKind) ->
         debarred: false,
         debar: None,
         debar_line: None,
+        raw_debar_status: String::new(),
     }
 }
 

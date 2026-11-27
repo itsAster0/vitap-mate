@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import vitapmate.data.Foreground
+import vitapmate.data.Settings
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 
@@ -98,6 +99,7 @@ fun Shell(nav: Nav) {
         val id = open.screen ?: return@LaunchedEffect
         open.screen = null
         when {
+            id == "wrapped" && !Settings.calculatedInsights -> Unit
             id in tabs -> nav.goTab(id)
             id == INBOX || featureById(id) != null -> if (nav.top.key != id) nav.push(Route.Screen(id))
         }
@@ -198,6 +200,7 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder) {
             UPDATES -> UpdatesScreen()
             INBOX -> InboxScreen()
             else -> {
+                if (route.id == "wrapped" && !Settings.calculatedInsights) return Page("Wrapped", route.id) { ComingSoon(route.id) }
                 val f = featureById(route.id) ?: return Page(route.id, route.id) { ComingSoon(route.id) }
                 if (f.fullScreen) return Box(Modifier.fillMaxSize().testTag("screen.${f.id}")) { f.content() }
                 val nav = LocalNav.current

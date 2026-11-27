@@ -42,6 +42,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.User
 import vitapmate.core.MarksCourse
+import vitapmate.data.Settings
 import vitapmate.ui.KindChip
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
@@ -59,8 +60,9 @@ import vitapmate.ui.tappable
 internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
+    val insights = Settings.calculatedInsights
     val name = course.name.ifBlank { course.code }
-    val latest = course.latest?.let { course.assessments.getOrNull(it) }
+    val latest = if (insights) course.latest?.let { course.assessments.getOrNull(it) } else null
     val assessed = course.maxWeighted > 0
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, motion.defaultSpatialSpec())
     SectionCard(
@@ -71,7 +73,11 @@ internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> U
                 stateDescription = if (expanded) "expanded" else "collapsed"
                 contentDescription = listOfNotNull(
                     name,
-                    if (assessed) "${course.weighted.marks()} of ${course.maxWeighted.marks()}" else "no marks yet",
+                    if (insights) {
+                        if (assessed) "${course.weighted.marks()} of ${course.maxWeighted.marks()}" else "no marks yet"
+                    } else {
+                        "${course.assessments.size} assessments"
+                    },
                     latest?.let { "latest ${it.title} ${it.scoreLabel}" },
                 ).joinToString(", ")
             },
@@ -85,44 +91,58 @@ internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> U
                     Text(course.code, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1)
                 }
             }
-            Spacer(Modifier.width(Space.md))
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    buildAnnotatedString {
-                        append(course.weighted.marks())
-                        withStyle(SpanStyle(color = scheme.onSurfaceVariant)) { append(" / ${course.maxWeighted.marks()}") }
-                    },
-                    style = MaterialTheme.typography.headlineMediumEmphasized.nums(),
-                    maxLines = 1,
-                )
-                course.percent?.let {
-                    Spacer(Modifier.height(Space.xs))
-                    StatusChip(it.percentLabel(), course.band.tone())
+            if (insights) {
+                Spacer(Modifier.width(Space.md))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        buildAnnotatedString {
+                            append(course.weighted.marks())
+                            withStyle(SpanStyle(color = scheme.onSurfaceVariant)) { append(" / ${course.maxWeighted.marks()}") }
+                        },
+                        style = MaterialTheme.typography.headlineMediumEmphasized.nums(),
+                        maxLines = 1,
+                    )
+                    course.percent?.let {
+                        Spacer(Modifier.height(Space.xs))
+                        StatusChip(it.percentLabel(), course.band.tone())
+                    }
                 }
             }
         }
-        WeightBar(course, Modifier.padding(vertical = Space.md))
+        if (insights) WeightBar(course, Modifier.padding(vertical = Space.md))
+        else Spacer(Modifier.height(Space.md))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (latest != null) {
-                Icon(Lucide.Sparkles, null, Modifier.size(14.dp), tint = latest.band.tone().base)
-                Spacer(Modifier.width(Space.xs))
+            if (insights) {
+                if (latest != null) {
+                    Icon(Lucide.Sparkles, null, Modifier.size(14.dp), tint = latest.band.tone().base)
+                    Spacer(Modifier.width(Space.xs))
+                    Text(
+                        "${latest.title} · ${latest.scoreLabel}",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge.nums(),
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text("No marks yet", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
+                }
                 Text(
-                    "${latest.title} · ${latest.scoreLabel}",
+                    if (course.toCome > 0) "${course.toCome.marks()} to come" else "All assessed",
+                    style = MaterialTheme.typography.labelMedium.nums(),
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            } else {
+                val count = course.assessments.size
+                Text(
+                    if (count == 0) "No marks yet" else "$count ${if (count == 1) "assessment" else "assessments"}",
                     Modifier.weight(1f),
                     style = MaterialTheme.typography.labelLarge.nums(),
                     color = scheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
-            } else {
-                Text("No marks yet", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
             }
-            Text(
-                if (course.toCome > 0) "${course.toCome.marks()} to come" else "All assessed",
-                style = MaterialTheme.typography.labelMedium.nums(),
-                color = scheme.onSurfaceVariant,
-                maxLines = 1,
-            )
             Spacer(Modifier.width(Space.xs))
             Icon(Lucide.ChevronDown, null, Modifier.size(16.dp).rotate(chevron), tint = scheme.onSurfaceVariant)
         }
@@ -131,14 +151,14 @@ internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> U
             enter = expandVertically(motion.defaultSpatialSpec()) + fadeIn(motion.defaultEffectsSpec()),
             exit = shrinkVertically(motion.fastSpatialSpec()) + fadeOut(motion.fastEffectsSpec()),
         ) {
-            Assessments(course)
+            Assessments(course, insights)
         }
     }
 }
 
 /** In an inset container: faculty and slot, a row per assessment, then their weighted total as a strip at the foot. */
 @Composable
-private fun Assessments(course: MarksCourse) {
+private fun Assessments(course: MarksCourse, insights: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Column(Modifier.padding(top = Space.md).clip(MaterialTheme.shapes.large).background(scheme.surfaceContainerHigh)) {
         Column(Modifier.padding(start = Space.md, top = Space.md, end = Space.md)) {
@@ -155,10 +175,10 @@ private fun Assessments(course: MarksCourse) {
             }
             course.assessments.forEachIndexed { i, assessment ->
                 if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.6f))
-                AssessmentRow(assessment, latest = i == course.latest, Modifier.testTag("marks.course.${course.key}.assessment.$i"))
+                AssessmentRow(assessment, latest = insights && i == course.latest, insights = insights, modifier = Modifier.testTag("marks.course.${course.key}.assessment.$i"))
             }
         }
-        if (course.assessments.isNotEmpty()) {
+        if (insights && course.assessments.isNotEmpty()) {
             Row(
                 Modifier.fillMaxWidth().background(scheme.surfaceContainerHighest).padding(horizontal = Space.md, vertical = Space.md).testTag("marks.course.${course.key}.total"),
                 verticalAlignment = Alignment.CenterVertically,

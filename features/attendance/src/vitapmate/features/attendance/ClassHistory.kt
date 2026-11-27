@@ -48,7 +48,7 @@ import vitapmate.ui.nums
  * then the rows as a connected list: a date tile (tinted for an absence or on duty), slot and
  * time, VTOP's remark, status.
  */
-internal fun LazyListScope.classHistory(classes: List<AttendedClass>) {
+internal fun LazyListScope.classHistory(classes: List<AttendedClass>, showCounts: Boolean = true) {
     if (classes.isEmpty()) {
         item("history") {
             SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.history"), title = "Classes", shape = MaterialTheme.shapes.extraLargeIncreased) {
@@ -65,7 +65,9 @@ internal fun LazyListScope.classHistory(classes: List<AttendedClass>) {
             Column(Modifier.fillMaxWidth().then(if (i == 0) Modifier.testTag("attendance.detail.history") else Modifier)) {
                 Row(Modifier.padding(start = Space.sm, end = Space.sm, bottom = Space.sm), verticalAlignment = Alignment.CenterVertically) {
                     Text(month, Modifier.weight(1f), style = MaterialTheme.typography.titleMediumEmphasized)
-                    Text("$present/$posted", style = MaterialTheme.typography.labelLarge.nums(), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (showCounts) {
+                        Text("$present/$posted", style = MaterialTheme.typography.labelLarge.nums(), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     rows.forEachIndexed { r, row -> ClassRow(row, connected(r, rows.size, 22.dp, 6.dp, vertical = true)) }

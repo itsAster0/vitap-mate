@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import vitapmate.core.Grades
 import vitapmate.data.PageState
 import vitapmate.data.SemesterChoice
+import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -59,12 +60,15 @@ fun GradesScreen() {
     var shown by remember { mutableStateOf<Grades?>(null) }
     val details = remember { Details() }
     val planner = remember { Planner() }
-    val pager = rememberSyncedPager(View.entries, view) { to ->
+    val insights = Settings.calculatedInsights
+    val views = if (insights) View.entries else listOf(View.Semester, View.History)
+    if (view !in views) view = View.Semester
+    val pager = rememberSyncedPager(views, view) { to ->
         view = to
         flow("grades.view") { id -> Log.info("ui.grades", "view ${to.name.lowercase()} (swipe)", id, mapOf("view" to to.name.lowercase(), "by" to "swipe")) }
     }
     val lists = View.entries.map { rememberLazyListState() }
-    ScrollToTopOnReselect(lists[pager.currentPage])
+    ScrollToTopOnReselect(lists[views[pager.currentPage.coerceIn(0, views.lastIndex)].ordinal])
     val historyData = (history.state as? PageState.Ready)?.data
     LaunchedEffect(view, shown, expanded, filter, historyData, planner.rows.size) {
         StateRegistry.report(
@@ -85,11 +89,11 @@ fun GradesScreen() {
     }
     Column(Modifier.fillMaxSize()) {
         ConnectedChoice(
-            View.entries,
-            View.entries[pager.targetPage],
+            views,
+            views[pager.targetPage.coerceIn(0, views.lastIndex)],
             onSelect = { to ->
                 view = to
-                scope.launch { pager.animateScrollToPage(to.ordinal) }
+                scope.launch { pager.animateScrollToPage(views.indexOf(to)) }
                 scope.logAction("grades.view", "ui.grades", "view ${to.name.lowercase()}", mapOf("view" to to.name.lowercase(), "by" to "tap"))
             },
             tag = "grades.view",
@@ -105,8 +109,9 @@ fun GradesScreen() {
             modifier = Modifier.padding(start = Space.sm, top = Space.xs, end = Space.sm, bottom = Space.xs),
             labelOnSelected = true,
         )
-        HorizontalPager(pager, Modifier.weight(1f).testTag("grades.pager"), key = { View.entries[it].name }) { i ->
-            when (View.entries[i]) {
+        HorizontalPager(pager, Modifier.weight(1f).testTag("grades.pager"), key = { views[it].name }) { i ->
+            val current = views[i]
+            when (current) {
                 View.Semester -> SemesterView(
                     viewed,
                     onView = { viewed = it },
@@ -121,7 +126,7 @@ fun GradesScreen() {
                             flow("grades.$what") { id -> Log.info("ui.grades", "$what $key", id, mapOf("course" to key)) }
                         }
                     },
-                    list = lists[i],
+                    list = lists[current.ordinal],
                     shown = { shown = it },
                 )
                 View.History -> HistoryView(
@@ -140,9 +145,9 @@ fun GradesScreen() {
                             flow("grades.history.$what") { id -> Log.info("ui.grades", "history $what $key", id, mapOf("course" to key)) }
                         }
                     },
-                    list = lists[i],
+                    list = lists[current.ordinal],
                 )
-                View.Planner -> PlannerView(planner, historyData, lists[i])
+                View.Planner -> PlannerView(planner, historyData, lists[current.ordinal])
             }
         }
     }

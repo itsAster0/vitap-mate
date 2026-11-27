@@ -28,7 +28,6 @@ import vitapmate.data.attempt
 import vitapmate.data.istDay
 import vitapmate.data.istMinute
 import vitapmate.data.istSecond
-import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.observability.logAction
@@ -61,6 +60,7 @@ object ClassMode {
         if (!supported()) return
         flow(flowName) { f ->
             val app = context.applicationContext
+            Settings.load(app)
             val manager = app.getSystemService(NotificationManager::class.java)
             val alarms = app.getSystemService(AlarmManager::class.java)
             val alarm = PendingIntent.getBroadcast(app, 1, Intent(app, LiveUpdateReceiver::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -78,7 +78,7 @@ object ClassMode {
             val quiet = attempt {
                 withContext(Dispatchers.IO) {
                     val c = AppCore.await()
-                    val classes = c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).flatMap { d -> meeting(d).map { Quiet(d.day, it.slot.start, it.slot.end, it.slot.name) } } }.orEmpty()
+                    val classes = c.scheduledDays(f, today, 8).orEmpty().flatMap { (day, slots) -> slots.map { Quiet(day, it.start, it.end, it.name) } }
                     val exams = c.cachedExams(f)?.groups.orEmpty().flatMap { g ->
                         g.papers.mapNotNull { p ->
                             val day = p.day?.takeIf { it in today until today + 8 } ?: return@mapNotNull null

@@ -31,7 +31,6 @@ import vitapmate.data.attempt
 import vitapmate.data.istDay
 import vitapmate.data.istMinute
 import vitapmate.data.istSecond
-import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.clock
@@ -87,10 +86,9 @@ object LiveUpdates {
         val today = istDay(ms)
         val now = istMinute(ms)
         // Days from today with their classes, start order; null without a cached timetable.
-        val days = cached(f, "timetable") { c ->
-            c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).map { d -> d.day to meeting(d).map { it.slot }.sortedBy { it.start } } }
-        }
-        val attendance = cached(f, "attendance") { c -> c.cachedAttendance(f)?.courses?.associateBy { it.key } }
+        val insights = Settings.calculatedInsights
+        val days = cached(f, "timetable") { c -> c.scheduledDays(f, today, 8) }
+        val attendance = if (insights) cached(f, "attendance") { c -> c.cachedAttendance(f)?.courses?.associateBy { it.key } } else null
         // Dated papers from today on, start order, in minutes from today's midnight.
         val papers = cached(f, "exams") { c ->
             c.cachedExams(f)?.groups.orEmpty().flatMap { g ->
@@ -184,7 +182,7 @@ object LiveUpdates {
         val ms = System.currentTimeMillis()
         val now = istMinute(ms)
         fun slot(start: Int, name: String, block: String, room: String, code: String) = ClassSlot(0, start, start + 50, "", name, ClassKind.THEORY, room, block, code, "", null)
-        val risky = AttendanceCourse("A1.theory", "", "", "A1", "Data Structures", ClassKind.THEORY, "", "", 30, 41, 41, 30, 41, 0, 73.2, false, 0, 3, "Attend 3", false, null, null)
+        val risky = AttendanceCourse("A1.theory", "", "", "A1", "Data Structures", ClassKind.THEORY, "", "", 30, 41, 41, 30, 41, 0, 73.2, 73.2, false, 0, 3, "Attend 3", false, null, null, "")
         post(app, manager, slot(now - 25, "Data Structures", "AB1", "204", "A1"), true, now - 25, now + 25, slot(now + 35, "Operating Systems", "CB", "312", "B1"), risky, ms, now)
         val paper = ScheduledPaper("B1.theory", "B1", "Operating Systems", ClassKind.THEORY, "ETH", "B1", null, now + 20, now + 110, now + 5, "FN", "AB1-204", "R6 · C6", "36")
         postExam(app, manager, Paper("CAT-II", paper, now + 20, now + 110), ms, now)
@@ -209,8 +207,10 @@ object LiveUpdates {
     private fun post(context: Context, manager: NotificationManager, slot: ClassSlot, live: Boolean, from: Int, to: Int, then: ClassSlot?, course: AttendanceCourse?, ms: Long, now: Int) {
         if (Build.VERSION.SDK_INT < 36) return
         val h24 = DateFormat.is24HourFormat(context)
-        val danger = course != null && course.total > 0 && (!course.safe || course.debarred || course.canSkip == 0)
-        val advice = course?.advice?.ifEmpty { null }?.takeIf { danger || course.canSkip in 1..2 }
+        val insights = Settings.calculatedInsights
+        val skips = Settings.effectiveSkipAdvice
+        val danger = insights && course != null && course.total > 0 && (!course.safe || course.debarred || (skips && course.canSkip == 0))
+        val advice = if (!insights) null else course?.advice?.ifEmpty { null }?.takeIf { danger || (skips && course.canSkip in 1..2) }
         val semantic = if (advice == null || Build.VERSION.SDK_INT < 37) null else if (danger) Notification.SEMANTIC_STYLE_DANGER else Notification.SEMANTIC_STYLE_CAUTION
         val text = SpannableString(listOfNotNull(
             advice,

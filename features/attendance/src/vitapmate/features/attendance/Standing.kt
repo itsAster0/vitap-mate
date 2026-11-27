@@ -42,6 +42,12 @@ internal val AttendanceCourse.isLab get() = kind == ClassKind.LAB
 /** VTOP's percentage as it shows it: "79%", "–" before the first class. */
 internal val AttendanceCourse.percentLabel get() = if (total == 0) "–" else "${percent.roundToInt()}%"
 
+/** VTOP's verbatim percentage (never computed when VTOP omits it): "79%", else "–". */
+internal val AttendanceCourse.reportedPercentLabel get() = reportedPercent?.let { "${it.roundToInt()}%" } ?: "–"
+
+/** VTOP's verbatim debar status text, or null when blank / "-". */
+internal val AttendanceCourse.verbatimDebar get() = rawDebarStatus.ifBlank { null }
+
 /**
  * The short advice, or null when there is none to give. "Can skip" and "Don't skip" show only
  * with [showSkip] (Settings → skip advice); "Attend N" always shows.

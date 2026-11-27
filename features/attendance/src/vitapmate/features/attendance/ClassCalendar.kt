@@ -65,7 +65,7 @@ import vitapmate.ui.nums
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun ClassCalendar(classes: List<AttendedClass>) {
+internal fun ClassCalendar(classes: List<AttendedClass>, showTally: Boolean = true) {
     // Each day's statuses, worst first.
     val byDay = remember(classes) {
         classes.groupBy { it.day }.mapValues { (_, day) -> day.map { it.status }.sortedByDescending(::rank) }
@@ -84,7 +84,7 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
                     Modifier.testTag("attendance.detail.calendar.month"),
                     style = MaterialTheme.typography.titleMediumEmphasized,
                 )
-                Tally(months[i], byDay)
+                if (showTally) Tally(months[i], byDay)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 FilledTonalIconButton({ index = i - 1 }, Modifier.size(44.dp, 40.dp).testTag("attendance.detail.calendar.prev"), enabled = i > 0, shape = connected(0, 2, 20.dp, 8.dp)) {

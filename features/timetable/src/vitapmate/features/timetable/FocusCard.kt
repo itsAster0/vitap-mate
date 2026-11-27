@@ -45,7 +45,7 @@ import vitapmate.ui.rememberNow
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun FocusCard(d: AgendaDay, today: Int, attendance: List<AttendanceCourse>, h24: Boolean, onOpen: (DayClass) -> Unit) {
+fun FocusCard(d: AgendaDay, today: Int, attendance: List<AttendanceCourse>, h24: Boolean, onOpen: (DayClass) -> Unit, insights: Boolean = true) {
     val c = d.current ?: d.next ?: return
     val s = c.slot
     val live = d.current != null
@@ -91,14 +91,14 @@ fun FocusCard(d: AgendaDay, today: Int, attendance: List<AttendanceCourse>, h24:
                     if (s.faculty.isNotBlank()) {
                         Text(s.faculty, style = MaterialTheme.typography.bodyMedium, color = secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    val last = d.isLastClass(c)
-                    val clash = c in d.clashes
+                    val last = insights && d.isLastClass(c)
+                    val clash = insights && c in d.clashes
                     if (labFat || last || clash) {
                         Spacer(Modifier.height(10.dp))
                         ClassTags(labFat = labFat, lastClass = last, clash = clash)
                     }
                     // A Lab FAT doesn't count towards attendance.
-                    val record = if (labFat) null else attendance.forSlot(s)
+                    val record = if (!insights || labFat) null else attendance.forSlot(s)
                     if (record != null) {
                         Spacer(Modifier.height(10.dp))
                         // On the accent fills the pill sits on the surface, so its tone stays readable.

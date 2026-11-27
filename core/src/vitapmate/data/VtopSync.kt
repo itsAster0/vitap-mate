@@ -125,7 +125,7 @@ object VtopSync {
                     add("course_page" to { it.fetchCoursePage(f) })
                 } else {
                     // One course's lecture plan a run, in turn, so new files reach the inbox.
-                    withContext(Dispatchers.IO) { nextCourse(core, f) }?.let { id -> add("course_files" to { it.fetchCourseView(f, id, null) }) }
+                    withContext(Dispatchers.IO) { nextCourse(core, f) }?.let { id -> add("course_files" to { it.fetchCourseView(f, id, null, Settings.calculatedInsights) }) }
                 }
                 // Outings are checked while a trip ahead is pending, so a decision shows in the inbox (and Live updates).
                 if (everything || withContext(Dispatchers.IO) { pendingOuting(core, f) }) {

@@ -45,7 +45,6 @@ import vitapmate.data.Settings
 import vitapmate.data.SyncEvent
 import vitapmate.data.attempt
 import vitapmate.data.istDay
-import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.observability.logAction
@@ -124,10 +123,10 @@ object CalendarSync {
 
     /** Classes, exam papers and marked days, each with its stable key. */
     private fun events(c: Core, f: String, today: Int): List<SyncEvent> {
-        val classes = c.cachedTimetable(f)?.let { c.timetableDays(f, today, DAYS) }.orEmpty().flatMap { d ->
-            meeting(d).map { it.slot }.map { s ->
+        val classes = c.scheduledDays(f, today, DAYS).orEmpty().flatMap { (day, slots) ->
+            slots.map { s ->
                 SyncEvent(
-                    "class.${d.day}.${s.start}.${s.code}", s.name, at(d.day, s.start), at(d.day, s.end),
+                    "class.$day.${s.start}.${s.code}", s.name, at(day, s.start), at(day, s.end),
                     location = join(" ", s.block, s.room), description = join(" · ", s.slot, s.faculty, s.code),
                 )
             }

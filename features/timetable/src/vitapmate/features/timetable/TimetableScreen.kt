@@ -95,18 +95,19 @@ private fun TimetableContent(tt: Timetable) {
     val now = rememberNow()
     val today by remember { derivedStateOf { istDay(now.value) } }
     val semester = SemesterChoice.selected
+    val insights = Settings.calculatedInsights
     // Bumped when the academic calendar arrives, so the days are read again with it.
     var calendars by remember { mutableIntStateOf(0) }
-    LaunchedEffect(tt.updatedAt, semester) { if (CalendarRefresh.ifOld(tt.semesterId, "timetable")) calendars++ }
+    LaunchedEffect(tt.updatedAt, semester, insights) { if (insights && CalendarRefresh.ifOld(tt.semesterId, "timetable")) calendars++ }
     // On a day with one of your papers, the schedule again (a moved venue, seat or time).
-    LaunchedEffect(tt.semesterId, today) { if (ExamDayRefresh.ifExamToday(tt.semesterId, "timetable")) calendars++ }
+    LaunchedEffect(tt.semesterId, today, insights) { if (insights && ExamDayRefresh.ifExamToday(tt.semesterId, "timetable")) calendars++ }
     // Bumped when class histories arrive, so held classes show what VTOP posted.
     var histories by remember { mutableIntStateOf(0) }
-    LaunchedEffect(tt.updatedAt, semester, today, calendars) {
-        if (Settings.autoRefresh && Histories.sync("timetable", tt.semesterId) { c, id -> c.staleAttendanceDetails(id, mondayOf(today), WINDOW) } > 0) histories++
+    LaunchedEffect(tt.updatedAt, semester, today, calendars, insights) {
+        if (insights && Settings.autoRefresh && Histories.sync("timetable", tt.semesterId) { c, id -> c.staleAttendanceDetails(id, mondayOf(today), WINDOW) } > 0) histories++
     }
-    val extra by produceState<Extra?>(null, tt, today, semester, calendars, histories) {
-        value = flow("timetable.days") { id -> withContext(Dispatchers.IO) { loadExtra(id, tt, today) } }
+    val extra by produceState<Extra?>(null, tt, today, semester, calendars, histories, insights) {
+        value = flow("timetable.days") { id -> withContext(Dispatchers.IO) { loadExtra(id, tt, today, insights) } }
     }
     val h24 = is24Hour()
     val mode = timetableViewMode()
@@ -184,9 +185,10 @@ private fun TimetableContent(tt: Timetable) {
         val labFat = c.state == ClassDay.LAB_FAT
         ClassSheet(
             c.slot,
-            if (labFat) null else ext.attendance.forSlot(c.slot),
+            if (!insights || labFat) null else ext.attendance.forSlot(c.slot),
             labFat,
             h24,
+            showAttendance = insights,
             onDismiss = { sheet = null },
             onOpenAttendance = { record ->
                 sheet = null
@@ -197,18 +199,20 @@ private fun TimetableContent(tt: Timetable) {
     }
 }
 
-/** The days and attendance from Rust's cache; a failure falls back to the bare timetable (every class held, no calendar). */
-private suspend fun loadExtra(flow: String, tt: Timetable, today: Int): Extra {
-    val core = AppCore.await()
+/** The days and attendance from Rust's cache; without insights (or on failure) uses the bare timetable (every class held, no cross-page joins). */
+private suspend fun loadExtra(flow: String, tt: Timetable, today: Int, insights: Boolean): Extra {
     val from = mondayOf(today)
+    fun bareDays() = (0 until WINDOW).map { i ->
+        val d = from + i
+        TimetableDay(d, tt.slots.filter { it.day + 1 == isoWeekday(d) }.map { DayClass(it, ClassDay.HELD, false, null) }, null, null, true, false, emptyList(), 0, null)
+    }
+    if (!insights) return Extra(bareDays(), emptyList())
+    val core = AppCore.await()
     val days = attempt {
         core.timetableDays(flow, from, WINDOW).takeIf { it.size >= 14 } ?: error("only some days")
     }.getOrElse { e ->
         Log.warn("ui.timetable", "agenda days unavailable, timetable only", flow, mapOf("error" to e.toString().take(200)))
-        (0 until WINDOW).map { i ->
-            val d = from + i
-            TimetableDay(d, tt.slots.filter { it.day + 1 == isoWeekday(d) }.map { DayClass(it, ClassDay.HELD, false, null) }, null, null, true, false, emptyList(), 0, null)
-        }
+        bareDays()
     }
     val attendance = try {
         core.cachedAttendance(flow)?.courses.orEmpty()

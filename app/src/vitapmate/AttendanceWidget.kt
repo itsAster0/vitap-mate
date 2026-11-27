@@ -19,6 +19,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import kotlin.math.roundToInt
 import vitapmate.core.ClassKind
+import vitapmate.data.Settings
 import vitapmate.observability.Log
 
 /**
@@ -49,13 +50,31 @@ object AttendanceWidget : GlanceAppWidget() {
     }
 
     private suspend fun load(context: Context): List<Line>? = Widgets.cached(context, "attendance") { c, f ->
+        Settings.load(context)
         val courses = c.cachedAttendance(f)?.courses ?: return@cached null
-        // Debarred, then below 75% by the classes to attend, then by the classes to spare; courses with none held last.
-        val risky = courses.sortedWith(compareBy({ it.total == 0 }, { !it.debarred }, { it.safe }, { it.canSkip - it.mustAttend }, { it.percent }))
-        Log.info("widget", "attendance", f, mapOf("courses" to "${courses.size}", "unsafe" to "${courses.count { !it.safe }}"))
-        risky.map {
-            val percent = if (it.total == 0) "–" else "${it.percent.roundToInt()}%"
-            Line(percent, it.name, if (it.kind == ClassKind.LAB) "Lab" else "Theory", it.code, if (it.debarred) "Debarred" else it.advice, it.safe)
+        val insights = Settings.calculatedInsights
+        val skips = Settings.effectiveSkipAdvice
+        val ordered = if (insights) {
+            // Debarred, then below 75% by the classes to attend, then by the classes to spare; courses with none held last.
+            courses.sortedWith(compareBy({ it.total == 0 }, { !it.debarred }, { it.safe }, { it.canSkip - it.mustAttend }, { it.percent }))
+        } else {
+            courses
+        }
+        Log.info("widget", "attendance", f, mapOf("courses" to "${courses.size}", "insights" to "$insights"))
+        ordered.map {
+            val percent = if (insights) {
+                if (it.total == 0) "–" else "${it.percent.roundToInt()}%"
+            } else {
+                it.reportedPercent?.let { p -> "${p.roundToInt()}%" } ?: "–"
+            }
+            val label = when {
+                it.debarred -> "Debarred"
+                !insights -> if (it.total == 0) "No classes yet" else "${it.attended}/${it.total}"
+                it.total == 0 -> "No classes yet"
+                !it.safe || skips -> it.advice
+                else -> "${it.sessionsAttended}/${it.sessionsHeld}"
+            }
+            Line(percent, it.name, if (it.kind == ClassKind.LAB) "Lab" else "Theory", it.code, label, if (insights) it.safe else !it.debarred)
         }
     }
 

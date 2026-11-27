@@ -27,7 +27,6 @@ import vitapmate.data.messMenuYear
 import vitapmate.data.parseMessMenu
 import vitapmate.data.readSpreadsheet
 import vitapmate.data.Settings
-import vitapmate.features.timetable.meeting
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.observability.logAction
@@ -292,8 +291,8 @@ abstract class AssistantFunctions : AppFunctionService() {
     suspend fun getNextClass(): AssistantClass? = read("next_class") { c, f ->
         val ms = System.currentTimeMillis()
         val today = istDay(ms)
-        c.timetableDays(f, today, 8).firstNotNullOfOrNull { d ->
-            meeting(d).map { it.slot }.sortedBy { it.start }.firstOrNull { d.day > today || it.end > istMinute(ms) }?.let { info(it, d.day) }
+        c.scheduledDays(f, today, 8).orEmpty().firstNotNullOfOrNull { (day, slots) ->
+            slots.firstOrNull { day > today || it.end > istMinute(ms) }?.let { info(it, day) }
         }
     }
 
@@ -308,14 +307,17 @@ abstract class AssistantFunctions : AppFunctionService() {
         if (daysFromToday !in 0..7) throw AppFunctionInvalidArgumentException("daysFromToday must be from 0 to 7")
         return read("classes") { c, f ->
             val day = istDay(System.currentTimeMillis()) + daysFromToday
-            c.timetableDays(f, day, 1).firstOrNull()?.let { d -> meeting(d).map { it.slot }.sortedBy { it.start }.map { info(it, d.day) } }.orEmpty()
+            c.scheduledDays(f, day, 1)?.firstOrNull()?.second.orEmpty().map { info(it, day) }
         }
     }
 
     /** The student's attendance in every course of the current semester, as VTOP last showed it. */
     @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun getAttendance(): List<AssistantAttendance> = read("attendance") { c, f ->
-        c.cachedAttendance(f)?.courses.orEmpty().map { AssistantAttendance(it.name, it.code, it.kind == ClassKind.LAB, it.attended, it.total, it.percent) }
+        val insights = Settings.calculatedInsights
+        c.cachedAttendance(f)?.courses.orEmpty().map {
+            AssistantAttendance(it.name, it.code, it.kind == ClassKind.LAB, it.attended, it.total, if (insights) it.percent else (it.reportedPercent ?: 0.0))
+        }
     }
 
     /**
@@ -325,13 +327,21 @@ abstract class AssistantFunctions : AppFunctionService() {
      */
     @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun getAttendancePlan(): List<AssistantAttendancePlan> = read("attendance_plan") { c, f ->
+        if (!Settings.calculatedInsights) return@read emptyList()
+        val skips = Settings.effectiveSkipAdvice
         val courses = c.cachedAttendance(f)?.courses.orEmpty().associateBy { it.key }
         c.attendanceOutlook(f).map { o ->
             val a = courses[o.key]
             val p = o.plan
+            val advice = when {
+                a == null -> ""
+                !a.safe -> a.advice
+                skips -> a.advice
+                else -> ""
+            }
             AssistantAttendancePlan(
                 a?.name.orEmpty(), a?.code ?: o.key.substringBefore('.'), o.key.endsWith(".lab"), p.until.orEmpty(), formatDay(p.untilDay, "yyyy-MM-dd"),
-                p.attended, p.held, p.upcoming, p.unposted, p.canMiss, p.mustAttend, p.bestPercent, a?.advice.orEmpty(), a?.debarred == true,
+                p.attended, p.held, p.upcoming, p.unposted, if (skips) p.canMiss else 0, p.mustAttend, p.bestPercent, advice, a?.debarred == true,
             )
         }
     }
@@ -364,10 +374,16 @@ abstract class AssistantFunctions : AppFunctionService() {
     /** The student's marks this semester per course, with each assessment and the weighted total so far (out of 100). */
     @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun getMarks(): List<AssistantMarks> = read("marks") { c, f ->
+        val insights = Settings.calculatedInsights
         c.cachedMarks(f)?.courses.orEmpty().map { m ->
             AssistantMarks(
-                m.name, m.code, m.kind == ClassKind.LAB, m.weighted, m.maxWeighted, m.percent,
-                m.assessments.map { AssistantAssessment(it.title, it.scored, it.max, it.weightage, it.weighted, it.status) },
+                m.name,
+                m.code,
+                m.kind == ClassKind.LAB,
+                if (insights) m.weighted else 0.0,
+                if (insights) m.maxWeighted else 0.0,
+                if (insights) m.percent else null,
+                m.assessments.map { AssistantAssessment(it.title, it.scored, it.max, it.weightage, if (insights) it.weighted else it.reportedWeighted, it.status) },
             )
         }
     }
@@ -375,10 +391,11 @@ abstract class AssistantFunctions : AppFunctionService() {
     /** The student's CGPA, credits and each semester's GPA and course grades. Null when the app has no grade history saved. */
     @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun getGrades(): AssistantGrades? = read("grades") { c, f ->
+        val insights = Settings.calculatedInsights
         c.cachedGradeHistory(f)?.let { g ->
             AssistantGrades(
                 g.cgpa, g.creditsEarned, g.creditsRegistered,
-                g.sessions.map { s -> AssistantGradeSemester(s.label, s.gpa, s.courses.map { AssistantGradeCourse(it.code, it.title, it.credits, it.grade) }) },
+                g.sessions.map { s -> AssistantGradeSemester(s.label, if (insights) s.gpa else null, s.courses.map { AssistantGradeCourse(it.code, it.title, it.credits, it.grade) }) },
             )
         }
     }
@@ -386,10 +403,11 @@ abstract class AssistantFunctions : AppFunctionService() {
     /** The student's general and weekend outing requests on VTOP with their status, as last fetched. Empty when there are none. */
     @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun getOutings(): List<AssistantOuting> = read("outings") { c, f ->
+        val insights = Settings.calculatedInsights
         (c.cachedGeneralOuting(f)?.requests.orEmpty() + c.cachedWeekendOuting(f)?.requests.orEmpty()).map { r ->
             AssistantOuting(
                 r.kind == OutingKind.WEEKEND, r.place, r.purpose, r.standing.name.lowercase(), r.status,
-                r.`when`.map { w -> listOfNotNull(w.label, w.text).joinToString(": ") }, r.highlight,
+                r.`when`.filter { insights || it.label != "Away" }.map { w -> listOfNotNull(w.label, w.text).joinToString(": ") }, r.highlight,
             )
         }
     }

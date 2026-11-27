@@ -43,7 +43,7 @@ fun skipHint(c: AttendanceCourse): String = when {
 fun AttendancePill(record: AttendanceCourse, modifier: Modifier = Modifier, hint: Boolean = true) {
     val tone = toneOf(record)
     val percent = "${record.percent.roundToInt()}%"
-    val skips = hint && Settings.showSkipAdvice
+    val skips = hint && Settings.effectiveSkipAdvice
     Row(
         modifier.clearAndSetSemantics { contentDescription = "$percent attendance${if (skips) ", ${skipHint(record)}" else ""}" },
         verticalAlignment = Alignment.CenterVertically,

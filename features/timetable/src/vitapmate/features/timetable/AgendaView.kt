@@ -34,6 +34,7 @@ import vitapmate.core.ClassDay
 import vitapmate.core.ClassKind
 import vitapmate.core.DayClass
 import vitapmate.core.TimetableDay
+import vitapmate.data.Settings
 import vitapmate.data.istDay
 import vitapmate.data.istMinute
 import vitapmate.data.zoneNote
@@ -172,15 +173,16 @@ private fun DayContent(
 ) = Column(Modifier.fillMaxWidth()) {
     val date = d.day.day
     val minuteNow = d.minuteNow
+    val insights = Settings.calculatedInsights
     when {
-        d.done -> DaySummary(d.slots, d.labFats, d.isToday)
-        d.current != null || d.next != null -> FocusCard(d, today, attendance, h24, onOpen)
+        d.done -> DaySummary(d.slots, d.labFats, d.isToday, showPosted = insights)
+        d.current != null || d.next != null -> FocusCard(d, today, attendance, h24, onOpen, insights = insights)
         else -> FreeDayCard(
             d,
-            countdown = listOfNotNull(
+            countdown = if (insights) listOfNotNull(
                 d.day.classDaysLeft.takeIf { it > 0 }?.let { "$it class ${if (it == 1) "day" else "days"} left" },
                 d.day.upcomingExam?.let { "${it.name} starts ${formatDay(it.day, "EEE d MMM")}" },
-            ).joinToString(" · ").ifEmpty { null },
+            ).joinToString(" · ").ifEmpty { null } else null,
             h24 = h24,
         )
     }
@@ -188,7 +190,7 @@ private fun DayContent(
     // A day your timetable has no classes on looks at the week ahead and the courses to watch.
     if (d.schedule.isEmpty()) {
         WeekAhead(from = date, days = days, onOpen = onGo, h24 = h24)
-        AttendanceWatch(attendance)
+        if (insights) AttendanceWatch(attendance)
         return@Column
     }
     SectionTitle(
@@ -236,14 +238,14 @@ private fun DayContent(
                         ),
                     ),
                     // A Lab FAT doesn't count towards attendance.
-                    record = if (labFat) null else attendance.forSlot(c.slot),
+                    record = if (!insights || labFat) null else attendance.forSlot(c.slot),
                     minuteNow = if (d.isToday && !off) minuteNow else null,
                     labFat = labFat,
-                    lastClass = d.isLastClass(c),
-                    clash = c in d.clashes,
+                    lastClass = insights && d.isLastClass(c),
+                    clash = insights && c in d.clashes,
                     // On a class day, a lab that doesn't meet says so; a day off says it once, in the card.
                     note = if (off && d.dayOff == null && c.slot.kind == ClassKind.LAB) "No lab" else null,
-                    showPosted = d.done && !off && !labFat,
+                    showPosted = insights && d.done && !off && !labFat,
                     posted = c.posted,
                     first = i == 0,
                     last = i == d.schedule.lastIndex,

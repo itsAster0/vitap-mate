@@ -55,7 +55,7 @@ import vitapmate.ui.nums
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun DaySummary(classes: List<DayClass>, labFats: Set<DayClass>, isToday: Boolean) {
+fun DaySummary(classes: List<DayClass>, labFats: Set<DayClass>, isToday: Boolean, showPosted: Boolean = true) {
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val pending = scheme.surfaceContainerHighest
@@ -99,7 +99,7 @@ fun DaySummary(classes: List<DayClass>, labFats: Set<DayClass>, isToday: Boolean
                     }
                 }
             }
-            if (marks.isNotEmpty()) BoxWithConstraints(Modifier.padding(top = 16.dp, bottom = 14.dp)) {
+            if (showPosted && marks.isNotEmpty()) BoxWithConstraints(Modifier.padding(top = 16.dp, bottom = 14.dp)) {
                 // Narrower capsules (8+ classes on a small phone) take a smaller gap and icon.
                 val gap = if (maxWidth / marks.size < 32.dp) 2.dp else 3.dp
                 val icon = min(18.dp, maxWidth / marks.size - gap - 8.dp)
@@ -120,7 +120,7 @@ fun DaySummary(classes: List<DayClass>, labFats: Set<DayClass>, isToday: Boolean
                     }
                 }
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (showPosted) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for ((n, label, colors) in legend) {
                     Text(
                         buildAnnotatedString {

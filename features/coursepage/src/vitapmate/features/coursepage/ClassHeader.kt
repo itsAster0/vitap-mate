@@ -27,6 +27,7 @@ import com.composables.icons.lucide.ArrowLeftRight
 import com.composables.icons.lucide.Clock
 import com.composables.icons.lucide.Lucide
 import vitapmate.core.CourseView
+import vitapmate.data.Settings
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonSize
@@ -49,6 +50,7 @@ internal fun ClassHeader(view: CourseView, today: Int, onSwitch: (() -> Unit)?, 
     val section = view.sections.firstOrNull { it.classId == view.selected } ?: return
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
+    val insights = Settings.calculatedInsights
     val lectures = view.plan?.lectures.orEmpty()
     Column(
         modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(tones.accentTone.subtle).heroCookie()
@@ -83,10 +85,12 @@ internal fun ClassHeader(view: CourseView, today: Int, onSwitch: (() -> Unit)?, 
                 Spacer(Modifier.width(6.dp))
                 Text("Slot ${section.slot}", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.width(Space.sm))
-            if (section.mine) ToneBadge("YOUR SECTION", tone = tones.accentTone, solid = true) else ToneBadge("OTHER SECTION")
+            if (insights) {
+                Spacer(Modifier.width(Space.sm))
+                if (section.mine) ToneBadge("YOUR SECTION", tone = tones.accentTone, solid = true) else ToneBadge("OTHER SECTION")
+            }
         }
-        if (lectures.isNotEmpty()) {
+        if (insights && lectures.isNotEmpty()) {
             val covered = lectures.count { (it.day ?: Int.MIN_VALUE) < today }
             ProgressBar(covered.toFloat() / lectures.size, tones.accent, Modifier.padding(top = Space.md))
             Text(

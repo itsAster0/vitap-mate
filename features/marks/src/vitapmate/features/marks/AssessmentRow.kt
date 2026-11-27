@@ -32,6 +32,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.ProgressBar
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip
+import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
 
 /**
@@ -39,30 +40,37 @@ import vitapmate.ui.nums
  * with weightage → what it adds to the total; VTOP's remark.
  */
 @Composable
-internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Modifier = Modifier) {
+internal fun AssessmentRow(assessment: Assessment, latest: Boolean, insights: Boolean = true, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val tone = assessment.band.tone()
+    val tone = when {
+        insights -> assessment.band.tone()
+        assessment.band == ScoreBand.ABSENT -> AppTheme.tones.danger
+        else -> neutralTone
+    }
     val weight = assessment.weightage
+    val weightedValue = if (insights) assessment.weighted else assessment.reportedWeighted
     Column(
         modifier.fillMaxWidth().padding(vertical = Space.md).semantics {
             contentDescription = listOfNotNull(
                 assessment.title,
                 assessment.scoreLabel,
-                weight?.let { "weightage ${it.marks()}, adds ${(assessment.weighted ?: 0.0).marks()}" },
+                weight?.let { "weightage ${it.marks()}${weightedValue?.let { w -> ", weighted ${w.marks()}" }.orEmpty()}" },
                 assessment.remark,
             ).joinToString(", ")
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // What it adds to the total, in its band's tone; the band's square without a weightage.
-            if (weight != null) {
-                Box(Modifier.widthIn(min = 48.dp).height(30.dp).background(tone.subtle, RoundedCornerShape(10.dp)).padding(horizontal = 6.dp), Alignment.Center) {
-                    Text(assessment.weighted?.let { "+${it.marks()}" } ?: "–", style = MaterialTheme.typography.labelMedium.nums(), color = tone.onSubtle, maxLines = 1)
+            if (insights) {
+                // What it adds to the total, in its band's tone; the band's square without a weightage.
+                if (weight != null) {
+                    Box(Modifier.widthIn(min = 48.dp).height(30.dp).background(tone.subtle, RoundedCornerShape(10.dp)).padding(horizontal = 6.dp), Alignment.Center) {
+                        Text(weightedValue?.let { "+${it.marks()}" } ?: "–", style = MaterialTheme.typography.labelMedium.nums(), color = tone.onSubtle, maxLines = 1)
+                    }
+                } else {
+                    Box(Modifier.size(10.dp).background(tone.base, RoundedCornerShape(3.dp)))
                 }
-            } else {
-                Box(Modifier.size(10.dp).background(tone.base, RoundedCornerShape(3.dp)))
+                Spacer(Modifier.width(Space.sm))
             }
-            Spacer(Modifier.width(Space.sm))
             Text(
                 assessment.title,
                 Modifier.weight(1f),
@@ -70,11 +78,11 @@ internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Mo
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (latest) {
+            if (insights && latest) {
                 Spacer(Modifier.width(Space.sm))
                 StatusChip("Latest", AppTheme.tones.accentTone)
             }
-            if (assessment.reevaluation) {
+            if (insights && assessment.reevaluation) {
                 Spacer(Modifier.width(Space.sm))
                 StatusChip("Re-evaluation", ScoreBand.NOT_POSTED.tone())
             }
@@ -92,21 +100,34 @@ internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Mo
                 StatusChip(assessment.scoreLabel, tone)
             }
         }
-        if (assessment.scored != null || weight != null) {
-            Row(Modifier.padding(top = Space.sm), verticalAlignment = Alignment.CenterVertically) {
-                ProgressBar(((assessment.percent ?: 0.0) / 100).toFloat(), tone.base, Modifier.weight(1f), height = 4.dp)
-                weight?.let {
-                    Spacer(Modifier.width(Space.md))
-                    Text(
-                        "${it.marks()}% → ${assessment.weighted?.marks() ?: "–"}",
-                        // A fixed width, so every row's bar ends at the same place.
-                        Modifier.widthIn(min = 84.dp),
-                        textAlign = TextAlign.End,
-                        style = MaterialTheme.typography.labelMedium.nums(),
-                        color = scheme.onSurfaceVariant,
-                    )
+        if (insights) {
+            if (assessment.scored != null || weight != null) {
+                Row(Modifier.padding(top = Space.sm), verticalAlignment = Alignment.CenterVertically) {
+                    ProgressBar(((assessment.percent ?: 0.0) / 100).toFloat(), tone.base, Modifier.weight(1f), height = 4.dp)
+                    weight?.let {
+                        Spacer(Modifier.width(Space.md))
+                        Text(
+                            "${it.marks()}% → ${weightedValue?.marks() ?: "–"}",
+                            // A fixed width, so every row's bar ends at the same place.
+                            Modifier.widthIn(min = 84.dp),
+                            textAlign = TextAlign.End,
+                            style = MaterialTheme.typography.labelMedium.nums(),
+                            color = scheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
+        } else if (weight != null || weightedValue != null) {
+            val detail = listOfNotNull(
+                weight?.let { "Weightage ${it.marks()}%" },
+                weightedValue?.let { "Weighted ${it.marks()}" },
+            ).joinToString(" · ")
+            Text(
+                detail,
+                Modifier.padding(top = Space.xs),
+                style = MaterialTheme.typography.labelMedium.nums(),
+                color = scheme.onSurfaceVariant,
+            )
         }
         assessment.remark?.let { remark ->
             Text(

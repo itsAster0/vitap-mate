@@ -16,8 +16,6 @@ use crate::pages::outing::{GENERAL, WEEKEND};
 use crate::pages::records::{Attendance, AttendanceCourse, ClassKind, epoch_day};
 use crate::{ATTENDANCE, ATTENDANCE_DETAIL, CALENDAR, TIMETABLE};
 
-const THRESHOLD: f64 = 75.0;
-
 /// One copy of a page to compare, decoded as the page's type.
 pub(crate) trait Version {
     fn decode<T: DeserializeOwned + Clone + Send + Sync + 'static>(&self) -> Option<T>;
@@ -63,8 +61,8 @@ pub(crate) fn detect(
     .unwrap_or_default()
 }
 
-fn plural(n: i32, one: &str) -> String {
-    format!("{n} {one}{}", if n == 1 { "" } else { "s" })
+fn classes(n: i32) -> String {
+    format!("{n} {}", if n == 1 { "class" } else { "classes" })
 }
 
 /// "Digital Image Processing (Lab)": attendance is per course and type.
@@ -81,7 +79,7 @@ fn label(course: &AttendanceCourse) -> String {
     labelled(name.trim(), course.kind == ClassKind::Lab)
 }
 
-/// Per course: classes posted (more held), and a crossing of 75% either way, from the summary.
+/// Per course: raw classes posted (more held) and VTOP debarment status changes, from the summary.
 fn attendance(old: AttendanceData, new: AttendanceData) -> Vec<Draft> {
     let before: BTreeMap<String, AttendanceCourse> = Attendance::from(old)
         .courses
@@ -93,68 +91,48 @@ fn attendance(old: AttendanceData, new: AttendanceData) -> Vec<Draft> {
         let Some(was) = before.get(&course.key) else {
             continue; // A course new to the list: nothing to compare.
         };
-        let lab = course.kind == ClassKind::Lab;
         let held = course.total - was.total;
         let present = (course.attended - was.attended).max(0);
-        let crossed_down = was.percent >= THRESHOLD && course.percent < THRESHOLD;
-        let crossed_up = was.percent < THRESHOLD && course.percent >= THRESHOLD && was.total > 0;
         if course.debarred != was.debarred {
             let what = if course.debarred {
                 "Debarred"
             } else {
                 "No longer debarred"
             };
-            let detail = course.debar_line.clone().unwrap_or_default();
             let mut d = draft(
                 ChangeKind::Attendance,
                 &label(&course),
                 what,
-                &detail,
+                &course.raw_debar_status,
                 Some(course.key.clone()),
             );
-            d.urgent = course.debar.as_ref().is_some_and(|debar| !debar.permitted);
+            d.urgent = course.debarred;
             out.push(d);
         }
-        if held <= 0 && !crossed_down && !crossed_up {
+        if held <= 0 {
             continue;
         }
-        let unit = |n: i32| {
-            if lab {
-                plural(n / 2, "session")
-            } else {
-                plural(n, "class")
-            }
-        };
         let mut parts = Vec::new();
-        if held > 0 {
-            let absent = (held - present).max(0);
-            if present > 0 {
-                parts.push(format!("{} present", unit(present)));
-            }
-            if absent > 0 {
-                parts.push(format!("{} absent", unit(absent)));
-            }
-            if parts.is_empty() {
-                parts.push(format!("{} posted", unit(held)));
-            }
+        let absent = (held - present).max(0);
+        if present > 0 {
+            parts.push(format!("{} present", classes(present)));
         }
-        parts.push(format!("now {}%", course.percent.round()));
-        let what = if crossed_down {
-            "Attendance below 75%"
-        } else if crossed_up {
-            "Attendance back at 75%"
-        } else {
-            "Attendance posted"
-        };
-        let mut d = draft(
+        if absent > 0 {
+            parts.push(format!("{} absent", classes(absent)));
+        }
+        if parts.is_empty() {
+            parts.push(format!("{} posted", classes(held)));
+        }
+        if let Some(percent) = course.reported_percent {
+            parts.push(format!("now {}%", percent.round()));
+        }
+        out.push(draft(
             ChangeKind::Attendance,
             &label(&course),
-            what,
+            "Attendance posted",
             &parts.join(", "),
             Some(course.key),
-        );
-        d.urgent = crossed_down;
-        out.push(d);
+        ));
     }
     out
 }

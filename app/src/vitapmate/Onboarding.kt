@@ -65,6 +65,7 @@ fun Onboarding(onDone: () -> Unit) {
                     color = scheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Space.md))
+                InsightsSetting()
                 ClassModeSetting()
                 LiveUpdatesSetting()
                 BackgroundSyncSetting {}

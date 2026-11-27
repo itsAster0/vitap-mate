@@ -62,6 +62,7 @@ import vitapmate.core.CoursePlan
 import vitapmate.core.CourseView
 import vitapmate.core.Lecture
 import vitapmate.core.FileLink
+import vitapmate.data.Settings
 import vitapmate.data.epochDayOf
 import vitapmate.data.rememberPage
 import vitapmate.observability.StateRegistry
@@ -93,12 +94,13 @@ private const val UPCOMING_SHOWN = 3
 @Composable
 internal fun CourseScreen(courseId: String) {
     var picked by rememberSaveable(courseId) { mutableStateOf<String?>(null) }
+    val insights = Settings.calculatedInsights
     val page = rememberPage(
         "coursepage_course",
-        { core, flow -> core.cachedCourseView(flow, courseId, picked) },
-        { core, flow -> core.fetchCourseView(flow, courseId, picked) },
+        { core, flow -> core.cachedCourseView(flow, courseId, picked, insights) },
+        { core, flow -> core.fetchCourseView(flow, courseId, picked, insights) },
         { it.updatedAt },
-        item = "$courseId/${picked.orEmpty()}",
+        item = "$courseId/${picked.orEmpty()}/${if (insights) 1 else 0}",
     ) { view -> view.plan?.lectures?.size ?: view.sections.size }
     var sheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -163,9 +165,10 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
             }
         }
     }
+    val insights = Settings.calculatedInsights
     val lectures = plan.lectures.filter { !withMaterialOnly || it.materials.isNotEmpty() }
-    val upcoming = lectures.filter { (it.day ?: Int.MIN_VALUE) >= today }
-    val covered = lectures.filter { (it.day ?: Int.MIN_VALUE) < today }.reversed()
+    val upcoming = if (insights) lectures.filter { (it.day ?: Int.MIN_VALUE) >= today } else emptyList()
+    val covered = if (insights) lectures.filter { (it.day ?: Int.MIN_VALUE) < today }.reversed() else emptyList()
     val next = upcoming.firstOrNull()
     val withMaterial = plan.lectures.count { it.materials.isNotEmpty() }
     LaunchedEffect(view, withMaterialOnly, showAll, today) {
@@ -258,6 +261,10 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
         }
         if (lectures.isEmpty()) item("empty") { EmptyView(Lucide.BookOpen, "Nothing here yet", Modifier.fillMaxWidth().testTag("coursepage.lectures.empty")) }
         val onMaterial: (String) -> Unit = { path -> download(path, "material", true) { c, f -> c.courseFileLink(f, path) } }
+        if (!insights && lectures.isNotEmpty()) {
+            item("lectures.header") { SectionHeader("Lectures", Modifier.animateItem(), trailing = { Text("${lectures.size}") }) }
+            item("lectures") { JoinedBlock(Modifier.animateItem()) { lectures.forEach { LectureItem(it, null, today, planned = false, busy, onMaterial) } } }
+        }
         if (upcoming.isNotEmpty()) {
             item("upcoming.header") { SectionHeader("Coming up", Modifier.animateItem(), trailing = { Text("${upcoming.size} planned") }) }
             // The next lecture stands alone; the rest join into one block.

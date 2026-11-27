@@ -150,12 +150,14 @@ impl Core {
     }
 
     /// `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
-    /// none until both are saved.
+    /// none until both are saved. When `match_timetable` is false, the student's section is
+    /// not inferred from the timetable.
     pub fn cached_course_view(
         &self,
         flow: String,
         course_id: String,
         class_id: Option<String>,
+        match_timetable: bool,
     ) -> Option<CourseView> {
         traced_sync("cached_course_view", &flow, || {
             let course_id = plain(&course_id)?;
@@ -163,7 +165,7 @@ impl Core {
             else {
                 return Ok(None);
             };
-            let mut view = self.view(course_id, classes, class_id.as_deref());
+            let mut view = self.view(course_id, classes, class_id.as_deref(), match_timetable);
             if let Some(selected) = &view.selected {
                 let Some(detail) = self.read_page::<CoursePageDetail>(&plan_file(selected)) else {
                     return Ok(None);
@@ -177,12 +179,13 @@ impl Core {
     }
 
     /// Fetches `course_id`'s sections, then the plan of `class_id` (else the
-    /// student's section, else the only one), and caches both.
+    /// student's section when `match_timetable` is true, else the only one), and caches both.
     pub async fn fetch_course_view(
         &self,
         flow: String,
         course_id: String,
         class_id: Option<String>,
+        match_timetable: bool,
     ) -> Result<CourseView, CoreError> {
         traced("fetch_course_view", &flow, async {
             let course_id = plain(&course_id)?;
@@ -193,7 +196,12 @@ impl Core {
                     &[("course_id", course_id)],
                 )
                 .await?;
-            let mut view = self.view(course_id, classes.clone(), class_id.as_deref());
+            let mut view = self.view(
+                course_id,
+                classes.clone(),
+                class_id.as_deref(),
+                match_timetable,
+            );
             if let Some(selected) = view.selected.clone() {
                 let erp_id = classes
                     .classes
@@ -260,9 +268,19 @@ impl Core {
 }
 
 impl Core {
-    fn view(&self, course_id: &str, classes: CoursePageClasses, asked: Option<&str>) -> CourseView {
-        let timetable = self.read_page::<TimetableData>(TIMETABLE);
-        let mine = my_class(&classes.classes, timetable.as_ref()).map(|c| c.class_id.clone());
+    fn view(
+        &self,
+        course_id: &str,
+        classes: CoursePageClasses,
+        asked: Option<&str>,
+        match_timetable: bool,
+    ) -> CourseView {
+        let mine = if match_timetable {
+            let timetable = self.read_page::<TimetableData>(TIMETABLE);
+            my_class(&classes.classes, timetable.as_ref()).map(|c| c.class_id.clone())
+        } else {
+            None
+        };
         let course = self
             .read_page::<CoursePageCourses>(COURSES)
             .and_then(|data| data.courses.into_iter().find(|c| c.id == course_id))

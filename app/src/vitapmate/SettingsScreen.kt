@@ -38,9 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Bug
-import com.composables.icons.lucide.CalendarMinus
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.FolderDown
 import com.composables.icons.lucide.History
@@ -62,11 +60,9 @@ import vitapmate.data.Settings
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.features.attendance.ATTENDANCE_GUIDE
-import vitapmate.features.attendance.SKIP_DISCLAIMER
 import vitapmate.features.docs.MessTimingsSheet
 import vitapmate.features.docs.messTimingsSummary
 import vitapmate.features.login.OtpAutofillSheet
-import vitapmate.observability.Log
 import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.DownloadFolderDialog
@@ -107,7 +103,7 @@ fun SettingsScreen() {
     }
     // Each group's title and its item's index in the list below (the profile, "Needs you" and these chips come first).
     val jumps = listOfNotNull(
-        "Account" to 3, "Sync" to 4, "Connections" to 5, "Attendance" to 6,
+        "Account" to 3, "Sync" to 4, "Connections" to 5, "Insights" to 6,
         ("Live updates" to 7).takeIf { LiveUpdates.supported() },
         ("In class" to 8).takeIf { ClassMode.supported() },
         ("Assistant" to 9).takeIf { android.os.Build.VERSION.SDK_INT >= 36 },
@@ -116,16 +112,6 @@ fun SettingsScreen() {
     var confirmSignOut by remember { mutableStateOf(false) }
     var messTimings by remember { mutableStateOf(false) }
     var downloadFolder by remember { mutableStateOf(false) }
-    var skipDisclaimer by remember { mutableStateOf(false) }
-    // Turning skip advice on asks first (a disclaimer); turning it off doesn't.
-    val setSkip = { on: Boolean ->
-        if (on) {
-            skipDisclaimer = true
-        } else {
-            Settings.showSkipAdvice = false
-            haptics.toggle(false)
-        }
-    }
 
     Page("Settings", SETTINGS) { padding ->
         LazyColumn(state = list, contentPadding = padding) {
@@ -195,25 +181,7 @@ fun SettingsScreen() {
                 }
             }
             item {
-                ListGroup("Attendance") {
-                    GroupItem(
-                        "Classes you can skip",
-                        "settings.skip_advice",
-                        Lucide.CalendarMinus,
-                        "On attendance and the timetable",
-                        onClick = { setSkip(!Settings.showSkipAdvice) },
-                        trailing = { ItemSwitch(Settings.showSkipAdvice, { setSkip(it) }) },
-                        on = Settings.showSkipAdvice,
-                    )
-                    GroupItem(
-                        "How the numbers work",
-                        "settings.attendance_guide",
-                        Lucide.BookOpen,
-                        "What each number means and when it can be off",
-                        onClick = { nav.push(Route.Detail("attendance", ATTENDANCE_GUIDE, "How the numbers work")) },
-                        trailing = { Chevron() },
-                    )
-                }
+                InsightsSetting(onGuide = { nav.push(Route.Detail("attendance", ATTENDANCE_GUIDE, "How the numbers work")) })
             }
             item { LiveUpdatesSetting() }
             item { ClassModeSetting() }
@@ -268,23 +236,6 @@ fun SettingsScreen() {
     if (otpSheet) OtpAutofillSheet { otpSheet = false }
     if (messTimings) MessTimingsSheet { messTimings = false }
     if (downloadFolder) DownloadFolderDialog({ downloadFolder = false })
-
-    if (skipDisclaimer) {
-        AppDialog(
-            { skipDisclaimer = false },
-            "Classes you can skip",
-            "Turn on",
-            {
-                skipDisclaimer = false
-                Settings.showSkipAdvice = true
-                haptics.toggle(true)
-                Log.info("ui.settings", "skip advice on (disclaimer accepted)")
-            },
-            icon = Lucide.CalendarMinus,
-            confirmTag = "settings.skip_disclaimer.on",
-            dismissTag = "settings.skip_disclaimer.cancel",
-        ) { Text(SKIP_DISCLAIMER) }
-    }
 
     if (confirmSignOut) {
         AppDialog(

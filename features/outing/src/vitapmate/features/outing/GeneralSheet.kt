@@ -48,6 +48,7 @@ import vitapmate.core.OutingResult
 import vitapmate.core.checkGeneralOuting
 import vitapmate.core.generalOutingTimes
 import vitapmate.core.generalReturnLastDay
+import vitapmate.data.Settings
 import vitapmate.ui.AppTheme
 import vitapmate.ui.DayPicker
 import vitapmate.ui.Radii
@@ -116,7 +117,7 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
         // Timing problems show at once: they come from the pickers, not typing.
         FieldError(check.leaving, Modifier.testTag("outing.leaving.error"))
         // How long away, as a pill on a dashed line between the two moments.
-        check.away?.let {
+        check.away.takeIf { Settings.calculatedInsights }?.let {
             val line = MaterialTheme.colorScheme.outlineVariant
             val dashed = Modifier.height(2.dp).drawBehind {
                 drawLine(line, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), size.height, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())))

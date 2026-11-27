@@ -85,6 +85,8 @@ pub struct Assessment {
     pub weightage: Option<f64>,
     /// What it adds to the course's total: VTOP's, else worked out.
     pub weighted: Option<f64>,
+    /// VTOP's own weighted mark when it sends one; none when omitted.
+    pub reported_weighted: Option<f64>,
     /// `scored / max`, 0–100.
     pub percent: Option<f64>,
     pub band: ScoreBand,
@@ -245,14 +247,14 @@ impl From<&MarksRecordEach> for Assessment {
         let max = number(&mark.maxmarks).unwrap_or(0.0);
         let weightage = number(&mark.weightage).filter(|w| *w > 0.0);
         let percent = scored.filter(|_| max > 0.0).map(|s| s / max * 100.0);
-        let weighted = number(&mark.weightagemark)
-            .filter(|_| scored.is_some())
-            .or_else(|| Some(percent? / 100.0 * weightage?));
+        let reported_weighted = number(&mark.weightagemark).filter(|_| scored.is_some());
+        let weighted = reported_weighted.or_else(|| Some(percent? / 100.0 * weightage?));
         let absent = mark.status.trim().eq_ignore_ascii_case("absent");
         let remark = mark.remark.trim();
         Self {
             title: mark.markstitle.trim().to_string(),
             weighted: weighted.map(round2),
+            reported_weighted: reported_weighted.map(round2),
             percent,
             band: if absent {
                 ScoreBand::Absent
@@ -475,20 +477,26 @@ mod tests {
             panic!("three assessments");
         };
         assert_eq!(
-            (absent.band, absent.scored, absent.weighted),
-            (ScoreBand::Absent, None, None)
+            (
+                absent.band,
+                absent.scored,
+                absent.weighted,
+                absent.reported_weighted
+            ),
+            (ScoreBand::Absent, None, None, None)
         );
         assert_eq!(
-            (unposted.band, unposted.scored),
-            (ScoreBand::NotPosted, None)
+            (unposted.band, unposted.scored, unposted.reported_weighted),
+            (ScoreBand::NotPosted, None, None)
         );
         assert_eq!(
             (
                 unweighted.weightage,
                 unweighted.weighted,
+                unweighted.reported_weighted,
                 unweighted.percent
             ),
-            (None, None, Some(80.0))
+            (None, None, None, Some(80.0))
         );
         // The absence counts against the total; the unposted CAT does not.
         assert_eq!(
@@ -513,8 +521,10 @@ mod tests {
             &HashMap::new(),
         );
         assert!(course.assessments[1].reevaluation && !course.assessments[0].reevaluation);
-        // VTOP's weighted mark is blank for the quiz: worked out.
+        // VTOP's weighted mark is blank for the quiz: worked out, while reported_weighted stays None.
+        assert_eq!(course.assessments[0].reported_weighted, Some(6.0));
         assert_eq!(course.assessments[2].weighted, Some(5.0));
+        assert_eq!(course.assessments[2].reported_weighted, None);
         assert_eq!((course.weighted, course.max_weighted), (14.0, 25.0));
         assert!(!is_reevaluation("Prerevaluation") && is_reevaluation("re evaluation CAT2"));
         assert!(is_reevaluation("Report Re-Evaluation"));

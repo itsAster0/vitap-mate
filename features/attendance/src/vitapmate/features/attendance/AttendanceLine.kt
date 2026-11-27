@@ -38,6 +38,7 @@ internal fun AttendanceLine(
     from: Double? = null,
     track: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     halo: Color = AppTheme.colors.card,
+    showThreshold: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
     var shown by remember { mutableStateOf(false) }
@@ -57,11 +58,13 @@ internal fun AttendanceLine(
         val rest = if (width > 0f) width.coerceAtLeast(h) + gap else 0f
         if (rest < size.width) drawRoundRect(track, Offset(rest, top), Size(size.width - rest, h), radius)
         if (width > 0f) drawRoundRect(color, Offset(0f, top), Size(width.coerceAtLeast(h), h), radius)
-        val x = size.width * 0.75f
-        // Round caps reach half the width past the ends: the tick fills the height, its halo 2 dp more.
-        val cap = 1.5.dp.toPx()
-        drawLine(halo, Offset(x, cap), Offset(x, size.height - cap), 7.dp.toPx(), StrokeCap.Round)
-        drawLine(ink, Offset(x, cap), Offset(x, size.height - cap), 3.dp.toPx(), StrokeCap.Round)
+        if (showThreshold) {
+            val x = size.width * 0.75f
+            // Round caps reach half the width past the ends: the tick fills the height, its halo 2 dp more.
+            val cap = 1.5.dp.toPx()
+            drawLine(halo, Offset(x, cap), Offset(x, size.height - cap), 7.dp.toPx(), StrokeCap.Round)
+            drawLine(ink, Offset(x, cap), Offset(x, size.height - cap), 3.dp.toPx(), StrokeCap.Round)
+        }
         from?.let {
             val r = 4.dp.toPx()
             val cx = (size.width * (it / 100).toFloat()).coerceIn(h / 2, size.width - h / 2)

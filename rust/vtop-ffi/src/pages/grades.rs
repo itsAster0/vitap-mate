@@ -88,6 +88,8 @@ pub struct GradeDetails {
     pub course_id: String,
     /// Unix seconds.
     pub updated_at: i64,
+    /// VTOP's grand total, as given.
+    pub grand_total: String,
     pub cutoffs: Vec<GradeCutoff>,
     pub sections: Vec<MarkSection>,
     /// A cut-off came as VTOP's "#" placeholder: fetch again when opened.
@@ -639,6 +641,7 @@ impl From<GradeDetailsData> for GradeDetails {
             semester_id: data.semester_id,
             course_id: data.course_id,
             updated_at: data.update_time as i64,
+            grand_total: data.grand_total.trim().to_string(),
             cutoffs,
             sections: sections
                 .into_iter()

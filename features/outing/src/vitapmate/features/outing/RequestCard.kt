@@ -49,6 +49,7 @@ import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
 import vitapmate.core.OutingRequest
 import vitapmate.core.OutingStanding
+import vitapmate.data.Settings
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonSize
@@ -106,7 +107,9 @@ internal fun RequestCard(
         }
         if (request.`when`.isNotEmpty()) {
             // The trip: the first line at the start, the time away as a pill, the next line at the end.
+            val insights = Settings.calculatedInsights
             val away = request.`when`.firstOrNull { it.label == "Away" }
+            val shownAway = away.takeIf { insights }
             val awayTone = if (request.standing == OutingStanding.APPROVED) tones.success else neutralTone
             Column(Modifier.padding(horizontal = Space.lg), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                 (request.`when` - listOfNotNull(away)).chunked(2).forEachIndexed { index, legs ->
@@ -127,10 +130,10 @@ internal fun RequestCard(
                                     textAlign = if (side == 0) TextAlign.Start else TextAlign.End,
                                 )
                             }
-                            if (side == 0 && index == 0 && away != null) {
+                            if (side == 0 && index == 0 && shownAway != null) {
                                 val dash = Modifier.size(12.dp, 2.dp).background(awayTone.base.copy(alpha = 0.6f), CircleShape)
                                 if (legs.size == 2) Box(dash)
-                                ToneBadge("${away.text} ${away.label.orEmpty().lowercase()}", tone = awayTone)
+                                ToneBadge("${shownAway.text} ${shownAway.label.orEmpty().lowercase()}", tone = awayTone)
                                 if (legs.size == 2) Box(dash)
                             }
                         }

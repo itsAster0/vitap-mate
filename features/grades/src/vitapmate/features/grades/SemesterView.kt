@@ -28,6 +28,7 @@ import vitapmate.core.Grades
 import vitapmate.core.semesterSummary
 import vitapmate.data.PageState
 import vitapmate.data.SemesterChoice
+import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.logAction
@@ -78,7 +79,8 @@ internal fun SemesterView(
             empty = { EmptyView(Lucide.School, "No grades for this semester", Modifier.testTag("grades.empty")) },
             modifier = Modifier.weight(1f),
         ) { grades ->
-            val summary = remember(grades, history) { semesterSummary(grades.courses, history) }
+            val insights = Settings.calculatedInsights
+            val summary = if (insights) remember(grades, history) { semesterSummary(grades.courses, history) } else null
             LazyColumn(
                 Modifier.fillMaxSize().testTag("grades.list.semester"),
                 list,
@@ -91,8 +93,10 @@ internal fun SemesterView(
                 // Course cards sit 3 dp apart as one segmented run.
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                item("summary") {
-                    SemesterSummaryCard(grades.courses, summary, onCourse = { i -> scope.launch { list.animateScrollToItem(i + 1) } }, Modifier.animateItem().padding(bottom = Space.sm))
+                if (summary != null) {
+                    item("summary") {
+                        SemesterSummaryCard(grades.courses, summary, onCourse = { i -> scope.launch { list.animateScrollToItem(i + 1) } }, Modifier.animateItem().padding(bottom = Space.sm))
+                    }
                 }
                 itemsIndexed(grades.courses, key = { _, c -> c.courseId.ifEmpty { c.code } }) { i, course ->
                     val key = "${grades.semesterId}/${course.courseId}"

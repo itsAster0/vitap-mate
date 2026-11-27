@@ -1585,7 +1585,7 @@ internal object UniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_fn_method_core_cached_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,`matchTimetable`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_course_file_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,
     ): Long
@@ -1593,7 +1593,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_fetch_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_fetch_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_fetch_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,`matchTimetable`: Byte,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -2260,7 +2260,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_page() and 0xFFFF) != 21026) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_view() and 0xFFFF) != 16878) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_view() and 0xFFFF) != 56086) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_course_file_link() and 0xFFFF) != 62912) {
@@ -2272,7 +2272,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_page() and 0xFFFF) != 49034) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_view() and 0xFFFF) != 58860) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_view() and 0xFFFF) != 57496) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_exams() and 0xFFFF) != 7261) {
@@ -5417,9 +5417,10 @@ public interface CoreInterface {
     
     /**
      * `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
-     * none until both are saved.
+     * none until both are saved. When `match_timetable` is false, the student's section is
+     * not inferred from the timetable.
      */
-    fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView?
+    fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?, `matchTimetable`: kotlin.Boolean): CourseView?
     
     /**
      * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
@@ -5439,9 +5440,9 @@ public interface CoreInterface {
     
     /**
      * Fetches `course_id`'s sections, then the plan of `class_id` (else the
-     * student's section, else the only one), and caches both.
+     * student's section when `match_timetable` is true, else the only one), and caches both.
      */
-    suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView
+    suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?, `matchTimetable`: kotlin.Boolean): CourseView
     
     /**
      * The selected semester's cached exam schedule.
@@ -6899,8 +6900,9 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * `course_id`'s saved sections and the shown one's plan ([`CourseView::selected`]);
-     * none until both are saved.
-     */override fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView? {
+     * none until both are saved. When `match_timetable` is false, the student's section is
+     * not inferred from the timetable.
+     */override fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?, `matchTimetable`: kotlin.Boolean): CourseView? {
             return FfiConverterOptionalTypeCourseView.lift(
     callWithHandle {
     uniffiRustCall() { _status ->
@@ -6909,7 +6911,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`courseId`),
-        FfiConverterOptionalString.lower(`classId`),_status)
+        FfiConverterOptionalString.lower(`classId`),
+        FfiConverterBoolean.lower(`matchTimetable`),_status)
 }
     }
     )
@@ -6997,11 +7000,11 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Fetches `course_id`'s sections, then the plan of `class_id` (else the
-     * student's section, else the only one), and caches both.
+     * student's section when `match_timetable` is true, else the only one), and caches both.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?) : CourseView {
+    override suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?, `matchTimetable`: kotlin.Boolean) : CourseView {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
             UniffiLib.uniffi_vtop_ffi_fn_method_core_fetch_course_view(
@@ -7010,6 +7013,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`courseId`),
         FfiConverterOptionalString.lower(`classId`),
+        FfiConverterBoolean.lower(`matchTimetable`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
@@ -13313,6 +13317,11 @@ data class Assessment (
     val `weighted`: kotlin.Double?
     , 
     /**
+     * VTOP's own weighted mark when it sends one; none when omitted.
+     */
+    val `reportedWeighted`: kotlin.Double?
+    , 
+    /**
      * `scored / max`, 0–100.
      */
     val `percent`: kotlin.Double?
@@ -13360,6 +13369,7 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
             FfiConverterOptionalDouble.read(buf),
             FfiConverterOptionalDouble.read(buf),
             FfiConverterOptionalDouble.read(buf),
+            FfiConverterOptionalDouble.read(buf),
             FfiConverterTypeScoreBand.read(buf),
             FfiConverterString.read(buf),
             FfiConverterOptionalString.read(buf),
@@ -13374,6 +13384,7 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
             FfiConverterDouble.allocationSize(value.`max`) +
             FfiConverterOptionalDouble.allocationSize(value.`weightage`) +
             FfiConverterOptionalDouble.allocationSize(value.`weighted`) +
+            FfiConverterOptionalDouble.allocationSize(value.`reportedWeighted`) +
             FfiConverterOptionalDouble.allocationSize(value.`percent`) +
             FfiConverterTypeScoreBand.allocationSize(value.`band`) +
             FfiConverterString.allocationSize(value.`status`) +
@@ -13388,6 +13399,7 @@ public object FfiConverterTypeAssessment: FfiConverterRustBuffer<Assessment> {
             FfiConverterDouble.write(value.`max`, buf)
             FfiConverterOptionalDouble.write(value.`weightage`, buf)
             FfiConverterOptionalDouble.write(value.`weighted`, buf)
+            FfiConverterOptionalDouble.write(value.`reportedWeighted`, buf)
             FfiConverterOptionalDouble.write(value.`percent`, buf)
             FfiConverterTypeScoreBand.write(value.`band`, buf)
             FfiConverterString.write(value.`status`, buf)
@@ -13500,6 +13512,11 @@ data class AttendanceCourse (
      */
     val `percent`: kotlin.Double
     , 
+    /**
+     * VTOP's own percentage when it sends one; none when omitted.
+     */
+    val `reportedPercent`: kotlin.Double?
+    , 
     val `safe`: kotlin.Boolean
     , 
     val `canSkip`: kotlin.Int
@@ -13523,6 +13540,11 @@ data class AttendanceCourse (
      * for FAT", or "… · Clear for FAT at 3 more" while below 75%.
      */
     val `debarLine`: kotlin.String?
+    , 
+    /**
+     * VTOP's trimmed debar status text; empty when blank or "-".
+     */
+    val `rawDebarStatus`: kotlin.String
     
 ){
     
@@ -13554,6 +13576,7 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterDouble.read(buf),
+            FfiConverterOptionalDouble.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
@@ -13561,6 +13584,7 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterBoolean.read(buf),
             FfiConverterOptionalTypeDebar.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
@@ -13580,13 +13604,15 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterInt.allocationSize(value.`sessionsHeld`) +
             FfiConverterInt.allocationSize(value.`sessionsUnposted`) +
             FfiConverterDouble.allocationSize(value.`percent`) +
+            FfiConverterOptionalDouble.allocationSize(value.`reportedPercent`) +
             FfiConverterBoolean.allocationSize(value.`safe`) +
             FfiConverterInt.allocationSize(value.`canSkip`) +
             FfiConverterInt.allocationSize(value.`mustAttend`) +
             FfiConverterString.allocationSize(value.`advice`) +
             FfiConverterBoolean.allocationSize(value.`debarred`) +
             FfiConverterOptionalTypeDebar.allocationSize(value.`debar`) +
-            FfiConverterOptionalString.allocationSize(value.`debarLine`)
+            FfiConverterOptionalString.allocationSize(value.`debarLine`) +
+            FfiConverterString.allocationSize(value.`rawDebarStatus`)
     )
 
     override fun write(value: AttendanceCourse, buf: ByteBuffer) {
@@ -13605,6 +13631,7 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterInt.write(value.`sessionsHeld`, buf)
             FfiConverterInt.write(value.`sessionsUnposted`, buf)
             FfiConverterDouble.write(value.`percent`, buf)
+            FfiConverterOptionalDouble.write(value.`reportedPercent`, buf)
             FfiConverterBoolean.write(value.`safe`, buf)
             FfiConverterInt.write(value.`canSkip`, buf)
             FfiConverterInt.write(value.`mustAttend`, buf)
@@ -13612,6 +13639,7 @@ public object FfiConverterTypeAttendanceCourse: FfiConverterRustBuffer<Attendanc
             FfiConverterBoolean.write(value.`debarred`, buf)
             FfiConverterOptionalTypeDebar.write(value.`debar`, buf)
             FfiConverterOptionalString.write(value.`debarLine`, buf)
+            FfiConverterString.write(value.`rawDebarStatus`, buf)
     }
 }
 
@@ -16495,6 +16523,11 @@ data class GradeDetails (
      */
     val `updatedAt`: kotlin.Long
     , 
+    /**
+     * VTOP's grand total, as given.
+     */
+    val `grandTotal`: kotlin.String
+    , 
     val `cutoffs`: List<GradeCutoff>
     , 
     val `sections`: List<MarkSection>
@@ -16522,6 +16555,7 @@ public object FfiConverterTypeGradeDetails: FfiConverterRustBuffer<GradeDetails>
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterLong.read(buf),
+            FfiConverterString.read(buf),
             FfiConverterSequenceTypeGradeCutoff.read(buf),
             FfiConverterSequenceTypeMarkSection.read(buf),
             FfiConverterBoolean.read(buf),
@@ -16532,6 +16566,7 @@ public object FfiConverterTypeGradeDetails: FfiConverterRustBuffer<GradeDetails>
             FfiConverterString.allocationSize(value.`semesterId`) +
             FfiConverterString.allocationSize(value.`courseId`) +
             FfiConverterLong.allocationSize(value.`updatedAt`) +
+            FfiConverterString.allocationSize(value.`grandTotal`) +
             FfiConverterSequenceTypeGradeCutoff.allocationSize(value.`cutoffs`) +
             FfiConverterSequenceTypeMarkSection.allocationSize(value.`sections`) +
             FfiConverterBoolean.allocationSize(value.`placeholder`)
@@ -16541,6 +16576,7 @@ public object FfiConverterTypeGradeDetails: FfiConverterRustBuffer<GradeDetails>
             FfiConverterString.write(value.`semesterId`, buf)
             FfiConverterString.write(value.`courseId`, buf)
             FfiConverterLong.write(value.`updatedAt`, buf)
+            FfiConverterString.write(value.`grandTotal`, buf)
             FfiConverterSequenceTypeGradeCutoff.write(value.`cutoffs`, buf)
             FfiConverterSequenceTypeMarkSection.write(value.`sections`, buf)
             FfiConverterBoolean.write(value.`placeholder`, buf)

@@ -26,6 +26,7 @@ import com.composables.icons.lucide.FileX
 import com.composables.icons.lucide.Lucide
 import vitapmate.core.GradeHistory
 import vitapmate.data.PageHandle
+import vitapmate.data.Settings
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
@@ -53,6 +54,7 @@ internal fun HistoryView(
         isEmpty = { false },
         empty = {},
     ) { history ->
+        val insights = Settings.calculatedInsights
         val sessions = history.sessions.mapNotNull { session ->
             val courses = if (filter == null) session.courses else session.courses.filter { it.grade == filter }
             if (courses.isEmpty()) null else session to courses
@@ -69,7 +71,7 @@ internal fun HistoryView(
             // A session's course cards sit 3 dp apart as one segmented run.
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            item("cgpa") { CgpaCard(history) }
+            item("cgpa") { CgpaCard(history, insights) }
             if (history.courseCount > 0) {
                 item("courses") {
                     SectionHeader("Courses", trailing = { Text("${sessions.sumOf { it.second.size }} of ${history.courseCount}") })
@@ -98,7 +100,7 @@ internal fun HistoryView(
             sessions.forEach { (session, courses) ->
                 item("session.${session.month}") {
                     // The session's GPA in a small pill.
-                    SectionHeader(session.label, Modifier.animateItem(), trailing = session.gpa?.let { gpa ->
+                    SectionHeader(session.label, Modifier.animateItem(), trailing = if (insights) session.gpa?.let { gpa ->
                         {
                             Text(
                                 "GPA ${gpa.fixed2()}",
@@ -108,7 +110,7 @@ internal fun HistoryView(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
-                    })
+                    } else null)
                 }
                 itemsIndexed(courses, key = { _, c -> c.key }) { i, course ->
                     HistoryCourseCard(course, course.key in expanded, { onToggle(course.key) }, Modifier.animateItem(), segment(i, courses.size))

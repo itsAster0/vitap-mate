@@ -62,6 +62,7 @@ fun ClassSheet(
     record: AttendanceCourse?,
     labFat: Boolean,
     h24: Boolean,
+    showAttendance: Boolean = true,
     onDismiss: () -> Unit,
     onOpenAttendance: (AttendanceCourse) -> Unit = {},
 ) {
@@ -121,11 +122,13 @@ fun ClassSheet(
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            when {
-                labFat -> Note("Lab FAT: this session doesn't count towards attendance.")
-                record == null -> Note("No attendance for this course yet. It shows here once VTOP counts a class.")
-                else -> AttendanceBox(record) { onOpenAttendance(record) }
+            if (showAttendance) {
+                Spacer(Modifier.height(14.dp))
+                when {
+                    labFat -> Note("Lab FAT: this session doesn't count towards attendance.")
+                    record == null -> Note("No attendance for this course yet. It shows here once VTOP counts a class.")
+                    else -> AttendanceBox(record) { onOpenAttendance(record) }
+                }
             }
         }
     }
@@ -144,7 +147,7 @@ private fun Note(text: String) = Text(
 @Composable
 private fun AttendanceBox(record: AttendanceCourse, onClick: () -> Unit) {
     val tone = toneOf(record)
-    val skips = Settings.showSkipAdvice
+    val skips = Settings.effectiveSkipAdvice
     Row(
         Modifier.fillMaxWidth()
             .tappable(onClick, "Open attendance details", Role.Button, haptic = true)

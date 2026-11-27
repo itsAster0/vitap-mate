@@ -41,6 +41,7 @@ import com.composables.icons.lucide.ScanFace
 import vitapmate.core.BiometricDay
 import vitapmate.core.Punch
 import vitapmate.core.PunchKind
+import vitapmate.data.Settings
 import vitapmate.ui.AppTheme
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
@@ -62,6 +63,7 @@ internal fun DayView(data: BiometricDay, isToday: Boolean) {
     val list = rememberLazyListState()
     ScrollToTopOnReselect(list)
     val h24 = is24Hour()
+    val insights = Settings.calculatedInsights
     LazyColumn(
         Modifier.fillMaxSize().testTag("biometric.list"),
         list,
@@ -73,15 +75,20 @@ internal fun DayView(data: BiometricDay, isToday: Boolean) {
                 EmptyView(Lucide.ScanFace, "No punches", Modifier.fillMaxWidth().testTag("biometric.empty"), message = formatDay(data.day, "EEE d MMM"))
             }
         } else {
-            item("status") { Status(latest, isToday, h24, data.entries, data.exits, Modifier.animateItem()) }
+            if (insights) item("status") { Status(latest, isToday, h24, data.entries, data.exits, Modifier.animateItem()) }
             item("header") {
-                SectionHeader(formatDay(data.day, "EEEE, d MMMM"), Modifier.animateItem()) { Text("${data.entries} in · ${data.exits} out") }
+                SectionHeader(formatDay(data.day, "EEEE, d MMMM"), Modifier.animateItem()) {
+                    Text(
+                        if (insights) "${data.entries} in · ${data.exits} out"
+                        else "${data.punches.size} ${if (data.punches.size == 1) "punch" else "punches"}",
+                    )
+                }
             }
             item("punches") {
                 Surface(Modifier.animateItem().testTag("biometric.punches"), padding = PaddingValues(horizontal = Space.md + 2.dp, vertical = Space.sm)) {
                     Column {
                         data.punches.forEachIndexed { i, punch ->
-                            PunchRow(punch, h24, first = i == 0, last = i == data.punches.lastIndex, Modifier.testTag("biometric.punch.$i"))
+                            PunchRow(punch, h24, insights, first = i == 0, last = i == data.punches.lastIndex, Modifier.testTag("biometric.punch.$i"))
                         }
                     }
                 }
@@ -154,11 +161,11 @@ private fun Count(label: String, count: Int, modifier: Modifier) {
 /** The kind's shaped icon on the day's line, the kind and VTOP's venue, then the time. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PunchRow(punch: Punch, h24: Boolean, first: Boolean, last: Boolean, modifier: Modifier = Modifier) {
-    val look = punch.kind.look()
+private fun PunchRow(punch: Punch, h24: Boolean, insights: Boolean, first: Boolean, last: Boolean, modifier: Modifier = Modifier) {
+    val look = if (insights) punch.kind.look() else Look(AppTheme.tones.accentTone, "PUNCH", Lucide.ScanFace)
     val line = MaterialTheme.colorScheme.outlineVariant
     // Entry round, exit scalloped, anything else a squircle.
-    val shape = when (punch.kind) {
+    val shape = if (!insights) CircleShape else when (punch.kind) {
         PunchKind.ENTRY -> CircleShape
         PunchKind.EXIT -> MaterialShapes.Cookie9Sided.toShape()
         PunchKind.OTHER -> RoundedCornerShape(12.dp)
@@ -175,8 +182,12 @@ private fun PunchRow(punch: Punch, h24: Boolean, first: Boolean, last: Boolean, 
         }
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f).padding(vertical = Space.sm + 2.dp), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-            ToneBadge(look.label, tone = look.tone)
-            Text(punch.venue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (insights) ToneBadge(look.label, tone = look.tone)
+            Text(
+                punch.venue,
+                style = if (insights) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                color = if (insights) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            )
         }
         Spacer(Modifier.width(Space.sm))
         Text(punch.at(h24), style = MaterialTheme.typography.titleMediumEmphasized.nums())

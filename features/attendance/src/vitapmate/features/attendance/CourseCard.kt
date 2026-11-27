@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.graphics.shapes.Morph
 import com.composables.icons.lucide.Ban
+import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lucide
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
@@ -68,20 +69,33 @@ import vitapmate.ui.tappable
 internal fun CourseCard(
     course: AttendanceCourse,
     plan: AttendancePlan?,
+    insights: Boolean,
     showSkipAdvice: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val standing = course.standing
-    val tone = standing.tone()
+    val standing = when {
+        insights -> course.standing
+        course.debarred -> Standing.Debarred
+        course.total == 0 -> Standing.NoClasses
+        else -> Standing.Safe
+    }
+    val tone = when {
+        insights -> standing.tone()
+        course.debarred -> AppTheme.tones.danger
+        course.total == 0 -> Standing.NoClasses.tone()
+        else -> AppTheme.tones.accentTone
+    }
     val danger = course.debarred
     // The chip is what VTOP's count allows right now; the outlook counts till the exam or the end.
-    val advice = course.advice(showSkipAdvice)
+    val advice = if (insights) course.advice(showSkipAdvice) else null
     val name = course.name.ifBlank { course.code }
-    val attended = course.sessionsAttended
-    val held = course.sessionsHeld
-    val debarLine = course.debarLine
+    val attended = if (insights) course.sessionsAttended else course.attended
+    val held = if (insights) course.sessionsHeld else course.total
+    val percentLabel = if (insights) course.percentLabel else course.reportedPercentLabel
+    val barPercent = if (insights) course.percent else (course.reportedPercent ?: 0.0)
+    val debarLine = if (insights) course.debarLine else course.verbatimDebar
     SectionCard(
         modifier.fillMaxWidth()
             .tappable(onClick, name, Role.Button, pressedScale = 0.98f)
@@ -89,7 +103,7 @@ internal fun CourseCard(
             .semantics {
                 contentDescription = listOfNotNull(
                     name,
-                    if (course.total == 0) "no classes yet" else "${course.percentLabel}, $attended of $held attended",
+                    if (course.total == 0) "no classes yet" else "$percentLabel, $attended of $held attended",
                     debarLine,
                     advice,
                 ).joinToString(", ")
@@ -97,7 +111,7 @@ internal fun CourseCard(
         shape = MaterialTheme.shapes.extraLargeIncreased,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StandingBadge(standing, course.percentLabel, tone)
+            StandingBadge(standing, percentLabel, tone)
             Spacer(Modifier.width(Space.md))
             Column(Modifier.weight(1f)) {
                 Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -108,19 +122,19 @@ internal fun CourseCard(
                 }
             }
         }
-        AttendanceLine(course.percent, tone.base, Modifier.padding(top = Space.md, bottom = Space.sm))
+        AttendanceLine(barPercent, tone.base, Modifier.padding(top = Space.md, bottom = Space.sm), showThreshold = insights)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (course.total == 0) AnnotatedString("No classes yet")
                 else buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = scheme.onSurface)) { append("$attended") }
-                    append("/$held${if (course.isLab) " sessions" else ""}")
+                    append("/$held${if (insights && course.isLab) " sessions" else ""}")
                 },
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium.nums(),
                 color = scheme.onSurfaceVariant,
             )
-            if (danger) AdvicePill("Debarred", tone, solid = true)
+            if (danger && (insights || !debarLine.equals("Debarred", ignoreCase = true))) AdvicePill("Debarred", tone, solid = true)
             else advice?.let { AdvicePill(it, tone) }
         }
         debarLine?.let {
@@ -128,12 +142,12 @@ internal fun CourseCard(
                 Modifier.padding(top = Space.md).fillMaxWidth().background(tone.subtle, RoundedCornerShape(14.dp)).padding(horizontal = Space.md, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Lucide.Ban, null, Modifier.size(16.dp), tint = tone.base)
+                Icon(if (course.debarred) Lucide.Ban else Lucide.Info, null, Modifier.size(16.dp), tint = tone.base)
                 Spacer(Modifier.width(Space.sm))
                 Text(it, style = MaterialTheme.typography.labelLarge.nums(), color = tone.onSubtle, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-        plan?.let { OutlookLine(course, it, showSkipAdvice, tone, Modifier.padding(top = Space.md)) }
+        if (insights) plan?.let { OutlookLine(course, it, showSkipAdvice, tone, Modifier.padding(top = Space.md)) }
     }
 }
 
