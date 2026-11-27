@@ -19,10 +19,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.core.content.FileProvider
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import vitapmate.data.Docs
 
 /** The share image's size: a phone story. */
 private const val WIDTH = 1080
@@ -36,11 +38,14 @@ internal class Capture(val slide: Slide, val context: SlideContext) {
     val image = CompletableDeferred<ImageBitmap>()
 }
 
+/** A share image's frame: 360 × 564 over the footer, or all 640 tall for a wallpaper. */
+internal fun shareFrame(wallpaper: Boolean) = Frame(DESIGN_WIDTH, if (wallpaper) CONTENT_HEIGHT + FOOTER_HEIGHT else CONTENT_HEIGHT)
+
 /**
- * Draws [capture]'s slide off screen into a graphics layer at 1080 × 1920 (the design frame at
- * density 3, so it matches the screen), without the progress bar, buttons or switch, and with
- * the first name and the footer. It takes no space and never shows: the layer is recorded, not
- * drawn.
+ * Draws [capture]'s slide off screen into a graphics layer at 1080 × 1920 (a 360 × 564 frame and
+ * the footer at density 3, or a 360 × 640 frame for a wallpaper), without the progress bar or
+ * buttons, with the first name unless hidden. It takes no space and never shows: the layer is
+ * recorded, not drawn.
  */
 @Composable
 internal fun CaptureBox(capture: Capture) {
@@ -57,7 +62,7 @@ internal fun CaptureBox(capture: Capture) {
                 recorded.complete(Unit)
             },
     ) {
-        CompositionLocalProvider(LocalDensity provides Density(WIDTH / DESIGN_WIDTH, 1f)) {
+        CompositionLocalProvider(LocalDensity provides Density(WIDTH / DESIGN_WIDTH, 1f), LocalFrame provides shareFrame(capture.context.wallpaper)) {
             SlideCanvas(capture.slide, capture.context)
         }
     }
@@ -65,6 +70,19 @@ internal fun CaptureBox(capture: Capture) {
         recorded.await()
         capture.image.complete(layer.toImageBitmap())
     }
+}
+
+/** [image] as PNG bytes. */
+private fun png(image: ImageBitmap): ByteArray = ByteArrayOutputStream().use { out ->
+    image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, out)
+    out.toByteArray()
+}
+
+/** Saves [image] into Docs as "Wrapped <semester> <slide>", replacing the same slide's earlier copy. */
+internal suspend fun saveImage(image: ImageBitmap, semester: String, semesterName: String, slide: String, flow: String) {
+    val bytes = withContext(Dispatchers.Default) { png(image) }
+    val safe = semester.replace(Regex("[^A-Za-z0-9_-]"), "_")
+    Docs.save("Wrapped ${semesterName.ifBlank { semester }} $slide.png", "image/png", bytes, source = "wrapped", id = "wrapped-$safe-$slide", flow = flow)
 }
 
 /** Saves [image] as `share/wrapped-<semester>-<slide>.png` in the cache and opens the share sheet (the `.logs` FileProvider). */

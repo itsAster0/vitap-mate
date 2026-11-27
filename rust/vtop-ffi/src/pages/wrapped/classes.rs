@@ -10,7 +10,15 @@ pub(super) const COMEBACK_POINTS: i32 = 5;
 /// The close call counts from a course's 10th counted class (in VTOP's units) on, and is
 /// skipped with more than this many classes to spare.
 pub(super) const CLOSE_CALL_FROM: i32 = 10;
-pub(super) const CLOSE_CALL_SPARE: i32 = 3;
+pub(super) const CLOSE_CALL_SPARE: i32 = 1;
+/// The Streak slide needs a run this long.
+pub(super) const STREAK_MIN: i32 = 5;
+/// The trap slide needs this many absences VTOP put down to a missing punch.
+pub(super) const TRAPS_MIN: i32 = 3;
+/// A class punch from this many minutes before a class to its end was "punched in".
+pub(super) const PUNCH_EARLY: i32 = 15;
+/// The guess's ranges: four of this many points, the last open-ended.
+pub(super) const GUESS_WIDTH: i32 = 5;
 /// VTOP's attendance floor, in percent.
 pub(super) const ATTENDANCE_FLOOR: i32 = 75;
 /// "8 AM" classes start before this minute.
@@ -26,6 +34,8 @@ pub(super) const DAY_HALF_PERCENT: i32 = 60;
 /// The day half's bars: hours from 8.
 pub(super) const FIRST_HOUR: i32 = 8;
 pub(super) const HOURS: usize = 11;
+/// A weekday needs this many class days for the quietest weekday.
+pub(super) const QUIET_MIN_DAYS: i32 = 3;
 
 pub(super) fn attendance(
     courses: &[AttendanceCourse],
@@ -72,7 +82,40 @@ pub(super) fn attendance(
         least: least.name.clone(),
         least_percent: least.percent.ceil() as i32,
         top,
+        guesses: guesses(percent),
+        lines: held()
+            .map(|course| WrappedCourseLine {
+                name: course.name.clone(),
+                lab: course.kind == ClassKind::Lab,
+                attended: course.attended,
+                percent: super::percent(course.attended, course.counted).unwrap_or(0),
+            })
+            .collect(),
     })
+}
+
+/// Four ranges of [`GUESS_WIDTH`] points around `percent`: it falls in the second or third (by
+/// its parity, so it isn't always the same pill), moved down to end at 100, with a top range
+/// from 90 or more open-ended.
+pub(super) fn guesses(percent: i32) -> Vec<WrappedGuess> {
+    let percent = percent.clamp(0, 100);
+    let holds = (percent.min(99) / GUESS_WIDTH) * GUESS_WIDTH;
+    let first = (holds - GUESS_WIDTH * (1 + percent % 2)).clamp(0, 100 - GUESS_WIDTH * 4);
+    (0..4)
+        .map(|at| {
+            let from = first + GUESS_WIDTH * at;
+            let to = (at < 3 || from < 90).then_some(from + GUESS_WIDTH - 1);
+            let top = to.unwrap_or(100);
+            let off = if percent < from {
+                percent - from
+            } else if percent > top {
+                percent - top
+            } else {
+                0
+            };
+            WrappedGuess { from, to, off }
+        })
+        .collect()
 }
 
 /// None under [`ON_DUTY_MIN`] classes on duty.
@@ -115,6 +158,9 @@ pub(super) fn streak(classes: &[Taken]) -> Option<WrappedStreak> {
         .map(|(_, class)| (class.day, class.start, class.status))
         .collect();
     let (length, first_day, last_day) = records::longest_run(&runs)?;
+    if length < STREAK_MIN {
+        return None;
+    }
     // Where the run sits among the posted classes, in time order: the first window of `length`
     // attended classes from its first day to its last, as `longest_run` keeps the first.
     let mut posted: Vec<&AttendedClass> = classes
@@ -253,6 +299,54 @@ pub(super) fn close_call(classes: &[Taken]) -> Option<WrappedCloseCall> {
         .filter(|call| call.spare.is_none_or(|spare| spare <= CLOSE_CALL_SPARE))
 }
 
+/// None under [`TRAPS_MIN`] absences with VTOP's missing-punch remark. `days` are the cached
+/// complete biometric copies, to see whether a class punch came in time after all.
+pub(super) fn traps(classes: &[Taken], days: &[BiometricDay]) -> Option<WrappedTraps> {
+    let absent = || {
+        classes
+            .iter()
+            .filter(|(_, class)| class.status == Some(ClassStatus::Absent))
+    };
+    let trapped: Vec<&Taken> = absent()
+        .filter(|(_, class)| {
+            let remark = class.remark.to_lowercase();
+            remark.contains("no punch") || remark.contains("faculty punch")
+        })
+        .collect();
+    if (trapped.len() as i32) < TRAPS_MIN {
+        return None;
+    }
+    let (mut checked, mut punched) = (0, 0);
+    for (_, class) in &trapped {
+        let Some(day) = days.iter().find(|day| day.day == class.day) else {
+            continue;
+        };
+        checked += 1;
+        let (Some(start), Some(end)) = (class.start, class.end) else {
+            continue;
+        };
+        punched += i32::from(day.punches.iter().any(|punch| {
+            punch
+                .minute
+                .is_some_and(|minute| (start - PUNCH_EARLY..=end).contains(&minute))
+                && class_punch(&punch.venue).is_some()
+        }));
+    }
+    let mut by_course = sums(trapped.iter().map(|(course, _)| (course.name.clone(), 1)));
+    by_course.sort_by_key(|&(_, n)| std::cmp::Reverse(n));
+    Some(WrappedTraps {
+        trapped: trapped.len() as i32,
+        absences: absent().count() as i32,
+        checked,
+        punched,
+        by_course: by_course
+            .into_iter()
+            .take(3)
+            .map(|(name, percent)| WrappedCourse { name, percent })
+            .collect(),
+    })
+}
+
 pub(super) fn habits(classes: &[Taken], slots: &[ClassSlot]) -> Option<WrappedHabits> {
     let posted: Vec<&AttendedClass> = classes
         .iter()
@@ -294,16 +388,58 @@ pub(super) fn habits(classes: &[Taken], slots: &[ClassSlot]) -> Option<WrappedHa
                 .len() as i32
         })
     };
+    let (classes_per_day_tenths, quietest_weekday) = quietest(&posted);
     Some(WrappedHabits {
+        classes_per_day_tenths,
+        quietest_weekday,
         worst_weekday,
         worst_weekday_misses: worst_misses.unwrap_or(0),
         misses: misses.iter().sum(),
         early_percent: percent(early_attended, early.len() as i32),
         early_classes: early.len() as i32,
+        early_attended,
         first_slot_days: days_at(slots.iter().map(|s| s.start).min(), |c| c.start),
         last_slot_days: days_at(slots.iter().map(|s| s.end).max(), |c| c.end),
         misses_by_weekday: misses.to_vec(),
     })
+}
+
+/// Attended classes (a lab session once) on an average class day of each weekday in tenths,
+/// Monday first, and the weekday with the fewest (the earliest of equals); weekdays with fewer
+/// than [`QUIET_MIN_DAYS`] class days are 0 and left out.
+fn quietest(posted: &[&AttendedClass]) -> (Vec<i32>, Option<i32>) {
+    // Each weekday's class days and attended classes.
+    let mut weekdays: [(HashSet<i32>, i32); 7] = Default::default();
+    for class in posted {
+        let Some((days, attended)) = usize::try_from(class.weekday)
+            .ok()
+            .and_then(|at| weekdays.get_mut(at))
+        else {
+            continue;
+        };
+        days.insert(class.day);
+        if is_attended(class) {
+            *attended += 1;
+        }
+    }
+    let average = |(days, attended): &(HashSet<i32>, i32)| {
+        let n = days.len() as i32;
+        (n >= QUIET_MIN_DAYS).then(|| (attended * 10 + n / 2) / n)
+    };
+    let averages: Vec<Option<i32>> = weekdays.iter().map(average).collect();
+    let held: Vec<(usize, i32)> = averages
+        .iter()
+        .enumerate()
+        .filter_map(|(at, n)| Some((at, (*n)?)))
+        .collect();
+    let quietest = (held.len() >= 2)
+        .then(|| {
+            held.iter()
+                .min_by_key(|&&(at, n)| (n, at))
+                .map(|&(at, _)| at as i32)
+        })
+        .flatten();
+    (averages.iter().map(|n| n.unwrap_or(0)).collect(), quietest)
 }
 
 /// None when neither side has [`DAY_HALF_PERCENT`] of the classes.
@@ -402,15 +538,15 @@ pub(super) fn places(classes: &[Taken], slots: &[ClassSlot]) -> Option<WrappedPl
             &slot.faculty
         };
         if !name.is_empty() {
-            faculty.push((name.clone(), 1));
+            faculty.push((name.clone(), slot.end - slot.start));
         }
     }
     let (room, room_minutes) = most(rooms).unzip();
-    let (faculty, faculty_classes) = most(faculty).unzip();
+    let (faculty, faculty_minutes) = most(faculty).unzip();
     (room.is_some() || faculty.is_some()).then(|| WrappedPlaces {
         room,
         room_minutes: room_minutes.unwrap_or(0),
         faculty,
-        faculty_classes: faculty_classes.unwrap_or(0),
+        faculty_minutes: faculty_minutes.unwrap_or(0),
     })
 }

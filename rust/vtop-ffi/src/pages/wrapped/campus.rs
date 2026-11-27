@@ -89,25 +89,30 @@ pub(super) fn trip(from: i32, to: i32, on_campus: impl Fn(i32) -> bool) -> Optio
     best
 }
 
-/// From the cached days of the semester's `total` class days; none without class days.
+/// From the cached days of the semester's `total` class days; none without class days. A
+/// hosteller's day starts at a hostel gate's OUT and ends at its IN; a day scholar's starts and
+/// ends at a campus gate's IN.
 pub(super) fn campus(days: &[BiometricDay], total: i32) -> Option<WrappedCampus> {
     if total == 0 {
         return None;
     }
-    let entries = |day: &BiometricDay| -> Vec<i32> {
+    let minutes = |day: &BiometricDay, starts: bool| -> Vec<i32> {
         day.punches
             .iter()
-            .filter(|punch| punch.kind == PunchKind::Entry)
+            .filter(|punch| match (is_hostel(punch), starts) {
+                (true, true) => punch.kind == PunchKind::Exit,
+                (true, false) | (false, _) => punch.kind == PunchKind::Entry,
+            })
             .filter_map(|punch| punch.minute)
             .collect()
     };
     let earliest = days
         .iter()
-        .filter_map(|day| entries(day).into_iter().min())
+        .filter_map(|day| minutes(day, true).into_iter().min())
         .min();
     let latest = days
         .iter()
-        .filter_map(|day| entries(day).into_iter().max())
+        .filter_map(|day| minutes(day, false).into_iter().max())
         .filter(|&minute| minute > EVENING)
         .max();
     Some(WrappedCampus {
@@ -254,7 +259,12 @@ pub(super) fn moves(days: &[BiometricDay]) -> Option<WrappedMoves> {
         let mut changes = 0;
         for pair in punches.windows(2) {
             if let [from, to] = pair {
-                floors += (to.floor - from.floor).max(0);
+                // Another block is down to its ground floor and up again.
+                floors += if to.block == from.block {
+                    (to.floor - from.floor).max(0)
+                } else {
+                    to.floor
+                };
                 changes += i32::from(to.block != from.block);
             }
         }

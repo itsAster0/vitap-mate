@@ -20374,6 +20374,88 @@ public object FfiConverterTypeWeekendOutingRules: FfiConverterRustBuffer<Weekend
 
 
 /**
+ * Pooled attendance over the semester, as it ran.
+ */
+data class WrappedArc (
+    /**
+     * At the end of each class day from the [`ARC_FROM`]th counted class on, thinned to about
+     * [`ARC_POINTS`], keeping the peak and the low; in day order.
+     */
+    val `points`: List<WrappedPoint>
+    , 
+    /**
+     * The calendar's exams inside the window, by first day.
+     */
+    val `exams`: List<WrappedSpan>
+    , 
+    /**
+     * Between the CATs; empty without one in the calendar.
+     */
+    val `phases`: List<WrappedPhase>
+    , 
+    val `shape`: WrappedArcShape
+    , 
+    /**
+     * The highest and lowest points of the whole line, the earliest of equals.
+     */
+    val `peak`: WrappedPoint
+    , 
+    val `low`: WrappedPoint
+    , 
+    /**
+     * The largest fall from a point to a later one, of [`ARC_DROP`] points or more.
+     */
+    val `drop`: WrappedDrop?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedArc: FfiConverterRustBuffer<WrappedArc> {
+    override fun read(buf: ByteBuffer): WrappedArc {
+        return WrappedArc(
+            FfiConverterSequenceTypeWrappedPoint.read(buf),
+            FfiConverterSequenceTypeWrappedSpan.read(buf),
+            FfiConverterSequenceTypeWrappedPhase.read(buf),
+            FfiConverterTypeWrappedArcShape.read(buf),
+            FfiConverterTypeWrappedPoint.read(buf),
+            FfiConverterTypeWrappedPoint.read(buf),
+            FfiConverterOptionalTypeWrappedDrop.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedArc) = (
+            FfiConverterSequenceTypeWrappedPoint.allocationSize(value.`points`) +
+            FfiConverterSequenceTypeWrappedSpan.allocationSize(value.`exams`) +
+            FfiConverterSequenceTypeWrappedPhase.allocationSize(value.`phases`) +
+            FfiConverterTypeWrappedArcShape.allocationSize(value.`shape`) +
+            FfiConverterTypeWrappedPoint.allocationSize(value.`peak`) +
+            FfiConverterTypeWrappedPoint.allocationSize(value.`low`) +
+            FfiConverterOptionalTypeWrappedDrop.allocationSize(value.`drop`)
+    )
+
+    override fun write(value: WrappedArc, buf: ByteBuffer) {
+            FfiConverterSequenceTypeWrappedPoint.write(value.`points`, buf)
+            FfiConverterSequenceTypeWrappedSpan.write(value.`exams`, buf)
+            FfiConverterSequenceTypeWrappedPhase.write(value.`phases`, buf)
+            FfiConverterTypeWrappedArcShape.write(value.`shape`, buf)
+            FfiConverterTypeWrappedPoint.write(value.`peak`, buf)
+            FfiConverterTypeWrappedPoint.write(value.`low`, buf)
+            FfiConverterOptionalTypeWrappedDrop.write(value.`drop`, buf)
+    }
+}
+
+
+
+/**
  * Posted assessments, re-evaluations left out.
  */
 data class WrappedAssessments (
@@ -20444,6 +20526,16 @@ data class WrappedAttendance (
      * The best-attended courses, up to 3, best first; never the least-attended one.
      */
     val `top`: List<WrappedCourse>
+    , 
+    /**
+     * Four ranges for the guess before the reveal, lowest first, one holding `percent`.
+     */
+    val `guesses`: List<WrappedGuess>
+    , 
+    /**
+     * Each course part (theory, lab) with a counted class, in VTOP's order.
+     */
+    val `lines`: List<WrappedCourseLine>
     
 ){
     
@@ -20469,6 +20561,8 @@ public object FfiConverterTypeWrappedAttendance: FfiConverterRustBuffer<WrappedA
             FfiConverterString.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterSequenceTypeWrappedCourse.read(buf),
+            FfiConverterSequenceTypeWrappedGuess.read(buf),
+            FfiConverterSequenceTypeWrappedCourseLine.read(buf),
         )
     }
 
@@ -20481,7 +20575,9 @@ public object FfiConverterTypeWrappedAttendance: FfiConverterRustBuffer<WrappedA
             FfiConverterInt.allocationSize(value.`bestPercent`) +
             FfiConverterString.allocationSize(value.`least`) +
             FfiConverterInt.allocationSize(value.`leastPercent`) +
-            FfiConverterSequenceTypeWrappedCourse.allocationSize(value.`top`)
+            FfiConverterSequenceTypeWrappedCourse.allocationSize(value.`top`) +
+            FfiConverterSequenceTypeWrappedGuess.allocationSize(value.`guesses`) +
+            FfiConverterSequenceTypeWrappedCourseLine.allocationSize(value.`lines`)
     )
 
     override fun write(value: WrappedAttendance, buf: ByteBuffer) {
@@ -20494,6 +20590,8 @@ public object FfiConverterTypeWrappedAttendance: FfiConverterRustBuffer<WrappedA
             FfiConverterString.write(value.`least`, buf)
             FfiConverterInt.write(value.`leastPercent`, buf)
             FfiConverterSequenceTypeWrappedCourse.write(value.`top`, buf)
+            FfiConverterSequenceTypeWrappedGuess.write(value.`guesses`, buf)
+            FfiConverterSequenceTypeWrappedCourseLine.write(value.`lines`, buf)
     }
 }
 
@@ -20837,6 +20935,101 @@ public object FfiConverterTypeWrappedCourse: FfiConverterRustBuffer<WrappedCours
 
 
 /**
+ * A course part's attendance, in VTOP's units (a lab session is two).
+ */
+data class WrappedCourseLine (
+    val `name`: kotlin.String
+    , 
+    val `lab`: kotlin.Boolean
+    , 
+    val `attended`: kotlin.Int
+    , 
+    /**
+     * Rounded up as VTOP does.
+     */
+    val `percent`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedCourseLine: FfiConverterRustBuffer<WrappedCourseLine> {
+    override fun read(buf: ByteBuffer): WrappedCourseLine {
+        return WrappedCourseLine(
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedCourseLine) = (
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterBoolean.allocationSize(value.`lab`) +
+            FfiConverterInt.allocationSize(value.`attended`) +
+            FfiConverterInt.allocationSize(value.`percent`)
+    )
+
+    override fun write(value: WrappedCourseLine, buf: ByteBuffer) {
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterBoolean.write(value.`lab`, buf)
+            FfiConverterInt.write(value.`attended`, buf)
+            FfiConverterInt.write(value.`percent`, buf)
+    }
+}
+
+
+
+data class WrappedCredits (
+    /**
+     * "Core" (programme core), "Univ" (university core), "Elect" (electives), else VTOP's code.
+     */
+    val `label`: kotlin.String
+    , 
+    val `credits`: kotlin.Double
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedCredits: FfiConverterRustBuffer<WrappedCredits> {
+    override fun read(buf: ByteBuffer): WrappedCredits {
+        return WrappedCredits(
+            FfiConverterString.read(buf),
+            FfiConverterDouble.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedCredits) = (
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterDouble.allocationSize(value.`credits`)
+    )
+
+    override fun write(value: WrappedCredits, buf: ByteBuffer) {
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterDouble.write(value.`credits`, buf)
+    }
+}
+
+
+
+/**
  * The 7 days from a paper's day with the most papers sat.
  */
 data class WrappedCrunch (
@@ -20979,12 +21172,126 @@ public object FfiConverterTypeWrappedDayHalf: FfiConverterRustBuffer<WrappedDayH
 
 
 
+/**
+ * The grade history up to this semester.
+ */
+data class WrappedDegree (
+    /**
+     * Graded semesters, oldest first; this one is `current`.
+     */
+    val `semesters`: List<WrappedSemesterGpa>
+    , 
+    /**
+     * This semester's GPA among them: 1 is the best (ties share it).
+     */
+    val `rank`: kotlin.Int
+    , 
+    /**
+     * Credits earned up to this semester.
+     */
+    val `credits`: kotlin.Double
+    , 
+    /**
+     * Those credits by course distribution, most first, none empty.
+     */
+    val `byDistribution`: List<WrappedCredits>
+    , 
+    /**
+     * The CGPA after this semester.
+     */
+    val `cgpa`: kotlin.Double?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedDegree: FfiConverterRustBuffer<WrappedDegree> {
+    override fun read(buf: ByteBuffer): WrappedDegree {
+        return WrappedDegree(
+            FfiConverterSequenceTypeWrappedSemesterGpa.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterDouble.read(buf),
+            FfiConverterSequenceTypeWrappedCredits.read(buf),
+            FfiConverterOptionalDouble.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedDegree) = (
+            FfiConverterSequenceTypeWrappedSemesterGpa.allocationSize(value.`semesters`) +
+            FfiConverterInt.allocationSize(value.`rank`) +
+            FfiConverterDouble.allocationSize(value.`credits`) +
+            FfiConverterSequenceTypeWrappedCredits.allocationSize(value.`byDistribution`) +
+            FfiConverterOptionalDouble.allocationSize(value.`cgpa`)
+    )
+
+    override fun write(value: WrappedDegree, buf: ByteBuffer) {
+            FfiConverterSequenceTypeWrappedSemesterGpa.write(value.`semesters`, buf)
+            FfiConverterInt.write(value.`rank`, buf)
+            FfiConverterDouble.write(value.`credits`, buf)
+            FfiConverterSequenceTypeWrappedCredits.write(value.`byDistribution`, buf)
+            FfiConverterOptionalDouble.write(value.`cgpa`, buf)
+    }
+}
+
+
+
+data class WrappedDrop (
+    val `from`: WrappedPoint
+    , 
+    val `to`: WrappedPoint
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedDrop: FfiConverterRustBuffer<WrappedDrop> {
+    override fun read(buf: ByteBuffer): WrappedDrop {
+        return WrappedDrop(
+            FfiConverterTypeWrappedPoint.read(buf),
+            FfiConverterTypeWrappedPoint.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedDrop) = (
+            FfiConverterTypeWrappedPoint.allocationSize(value.`from`) +
+            FfiConverterTypeWrappedPoint.allocationSize(value.`to`)
+    )
+
+    override fun write(value: WrappedDrop, buf: ByteBuffer) {
+            FfiConverterTypeWrappedPoint.write(value.`from`, buf)
+            FfiConverterTypeWrappedPoint.write(value.`to`, buf)
+    }
+}
+
+
+
 data class WrappedExams (
     val `cats`: kotlin.Int
     , 
     val `fats`: kotlin.Int
     , 
     val `topVenue`: kotlin.String?
+    , 
+    /**
+     * Time in exam halls: each paper's start to end, else [`CAT_MINUTES`] or [`FAT_MINUTES`].
+     */
+    val `minutes`: kotlin.Int
     
 ){
     
@@ -21004,19 +21311,142 @@ public object FfiConverterTypeWrappedExams: FfiConverterRustBuffer<WrappedExams>
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterInt.read(buf),
         )
     }
 
     override fun allocationSize(value: WrappedExams) = (
             FfiConverterInt.allocationSize(value.`cats`) +
             FfiConverterInt.allocationSize(value.`fats`) +
-            FfiConverterOptionalString.allocationSize(value.`topVenue`)
+            FfiConverterOptionalString.allocationSize(value.`topVenue`) +
+            FfiConverterInt.allocationSize(value.`minutes`)
     )
 
     override fun write(value: WrappedExams, buf: ByteBuffer) {
             FfiConverterInt.write(value.`cats`, buf)
             FfiConverterInt.write(value.`fats`, buf)
             FfiConverterOptionalString.write(value.`topVenue`, buf)
+            FfiConverterInt.write(value.`minutes`, buf)
+    }
+}
+
+
+
+/**
+ * The week's timetable graded: four parts of 25 points, each from one fact.
+ */
+data class WrappedFfcs (
+    /**
+     * 0 to 100, the parts' sum.
+     */
+    val `score`: kotlin.Int
+    , 
+    val `grade`: WrappedGrade
+    , 
+    /**
+     * The part with the most points and the one with the fewest (the first of equals).
+     */
+    val `best`: WrappedFfcsPart
+    , 
+    val `worst`: WrappedFfcsPart
+    , 
+    /**
+     * Monday to Saturday without a class, 0 = Monday.
+     */
+    val `freeDays`: List<kotlin.Int>
+    , 
+    /**
+     * Classes starting before 9:00 in a week.
+     */
+    val `early`: kotlin.Int
+    , 
+    /**
+     * Minutes a week waiting between classes, the lunch break left out.
+     */
+    val `gapMinutes`: kotlin.Int
+    , 
+    /**
+     * Class days with nothing from 12:30 to 14:00, of `class_days`.
+     */
+    val `lunchFreeDays`: kotlin.Int
+    , 
+    val `classDays`: kotlin.Int
+    , 
+    /**
+     * Back-to-back classes in different blocks a week, and the pair seen most.
+     */
+    val `sprints`: kotlin.Int
+    , 
+    val `sprintFrom`: kotlin.String?
+    , 
+    val `sprintTo`: kotlin.String?
+    , 
+    /**
+     * The week drawn: each class once (a lab session once), by day then start.
+     */
+    val `week`: List<WrappedWeekSlot>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedFfcs: FfiConverterRustBuffer<WrappedFfcs> {
+    override fun read(buf: ByteBuffer): WrappedFfcs {
+        return WrappedFfcs(
+            FfiConverterInt.read(buf),
+            FfiConverterTypeWrappedGrade.read(buf),
+            FfiConverterTypeWrappedFfcsPart.read(buf),
+            FfiConverterTypeWrappedFfcsPart.read(buf),
+            FfiConverterSequenceInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceTypeWrappedWeekSlot.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedFfcs) = (
+            FfiConverterInt.allocationSize(value.`score`) +
+            FfiConverterTypeWrappedGrade.allocationSize(value.`grade`) +
+            FfiConverterTypeWrappedFfcsPart.allocationSize(value.`best`) +
+            FfiConverterTypeWrappedFfcsPart.allocationSize(value.`worst`) +
+            FfiConverterSequenceInt.allocationSize(value.`freeDays`) +
+            FfiConverterInt.allocationSize(value.`early`) +
+            FfiConverterInt.allocationSize(value.`gapMinutes`) +
+            FfiConverterInt.allocationSize(value.`lunchFreeDays`) +
+            FfiConverterInt.allocationSize(value.`classDays`) +
+            FfiConverterInt.allocationSize(value.`sprints`) +
+            FfiConverterOptionalString.allocationSize(value.`sprintFrom`) +
+            FfiConverterOptionalString.allocationSize(value.`sprintTo`) +
+            FfiConverterSequenceTypeWrappedWeekSlot.allocationSize(value.`week`)
+    )
+
+    override fun write(value: WrappedFfcs, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`score`, buf)
+            FfiConverterTypeWrappedGrade.write(value.`grade`, buf)
+            FfiConverterTypeWrappedFfcsPart.write(value.`best`, buf)
+            FfiConverterTypeWrappedFfcsPart.write(value.`worst`, buf)
+            FfiConverterSequenceInt.write(value.`freeDays`, buf)
+            FfiConverterInt.write(value.`early`, buf)
+            FfiConverterInt.write(value.`gapMinutes`, buf)
+            FfiConverterInt.write(value.`lunchFreeDays`, buf)
+            FfiConverterInt.write(value.`classDays`, buf)
+            FfiConverterInt.write(value.`sprints`, buf)
+            FfiConverterOptionalString.write(value.`sprintFrom`, buf)
+            FfiConverterOptionalString.write(value.`sprintTo`, buf)
+            FfiConverterSequenceTypeWrappedWeekSlot.write(value.`week`, buf)
     }
 }
 
@@ -21138,6 +21568,59 @@ public object FfiConverterTypeWrappedGrades: FfiConverterRustBuffer<WrappedGrade
 
 
 
+/**
+ * A guess's range of attendance percent.
+ */
+data class WrappedGuess (
+    val `from`: kotlin.Int
+    , 
+    /**
+     * Inclusive; none for the top range ("90%+"), which runs to 100.
+     */
+    val `to`: kotlin.Int?
+    , 
+    /**
+     * Points from the range to the real percent: 0 inside it, more than 0 when the real one is
+     * higher (undersold), less when lower.
+     */
+    val `off`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedGuess: FfiConverterRustBuffer<WrappedGuess> {
+    override fun read(buf: ByteBuffer): WrappedGuess {
+        return WrappedGuess(
+            FfiConverterInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedGuess) = (
+            FfiConverterInt.allocationSize(value.`from`) +
+            FfiConverterOptionalInt.allocationSize(value.`to`) +
+            FfiConverterInt.allocationSize(value.`off`)
+    )
+
+    override fun write(value: WrappedGuess, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`from`, buf)
+            FfiConverterOptionalInt.write(value.`to`, buf)
+            FfiConverterInt.write(value.`off`, buf)
+    }
+}
+
+
+
 data class WrappedHabits (
     /**
      * 0 = Monday; none without an absence.
@@ -21155,6 +21638,11 @@ data class WrappedHabits (
     , 
     val `earlyClasses`: kotlin.Int
     , 
+    /**
+     * Of those, attended.
+     */
+    val `earlyAttended`: kotlin.Int
+    , 
     val `firstSlotDays`: kotlin.Int
     , 
     val `lastSlotDays`: kotlin.Int
@@ -21163,6 +21651,17 @@ data class WrappedHabits (
      * Absences by weekday, Monday first; 7 long.
      */
     val `missesByWeekday`: List<kotlin.Int>
+    , 
+    /**
+     * Attended classes (a lab session once) on an average class day of each weekday, in
+     * tenths, Monday first; 7 long, 0 for a weekday without [`QUIET_MIN_DAYS`] class days.
+     */
+    val `classesPerDayTenths`: List<kotlin.Int>
+    , 
+    /**
+     * 0 = Monday: the fewest of those; none with fewer than two such weekdays.
+     */
+    val `quietestWeekday`: kotlin.Int?
     
 ){
     
@@ -21186,7 +21685,10 @@ public object FfiConverterTypeWrappedHabits: FfiConverterRustBuffer<WrappedHabit
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
             FfiConverterSequenceInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
         )
     }
 
@@ -21196,9 +21698,12 @@ public object FfiConverterTypeWrappedHabits: FfiConverterRustBuffer<WrappedHabit
             FfiConverterInt.allocationSize(value.`misses`) +
             FfiConverterOptionalInt.allocationSize(value.`earlyPercent`) +
             FfiConverterInt.allocationSize(value.`earlyClasses`) +
+            FfiConverterInt.allocationSize(value.`earlyAttended`) +
             FfiConverterInt.allocationSize(value.`firstSlotDays`) +
             FfiConverterInt.allocationSize(value.`lastSlotDays`) +
-            FfiConverterSequenceInt.allocationSize(value.`missesByWeekday`)
+            FfiConverterSequenceInt.allocationSize(value.`missesByWeekday`) +
+            FfiConverterSequenceInt.allocationSize(value.`classesPerDayTenths`) +
+            FfiConverterOptionalInt.allocationSize(value.`quietestWeekday`)
     )
 
     override fun write(value: WrappedHabits, buf: ByteBuffer) {
@@ -21207,9 +21712,12 @@ public object FfiConverterTypeWrappedHabits: FfiConverterRustBuffer<WrappedHabit
             FfiConverterInt.write(value.`misses`, buf)
             FfiConverterOptionalInt.write(value.`earlyPercent`, buf)
             FfiConverterInt.write(value.`earlyClasses`, buf)
+            FfiConverterInt.write(value.`earlyAttended`, buf)
             FfiConverterInt.write(value.`firstSlotDays`, buf)
             FfiConverterInt.write(value.`lastSlotDays`, buf)
             FfiConverterSequenceInt.write(value.`missesByWeekday`, buf)
+            FfiConverterSequenceInt.write(value.`classesPerDayTenths`, buf)
+            FfiConverterOptionalInt.write(value.`quietestWeekday`, buf)
     }
 }
 
@@ -21340,7 +21848,10 @@ data class WrappedMarks (
      */
     val `catChange`: kotlin.Int?
     , 
-    val `mostImproved`: kotlin.String?
+    /**
+     * The course that rose the most from CAT-I to CAT-II, whatever the average did.
+     */
+    val `mostImproved`: WrappedRise?
     
 ){
     
@@ -21361,7 +21872,7 @@ public object FfiConverterTypeWrappedMarks: FfiConverterRustBuffer<WrappedMarks>
             FfiConverterOptionalString.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterOptionalInt.read(buf),
-            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalTypeWrappedRise.read(buf),
         )
     }
 
@@ -21370,7 +21881,7 @@ public object FfiConverterTypeWrappedMarks: FfiConverterRustBuffer<WrappedMarks>
             FfiConverterOptionalString.allocationSize(value.`bestCourse`) +
             FfiConverterInt.allocationSize(value.`bestCoursePercent`) +
             FfiConverterOptionalInt.allocationSize(value.`catChange`) +
-            FfiConverterOptionalString.allocationSize(value.`mostImproved`)
+            FfiConverterOptionalTypeWrappedRise.allocationSize(value.`mostImproved`)
     )
 
     override fun write(value: WrappedMarks, buf: ByteBuffer) {
@@ -21378,7 +21889,246 @@ public object FfiConverterTypeWrappedMarks: FfiConverterRustBuffer<WrappedMarks>
             FfiConverterOptionalString.write(value.`bestCourse`, buf)
             FfiConverterInt.write(value.`bestCoursePercent`, buf)
             FfiConverterOptionalInt.write(value.`catChange`, buf)
-            FfiConverterOptionalString.write(value.`mostImproved`, buf)
+            FfiConverterOptionalTypeWrappedRise.write(value.`mostImproved`, buf)
+    }
+}
+
+
+
+/**
+ * The semester as a five-track tape, picked by [`mixtape::RULES`].
+ */
+data class WrappedMixtape (
+    /**
+     * "The Comeback Cut".
+     */
+    val `albumTitle`: kotlin.String
+    , 
+    /**
+     * "Lab-Coat Ambient".
+     */
+    val `genre`: kotlin.String
+    , 
+    /**
+     * "FALL '26", on the cover.
+     */
+    val `stamp`: kotlin.String
+    , 
+    /**
+     * The tracks' lengths summed, "m:ss".
+     */
+    val `totalDuration`: kotlin.String
+    , 
+    val `totalSecs`: kotlin.Int
+    , 
+    /**
+     * From the student and semester, for the cover's shapes: the same tape every time.
+     */
+    val `coverSeed`: kotlin.ULong
+    , 
+    val `coverTone`: WrappedMixtapeTone
+    , 
+    /**
+     * A run of [`mixtape::NO_SKIPS`] classes or more: "No skips" beside the runtime.
+     */
+    val `noSkips`: kotlin.Boolean
+    , 
+    /**
+     * Five, in play order.
+     */
+    val `tracks`: List<WrappedTrack>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedMixtape: FfiConverterRustBuffer<WrappedMixtape> {
+    override fun read(buf: ByteBuffer): WrappedMixtape {
+        return WrappedMixtape(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterTypeWrappedMixtapeTone.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceTypeWrappedTrack.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedMixtape) = (
+            FfiConverterString.allocationSize(value.`albumTitle`) +
+            FfiConverterString.allocationSize(value.`genre`) +
+            FfiConverterString.allocationSize(value.`stamp`) +
+            FfiConverterString.allocationSize(value.`totalDuration`) +
+            FfiConverterInt.allocationSize(value.`totalSecs`) +
+            FfiConverterULong.allocationSize(value.`coverSeed`) +
+            FfiConverterTypeWrappedMixtapeTone.allocationSize(value.`coverTone`) +
+            FfiConverterBoolean.allocationSize(value.`noSkips`) +
+            FfiConverterSequenceTypeWrappedTrack.allocationSize(value.`tracks`)
+    )
+
+    override fun write(value: WrappedMixtape, buf: ByteBuffer) {
+            FfiConverterString.write(value.`albumTitle`, buf)
+            FfiConverterString.write(value.`genre`, buf)
+            FfiConverterString.write(value.`stamp`, buf)
+            FfiConverterString.write(value.`totalDuration`, buf)
+            FfiConverterInt.write(value.`totalSecs`, buf)
+            FfiConverterULong.write(value.`coverSeed`, buf)
+            FfiConverterTypeWrappedMixtapeTone.write(value.`coverTone`, buf)
+            FfiConverterBoolean.write(value.`noSkips`, buf)
+            FfiConverterSequenceTypeWrappedTrack.write(value.`tracks`, buf)
+    }
+}
+
+
+
+data class WrappedMonth (
+    /**
+     * 1 = January.
+     */
+    val `month`: kotlin.Int
+    , 
+    /**
+     * Its first and last day inside the window.
+     */
+    val `firstDay`: kotlin.Int
+    , 
+    val `lastDay`: kotlin.Int
+    , 
+    /**
+     * Classes in VTOP's units (a lab session is two).
+     */
+    val `counted`: kotlin.Int
+    , 
+    /**
+     * Rounded up as VTOP does; none without a counted class.
+     */
+    val `percent`: kotlin.Int?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedMonth: FfiConverterRustBuffer<WrappedMonth> {
+    override fun read(buf: ByteBuffer): WrappedMonth {
+        return WrappedMonth(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedMonth) = (
+            FfiConverterInt.allocationSize(value.`month`) +
+            FfiConverterInt.allocationSize(value.`firstDay`) +
+            FfiConverterInt.allocationSize(value.`lastDay`) +
+            FfiConverterInt.allocationSize(value.`counted`) +
+            FfiConverterOptionalInt.allocationSize(value.`percent`)
+    )
+
+    override fun write(value: WrappedMonth, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`month`, buf)
+            FfiConverterInt.write(value.`firstDay`, buf)
+            FfiConverterInt.write(value.`lastDay`, buf)
+            FfiConverterInt.write(value.`counted`, buf)
+            FfiConverterOptionalInt.write(value.`percent`, buf)
+    }
+}
+
+
+
+/**
+ * The semester a day at a time, Monday to Sunday rows.
+ */
+data class WrappedMosaic (
+    /**
+     * The Monday on or before the first class day: `days`' first.
+     */
+    val `firstDay`: kotlin.Int
+    , 
+    /**
+     * To the Sunday on or after the window's end; a multiple of 7 long.
+     */
+    val `days`: List<WrappedDay>
+    , 
+    /**
+     * Calendar months with a day in the window, in order.
+     */
+    val `months`: List<WrappedMonth>
+    , 
+    /**
+     * Indices into `months`, among months with [`MONTH_MIN`] counted classes; none
+     * with fewer than two such months, or when they tie.
+     */
+    val `bestMonth`: kotlin.Int?
+    , 
+    val `worstMonth`: kotlin.Int?
+    , 
+    /**
+     * Days with a counted class.
+     */
+    val `classDays`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedMosaic: FfiConverterRustBuffer<WrappedMosaic> {
+    override fun read(buf: ByteBuffer): WrappedMosaic {
+        return WrappedMosaic(
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceTypeWrappedDay.read(buf),
+            FfiConverterSequenceTypeWrappedMonth.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedMosaic) = (
+            FfiConverterInt.allocationSize(value.`firstDay`) +
+            FfiConverterSequenceTypeWrappedDay.allocationSize(value.`days`) +
+            FfiConverterSequenceTypeWrappedMonth.allocationSize(value.`months`) +
+            FfiConverterOptionalInt.allocationSize(value.`bestMonth`) +
+            FfiConverterOptionalInt.allocationSize(value.`worstMonth`) +
+            FfiConverterInt.allocationSize(value.`classDays`)
+    )
+
+    override fun write(value: WrappedMosaic, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`firstDay`, buf)
+            FfiConverterSequenceTypeWrappedDay.write(value.`days`, buf)
+            FfiConverterSequenceTypeWrappedMonth.write(value.`months`, buf)
+            FfiConverterOptionalInt.write(value.`bestMonth`, buf)
+            FfiConverterOptionalInt.write(value.`worstMonth`, buf)
+            FfiConverterInt.write(value.`classDays`, buf)
     }
 }
 
@@ -21389,7 +22139,8 @@ public object FfiConverterTypeWrappedMarks: FfiConverterRustBuffer<WrappedMarks>
  */
 data class WrappedMoves (
     /**
-     * Each day's first floor and every rise after it.
+     * Each day's first floor and every rise after it; a room in another block counts from
+     * that block's ground floor.
      */
     val `floors`: kotlin.Int
     , 
@@ -21575,6 +22326,66 @@ public object FfiConverterTypeWrappedOutings: FfiConverterRustBuffer<WrappedOuti
 
 
 
+data class WrappedPhase (
+    /**
+     * The exam it follows ("CAT-I"); none for the first.
+     */
+    val `after`: kotlin.String?
+    , 
+    /**
+     * The exam it leads to; none for the last.
+     */
+    val `before`: kotlin.String?
+    , 
+    /**
+     * Classes inside it only, rounded up as VTOP does.
+     */
+    val `percent`: kotlin.Int
+    , 
+    /**
+     * Lower than every other phase.
+     */
+    val `lowest`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedPhase: FfiConverterRustBuffer<WrappedPhase> {
+    override fun read(buf: ByteBuffer): WrappedPhase {
+        return WrappedPhase(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedPhase) = (
+            FfiConverterOptionalString.allocationSize(value.`after`) +
+            FfiConverterOptionalString.allocationSize(value.`before`) +
+            FfiConverterInt.allocationSize(value.`percent`) +
+            FfiConverterBoolean.allocationSize(value.`lowest`)
+    )
+
+    override fun write(value: WrappedPhase, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`after`, buf)
+            FfiConverterOptionalString.write(value.`before`, buf)
+            FfiConverterInt.write(value.`percent`, buf)
+            FfiConverterBoolean.write(value.`lowest`, buf)
+    }
+}
+
+
+
 data class WrappedPlaces (
     /**
      * "AB1-205".
@@ -21585,7 +22396,10 @@ data class WrappedPlaces (
     , 
     val `faculty`: kotlin.String?
     , 
-    val `facultyClasses`: kotlin.Int
+    /**
+     * Attended class time with that faculty; a lab session is 100 minutes.
+     */
+    val `facultyMinutes`: kotlin.Int
     
 ){
     
@@ -21613,14 +22427,55 @@ public object FfiConverterTypeWrappedPlaces: FfiConverterRustBuffer<WrappedPlace
             FfiConverterOptionalString.allocationSize(value.`room`) +
             FfiConverterInt.allocationSize(value.`roomMinutes`) +
             FfiConverterOptionalString.allocationSize(value.`faculty`) +
-            FfiConverterInt.allocationSize(value.`facultyClasses`)
+            FfiConverterInt.allocationSize(value.`facultyMinutes`)
     )
 
     override fun write(value: WrappedPlaces, buf: ByteBuffer) {
             FfiConverterOptionalString.write(value.`room`, buf)
             FfiConverterInt.write(value.`roomMinutes`, buf)
             FfiConverterOptionalString.write(value.`faculty`, buf)
-            FfiConverterInt.write(value.`facultyClasses`, buf)
+            FfiConverterInt.write(value.`facultyMinutes`, buf)
+    }
+}
+
+
+
+data class WrappedPoint (
+    val `day`: kotlin.Int
+    , 
+    /**
+     * Exact, not rounded.
+     */
+    val `percent`: kotlin.Double
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedPoint: FfiConverterRustBuffer<WrappedPoint> {
+    override fun read(buf: ByteBuffer): WrappedPoint {
+        return WrappedPoint(
+            FfiConverterInt.read(buf),
+            FfiConverterDouble.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedPoint) = (
+            FfiConverterInt.allocationSize(value.`day`) +
+            FfiConverterDouble.allocationSize(value.`percent`)
+    )
+
+    override fun write(value: WrappedPoint, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`day`, buf)
+            FfiConverterDouble.write(value.`percent`, buf)
     }
 }
 
@@ -21698,20 +22553,36 @@ data class WrappedReport (
     , 
     val `holidays`: kotlin.Int
     , 
+    /**
+     * Days from `first_day` to `window_end`, both counted.
+     */
+    val `spanDays`: kotlin.Int
+    , 
+    /**
+     * The semester's course codes, sorted, for the opening.
+     */
+    val `courseCodes`: List<kotlin.String>
+    , 
     val `attendance`: WrappedAttendance?
+    , 
+    val `mosaic`: WrappedMosaic?
+    , 
+    val `arc`: WrappedArc?
     , 
     val `onDuty`: WrappedOnDuty?
     , 
     val `streak`: WrappedStreak?
     , 
     /**
-     * Course names; empty skips the slide.
+     * Course names, badged on the Courses slide.
      */
     val `neverMissed`: List<kotlin.String>
     , 
     val `comeback`: WrappedComeback?
     , 
     val `closeCall`: WrappedCloseCall?
+    , 
+    val `traps`: WrappedTraps?
     , 
     val `habits`: WrappedHabits?
     , 
@@ -21720,6 +22591,11 @@ data class WrappedReport (
     val `time`: WrappedTime?
     , 
     val `places`: WrappedPlaces?
+    , 
+    /**
+     * None in a first semester (no FFCS yet) or without a timetable.
+     */
+    val `ffcs`: WrappedFfcs?
     , 
     val `marks`: WrappedMarks?
     , 
@@ -21735,6 +22611,10 @@ data class WrappedReport (
     , 
     val `cgpa`: WrappedCgpa?
     , 
+    val `degree`: WrappedDegree?
+    , 
+    val `roi`: WrappedRoi?
+    , 
     val `outings`: WrappedOutings?
     , 
     val `campus`: WrappedCampus?
@@ -21745,12 +22625,35 @@ data class WrappedReport (
     , 
     val `previous`: WrappedPrevious?
     , 
+    /**
+     * Every title the facts earn, the strongest first, ending with The Steady Cruiser; the
+     * title is the first one the share's privacy choices leave.
+     */
+    val `traits`: List<WrappedTrait>
+    , 
     val `title`: WrappedTitle
     , 
     /**
      * The title when Hide grades is on.
      */
     val `titleWithoutGrades`: WrappedTitle
+    , 
+    /**
+     * Picked from the facts above; none skips the slide.
+     */
+    val `mixtape`: WrappedMixtape?
+    , 
+    /**
+     * The mixtape when Hide grades is on.
+     */
+    val `mixtapeWithoutGrades`: WrappedMixtape?
+    , 
+    /**
+     * The mixtape when Hide hostel and outings is on, and when both are.
+     */
+    val `mixtapeWithoutHostel`: WrappedMixtape?
+    , 
+    val `mixtapeWithoutEither`: WrappedMixtape?
     , 
     /**
      * Every instructional day, for the campus fetch.
@@ -21780,16 +22683,22 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
             FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceString.read(buf),
             FfiConverterOptionalTypeWrappedAttendance.read(buf),
+            FfiConverterOptionalTypeWrappedMosaic.read(buf),
+            FfiConverterOptionalTypeWrappedArc.read(buf),
             FfiConverterOptionalTypeWrappedOnDuty.read(buf),
             FfiConverterOptionalTypeWrappedStreak.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterOptionalTypeWrappedComeback.read(buf),
             FfiConverterOptionalTypeWrappedCloseCall.read(buf),
+            FfiConverterOptionalTypeWrappedTraps.read(buf),
             FfiConverterOptionalTypeWrappedHabits.read(buf),
             FfiConverterOptionalTypeWrappedDayHalf.read(buf),
             FfiConverterOptionalTypeWrappedTime.read(buf),
             FfiConverterOptionalTypeWrappedPlaces.read(buf),
+            FfiConverterOptionalTypeWrappedFfcs.read(buf),
             FfiConverterOptionalTypeWrappedMarks.read(buf),
             FfiConverterOptionalTypeWrappedFullMarks.read(buf),
             FfiConverterOptionalTypeWrappedAssessments.read(buf),
@@ -21797,13 +22706,20 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterOptionalTypeWrappedCrunch.read(buf),
             FfiConverterOptionalTypeWrappedGrades.read(buf),
             FfiConverterOptionalTypeWrappedCgpa.read(buf),
+            FfiConverterOptionalTypeWrappedDegree.read(buf),
+            FfiConverterOptionalTypeWrappedRoi.read(buf),
             FfiConverterOptionalTypeWrappedOutings.read(buf),
             FfiConverterOptionalTypeWrappedCampus.read(buf),
             FfiConverterOptionalTypeWrappedHostel.read(buf),
             FfiConverterOptionalTypeWrappedMoves.read(buf),
             FfiConverterOptionalTypeWrappedPrevious.read(buf),
+            FfiConverterSequenceTypeWrappedTrait.read(buf),
             FfiConverterTypeWrappedTitle.read(buf),
             FfiConverterTypeWrappedTitle.read(buf),
+            FfiConverterOptionalTypeWrappedMixtape.read(buf),
+            FfiConverterOptionalTypeWrappedMixtape.read(buf),
+            FfiConverterOptionalTypeWrappedMixtape.read(buf),
+            FfiConverterOptionalTypeWrappedMixtape.read(buf),
             FfiConverterSequenceInt.read(buf),
         )
     }
@@ -21817,16 +22733,22 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterInt.allocationSize(value.`courses`) +
             FfiConverterInt.allocationSize(value.`classDayCount`) +
             FfiConverterInt.allocationSize(value.`holidays`) +
+            FfiConverterInt.allocationSize(value.`spanDays`) +
+            FfiConverterSequenceString.allocationSize(value.`courseCodes`) +
             FfiConverterOptionalTypeWrappedAttendance.allocationSize(value.`attendance`) +
+            FfiConverterOptionalTypeWrappedMosaic.allocationSize(value.`mosaic`) +
+            FfiConverterOptionalTypeWrappedArc.allocationSize(value.`arc`) +
             FfiConverterOptionalTypeWrappedOnDuty.allocationSize(value.`onDuty`) +
             FfiConverterOptionalTypeWrappedStreak.allocationSize(value.`streak`) +
             FfiConverterSequenceString.allocationSize(value.`neverMissed`) +
             FfiConverterOptionalTypeWrappedComeback.allocationSize(value.`comeback`) +
             FfiConverterOptionalTypeWrappedCloseCall.allocationSize(value.`closeCall`) +
+            FfiConverterOptionalTypeWrappedTraps.allocationSize(value.`traps`) +
             FfiConverterOptionalTypeWrappedHabits.allocationSize(value.`habits`) +
             FfiConverterOptionalTypeWrappedDayHalf.allocationSize(value.`dayHalf`) +
             FfiConverterOptionalTypeWrappedTime.allocationSize(value.`time`) +
             FfiConverterOptionalTypeWrappedPlaces.allocationSize(value.`places`) +
+            FfiConverterOptionalTypeWrappedFfcs.allocationSize(value.`ffcs`) +
             FfiConverterOptionalTypeWrappedMarks.allocationSize(value.`marks`) +
             FfiConverterOptionalTypeWrappedFullMarks.allocationSize(value.`fullMarks`) +
             FfiConverterOptionalTypeWrappedAssessments.allocationSize(value.`assessments`) +
@@ -21834,13 +22756,20 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterOptionalTypeWrappedCrunch.allocationSize(value.`crunch`) +
             FfiConverterOptionalTypeWrappedGrades.allocationSize(value.`grades`) +
             FfiConverterOptionalTypeWrappedCgpa.allocationSize(value.`cgpa`) +
+            FfiConverterOptionalTypeWrappedDegree.allocationSize(value.`degree`) +
+            FfiConverterOptionalTypeWrappedRoi.allocationSize(value.`roi`) +
             FfiConverterOptionalTypeWrappedOutings.allocationSize(value.`outings`) +
             FfiConverterOptionalTypeWrappedCampus.allocationSize(value.`campus`) +
             FfiConverterOptionalTypeWrappedHostel.allocationSize(value.`hostel`) +
             FfiConverterOptionalTypeWrappedMoves.allocationSize(value.`moves`) +
             FfiConverterOptionalTypeWrappedPrevious.allocationSize(value.`previous`) +
+            FfiConverterSequenceTypeWrappedTrait.allocationSize(value.`traits`) +
             FfiConverterTypeWrappedTitle.allocationSize(value.`title`) +
             FfiConverterTypeWrappedTitle.allocationSize(value.`titleWithoutGrades`) +
+            FfiConverterOptionalTypeWrappedMixtape.allocationSize(value.`mixtape`) +
+            FfiConverterOptionalTypeWrappedMixtape.allocationSize(value.`mixtapeWithoutGrades`) +
+            FfiConverterOptionalTypeWrappedMixtape.allocationSize(value.`mixtapeWithoutHostel`) +
+            FfiConverterOptionalTypeWrappedMixtape.allocationSize(value.`mixtapeWithoutEither`) +
             FfiConverterSequenceInt.allocationSize(value.`classDays`)
     )
 
@@ -21853,16 +22782,22 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterInt.write(value.`courses`, buf)
             FfiConverterInt.write(value.`classDayCount`, buf)
             FfiConverterInt.write(value.`holidays`, buf)
+            FfiConverterInt.write(value.`spanDays`, buf)
+            FfiConverterSequenceString.write(value.`courseCodes`, buf)
             FfiConverterOptionalTypeWrappedAttendance.write(value.`attendance`, buf)
+            FfiConverterOptionalTypeWrappedMosaic.write(value.`mosaic`, buf)
+            FfiConverterOptionalTypeWrappedArc.write(value.`arc`, buf)
             FfiConverterOptionalTypeWrappedOnDuty.write(value.`onDuty`, buf)
             FfiConverterOptionalTypeWrappedStreak.write(value.`streak`, buf)
             FfiConverterSequenceString.write(value.`neverMissed`, buf)
             FfiConverterOptionalTypeWrappedComeback.write(value.`comeback`, buf)
             FfiConverterOptionalTypeWrappedCloseCall.write(value.`closeCall`, buf)
+            FfiConverterOptionalTypeWrappedTraps.write(value.`traps`, buf)
             FfiConverterOptionalTypeWrappedHabits.write(value.`habits`, buf)
             FfiConverterOptionalTypeWrappedDayHalf.write(value.`dayHalf`, buf)
             FfiConverterOptionalTypeWrappedTime.write(value.`time`, buf)
             FfiConverterOptionalTypeWrappedPlaces.write(value.`places`, buf)
+            FfiConverterOptionalTypeWrappedFfcs.write(value.`ffcs`, buf)
             FfiConverterOptionalTypeWrappedMarks.write(value.`marks`, buf)
             FfiConverterOptionalTypeWrappedFullMarks.write(value.`fullMarks`, buf)
             FfiConverterOptionalTypeWrappedAssessments.write(value.`assessments`, buf)
@@ -21870,14 +22805,263 @@ public object FfiConverterTypeWrappedReport: FfiConverterRustBuffer<WrappedRepor
             FfiConverterOptionalTypeWrappedCrunch.write(value.`crunch`, buf)
             FfiConverterOptionalTypeWrappedGrades.write(value.`grades`, buf)
             FfiConverterOptionalTypeWrappedCgpa.write(value.`cgpa`, buf)
+            FfiConverterOptionalTypeWrappedDegree.write(value.`degree`, buf)
+            FfiConverterOptionalTypeWrappedRoi.write(value.`roi`, buf)
             FfiConverterOptionalTypeWrappedOutings.write(value.`outings`, buf)
             FfiConverterOptionalTypeWrappedCampus.write(value.`campus`, buf)
             FfiConverterOptionalTypeWrappedHostel.write(value.`hostel`, buf)
             FfiConverterOptionalTypeWrappedMoves.write(value.`moves`, buf)
             FfiConverterOptionalTypeWrappedPrevious.write(value.`previous`, buf)
+            FfiConverterSequenceTypeWrappedTrait.write(value.`traits`, buf)
             FfiConverterTypeWrappedTitle.write(value.`title`, buf)
             FfiConverterTypeWrappedTitle.write(value.`titleWithoutGrades`, buf)
+            FfiConverterOptionalTypeWrappedMixtape.write(value.`mixtape`, buf)
+            FfiConverterOptionalTypeWrappedMixtape.write(value.`mixtapeWithoutGrades`, buf)
+            FfiConverterOptionalTypeWrappedMixtape.write(value.`mixtapeWithoutHostel`, buf)
+            FfiConverterOptionalTypeWrappedMixtape.write(value.`mixtapeWithoutEither`, buf)
             FfiConverterSequenceInt.write(value.`classDays`, buf)
+    }
+}
+
+
+
+data class WrappedRise (
+    val `course`: kotlin.String
+    , 
+    /**
+     * Percentage points, more than 0.
+     */
+    val `points`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedRise: FfiConverterRustBuffer<WrappedRise> {
+    override fun read(buf: ByteBuffer): WrappedRise {
+        return WrappedRise(
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedRise) = (
+            FfiConverterString.allocationSize(value.`course`) +
+            FfiConverterInt.allocationSize(value.`points`)
+    )
+
+    override fun write(value: WrappedRise, buf: ByteBuffer) {
+            FfiConverterString.write(value.`course`, buf)
+            FfiConverterInt.write(value.`points`, buf)
+    }
+}
+
+
+
+/**
+ * Attendance against score per course (theory and lab pooled by code).
+ */
+data class WrappedRoi (
+    val `points`: List<WrappedRoiPoint>
+    , 
+    val `source`: WrappedScoreSource
+    , 
+    val `verdict`: WrappedRoiVerdict
+    , 
+    /**
+     * Indices into `points`: the most score over attendance, and the most attendance over
+     * score (another course, at least [`GRIND_GAP`] points apart).
+     */
+    val `best`: kotlin.Int
+    , 
+    val `grind`: kotlin.Int?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedRoi: FfiConverterRustBuffer<WrappedRoi> {
+    override fun read(buf: ByteBuffer): WrappedRoi {
+        return WrappedRoi(
+            FfiConverterSequenceTypeWrappedRoiPoint.read(buf),
+            FfiConverterTypeWrappedScoreSource.read(buf),
+            FfiConverterTypeWrappedRoiVerdict.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedRoi) = (
+            FfiConverterSequenceTypeWrappedRoiPoint.allocationSize(value.`points`) +
+            FfiConverterTypeWrappedScoreSource.allocationSize(value.`source`) +
+            FfiConverterTypeWrappedRoiVerdict.allocationSize(value.`verdict`) +
+            FfiConverterInt.allocationSize(value.`best`) +
+            FfiConverterOptionalInt.allocationSize(value.`grind`)
+    )
+
+    override fun write(value: WrappedRoi, buf: ByteBuffer) {
+            FfiConverterSequenceTypeWrappedRoiPoint.write(value.`points`, buf)
+            FfiConverterTypeWrappedScoreSource.write(value.`source`, buf)
+            FfiConverterTypeWrappedRoiVerdict.write(value.`verdict`, buf)
+            FfiConverterInt.write(value.`best`, buf)
+            FfiConverterOptionalInt.write(value.`grind`, buf)
+    }
+}
+
+
+
+data class WrappedRoiPoint (
+    val `course`: kotlin.String
+    , 
+    /**
+     * Percent, rounded up as VTOP does.
+     */
+    val `attendance`: kotlin.Int
+    , 
+    /**
+     * Out of 100.
+     */
+    val `score`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedRoiPoint: FfiConverterRustBuffer<WrappedRoiPoint> {
+    override fun read(buf: ByteBuffer): WrappedRoiPoint {
+        return WrappedRoiPoint(
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedRoiPoint) = (
+            FfiConverterString.allocationSize(value.`course`) +
+            FfiConverterInt.allocationSize(value.`attendance`) +
+            FfiConverterInt.allocationSize(value.`score`)
+    )
+
+    override fun write(value: WrappedRoiPoint, buf: ByteBuffer) {
+            FfiConverterString.write(value.`course`, buf)
+            FfiConverterInt.write(value.`attendance`, buf)
+            FfiConverterInt.write(value.`score`, buf)
+    }
+}
+
+
+
+data class WrappedSemesterGpa (
+    /**
+     * "Nov '25", as the grade history's trend.
+     */
+    val `short`: kotlin.String
+    , 
+    val `gpa`: kotlin.Double
+    , 
+    val `current`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedSemesterGpa: FfiConverterRustBuffer<WrappedSemesterGpa> {
+    override fun read(buf: ByteBuffer): WrappedSemesterGpa {
+        return WrappedSemesterGpa(
+            FfiConverterString.read(buf),
+            FfiConverterDouble.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedSemesterGpa) = (
+            FfiConverterString.allocationSize(value.`short`) +
+            FfiConverterDouble.allocationSize(value.`gpa`) +
+            FfiConverterBoolean.allocationSize(value.`current`)
+    )
+
+    override fun write(value: WrappedSemesterGpa, buf: ByteBuffer) {
+            FfiConverterString.write(value.`short`, buf)
+            FfiConverterDouble.write(value.`gpa`, buf)
+            FfiConverterBoolean.write(value.`current`, buf)
+    }
+}
+
+
+
+data class WrappedSpan (
+    /**
+     * "CAT-I", "CAT-II", "FAT".
+     */
+    val `name`: kotlin.String
+    , 
+    val `firstDay`: kotlin.Int
+    , 
+    val `lastDay`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedSpan: FfiConverterRustBuffer<WrappedSpan> {
+    override fun read(buf: ByteBuffer): WrappedSpan {
+        return WrappedSpan(
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedSpan) = (
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterInt.allocationSize(value.`firstDay`) +
+            FfiConverterInt.allocationSize(value.`lastDay`)
+    )
+
+    override fun write(value: WrappedSpan, buf: ByteBuffer) {
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterInt.write(value.`firstDay`, buf)
+            FfiConverterInt.write(value.`lastDay`, buf)
     }
 }
 
@@ -22004,6 +23188,245 @@ public object FfiConverterTypeWrappedTime: FfiConverterRustBuffer<WrappedTime> {
             FfiConverterInt.write(value.`labMinutes`, buf)
             FfiConverterInt.write(value.`busiestWeekday`, buf)
             FfiConverterSequenceInt.write(value.`classesByWeekday`, buf)
+    }
+}
+
+
+
+data class WrappedTrack (
+    /**
+     * 1 to 5.
+     */
+    val `number`: kotlin.Int
+    , 
+    val `slot`: WrappedTrackSlot
+    , 
+    val `title`: kotlin.String
+    , 
+    /**
+     * The fact behind it: "8 AM classes: 64%".
+     */
+    val `statLine`: kotlin.String
+    , 
+    /**
+     * "6:04": `duration_secs` as "m:ss".
+     */
+    val `duration`: kotlin.String
+    , 
+    val `durationSecs`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedTrack: FfiConverterRustBuffer<WrappedTrack> {
+    override fun read(buf: ByteBuffer): WrappedTrack {
+        return WrappedTrack(
+            FfiConverterInt.read(buf),
+            FfiConverterTypeWrappedTrackSlot.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedTrack) = (
+            FfiConverterInt.allocationSize(value.`number`) +
+            FfiConverterTypeWrappedTrackSlot.allocationSize(value.`slot`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterString.allocationSize(value.`statLine`) +
+            FfiConverterString.allocationSize(value.`duration`) +
+            FfiConverterInt.allocationSize(value.`durationSecs`)
+    )
+
+    override fun write(value: WrappedTrack, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`number`, buf)
+            FfiConverterTypeWrappedTrackSlot.write(value.`slot`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterString.write(value.`statLine`, buf)
+            FfiConverterString.write(value.`duration`, buf)
+            FfiConverterInt.write(value.`durationSecs`, buf)
+    }
+}
+
+
+
+/**
+ * A title the facts earn and how strongly, 1 to 100.
+ */
+data class WrappedTrait (
+    val `title`: WrappedTitle
+    , 
+    val `score`: kotlin.Int
+    , 
+    /**
+     * Left out with Hide grades, and with Hide hostel and outings.
+     */
+    val `grades`: kotlin.Boolean
+    , 
+    val `hostel`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedTrait: FfiConverterRustBuffer<WrappedTrait> {
+    override fun read(buf: ByteBuffer): WrappedTrait {
+        return WrappedTrait(
+            FfiConverterTypeWrappedTitle.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedTrait) = (
+            FfiConverterTypeWrappedTitle.allocationSize(value.`title`) +
+            FfiConverterInt.allocationSize(value.`score`) +
+            FfiConverterBoolean.allocationSize(value.`grades`) +
+            FfiConverterBoolean.allocationSize(value.`hostel`)
+    )
+
+    override fun write(value: WrappedTrait, buf: ByteBuffer) {
+            FfiConverterTypeWrappedTitle.write(value.`title`, buf)
+            FfiConverterInt.write(value.`score`, buf)
+            FfiConverterBoolean.write(value.`grades`, buf)
+            FfiConverterBoolean.write(value.`hostel`, buf)
+    }
+}
+
+
+
+/**
+ * Absences VTOP put down to a missing punch ("No punch found during class hours between faculty
+ * punch."); classes counted once, a lab session too.
+ */
+data class WrappedTraps (
+    val `trapped`: kotlin.Int
+    , 
+    /**
+     * Every absence.
+     */
+    val `absences`: kotlin.Int
+    , 
+    /**
+     * Of `trapped`, on days with a cached biometric copy, and of those, with a class punch from
+     * [`PUNCH_EARLY`] minutes before the class to its end.
+     */
+    val `checked`: kotlin.Int
+    , 
+    val `punched`: kotlin.Int
+    , 
+    /**
+     * The courses with the most, up to 3, most first; `percent` is the count.
+     */
+    val `byCourse`: List<WrappedCourse>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedTraps: FfiConverterRustBuffer<WrappedTraps> {
+    override fun read(buf: ByteBuffer): WrappedTraps {
+        return WrappedTraps(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceTypeWrappedCourse.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedTraps) = (
+            FfiConverterInt.allocationSize(value.`trapped`) +
+            FfiConverterInt.allocationSize(value.`absences`) +
+            FfiConverterInt.allocationSize(value.`checked`) +
+            FfiConverterInt.allocationSize(value.`punched`) +
+            FfiConverterSequenceTypeWrappedCourse.allocationSize(value.`byCourse`)
+    )
+
+    override fun write(value: WrappedTraps, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`trapped`, buf)
+            FfiConverterInt.write(value.`absences`, buf)
+            FfiConverterInt.write(value.`checked`, buf)
+            FfiConverterInt.write(value.`punched`, buf)
+            FfiConverterSequenceTypeWrappedCourse.write(value.`byCourse`, buf)
+    }
+}
+
+
+
+data class WrappedWeekSlot (
+    /**
+     * 0 = Monday.
+     */
+    val `day`: kotlin.Int
+    , 
+    val `start`: kotlin.Int
+    , 
+    val `end`: kotlin.Int
+    , 
+    val `lab`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedWeekSlot: FfiConverterRustBuffer<WrappedWeekSlot> {
+    override fun read(buf: ByteBuffer): WrappedWeekSlot {
+        return WrappedWeekSlot(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: WrappedWeekSlot) = (
+            FfiConverterInt.allocationSize(value.`day`) +
+            FfiConverterInt.allocationSize(value.`start`) +
+            FfiConverterInt.allocationSize(value.`end`) +
+            FfiConverterBoolean.allocationSize(value.`lab`)
+    )
+
+    override fun write(value: WrappedWeekSlot, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`day`, buf)
+            FfiConverterInt.write(value.`start`, buf)
+            FfiConverterInt.write(value.`end`, buf)
+            FfiConverterBoolean.write(value.`lab`, buf)
     }
 }
 
@@ -25968,17 +27391,340 @@ public object FfiConverterTypeTransportError : FfiConverterRustBuffer<TransportE
 
 
 
+/**
+ * The run of the line, by [`COMEBACK_POINTS`].
+ */
+
+enum class WrappedArcShape {
+    
+    /**
+     * Fell, then came back up.
+     */
+    COMEBACK,
+    /**
+     * Ended lower than it started.
+     */
+    SLIDE,
+    /**
+     * Ended higher than it started.
+     */
+    CLIMB,
+    STEADY;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedArcShape: FfiConverterRustBuffer<WrappedArcShape> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedArcShape.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedArcShape) = 4UL
+
+    override fun write(value: WrappedArcShape, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class WrappedDay {
+    
+    /**
+     * Before the first class day or after the window.
+     */
+    OUTSIDE,
+    /**
+     * A named day off (a festival), without a class.
+     */
+    HOLIDAY,
+    /**
+     * An exam day, without a class.
+     */
+    EXAM,
+    /**
+     * Another day without a counted class.
+     */
+    NO_CLASS,
+    ALL_PRESENT,
+    /**
+     * Every class attended, one or more on duty.
+     */
+    ON_DUTY,
+    /**
+     * Some classes missed.
+     */
+    MIXED,
+    ALL_ABSENT;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedDay: FfiConverterRustBuffer<WrappedDay> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedDay.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedDay) = 4UL
+
+    override fun write(value: WrappedDay, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class WrappedFfcsPart {
+    
+    /**
+     * Fewer 8 AMs.
+     */
+    EARLY,
+    /**
+     * Less waiting between classes.
+     */
+    GAPS,
+    /**
+     * Lunch kept free.
+     */
+    LUNCH,
+    /**
+     * Days without a class.
+     */
+    FREE_DAYS;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedFfcsPart: FfiConverterRustBuffer<WrappedFfcsPart> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedFfcsPart.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedFfcsPart) = 4UL
+
+    override fun write(value: WrappedFfcsPart, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class WrappedGrade {
+    
+    S,
+    A,
+    B,
+    C,
+    D,
+    E;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedGrade: FfiConverterRustBuffer<WrappedGrade> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedGrade.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedGrade) = 4UL
+
+    override fun write(value: WrappedGrade, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * The cover's lead colour.
+ */
+
+enum class WrappedMixtapeTone {
+    
+    WARNING,
+    ACCENT,
+    SUCCESS,
+    LAB,
+    DANGER;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedMixtapeTone: FfiConverterRustBuffer<WrappedMixtapeTone> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedMixtapeTone.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedMixtapeTone) = 4UL
+
+    override fun write(value: WrappedMixtapeTone, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * From the correlation of attendance and score.
+ */
+
+enum class WrappedRoiVerdict {
+    
+    SHOWED_UP_PAID_OFF,
+    BUNKED_AND_ACED,
+    NO_PATTERN;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedRoiVerdict: FfiConverterRustBuffer<WrappedRoiVerdict> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedRoiVerdict.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedRoiVerdict) = 4UL
+
+    override fun write(value: WrappedRoiVerdict, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class WrappedScoreSource {
+    
+    /**
+     * The grand total on the grades page.
+     */
+    TOTAL,
+    /**
+     * Weighted marks so far.
+     */
+    MARKS;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedScoreSource: FfiConverterRustBuffer<WrappedScoreSource> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedScoreSource.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedScoreSource) = 4UL
+
+    override fun write(value: WrappedScoreSource, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * In [`titles::RULES`] order, which breaks ties.
+ */
 
 enum class WrappedTitle {
     
+    TOPPER,
+    GHOST_GENIUS,
+    EXAM_CLUTCH,
+    PERFECTIONIST,
     COMEBACK,
+    EDGE_WALKER,
     IRON_STREAK,
     EARLY_REGULAR,
-    TOPPER,
-    EXPLORER,
-    LAB_RAT,
     REGULAR,
-    FREE_SPIRIT;
+    CLUB_CAPTAIN,
+    LAB_RAT,
+    EXPLORER,
+    STAIRMASTER,
+    NIGHT_OWL,
+    /**
+     * Nothing else matched.
+     */
+    STEADY_CRUISER;
 
     
 
@@ -26000,6 +27746,49 @@ public object FfiConverterTypeWrappedTitle: FfiConverterRustBuffer<WrappedTitle>
     override fun allocationSize(value: WrappedTitle) = 4UL
 
     override fun write(value: WrappedTitle, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Where a track's rule belongs on the tape.
+ */
+
+enum class WrappedTrackSlot {
+    
+    OPENER,
+    ATTENDANCE,
+    GRIND,
+    CAMPUS,
+    EXAMS,
+    WILDCARD,
+    RESULTS,
+    CLOSER;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeWrappedTrackSlot: FfiConverterRustBuffer<WrappedTrackSlot> {
+    override fun read(buf: ByteBuffer) = try {
+        WrappedTrackSlot.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: WrappedTrackSlot) = 4UL
+
+    override fun write(value: WrappedTrackSlot, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -27196,6 +28985,38 @@ public object FfiConverterOptionalTypeWeekendOuting: FfiConverterRustBuffer<Week
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedArc: FfiConverterRustBuffer<WrappedArc?> {
+    override fun read(buf: ByteBuffer): WrappedArc? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedArc.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedArc?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedArc.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedArc?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedArc.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedAssessments: FfiConverterRustBuffer<WrappedAssessments?> {
     override fun read(buf: ByteBuffer): WrappedAssessments? {
         if (buf.get().toInt() == 0) {
@@ -27484,6 +29305,70 @@ public object FfiConverterOptionalTypeWrappedDayHalf: FfiConverterRustBuffer<Wra
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedDegree: FfiConverterRustBuffer<WrappedDegree?> {
+    override fun read(buf: ByteBuffer): WrappedDegree? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedDegree.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedDegree?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedDegree.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedDegree?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedDegree.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedDrop: FfiConverterRustBuffer<WrappedDrop?> {
+    override fun read(buf: ByteBuffer): WrappedDrop? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedDrop.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedDrop?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedDrop.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedDrop?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedDrop.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedExams: FfiConverterRustBuffer<WrappedExams?> {
     override fun read(buf: ByteBuffer): WrappedExams? {
         if (buf.get().toInt() == 0) {
@@ -27506,6 +29391,38 @@ public object FfiConverterOptionalTypeWrappedExams: FfiConverterRustBuffer<Wrapp
         } else {
             buf.put(1)
             FfiConverterTypeWrappedExams.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedFfcs: FfiConverterRustBuffer<WrappedFfcs?> {
+    override fun read(buf: ByteBuffer): WrappedFfcs? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedFfcs.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedFfcs?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedFfcs.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedFfcs?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedFfcs.write(value, buf)
         }
     }
 }
@@ -27666,6 +29583,70 @@ public object FfiConverterOptionalTypeWrappedMarks: FfiConverterRustBuffer<Wrapp
         } else {
             buf.put(1)
             FfiConverterTypeWrappedMarks.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedMixtape: FfiConverterRustBuffer<WrappedMixtape?> {
+    override fun read(buf: ByteBuffer): WrappedMixtape? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedMixtape.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedMixtape?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedMixtape.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedMixtape?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedMixtape.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedMosaic: FfiConverterRustBuffer<WrappedMosaic?> {
+    override fun read(buf: ByteBuffer): WrappedMosaic? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedMosaic.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedMosaic?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedMosaic.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedMosaic?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedMosaic.write(value, buf)
         }
     }
 }
@@ -27868,6 +29849,70 @@ public object FfiConverterOptionalTypeWrappedReport: FfiConverterRustBuffer<Wrap
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeWrappedRise: FfiConverterRustBuffer<WrappedRise?> {
+    override fun read(buf: ByteBuffer): WrappedRise? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedRise.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedRise?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedRise.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedRise?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedRise.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedRoi: FfiConverterRustBuffer<WrappedRoi?> {
+    override fun read(buf: ByteBuffer): WrappedRoi? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedRoi.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedRoi?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedRoi.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedRoi?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedRoi.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeWrappedStreak: FfiConverterRustBuffer<WrappedStreak?> {
     override fun read(buf: ByteBuffer): WrappedStreak? {
         if (buf.get().toInt() == 0) {
@@ -27922,6 +29967,38 @@ public object FfiConverterOptionalTypeWrappedTime: FfiConverterRustBuffer<Wrappe
         } else {
             buf.put(1)
             FfiConverterTypeWrappedTime.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeWrappedTraps: FfiConverterRustBuffer<WrappedTraps?> {
+    override fun read(buf: ByteBuffer): WrappedTraps? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeWrappedTraps.read(buf)
+    }
+
+    override fun allocationSize(value: WrappedTraps?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeWrappedTraps.allocationSize(value)
+        }
+    }
+
+    override fun write(value: WrappedTraps?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeWrappedTraps.write(value, buf)
         }
     }
 }
@@ -30004,6 +32081,90 @@ public object FfiConverterSequenceTypeWrappedCourse: FfiConverterRustBuffer<List
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeWrappedCourseLine: FfiConverterRustBuffer<List<WrappedCourseLine>> {
+    override fun read(buf: ByteBuffer): List<WrappedCourseLine> {
+        val len = buf.getInt()
+        return List<WrappedCourseLine>(len) {
+            FfiConverterTypeWrappedCourseLine.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedCourseLine>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedCourseLine.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedCourseLine>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedCourseLine.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedCredits: FfiConverterRustBuffer<List<WrappedCredits>> {
+    override fun read(buf: ByteBuffer): List<WrappedCredits> {
+        val len = buf.getInt()
+        return List<WrappedCredits>(len) {
+            FfiConverterTypeWrappedCredits.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedCredits>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedCredits.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedCredits>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedCredits.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedGuess: FfiConverterRustBuffer<List<WrappedGuess>> {
+    override fun read(buf: ByteBuffer): List<WrappedGuess> {
+        val len = buf.getInt()
+        return List<WrappedGuess>(len) {
+            FfiConverterTypeWrappedGuess.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedGuess>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedGuess.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedGuess>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedGuess.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeWrappedKindCount: FfiConverterRustBuffer<List<WrappedKindCount>> {
     override fun read(buf: ByteBuffer): List<WrappedKindCount> {
         val len = buf.getInt()
@@ -30022,6 +32183,258 @@ public object FfiConverterSequenceTypeWrappedKindCount: FfiConverterRustBuffer<L
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeWrappedKindCount.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedMonth: FfiConverterRustBuffer<List<WrappedMonth>> {
+    override fun read(buf: ByteBuffer): List<WrappedMonth> {
+        val len = buf.getInt()
+        return List<WrappedMonth>(len) {
+            FfiConverterTypeWrappedMonth.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedMonth>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedMonth.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedMonth>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedMonth.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedPhase: FfiConverterRustBuffer<List<WrappedPhase>> {
+    override fun read(buf: ByteBuffer): List<WrappedPhase> {
+        val len = buf.getInt()
+        return List<WrappedPhase>(len) {
+            FfiConverterTypeWrappedPhase.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedPhase>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedPhase.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedPhase>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedPhase.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedPoint: FfiConverterRustBuffer<List<WrappedPoint>> {
+    override fun read(buf: ByteBuffer): List<WrappedPoint> {
+        val len = buf.getInt()
+        return List<WrappedPoint>(len) {
+            FfiConverterTypeWrappedPoint.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedPoint>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedPoint.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedPoint>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedPoint.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedRoiPoint: FfiConverterRustBuffer<List<WrappedRoiPoint>> {
+    override fun read(buf: ByteBuffer): List<WrappedRoiPoint> {
+        val len = buf.getInt()
+        return List<WrappedRoiPoint>(len) {
+            FfiConverterTypeWrappedRoiPoint.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedRoiPoint>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedRoiPoint.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedRoiPoint>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedRoiPoint.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedSemesterGpa: FfiConverterRustBuffer<List<WrappedSemesterGpa>> {
+    override fun read(buf: ByteBuffer): List<WrappedSemesterGpa> {
+        val len = buf.getInt()
+        return List<WrappedSemesterGpa>(len) {
+            FfiConverterTypeWrappedSemesterGpa.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedSemesterGpa>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedSemesterGpa.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedSemesterGpa>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedSemesterGpa.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedSpan: FfiConverterRustBuffer<List<WrappedSpan>> {
+    override fun read(buf: ByteBuffer): List<WrappedSpan> {
+        val len = buf.getInt()
+        return List<WrappedSpan>(len) {
+            FfiConverterTypeWrappedSpan.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedSpan>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedSpan.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedSpan>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedSpan.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedTrack: FfiConverterRustBuffer<List<WrappedTrack>> {
+    override fun read(buf: ByteBuffer): List<WrappedTrack> {
+        val len = buf.getInt()
+        return List<WrappedTrack>(len) {
+            FfiConverterTypeWrappedTrack.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedTrack>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedTrack.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedTrack>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedTrack.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedTrait: FfiConverterRustBuffer<List<WrappedTrait>> {
+    override fun read(buf: ByteBuffer): List<WrappedTrait> {
+        val len = buf.getInt()
+        return List<WrappedTrait>(len) {
+            FfiConverterTypeWrappedTrait.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedTrait>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedTrait.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedTrait>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedTrait.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedWeekSlot: FfiConverterRustBuffer<List<WrappedWeekSlot>> {
+    override fun read(buf: ByteBuffer): List<WrappedWeekSlot> {
+        val len = buf.getInt()
+        return List<WrappedWeekSlot>(len) {
+            FfiConverterTypeWrappedWeekSlot.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedWeekSlot>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedWeekSlot.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedWeekSlot>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedWeekSlot.write(it, buf)
         }
     }
 }
@@ -30078,6 +32491,34 @@ public object FfiConverterSequenceTypeHandoverEffect: FfiConverterRustBuffer<Lis
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeHandoverEffect.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeWrappedDay: FfiConverterRustBuffer<List<WrappedDay>> {
+    override fun read(buf: ByteBuffer): List<WrappedDay> {
+        val len = buf.getInt()
+        return List<WrappedDay>(len) {
+            FfiConverterTypeWrappedDay.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<WrappedDay>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeWrappedDay.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<WrappedDay>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeWrappedDay.write(it, buf)
         }
     }
 }

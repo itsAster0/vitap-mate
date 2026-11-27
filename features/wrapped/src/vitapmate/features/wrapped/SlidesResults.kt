@@ -1,18 +1,22 @@
 package vitapmate.features.wrapped
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialShapes
@@ -21,94 +25,67 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import vitapmate.core.WrappedReport
 
-// Slides 10 to 13 and 17: marks, exams, grades, CGPA and the last semester.
+// Marks, exams, grades and the last semester.
 
 /** "CAT-I" as "CAT-1". */
 private fun cat(exam: String) = exam.replace("CAT-II", "CAT-2").replace("CAT-I", "CAT-1")
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/**
+ * Marks: the best CAT on a burst, the best course, the CAT-1 to CAT-2 jump, and full marks out
+ * of every assessment posted, by kind. Flexible; grades.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 internal fun marksSlide(r: WrappedReport): Slide? {
-    val m = r.marks ?: return null
-    val best = m.bestCat
-    val course = m.bestCourse?.takeIf { it.isNotBlank() }
-    val change = m.catChange?.takeIf { it > 0 }
-    if (best == null && course == null && change == null) return null
-    val tile = if (best != null) Tile(Ink.Lab, "${best.percent}%", "best CAT", key = true, grades = true)
-    else if (course != null) Tile(Ink.Lab, "${m.bestCoursePercent}%", "best course by marks", key = true, grades = true)
-    else Tile(Ink.Lab, "+$change", "points, CAT-1 to CAT-2", key = true, grades = true)
-    return Slide("marks", Ink.Lab, grades = true, tiles = listOf(tile), shareable = { !it }) {
-        if (best != null) {
-            Shaped(MaterialShapes.SoftBurst.toShape(), -44, 60, 240, text = "${best.percent}%", size = 68f)
-            Column(Modifier.offset(208.dp, 132.dp).width(136.dp)) {
-                H("Your best CAT", 24f)
-                P("${cat(best.exam)} in ${titled(best.course)}", 13f, top = 6)
-            }
-        }
-        val rows = listOfNotNull(
-            course?.let { Triple("${m.bestCoursePercent}%", "Best course by marks", titled(it)) },
-            change?.let { Triple("+$it", "points from CAT-1 to CAT-2, on average", m.mostImproved?.takeIf { s -> s.isNotBlank() }?.let { s -> "Most in ${titled(s)}" }) },
-        )
-        Txt(if (best != null) 332 else 120) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { rows.forEach { (value, line, name) -> Wide(value, line, name) } }
-        }
+    val m = r.marks
+    val best = m?.bestCat
+    val course = m?.bestCourse?.takeIf { it.isNotBlank() }
+    val change = m?.catChange?.takeIf { it > 0 }
+    val rise = m?.mostImproved
+    val a = r.assessments
+    val f = r.fullMarks
+    if (best == null && course == null && change == null && rise == null && a == null) return null
+    val tile = when {
+        best != null -> Tile(Ink.Lab, "${best.percent}%", "best CAT", key = true, grades = true)
+        course != null -> Tile(Ink.Lab, "${m.bestCoursePercent}%", "best course by marks", key = true, grades = true)
+        change != null -> Tile(Ink.Lab, "+$change", "points, CAT-1 to CAT-2", key = true, grades = true)
+        rise != null -> Tile(Ink.Lab, "+${rise.points}", "points in ${titled(rise.course)}", key = true, grades = true)
+        else -> null
     }
-}
-
-/** Assessments scored at their max marks, by kind, and the course with the most. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-internal fun fullMarksSlide(r: WrappedReport): Slide? {
-    val f = r.fullMarks ?: return null
-    val words = if (f.count == 1) "full mark" else "full marks"
-    return Slide("full_marks", Ink.Lab, grades = true, tiles = listOf(Tile(Ink.Lab, "${f.count}", words, key = true, grades = true)), shareable = { !it }) {
-        Shaped(MaterialShapes.SoftBurst.toShape(), -36, 58, 250, text = "${f.count}", size = 96f)
-        Column(Modifier.offset(216.dp, 126.dp).width(124.dp)) {
-            H(words.replace(' ', '\n'), 28f)
-            P("${f.count} of ${count(f.of, "assessment")}, top score", 13f, top = 6)
-        }
-        // Short kinds, so three fit across.
-        val short = { kind: String -> kind.replace("lab experiments", "lab exps").replace("digital assessments", "DAs").replace(" and reports", "") }
-        Minis(330, f.byKind.take(3).map { "${it.count}" to short(it.kind) }, columns = 3)
-        f.topCourse?.takeIf { it.isNotBlank() }?.let { course ->
-            Txt(420) { Wide("${f.topCount}", "full marks, the most in one course", titled(course)) }
-        }
-    }
-}
-
-/** Posted assessments by kind, a pill per kind sized by its count. */
-internal fun assessmentsSlide(r: WrappedReport): Slide? {
-    val a = r.assessments ?: return null
-    return Slide("assessments", Ink.Danger, tiles = listOf(Tile(Ink.Danger, "${a.total}", if (a.total == 1) "assessment" else "assessments"))) {
+    val tiles = listOfNotNull(tile, a?.let { Tile(Ink.Lab, "${it.total}", if (it.total == 1) "assessment" else "assessments") })
+    return Slide("marks", Ink.Lab, grades = true, tiles = tiles, shareable = { !it.grades }, fixed = false) {
         val ink = LocalInks.current
-        Txt(52) {
-            BigBeside("${a.total}", 140f, if (a.total == 1) "test\ntaken" else "tests\ntaken")
-        }
-        val most = a.byKind.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
-        Txt(218) {
-            a.byKind.take(6).forEachIndexed { i, k ->
-                val (bg, fg) = when (i) {
-                    0 -> ink.shape to ink.onShape
-                    1, 2 -> ink.mid to ink.text
-                    else -> ink.text.copy(alpha = 0.16f) to ink.text
+        Flow {
+            if (best != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val s = fits(190f, 150f)
+                Box(Modifier.offset(x = (-44).dp).size(s.dp).background(ink.shape, MaterialShapes.SoftBurst.toShape()), Alignment.Center) {
+                    Text("${best.percent}%", Modifier.offset(x = 10.dp), color = ink.onShape, style = type(s * 0.3f, 800, -0.05f, 1f), maxLines = 1)
                 }
-                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Up to 180 of the 312 across, so the kind fits beside.
-                    Box(Modifier.width((180f * k.count / most).coerceAtLeast(50f).dp).height(40.dp).background(bg, RoundedCornerShape(20.dp)).padding(horizontal = 14.dp), Alignment.CenterStart) {
-                        Text("${k.count}", color = fg, style = type(15f, 800, -0.02f, 1f), maxLines = 1)
-                    }
-                    Text(k.kind, color = ink.text.copy(alpha = 0.85f), style = type(13f, 600, -0.01f, 1.2f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f).offset(x = (-40).dp)) {
+                    H("Your best CAT", fits(26f, 23f))
+                    P("${cat(best.exam)} in ${titled(best.course)}", 13f, top = 6)
                 }
+            } else H("Your marks", fits(34f, 28f))
+            Spacer(Modifier.weight(1f).heightIn(min = 10.dp))
+            val rows = listOfNotNull(
+                course?.let { Triple("${m.bestCoursePercent}%", "Best course by marks", titled(it)) },
+                change?.let { Triple("+$it", "points from CAT-1 to CAT-2, on average", rise?.let { s -> "Most in ${titled(s.course)}, up ${s.points}" }) },
+                // The biggest jump shows even when the average fell.
+                rise?.takeIf { change == null }?.let { Triple("+${it.points}", "points from CAT-1 to CAT-2, your biggest jump", titled(it.course)) },
+                a?.let { all ->
+                    val full = f?.count ?: 0
+                    Triple("$full", (if (full == 1) "full mark" else "full marks") + " of ${count(all.total, "assessment")}", f?.topCourse?.takeIf { it.isNotBlank() && full > 1 }?.let { "${f.topCount} in ${titled(it)}" })
+                },
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { rows.forEach { (value, line, name) -> Wide(value, line, name) } }
+            if (a != null && a.byKind.isNotEmpty()) FlowRow(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                a.byKind.take(if (LocalFrame.current.compact) 2 else 3).forEach { Chip("${it.count} ${it.kind}") }
             }
         }
     }
@@ -131,75 +108,92 @@ private fun Wide(value: String, line: String, name: String?) {
     }
 }
 
+/**
+ * Exams: papers sat, CATs and FATs, hours in exam halls, the busiest week as a column per day
+ * with a shape per paper, and the venue used most. Flexible.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal fun examsSlide(r: WrappedReport): Slide? {
     val e = r.exams?.takeIf { it.cats + it.fats > 0 } ?: return null
+    val c = r.crunch
     val total = e.cats + e.fats
-    return Slide("exams", Ink.Danger, tiles = listOf(Tile(Ink.Danger, "$total", if (total == 1) "exam sat" else "exams sat"))) {
-        val ink = LocalInks.current
-        Txt(58) {
-            BigBeside("$total", 140f, if (total == 1) "exam\nsat" else "exams\nsat")
-        }
-        if (e.cats > 0) Shaped(MaterialShapes.Clover8Leaf.toShape(), 14, 226, 176, text = count(e.cats, "CAT"), size = 30f, track = -0.03f)
-        if (e.fats > 0) Shaped(MaterialShapes.Cookie6Sided.toShape(), 186, 296, 150, color = ink.mid, text = count(e.fats, "FAT"), size = 28f, textColor = ink.text, track = -0.03f)
-        e.topVenue?.takeIf { it.isNotBlank() }?.let { venue ->
-            Txt(470) {
-                Label("Most of them in")
-                H(venue, 30f, Modifier.padding(top = 4.dp))
-            }
-        }
-    }
-}
-
-/** The 7 days with the most papers sat: a column per day, a shape per paper. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-internal fun crunchSlide(r: WrappedReport): Slide? {
-    val c = r.crunch ?: return null
+    val hours = (e.minutes + 30) / 60
+    val venue = e.topVenue?.takeIf { it.isNotBlank() && it != "-" }
     val weekday = { d: Int -> LocalDate.ofEpochDay(d.toLong()).dayOfWeek.value - 1 }
-    return Slide("crunch", Ink.Accent, tiles = listOf(Tile(Ink.Accent, "${c.papers}", "exams in one week"))) {
+    return Slide("exams", Ink.Danger, tiles = listOf(Tile(Ink.Danger, "$total", (if (total == 1) "exam" else "exams") + if (hours > 0) ", $hours h in halls" else "")), fixed = false) {
         val ink = LocalInks.current
-        Txt(52) {
-            BigBeside("${c.papers}", 140f, "exams in\none week")
-        }
-        Txt(212) { P("Your busiest week, ${day(c.firstDay)} to ${day(c.lastDay)}", top = 0) }
-        val most = c.byDay.maxOrNull()?.coerceAtLeast(1) ?: 1
-        // The busiest day on a pill, only when it had more than one.
-        val busiest = if (most > 1) c.byDay.indexOf(most) else -1
-        val dot = (120 / most).coerceAtMost(36)
-        Txt(262) {
-            Row(Modifier.fillMaxWidth().height(168.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
-                c.byDay.forEachIndexed { i, n ->
-                    val on = i == busiest
-                    Column(
-                        Modifier.weight(1f).then(if (on) Modifier.background(ink.shape.copy(alpha = 0.22f), RoundedCornerShape(24.dp)).padding(vertical = 8.dp) else Modifier),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        repeat(n) { Box(Modifier.size(dot.dp).background(ink.shape, MaterialShapes.Cookie9Sided.toShape())) }
-                        Text(
-                            WEEKDAYS[weekday(c.firstDay + i)].take(1),
-                            color = if (on) ink.shape else ink.text.copy(alpha = if (n > 0) 1f else 0.5f),
-                            style = type(13f, 700, 0f, 1.2f),
-                        )
+        Flow {
+            BigBeside("$total", fits(124f, 100f), if (total == 1) "exam\nsat" else "exams\nsat")
+            P(
+                listOfNotNull(
+                    e.cats.takeIf { it > 0 }?.let { count(it, "CAT") },
+                    e.fats.takeIf { it > 0 }?.let { count(it, "FAT") },
+                ).joinToString(" and ") + if (hours > 0) ", ${count(hours, "hour")} under the clock" else "",
+                14f, top = 4,
+            )
+            // CATs, FATs and the hours, across the column.
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 10.dp).height(fits(104f, 88f).dp)) {
+                val w = maxWidth
+                val size = minOf(maxHeight, w * 0.32f)
+                if (e.cats > 0) Box(Modifier.size(size).background(ink.shape, MaterialShapes.Clover8Leaf.toShape()), Alignment.Center) {
+                    Text("${e.cats} CAT", color = ink.onShape, style = type(20f, 800, -0.03f, 1f), maxLines = 1)
+                }
+                if (e.fats > 0) Box(Modifier.offset(x = size * 0.96f, y = size * 0.08f).size(size * 0.88f).background(ink.mid, MaterialShapes.Cookie6Sided.toShape()), Alignment.Center) {
+                    Text("${e.fats} FAT", color = ink.text, style = type(18f, 800, -0.03f, 1f), maxLines = 1)
+                }
+                if (hours > 0) Column(Modifier.align(Alignment.TopEnd).width(w * 0.34f), horizontalAlignment = Alignment.End) {
+                    Box(Modifier.fillMaxWidth().height(size * 0.56f).rotate(-8f).background(ink.shape, RoundedCornerShape(50)), Alignment.Center) {
+                        Text("$hours h", color = ink.onShape, style = type(26f, 800, -0.04f, 1f), maxLines = 1)
                     }
+                    Text("in exam halls", Modifier.padding(top = 8.dp), color = ink.text.copy(alpha = 0.85f), style = type(12f, 600, 0f, 1.2f))
                 }
             }
+            if (c != null) {
+                Label("Crunch week, ${day(c.firstDay)} to ${day(c.lastDay)}", 14f)
+                val most = c.byDay.maxOrNull()?.coerceAtLeast(1) ?: 1
+                // The busiest day on a pill, only when it had more than one.
+                val busiest = if (most > 1) c.byDay.indexOf(most) else -1
+                BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp).heightIn(min = 72.dp, max = 150.dp)) {
+                    val dot = minOf((maxHeight - 34.dp) / most - 6.dp, 30.dp).coerceAtLeast(12.dp)
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+                        c.byDay.forEachIndexed { i, n ->
+                            val on = i == busiest
+                            Column(
+                                Modifier.weight(1f).then(if (on) Modifier.background(ink.shape.copy(alpha = 0.22f), RoundedCornerShape(24.dp)).padding(vertical = 8.dp) else Modifier.padding(vertical = 8.dp)),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                repeat(n) { Box(Modifier.size(dot).background(ink.shape, MaterialShapes.Cookie9Sided.toShape())) }
+                                Text(
+                                    WEEKDAYS[weekday(c.firstDay + i)].take(1),
+                                    color = if (on) ink.shape else ink.text.copy(alpha = if (n > 0) 1f else 0.5f),
+                                    style = type(13f, 700, 0f, 1.2f),
+                                )
+                            }
+                        }
+                    }
+                }
+            } else Spacer(Modifier.weight(1f))
+            MiniRow(
+                listOfNotNull(
+                    c?.mostInADay?.takeIf { it > 1 }?.let { "$it in a day" to "${WEEKDAYS[weekday(c.mostDay)].take(3)} ${day(c.mostDay)}" },
+                    venue?.let { it to "most of your papers" },
+                    c?.takeIf { venue == null || it.mostInADay <= 1 }?.let { count(it.examDays, "day") to "with an exam" },
+                ).take(2),
+                Modifier.padding(top = 10.dp),
+                columns = 2,
+            )
         }
-        Minis(
-            446,
-            listOfNotNull(
-                c.mostInADay.takeIf { it > 1 }?.let { "$it in a day" to "${WEEKDAYS[weekday(c.mostDay)].take(3)} ${day(c.mostDay)}" },
-                count(c.examDays, "day") to "with an exam",
-            ),
-        )
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** The semester's GPA on a clover, the grade mix, S grades, and credits earned in a first semester (no Degree journey then). */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 internal fun gradesSlide(r: WrappedReport): Slide? {
     val g = r.grades ?: return null
     val s = g.sCount.takeIf { it > 0 }
-    return Slide("grades", Ink.Success, grades = true, shareable = { !it }, tiles = listOf(Tile(Ink.Success, gpa(g.gpa), "GPA" + (s?.let { ", ${count(it, "S grade")}" } ?: ""), key = true, grades = true))) {
+    val earned = r.cgpa?.creditsSemester?.takeIf { it > 0 && degreeSlide(r) == null }
+    return Slide("grades", Ink.Success, grades = true, shareable = { !it.grades }, tiles = listOf(Tile(Ink.Success, gpa(g.gpa), "GPA" + (s?.let { ", ${count(it, "S grade")}" } ?: ""), key = true, grades = true))) {
         val ink = LocalInks.current
         Shaped(MaterialShapes.Clover4Leaf.toShape(), 35, 52, 290, text = gpa(g.gpa), size = 88f, shapeRotate = 45f)
         Txt(352) { H("Semester GPA") }
@@ -214,75 +208,23 @@ internal fun gradesSlide(r: WrappedReport): Slide? {
                 },
             )
         }
-        if (s != null) Txt(470) { Chip(if (g.sRecord) "${count(s, "S grade")}, your most in a semester" else count(s, "S grade")) }
+        if (s != null || earned != null) Txt(470) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (s != null) Chip(if (g.sRecord) "${count(s, "S grade")}, your most in a semester" else count(s, "S grade"))
+                if (earned != null) Chip("${credits(earned)} credits earned")
+            }
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-internal fun cgpaSlide(r: WrappedReport): Slide? {
-    val c = r.cgpa ?: return null
-    val before = c.before
-    // At hundredths, as drawn: positive up, negative down, 0 held.
-    val change = before?.let { Math.round(c.after * 100) - Math.round(it * 100) }
-    val moved = when {
-        change == null -> ""
-        change > 0 -> ", up from ${gpa(before)}"
-        change < 0 -> ", down from ${gpa(before)}"
-        else -> ", same as before"
-    }
-    val tile = Tile(Ink.Accent, gpa(c.after), "CGPA$moved", grades = true)
-    return Slide("cgpa", Ink.Accent, grades = true, shareable = { !it }, tiles = listOf(tile)) {
-        val ink = LocalInks.current
-        Txt(62) {
-            H(
-                when {
-                    change == null -> "Your CGPA"
-                    change > 0 -> "Your CGPA moved up"
-                    change < 0 -> "Your CGPA dipped"
-                    else -> "Your CGPA held steady"
-                },
-            )
-        }
-        if (before != null) {
-            At(24, 190, 96, 96) {
-                Box(Modifier.size(96.dp).background(lerp(ink.bg, ink.shape, 0.4f), CircleShape), Alignment.Center) {
-                    Text(gpa(before), color = ink.text, style = type(28f, 800, -0.04f, 1f))
-                }
-            }
-            At(36, 294) { Label("before") }
-            At(96, 150, 110, 90) {
-                Canvas(Modifier.size(110.dp, 90.dp)) {
-                    scale(size.width / 110f, Offset.Zero) {
-                        val path = Path().apply { moveTo(10f, 70f); cubicTo(30f, 20f, 70f, 10f, 100f, 26f) }
-                        drawPath(path, ink.shape, style = Stroke(6f, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(1f, 13f))))
-                    }
-                }
-            }
-        }
-        Shaped(MaterialShapes.Cookie9Sided.toShape(), 140, 116, 216, text = gpa(c.after), size = 68f)
-        if (before != null && change != null) At(228, 340) {
-            Label(
-                when {
-                    change > 0 -> "now, up ${gpa(change / 100.0)}"
-                    change < 0 -> "now, down ${gpa(-change / 100.0)}"
-                    else -> "now"
-                },
-            )
-        }
-        Minis(
-            392,
-            listOfNotNull(
-                c.creditsSemester.takeIf { it > 0 }?.let { credits(it) to "credits earned this semester" },
-                c.creditsTotal.takeIf { it > 0 }?.let { credits(it) to "credits in total" },
-            ),
-        )
-    }
-}
-
+/**
+ * Better than last semester: attendance first, its change large over last semester's bar and
+ * this one's; the GPA's too, only when the Degree journey doesn't show it. Flexible.
+ */
 internal fun previousSlide(r: WrappedReport): Slide? {
     val p = r.previous ?: return null
     val attendance = p.attendanceChange?.let { change -> r.attendance?.let { it.percent to change } }
-    val gpaPair = p.gpaChange?.let { change -> r.grades?.let { it.gpa to change } }
+    val gpaPair = p.gpaChange?.takeIf { degreeSlide(r) == null }?.let { change -> r.grades?.let { it.gpa to change } }
     if (attendance == null && gpaPair == null) return null
     val tile = when {
         attendance != null -> Tile(Ink.Success, "+${attendance.second}%", "attendance on last semester")
@@ -291,38 +233,71 @@ internal fun previousSlide(r: WrappedReport): Slide? {
     }
     val then = shortName(p.semesterName)
     val now = shortName(r.semesterName)
-    return Slide("last_semester", Ink.Success, grades = gpaPair != null, tiles = listOf(tile), shareable = { hide -> !hide || attendance != null }) { c ->
-        Txt(62) { H("Better than ${p.semesterName}") }
-        var y = 176
-        if (attendance != null) {
-            val (percent, change) = attendance
-            Compare(y, "Attendance", "$then, ${percent - change}%", "$now, $percent%", "up $change%", (percent - change).toFloat() / percent)
-            y = 340
+    return Slide("last_semester", Ink.Success, grades = gpaPair != null, tiles = listOf(tile), shareable = { hide -> !hide.grades || attendance != null }, fixed = false) { c ->
+        val gpaShown = gpaPair?.takeIf { !c.hide }
+        val ink = LocalInks.current
+        Flow {
+            Label("Better than ${p.semesterName}")
+            if (attendance != null) {
+                BigBeside("+${attendance.second}", fits(120f, 96f), "points of\nattendance", headingSize = fits(28f, 24f))
+            } else if (gpaShown != null) {
+                BigBeside("+${gpa(gpaShown.second)}", fits(96f, 80f), "on your\nGPA", headingSize = fits(28f, 24f))
+            }
+            Spacer(Modifier.weight(1f).heightIn(min = 12.dp))
+            if (attendance != null) {
+                val (percent, change) = attendance
+                Compare("Attendance", "$then, ${percent - change}%", "$now, $percent%", "up $change", (percent - change).toFloat() / percent)
+            }
+            if (gpaShown != null) {
+                val (value, change) = gpaShown
+                Box(Modifier.padding(top = if (attendance != null) 18.dp else 0.dp)) {
+                    Compare("GPA", "$then, ${gpa(value - change)}", "$now, ${gpa(value)}", "up ${gpa(change)}", ((value - change) / value).toFloat())
+                }
+            }
+            // One fact left: what moved it, so the slide isn't half empty.
+            if ((attendance == null) != (gpaShown == null)) {
+                val a = r.attendance
+                MiniRow(
+                    listOfNotNull(
+                        a?.let { "${it.attended}" to "classes attended this semester" },
+                        r.streak?.let { "${it.length}" to "in a row, your longest run" } ?: r.time?.let { "${(it.minutes + 30) / 60} h" to "in class" },
+                    ),
+                    Modifier.padding(top = 14.dp),
+                    columns = 2,
+                )
+            }
+            Shapes(ink)
         }
-        if (gpaPair != null && !c.hide) {
-            val (value, change) = gpaPair
-            Compare(y, "GPA", "$then, ${gpa(value - change)}", "$now, ${gpa(value)}", "up ${gpa(change)}", ((value - change) / value).toFloat())
-        }
+    }
+}
+
+/** Two small shapes under the facts, so a short slide still has its tone's shapes. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun Shapes(ink: Inks) {
+    Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Bottom) {
+        Box(Modifier.size(28.dp).background(ink.mid, MaterialShapes.Cookie6Sided.toShape()))
+        Box(Modifier.padding(start = 8.dp).size(44.dp).rotate(12f).background(ink.shape, MaterialShapes.SoftBurst.toShape()))
     }
 }
 
 /** Last semester's bar over this one's, for one fact. */
 @Composable
-private fun Compare(y: Int, label: String, before: String, after: String, change: String, ratio: Float) {
+private fun Compare(label: String, before: String, after: String, change: String, ratio: Float) {
     val ink = LocalInks.current
-    Txt(y) {
+    Column(Modifier.fillMaxWidth()) {
         Label(label)
         Box(
             Modifier.padding(top = 10.dp).fillMaxWidth(ratio.coerceIn(0.45f, 0.9f)).height(34.dp).background(lerp(ink.bg, ink.shape, 0.4f), RoundedCornerShape(17.dp)).padding(start = 14.dp),
             Alignment.CenterStart,
-        ) { Text(before, color = ink.text, style = type(13f, 700, -0.01f, 1.2f)) }
+        ) { Text(before, color = ink.text, style = type(13f, 700, -0.01f, 1.2f), maxLines = 1) }
         Row(
             Modifier.padding(top = 6.dp).fillMaxWidth().height(52.dp).background(ink.shape, RoundedCornerShape(26.dp)).padding(horizontal = 18.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(after, color = ink.onShape, style = type(18f, 800, -0.02f, 1.2f))
-            Text(change, color = ink.onShape, style = type(18f, 800, -0.02f, 1.2f))
+            Text(after, color = ink.onShape, style = type(18f, 800, -0.02f, 1.2f), maxLines = 1)
+            Text(change, color = ink.onShape, style = type(18f, 800, -0.02f, 1.2f), maxLines = 1)
         }
     }
 }

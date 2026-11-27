@@ -171,6 +171,12 @@ object Settings {
     /** Semester ids whose Wrapped share images hide grades and marks. */
     var wrappedHideGrades by ids("settings_wrapped_hide_grades")
 
+    /** Wrapped share images leave out the first name. */
+    var wrappedHideName by flag("settings_wrapped_hide_name", false)
+
+    /** Wrapped share images leave out hostel times and outings. */
+    var wrappedHideHostel by flag("settings_wrapped_hide_hostel", false)
+
     /** Hours between background syncs, one of [SYNC_HOURS]. */
     var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
 
@@ -208,6 +214,8 @@ object Settings {
         syncCourse = null
         wrappedSeen = emptySet()
         wrappedHideGrades = emptySet()
+        wrappedHideName = false
+        wrappedHideHostel = false
         storageNoteSeen = false
         student = null
     }

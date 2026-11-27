@@ -360,6 +360,30 @@ impl SemesterCalendar {
             .min_by_key(|entry| entry.mark as u8)
     }
 
+    /// The day's most notable kind, and whether a day off has its own name
+    /// (a festival, not the weekly Sunday).
+    pub(crate) fn kind_on(&self, day: i32) -> Option<(CalendarKind, bool)> {
+        self.entry_on(day)
+            .map(|entry| (entry.kind.clone(), entry.day_off() && entry.named()))
+    }
+
+    /// Each exam's first and last listed day, by first day.
+    pub(crate) fn exam_spans(&self) -> Vec<(String, i32, i32)> {
+        let mut spans: Vec<(String, i32, i32)> = Vec::new();
+        for (&day, entries) in &self.entries {
+            for entry in entries {
+                let CalendarKind::Exam { name } = &entry.kind else {
+                    continue;
+                };
+                match spans.iter_mut().find(|(seen, _, _)| seen == name) {
+                    Some(span) => span.2 = span.2.max(day),
+                    None => spans.push((name.clone(), day, day)),
+                }
+            }
+        }
+        spans
+    }
+
     /// The day's mark and title, for the agenda.
     pub(crate) fn mark_on(&self, day: i32) -> Option<(CalendarMark, String)> {
         self.entry_on(day)

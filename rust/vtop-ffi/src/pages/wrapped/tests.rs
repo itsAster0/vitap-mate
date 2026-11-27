@@ -299,6 +299,7 @@ fn streak_runs_across_courses_in_time_order() {
         &[
             (d, "08:00-08:50", "Present", "A1"),
             (d + 1, "08:00-08:50", "Present", "A1"),
+            (d + 1, "09:00-09:50", "Present", "A1"),
             (d + 2, "10:00-10:50", "Absent", "A1"),
         ],
     );
@@ -314,7 +315,7 @@ fn streak_runs_across_courses_in_time_order() {
     let streak = fixture.report().streak.unwrap();
     assert_eq!(
         (streak.length, streak.first_day, streak.last_day),
-        (4, d, d + 2)
+        (5, d, d + 2)
     );
 }
 
@@ -332,7 +333,9 @@ fn perfect_weeks_need_a_posted_class_and_no_absence() {
         &[
             // Week 1: all present.
             (d, "08:00-08:50", "Present", "A1"),
+            (d + 1, "08:00-08:50", "Present", "A1"),
             (d + 2, "08:00-08:50", "Present", "A1"),
+            (d + 3, "08:00-08:50", "Present", "A1"),
             // Week 2: one absence.
             (d + 7, "08:00-08:50", "Present", "A1"),
             (d + 8, "08:00-08:50", "Absent", "A1"),
@@ -421,7 +424,14 @@ fn worst_weekday_and_early_percent() {
         ),
         (Some(0), 2, 3)
     );
-    assert_eq!((habits.early_percent, habits.early_classes), (Some(50), 4));
+    assert_eq!(
+        (
+            habits.early_percent,
+            habits.early_classes,
+            habits.early_attended
+        ),
+        (Some(50), 4, 2)
+    );
 }
 
 #[test]
@@ -543,9 +553,10 @@ fn room_and_faculty_by_attended_classes() {
         (places.room.as_deref(), places.room_minutes),
         (Some("AB2-202"), 200)
     );
+    // By time, not sessions: two 100-minute labs beat three 50-minute classes.
     assert_eq!(
-        (places.faculty.as_deref(), places.faculty_classes),
-        (Some("Fac One"), 3)
+        (places.faculty.as_deref(), places.faculty_minutes),
+        (Some("Fac Two"), 200)
     );
     let time = fixture.report().time.unwrap();
     assert_eq!(
@@ -580,7 +591,13 @@ fn cat_change_averages_courses_with_both() {
     );
     let marks = fixture.report().marks.unwrap();
     assert_eq!(marks.cat_change, Some(15));
-    assert_eq!(marks.most_improved.as_deref(), Some("CSE1001 name"));
+    assert_eq!(
+        marks.most_improved,
+        Some(WrappedRise {
+            course: "CSE1001 name".into(),
+            points: 20
+        })
+    );
     assert_eq!(
         marks.best_cat,
         Some(WrappedCat {
@@ -596,24 +613,27 @@ fn cat_change_averages_courses_with_both() {
 #[test]
 fn exams_count_papers_and_the_venue_used_most() {
     let fixture = Fixture::new("exams");
-    let paper = |code: &str, venue: &str| {
+    let paper = |code: &str, venue: &str, time: &str| {
         json!({"serial": "1", "slot": "A1", "course_name": code, "course_code": code, "course_type": "ETH",
             "course_id": "", "exam_date": "01-Aug-2025", "exam_session": "FN", "reporting_time": "",
-            "exam_time": "09:30 AM - 11:00 AM", "venue": venue, "seat_location": "", "seat_no": ""})
+            "exam_time": time, "venue": venue, "seat_location": "", "seat_no": ""})
     };
+    let timed = "09:30 AM - 11:00 AM";
     fixture.page(
         "exam_schedule.json",
         &json!({"exams": [
-            {"exam_type": "CAT1", "records": [paper("A", "AB1-101"), paper("B", "AB1-102")]},
-            {"exam_type": "CAT2", "records": [paper("A", "AB1-102")]},
-            {"exam_type": "FAT", "records": [paper("A", "-")]},
+            {"exam_type": "CAT1", "records": [paper("A", "AB1-101", timed), paper("B", "AB1-102", "")]},
+            {"exam_type": "CAT2", "records": [paper("A", "AB1-102", timed)]},
+            {"exam_type": "FAT", "records": [paper("A", "-", ""), paper("B", "-", "02:00 PM - 05:30 PM")]},
         ], "semester_id": "AP2", "update_time": 1}),
     );
     let exams = fixture.report().exams.unwrap();
     assert_eq!(
         (exams.cats, exams.fats, exams.top_venue.as_deref()),
-        (3, 1, Some("AB1-102"))
+        (3, 2, Some("AB1-102"))
     );
+    // Timed papers by their times; untimed ones 90 minutes for a CAT, 180 for a FAT.
+    assert_eq!(exams.minutes, 90 + 90 + 90 + 180 + 210);
 }
 
 #[test]
@@ -764,8 +784,13 @@ fn days_away_clips_to_the_window() {
     assert_eq!(outings.top_place.as_deref(), Some("Home"));
 }
 
+/// The title `report`'s traits give, with or without grades.
+fn t(report: &WrappedReport, grades: bool) -> WrappedTitle {
+    title(&traits(report), grades, true)
+}
+
 #[test]
-fn title_follows_the_order() {
+fn title_follows_the_scores() {
     let both = WrappedReport {
         streak: Some(WrappedStreak {
             length: 45,
@@ -778,7 +803,7 @@ fn title_follows_the_order() {
         }),
         ..Default::default()
     };
-    assert_eq!(title(&both, true), WrappedTitle::IronStreak);
+    assert_eq!(t(&both, true), WrappedTitle::IronStreak);
     let topper = WrappedReport {
         grades: Some(WrappedGrades {
             gpa: 9.2,
@@ -786,9 +811,10 @@ fn title_follows_the_order() {
         }),
         ..Default::default()
     };
-    assert_eq!(title(&topper, true), WrappedTitle::Topper);
-    assert_eq!(title(&topper, false), WrappedTitle::FreeSpirit);
-    let comeback = WrappedReport {
+    assert_eq!(t(&topper, true), WrappedTitle::Topper);
+    assert_eq!(t(&topper, false), WrappedTitle::SteadyCruiser);
+    // A small comeback no longer beats a long streak; a big one ties it, and wins by order.
+    let small = WrappedReport {
         comeback: Some(WrappedComeback {
             low_percent: 70,
             low_day: 0,
@@ -796,7 +822,16 @@ fn title_follows_the_order() {
         }),
         ..both.clone()
     };
-    assert_eq!(title(&comeback, true), WrappedTitle::Comeback);
+    assert_eq!(t(&small, true), WrappedTitle::IronStreak);
+    let big = WrappedReport {
+        comeback: Some(WrappedComeback {
+            low_percent: 55,
+            low_day: 0,
+            final_percent: 90,
+        }),
+        ..both.clone()
+    };
+    assert_eq!(t(&big, true), WrappedTitle::Comeback);
     let lab = WrappedReport {
         time: Some(WrappedTime {
             classes: 10,
@@ -807,7 +842,7 @@ fn title_follows_the_order() {
         }),
         ..Default::default()
     };
-    assert_eq!(title(&lab, true), WrappedTitle::LabRat);
+    assert_eq!(t(&lab, true), WrappedTitle::LabRat);
 }
 
 #[test]
@@ -858,7 +893,7 @@ fn missing_days_skip_complete_cache() {
         d,
         i64::from(d + 1) * 86_400,
         &[
-            ("07:12:00", "MH2-FACE-IN-1"),
+            ("07:12:00", "MH2-FACE-OUT-1"),
             ("21:48:00", "MH2-FACE-IN-1"),
             ("08:00:00", "AB1-FACE-OUT-1"),
         ],
@@ -1528,13 +1563,38 @@ fn streak_sits_among_all_posted_classes() {
             (d + 2, "08:00-08:50", "Not Posted", "A1"),
             (d + 3, "08:00-08:50", "Present", "A1"),
             (d + 4, "08:00-08:50", "On Duty", "A1"),
+            (d + 4, "10:00-10:50", "Present", "A1"),
+            (d + 4, "11:00-11:50", "Present", "A1"),
             (d + 5, "08:00-08:50", "Absent", "A1"),
             (d + 6, "08:00-08:50", "Present", "A1"),
         ],
     );
     let streak = fixture.report().streak.unwrap();
-    assert_eq!((streak.length, streak.offset, streak.total), (3, 1, 6));
+    assert_eq!((streak.length, streak.offset, streak.total), (5, 1, 8));
     assert_eq!((streak.first_day, streak.last_day), (d + 1, d + 4));
+}
+
+#[test]
+fn streak_needs_five_in_a_row() {
+    let fixture = Fixture::new("streak-short");
+    let d = d0();
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 4, 5)]),
+    );
+    let mut classes: Vec<(i32, &str, &str, &str)> = (0..4)
+        .map(|n| (d + n, "08:00-08:50", "Present", "A1"))
+        .collect();
+    classes.push((d + 4, "08:00-08:50", "Absent", "A1"));
+    fixture.history("CSE1001.theory", &classes);
+    assert_eq!(fixture.report().streak, None);
+    classes.push((d + 5, "08:00-08:50", "Present", "A1"));
+    classes.push((d + 6, "08:00-08:50", "Present", "A1"));
+    classes.push((d + 7, "08:00-08:50", "Present", "A1"));
+    classes.push((d + 8, "08:00-08:50", "Present", "A1"));
+    classes.push((d + 9, "08:00-08:50", "Present", "A1"));
+    fixture.history("CSE1001.theory", &classes);
+    assert_eq!(fixture.report().streak.unwrap().length, 5);
 }
 
 #[test]
@@ -1547,11 +1607,11 @@ fn iron_streak_is_relative_to_all_classes() {
         }),
         ..Default::default()
     };
-    assert_eq!(title(&streak(59, 336), true), WrappedTitle::IronStreak);
-    assert_eq!(title(&streak(45, 400), true), WrappedTitle::FreeSpirit);
+    assert_eq!(t(&streak(59, 336), true), WrappedTitle::IronStreak);
+    assert_eq!(t(&streak(45, 400), true), WrappedTitle::SteadyCruiser);
     // A large share of a short semester still needs 15 classes.
-    assert_eq!(title(&streak(14, 50), true), WrappedTitle::FreeSpirit);
-    assert_eq!(title(&streak(15, 100), true), WrappedTitle::IronStreak);
+    assert_eq!(t(&streak(14, 50), true), WrappedTitle::SteadyCruiser);
+    assert_eq!(t(&streak(15, 100), true), WrappedTitle::IronStreak);
 }
 
 #[test]
@@ -2060,4 +2120,988 @@ fn assessments_group_by_kind() {
     );
     fixture.page("marks.json", &marks_page(&[("CSE1001", &[("QUIZ1", "")])]));
     assert_eq!(fixture.report().assessments, None);
+}
+
+#[test]
+fn most_improved_shows_even_when_the_average_fell() {
+    let fixture = Fixture::new("most-improved");
+    fixture.page(
+        "marks.json",
+        &marks_page(&[
+            ("CSE1001", &[("CAT1", "20"), ("CAT2", "35")]),
+            ("MAT1001", &[("CAT1", "45"), ("CAT2", "20")]),
+            ("PHY1001", &[("CAT1", "40"), ("CAT2", "30")]),
+        ]),
+    );
+    let marks = fixture.report().marks.unwrap();
+    // +30, -50 and -20 points: -13 on average.
+    assert_eq!(marks.cat_change, Some(-13));
+    assert_eq!(
+        marks.most_improved,
+        Some(WrappedRise {
+            course: "CSE1001 name".into(),
+            points: 30
+        })
+    );
+    fixture.page(
+        "marks.json",
+        &marks_page(&[("CSE1001", &[("CAT1", "40"), ("CAT2", "30")])]),
+    );
+    assert_eq!(fixture.report().marks.unwrap().most_improved, None);
+}
+
+#[test]
+fn hosteller_day_starts_at_the_hostel_out() {
+    let fixture = Fixture::new("campus-hostel");
+    let d = d0();
+    fixture.page(CALENDAR, &calendar(d..d + 1, &[]));
+    punches(&fixture, d, &HOSTEL_DAY);
+    let campus = fixture.report().campus.unwrap();
+    // Not the first IN back to the hostel (7:27 AM).
+    assert_eq!(campus.earliest_entry.as_deref(), Some("6:27 AM"));
+}
+
+/// A calendar entry with a note, as VTOP names holidays.
+fn named(day: i32, kind: &str, note: &str) -> Value {
+    json!({"date": iso(day), "kind": kind, "group": "General (Semester)", "note": note})
+}
+
+#[test]
+fn mosaic_marks_each_day_and_ranks_months() {
+    let fixture = Fixture::new("mosaic");
+    let d = d0();
+    let mut cal = calendar(d..d + 60, &[(d + 70, "Final Assessment Test")]);
+    cal["entries"]
+        .as_array_mut()
+        .unwrap()
+        .push(named(d + 65, "Holiday", "Independence Day"));
+    fixture.page(CALENDAR, &cal);
+    let mut classes = vec![
+        (d, "08:00-08:50", "Present", "A1"),
+        (d + 1, "08:00-08:50", "Absent", "A1"),
+        (d + 2, "08:00-08:50", "On Duty", "A1"),
+        (d + 3, "08:00-08:50", "Present", "A1"),
+        (d + 3, "09:00-09:50", "Absent", "A1"),
+    ];
+    // 14 days present in July (14 to 27 Jul), then August: 10 present, 3 absent.
+    classes.extend((7..21).map(|i| (d + i, "08:00-08:50", "Present", "A1")));
+    classes.extend((28..41).map(|i| {
+        let status = if i < 31 { "Absent" } else { "Present" };
+        (d + i, "08:00-08:50", status, "A1")
+    }));
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 27, 32)]),
+    );
+    fixture.history("CSE1001.theory", &classes);
+    let m = fixture.report().mosaic.unwrap();
+    // 7 Jul is a Monday; the window ends Monday 15 Sep, so the grid runs to Sunday 21 Sep.
+    assert_eq!((m.first_day, m.days.len(), m.class_days), (d, 77, 31));
+    use WrappedDay::*;
+    assert_eq!(
+        (m.days[0], m.days[1], m.days[2], m.days[3], m.days[4]),
+        (AllPresent, AllAbsent, OnDuty, Mixed, NoClass)
+    );
+    assert_eq!(
+        (m.days[65], m.days[66], m.days[70], m.days[71]),
+        (Holiday, NoClass, Exam, Outside)
+    );
+    let months: Vec<(i32, i32, Option<i32>)> = m
+        .months
+        .iter()
+        .map(|m| (m.month, m.counted, m.percent))
+        .collect();
+    // July 17 of 19 (89.5, 90 rounded up), August 10 of 13 (77), September none.
+    assert_eq!(months, [(7, 19, Some(90)), (8, 13, Some(77)), (9, 0, None)]);
+    assert_eq!((m.months[0].first_day, m.months[2].last_day), (d, d + 70));
+    assert_eq!((m.best_month, m.worst_month), (Some(0), Some(1)));
+}
+
+#[test]
+fn mosaic_needs_fifteen_classes() {
+    let fixture = Fixture::new("mosaic-few");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 14, 14)]),
+    );
+    fixture.history("CSE1001.theory", &runs(&[(14, "Present")], "A1"));
+    let report = fixture.report();
+    assert_eq!((report.mosaic, report.arc), (None, None));
+}
+
+#[test]
+fn arc_follows_the_line_between_the_cats() {
+    let fixture = Fixture::new("arc");
+    let d = d0();
+    fixture.page(
+        CALENDAR,
+        &calendar(
+            (d..d + 60).filter(|&day| day != d + 15 && day != d + 30),
+            &[
+                (d + 15, "CAT - I"),
+                (d + 30, "CAT - II"),
+                (d + 70, "Final Assessment Test"),
+            ],
+        ),
+    );
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 37, 45)]),
+    );
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(15, "Present"), (8, "Absent"), (22, "Present")], "A1"),
+    );
+    let arc = fixture.report().arc.unwrap();
+    let phases: Vec<(Option<&str>, Option<&str>, i32, bool)> = arc
+        .phases
+        .iter()
+        .map(|p| (p.after.as_deref(), p.before.as_deref(), p.percent, p.lowest))
+        .collect();
+    // 15 of 15, then 7 of 15 (46.7, 47 rounded up), then 15 of 15.
+    assert_eq!(
+        phases,
+        [
+            (None, Some("CAT-I"), 100, false),
+            (Some("CAT-I"), Some("CAT-II"), 47, true),
+            (Some("CAT-II"), None, 100, false),
+        ]
+    );
+    let exams: Vec<(&str, i32, i32)> = arc
+        .exams
+        .iter()
+        .map(|e| (e.name.as_str(), e.first_day, e.last_day))
+        .collect();
+    assert_eq!(
+        exams,
+        [
+            ("CAT-I", d + 15, d + 15),
+            ("CAT-II", d + 30, d + 30),
+            ("FAT", d + 70, d + 70)
+        ]
+    );
+    assert_eq!(arc.shape, WrappedArcShape::Comeback);
+    assert_eq!((arc.peak.day, arc.low.day), (d + 9, d + 22));
+    // From the 10th class (100%) down to 15 of 23 (65.2%).
+    let drop = arc.drop.unwrap();
+    assert_eq!((drop.from.day, drop.to.day), (d + 9, d + 22));
+    assert!((drop.to.percent - 1500.0 / 23.0).abs() < 1e-9);
+    // 36 days from the 10th class, thinned to 20 with the peak and low kept.
+    assert!(arc.points.len() <= ARC_POINTS + 2, "{}", arc.points.len());
+    assert_eq!(arc.points.first().map(|p| p.day), Some(d + 9));
+    assert_eq!(arc.points.last().map(|p| p.day), Some(d + 44));
+    assert!(arc.points.iter().any(|p| p.day == d + 22));
+    assert!(arc.points.windows(2).all(|w| w[0].day < w[1].day));
+}
+
+#[test]
+fn arc_without_cats_has_no_phases() {
+    let fixture = Fixture::new("arc-no-cats");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 25, 30)]),
+    );
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(20, "Present"), (5, "Absent"), (5, "Present")], "A1"),
+    );
+    let arc = fixture.report().arc.unwrap();
+    assert!(arc.phases.is_empty());
+    // 100% down to 80% (20 of 25), ending at 83.3%: a slide, not a comeback.
+    assert_eq!(arc.shape, WrappedArcShape::Slide);
+}
+
+#[test]
+fn quietest_weekday_by_classes_a_day() {
+    let fixture = Fixture::new("quietest");
+    let d = d0();
+    let mut classes = Vec::new();
+    for week in 0..3 {
+        let monday = d + 7 * week;
+        for time in ["08:00-08:50", "09:00-09:50", "10:00-10:50"] {
+            classes.push((monday, time, "Present", "A1"));
+        }
+        classes.push((monday + 1, "08:00-08:50", "Present", "A1"));
+    }
+    // Two Wednesdays only: left out.
+    classes.push((d + 2, "08:00-08:50", "Present", "A1"));
+    classes.push((d + 9, "08:00-08:50", "Absent", "A1"));
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 13, 14)]),
+    );
+    fixture.history("CSE1001.theory", &classes);
+    let h = fixture.report().habits.unwrap();
+    assert_eq!(h.classes_per_day_tenths, [30, 10, 0, 0, 0, 0, 0]);
+    assert_eq!(h.quietest_weekday, Some(1));
+}
+
+/// Grades this semester as (code, grand total, grade).
+fn totals(courses: &[(&str, &str, &str)]) -> Value {
+    let courses: Vec<Value> = courses
+        .iter()
+        .map(|&(code, total, grade)| {
+            json!({"serial": "1", "course_code": code, "course_title": code, "course_type": "Theory Only",
+                "grading_type": "RG", "grand_total": total, "grade": grade, "course_id": format!("AP2_{code}")})
+        })
+        .collect();
+    json!({"courses": courses, "semesters": [], "semester_id": "AP2", "update_time": 1})
+}
+
+#[test]
+fn roi_pools_parts_and_picks_best_and_grind() {
+    let fixture = Fixture::new("roi");
+    fixture.page(
+        ATTENDANCE,
+        &attendance(
+            "AP2",
+            vec![
+                course("CSE1001", "ETH", 20, 25),
+                course("CSE1001", "ELA", 10, 15),
+                course("MAT1001", "ETH", 38, 40),
+                course("PHY1001", "ETH", 36, 40),
+            ],
+        ),
+    );
+    fixture.page(
+        "grades.json",
+        &totals(&[
+            ("CSE1001", "88", "A"),
+            ("MAT1001", "58", "C"),
+            ("PHY1001", "80", "A"),
+        ]),
+    );
+    let roi = fixture.report().roi.unwrap();
+    let points: Vec<(&str, i32, i32)> = roi
+        .points
+        .iter()
+        .map(|p| (p.course.as_str(), p.attendance, p.score))
+        .collect();
+    assert_eq!(
+        points,
+        [
+            ("CSE1001 name", 75, 88),
+            ("MAT1001 name", 95, 58),
+            ("PHY1001 name", 90, 80)
+        ]
+    );
+    assert_eq!((roi.best, roi.grind), (0, Some(1)));
+    assert_eq!(
+        (roi.source, roi.verdict),
+        (WrappedScoreSource::Total, WrappedRoiVerdict::BunkedAndAced)
+    );
+}
+
+#[test]
+fn roi_falls_back_to_marks() {
+    let fixture = Fixture::new("roi-marks");
+    fixture.page(
+        ATTENDANCE,
+        &attendance(
+            "AP2",
+            vec![
+                course("CSE1001", "ETH", 30, 40),
+                course("MAT1001", "ETH", 36, 40),
+                course("PHY1001", "ETH", 39, 40),
+                course("ENG1001", "ETH", 39, 40),
+            ],
+        ),
+    );
+    // ENG1001 has only 20 of its 100 assessed: left out.
+    fixture.page(
+        "marks.json",
+        &marks_page(&[
+            ("CSE1001", &[("CAT1", "30"), ("CAT2", "30")]),
+            ("MAT1001", &[("CAT1", "40"), ("CAT2", "40")]),
+            ("PHY1001", &[("CAT1", "45"), ("CAT2", "45")]),
+            ("ENG1001", &[("CAT1", "10")]),
+        ]),
+    );
+    let roi = fixture.report().roi.unwrap();
+    let scores: Vec<(i32, i32)> = roi.points.iter().map(|p| (p.attendance, p.score)).collect();
+    assert_eq!(scores, [(75, 60), (90, 80), (98, 90)]);
+    assert_eq!(
+        (roi.source, roi.verdict, roi.best, roi.grind),
+        (
+            WrappedScoreSource::Marks,
+            WrappedRoiVerdict::ShowedUpPaidOff,
+            2,
+            Some(0)
+        )
+    );
+    // Two courses are not enough.
+    fixture.page(
+        "marks.json",
+        &marks_page(&[
+            ("CSE1001", &[("CAT1", "30"), ("CAT2", "30")]),
+            ("MAT1001", &[("CAT1", "40"), ("CAT2", "40")]),
+        ]),
+    );
+    assert_eq!(fixture.report().roi, None);
+}
+
+#[test]
+fn degree_ranks_this_semester_among_earlier_ones() {
+    let fixture = Fixture::new("degree");
+    fixture.shared(
+        "grade_history.json",
+        &grade_history(
+            &[
+                ("X1001", "4", "S", "Nov-2024"),
+                ("OLD1001", "4", "A", "Apr-2025"),
+                ("OLD1002", "4", "B", "Apr-2025"),
+                ("CSE1001", "4", "S", "Nov-2025"),
+                ("MAT1001", "4", "A", "Nov-2025"),
+                ("NEW1001", "4", "S", "Apr-2026"),
+            ],
+            "9.3",
+            "24",
+        ),
+    );
+    fixture.page(
+        "grades.json",
+        &grades(&[("CSE1001", "S"), ("MAT1001", "A")]),
+    );
+    let degree = fixture.report().degree.unwrap();
+    let semesters: Vec<(&str, f64, bool)> = degree
+        .semesters
+        .iter()
+        .map(|s| (s.short.as_str(), s.gpa, s.current))
+        .collect();
+    // A later semester is left out of this one's story.
+    assert_eq!(
+        semesters,
+        [
+            ("Nov '24", 10.0, false),
+            ("Apr '25", 8.5, false),
+            ("Nov '25", 9.5, true)
+        ]
+    );
+    assert_eq!((degree.rank, degree.credits), (2, 20.0));
+    assert_eq!(
+        degree.by_distribution,
+        [WrappedCredits {
+            label: "Core".into(),
+            credits: 20.0
+        }]
+    );
+    assert!((degree.cgpa.unwrap() - 9.2).abs() < 1e-9);
+}
+
+#[test]
+fn degree_needs_two_graded_semesters() {
+    let fixture = Fixture::new("degree-first");
+    fixture.shared(
+        "grade_history.json",
+        &grade_history(&[("CSE1001", "4", "S", "Nov-2025")], "10", "4"),
+    );
+    fixture.page("grades.json", &grades(&[("CSE1001", "S")]));
+    let report = fixture.report();
+    assert_eq!(report.degree, None);
+    assert!(report.cgpa.is_some());
+}
+
+fn titles(tape: &WrappedMixtape) -> Vec<&str> {
+    tape.tracks.iter().map(|t| t.title.as_str()).collect()
+}
+
+/// A hosteller's rich semester: snoozed 8 AMs, under 75% once, labs and naps, a crunch week
+/// with two papers a day, and an S-grade record.
+fn rich() -> WrappedReport {
+    WrappedReport {
+        semester_id: "AP2026272".into(),
+        semester_name: "Fall Semester 2026-27".into(),
+        first_day: records::epoch_day("2026-07-14").unwrap(),
+        last_day: records::epoch_day("2026-11-14").unwrap(),
+        courses: 7,
+        class_day_count: 72,
+        habits: Some(WrappedHabits {
+            early_percent: Some(64),
+            early_classes: 20,
+            ..Default::default()
+        }),
+        close_call: Some(WrappedCloseCall {
+            course: "WATER AND SOCIETY".into(),
+            spare: None,
+            percent: 71,
+            final_percent: 78,
+            ..Default::default()
+        }),
+        time: Some(WrappedTime {
+            minutes: 6000,
+            lab_minutes: 2460,
+            classes: 100,
+            ..Default::default()
+        }),
+        hostel: Some(WrappedHostel {
+            naps: 6,
+            ..Default::default()
+        }),
+        crunch: Some(WrappedCrunch {
+            papers: 5,
+            most_in_a_day: 2,
+            most_day: records::epoch_day("2026-11-21").unwrap(),
+            first_day: records::epoch_day("2026-11-18").unwrap(),
+            last_day: records::epoch_day("2026-11-24").unwrap(),
+            ..Default::default()
+        }),
+        grades: Some(WrappedGrades {
+            gpa: 9.3,
+            s_count: 4,
+            s_record: true,
+            ..Default::default()
+        }),
+        traits: vec![
+            WrappedTrait {
+                title: WrappedTitle::Topper,
+                score: 69,
+                grades: true,
+                hostel: false,
+            },
+            WrappedTrait {
+                title: WrappedTitle::Regular,
+                score: 45,
+                grades: false,
+                hostel: false,
+            },
+        ],
+        ..Default::default()
+    }
+}
+
+#[test]
+fn mixtape_full_hosteller_five_unique_tracks() {
+    let tape = mixtape(&rich(), "22BCE0001", true, true).unwrap();
+    let numbers: Vec<i32> = tape.tracks.iter().map(|t| t.number).collect();
+    assert_eq!(numbers, [1, 2, 3, 4, 5]);
+    let t = titles(&tape);
+    assert_eq!(t[0], "8 AM Alarm (Snoozed Mix)");
+    assert_eq!(t[1], "Negotiating With 75%");
+    // Labs (92) and naps (91) are a near tie, broken by the hash.
+    assert!(
+        ["Lab Rat Anthem", "Hostel Nap Interlude"].contains(&t[2]),
+        "{t:?}"
+    );
+    // One track per fact: the double header over the crunch week, the S record over 9-point.
+    assert_eq!(
+        (t[3], t[4]),
+        ("Double-Header Panic", "All-Time S-Grade Run")
+    );
+    assert_eq!(
+        tape.tracks.iter().map(|t| t.duration_secs).sum::<i32>(),
+        tape.total_secs
+    );
+    assert_eq!(tape.tracks[0].duration, "6:04");
+    assert_eq!(tape.tracks[1].stat_line, "Water And Society · 71% → 78%");
+    assert_eq!(
+        (tape.stamp.as_str(), tape.genre.as_str()),
+        ("FALL '26", "Honor-Roll Synth")
+    );
+    assert!(["Nine-Pointer Tape", "S-Grade Sessions"].contains(&tape.album_title.as_str()));
+    assert!(!tape.no_skips);
+}
+
+#[test]
+fn mixtape_hide_grades_swaps_tracks_and_metadata() {
+    let report = rich();
+    let (with, without) = (
+        mixtape(&report, "22BCE0001", true, true).unwrap(),
+        mixtape(&report, "22BCE0001", false, true).unwrap(),
+    );
+    assert_ne!(with, without);
+    let t = titles(&without);
+    assert!(!t.contains(&"All-Time S-Grade Run"), "{t:?}");
+    assert!(
+        without
+            .tracks
+            .iter()
+            .all(|track| track.slot != WrappedTrackSlot::Results)
+    );
+    // The closer borrows the other of labs and naps, a fact over 75.
+    assert!(
+        ["Lab Rat Anthem", "Hostel Nap Interlude"].contains(&t[4]),
+        "{t:?}"
+    );
+    assert_eq!(without.genre, "75% Debar-Line Punk");
+    assert!(["Clockwork Sem", "Daily Check-In EP"].contains(&without.album_title.as_str()));
+}
+
+#[test]
+fn mixtape_sparse_day_scholar_no_biometric_no_grades() {
+    let report = WrappedReport {
+        semester_name: "Fall Semester 2026-27".into(),
+        first_day: records::epoch_day("2026-07-14").unwrap(),
+        last_day: records::epoch_day("2026-11-14").unwrap(),
+        courses: 6,
+        class_day_count: 72,
+        attendance: Some(WrappedAttendance {
+            percent: 85,
+            attended: 340,
+            counted: 400,
+            ..Default::default()
+        }),
+        habits: Some(WrappedHabits {
+            early_percent: Some(64),
+            early_classes: 20,
+            worst_weekday: Some(0),
+            worst_weekday_misses: 6,
+            misses: 20,
+            ..Default::default()
+        }),
+        time: Some(WrappedTime {
+            minutes: 6000,
+            lab_minutes: 600,
+            classes: 110,
+            ..Default::default()
+        }),
+        exams: Some(WrappedExams {
+            cats: 6,
+            fats: 5,
+            top_venue: Some("AB1-208".into()),
+            minutes: 1440,
+        }),
+        ..Default::default()
+    };
+    let tape = mixtape(&report, "", false, true).unwrap();
+    assert_eq!(
+        titles(&tape),
+        [
+            "8 AM Alarm (Snoozed Mix)",
+            "Monday Vanishing Act",
+            // Nothing of its own for the grind: it borrows the next strong fact.
+            "Assigned Seat: AB1-208",
+            "Under the Hall Clock",
+            "FALL '26 Credits Roll",
+        ]
+    );
+    assert_eq!(tape.tracks[3].stat_line, "24 h in exam halls");
+}
+
+#[test]
+fn mixtape_calendar_only_returns_none() {
+    let report = WrappedReport {
+        semester_name: "Fall Semester 2026-27".into(),
+        first_day: 100,
+        last_day: 200,
+        courses: 6,
+        class_day_count: 72,
+        holidays: 20,
+        ..Default::default()
+    };
+    assert_eq!(mixtape(&report, "", true, true), None);
+}
+
+#[test]
+fn mixtape_deterministic_and_tie_break_scoped() {
+    let mut report = rich();
+    report.habits = Some(WrappedHabits {
+        early_percent: Some(64),
+        early_classes: 20,
+        worst_weekday: Some(4),
+        worst_weekday_misses: 9,
+        misses: 20,
+        ..Default::default()
+    });
+    assert_eq!(
+        mixtape(&report, "22BCE0001", true, true),
+        mixtape(&report, "22BCE0001", true, true)
+    );
+    for regno in ["", "A", "22BCE0001", "23BCE7777", "24MIS0420", "zz"] {
+        let tape = mixtape(&report, regno, true, true).unwrap();
+        // 96 never loses to 74, whatever the seed.
+        assert_eq!(tape.tracks[1].title, "Negotiating With 75%", "{regno}");
+        assert_eq!(
+            tape.cover_seed,
+            fnv1a(
+                FNV_OFFSET_FOR_TESTS,
+                format!("{regno}:AP2026272").as_bytes()
+            )
+        );
+    }
+}
+
+const FNV_OFFSET_FOR_TESTS: u64 = 0xcbf2_9ce4_8422_2325;
+
+#[test]
+fn mixtape_low_attendance_and_cat_dip_stay_playful() {
+    let report = WrappedReport {
+        semester_name: "Winter Semester 2025-26".into(),
+        first_day: records::epoch_day("2026-01-05").unwrap(),
+        last_day: records::epoch_day("2026-04-30").unwrap(),
+        courses: 6,
+        class_day_count: 70,
+        habits: Some(WrappedHabits {
+            early_percent: Some(42),
+            early_classes: 18,
+            ..Default::default()
+        }),
+        close_call: Some(WrappedCloseCall {
+            course: "Operating Systems".into(),
+            spare: None,
+            percent: 68,
+            final_percent: 74,
+            ..Default::default()
+        }),
+        marks: Some(WrappedMarks {
+            cat_change: Some(-12),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let tape = mixtape(&report, "22BCE0001", true, true).unwrap();
+    let t = titles(&tape);
+    assert_eq!(t.len(), 5);
+    for title in [
+        "8 AM Alarm (Snoozed Mix)",
+        "Negotiating With 75%",
+        "Open-Book Plot Twist",
+    ] {
+        assert!(t.contains(&title), "{t:?}");
+    }
+    assert!(t.iter().any(|t| t.starts_with("WIN '26")) || t.contains(&"Day One on VTOP"));
+    assert_eq!(tape.genre, "75% Debar-Line Punk");
+}
+
+#[test]
+fn duration_encoders_always_valid_mss() {
+    let valid = |secs: i32| {
+        let text = clock_of(secs);
+        let (m, s) = text.split_once(':').unwrap();
+        assert!(s.len() == 2 && s.parse::<i32>().unwrap() < 60, "{text}");
+        assert_eq!(
+            m.parse::<i32>().unwrap() * 60 + s.parse::<i32>().unwrap(),
+            secs
+        );
+    };
+    for p in 0..=100 {
+        valid(dur_pct(p));
+    }
+    for hundredths in 0..=1000 {
+        valid(dur_gpa(f64::from(hundredths) / 100.0));
+    }
+    for n in [0, 1, 34, 59, 60, 420, 9999] {
+        valid(dur_secs(n));
+        valid(dur_pair(n, n));
+    }
+    for t in 0..=240 {
+        valid(dur_pair(t / 10, (t % 10) * 6));
+    }
+    assert_eq!(
+        (
+            clock_of(dur_pct(64)),
+            clock_of(dur_pct(100)),
+            clock_of(dur_gpa(9.05))
+        ),
+        ("6:04".into(), "10:00".into(), "9:03".to_string())
+    );
+    assert_eq!(
+        (clock_of(dur_pair(5, 7)), clock_of(dur_secs(137))),
+        ("5:07".into(), "2:17".to_string())
+    );
+    assert_eq!(
+        (
+            dur_clock("7:05 AM"),
+            dur_clock("12:00 PM"),
+            dur_clock("11:59 PM"),
+            dur_clock("")
+        ),
+        (Some(7 * 60 + 5), Some(12 * 60), Some(11 * 60 + 59), None)
+    );
+    assert_eq!(
+        (minute_of("12:30 AM"), minute_of("9:48 PM")),
+        (Some(30), Some(21 * 60 + 48))
+    );
+    assert_eq!(
+        span(
+            records::epoch_day("2026-11-28").unwrap(),
+            records::epoch_day("2026-12-04").unwrap()
+        ),
+        "28 Nov to 4 Dec"
+    );
+}
+
+#[test]
+fn short_course_and_unicode_safe_truncation() {
+    assert_eq!(
+        short_course("Cloud Computing and its Applications"),
+        "Cloud Computing"
+    );
+    assert_eq!(short_course("INTRODUCTION TO PROGRAMMING"), "Programming");
+    let long = short_course("Systèmes Avancés de Réseaux Numériques");
+    assert!(long.chars().count() <= 20, "{long}");
+    assert_eq!(fit("Ünïcødéwordwithoutspaces", 5).chars().count(), 5);
+    assert_eq!(short_faculty("KANKANALA SRINIVAS - SENSE"), "Srinivas");
+    assert_eq!(short_faculty("Ravi Kumar"), "Ravi Kumar");
+}
+
+#[test]
+fn close_call_skipped_with_two_to_spare() {
+    let fixture = Fixture::new("close-call-two");
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 19, 20)]),
+    );
+    // 9 of 10 is 90%: two more misses keep it at 75%.
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(9, "Present"), (1, "Absent"), (10, "Present")], "A1"),
+    );
+    assert_eq!(fixture.report().close_call, None);
+    // 9 of 11 is 82%: one to spare.
+    fixture.history(
+        "CSE1001.theory",
+        &runs(&[(9, "Present"), (2, "Absent"), (10, "Present")], "A1"),
+    );
+    assert_eq!(fixture.report().close_call.unwrap().spare, Some(1));
+}
+
+#[test]
+fn mosaic_slump_only_under_85() {
+    let fixture = Fixture::new("mosaic-slump");
+    let d = d0();
+    // July: 11 present. August (from d + 25): 12 of 13, 93% rounded up.
+    let mut classes: Vec<(i32, &str, &str, &str)> = (0..11)
+        .map(|i| (d + i, "08:00-08:50", "Present", "A1"))
+        .collect();
+    classes.extend((25..38).map(|i| {
+        let status = if i == 30 { "Absent" } else { "Present" };
+        (d + i, "08:00-08:50", status, "A1")
+    }));
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 23, 24)]),
+    );
+    fixture.history("CSE1001.theory", &classes);
+    let m = fixture.report().mosaic.unwrap();
+    assert_eq!((m.best_month, m.worst_month), (Some(0), None));
+}
+
+#[test]
+fn guesses_hold_the_answer_in_the_second_or_third() {
+    let ranges = |p| {
+        guesses(p)
+            .into_iter()
+            .map(|g| (g.from, g.to, g.off))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        ranges(86),
+        [
+            (80, Some(84), 2),
+            (85, Some(89), 0),
+            (90, Some(94), -4),
+            (95, None, -9)
+        ]
+    );
+    assert_eq!(
+        ranges(87),
+        [
+            (75, Some(79), 8),
+            (80, Some(84), 3),
+            (85, Some(89), 0),
+            (90, None, -3)
+        ]
+    );
+    // Moved down to end at 100.
+    assert_eq!(ranges(100)[3], (95, None, 0));
+    assert_eq!(ranges(100)[0], (80, Some(84), 16));
+    assert_eq!(ranges(3)[0], (0, Some(4), 0));
+    assert_eq!(ranges(61)[1], (55, Some(59), 2));
+    for p in 0..=100 {
+        let g = guesses(p);
+        assert_eq!(g.len(), 4);
+        assert_eq!(g.iter().filter(|g| g.off == 0).count(), 1, "{p}");
+    }
+}
+
+#[test]
+fn receipt_lines_keep_each_part() {
+    let fixture = Fixture::new("lines");
+    fixture.page(
+        ATTENDANCE,
+        &attendance(
+            "AP2",
+            vec![
+                course("CSE1001", "ETH", 30, 40),
+                course("CSE1001", "ELA", 20, 20),
+                course("PHY1001", "ETH", 0, 0),
+            ],
+        ),
+    );
+    let lines: Vec<(bool, i32, i32)> = fixture
+        .report()
+        .attendance
+        .unwrap()
+        .lines
+        .iter()
+        .map(|l| (l.lab, l.attended, l.percent))
+        .collect();
+    assert_eq!(lines, [(false, 30, 75), (true, 20, 100)]);
+}
+
+/// `classes` as [`history`], each absence with VTOP's missing-punch remark unless `plain`.
+fn trapped_history(classes: &[(i32, &str, &str, &str)], plain: &[i32]) -> Value {
+    let mut value = history(classes);
+    for record in value["records"].as_array_mut().unwrap() {
+        let day = records::history_day(record["date"].as_str().unwrap()).unwrap();
+        if record["status"] == "Absent" && !plain.contains(&day) {
+            record["remark"] = json!("No punch found during class hours between faculty punch.");
+        }
+    }
+    value
+}
+
+#[test]
+fn traps_count_missing_punch_absences() {
+    let fixture = Fixture::new("traps");
+    let d = d0();
+    fixture.page(
+        ATTENDANCE,
+        &attendance("AP2", vec![course("CSE1001", "ETH", 4, 9)]),
+    );
+    let classes = [
+        (d, "08:00-08:50", "Absent", "A1"),
+        (d + 1, "08:00-08:50", "Absent", "A1"),
+        (d + 2, "08:00-08:50", "Absent", "A1"),
+        (d + 3, "08:00-08:50", "Absent", "A1"),
+        (d + 4, "08:00-08:50", "Absent", "A1"),
+        (d + 7, "08:00-08:50", "Present", "A1"),
+    ];
+    fixture.page(
+        &format!("{ATTENDANCE_DETAIL}/CSE1001.theory.json"),
+        &trapped_history(&classes, &[d + 4]),
+    );
+    // Punched in on time on d; on d + 1 only long after the class.
+    punches(&fixture, d, &[("07:50:00", "CB-214-FACE")]);
+    punches(&fixture, d + 1, &[("10:00:00", "CB-214-FACE")]);
+    let traps = fixture.report().traps.unwrap();
+    assert_eq!(
+        (traps.trapped, traps.absences, traps.checked, traps.punched),
+        (4, 5, 2, 1)
+    );
+    assert_eq!(
+        traps.by_course,
+        [WrappedCourse {
+            name: "CSE1001 name".into(),
+            percent: 4
+        }]
+    );
+    // Under three, no slide.
+    fixture.page(
+        &format!("{ATTENDANCE_DETAIL}/CSE1001.theory.json"),
+        &trapped_history(&classes, &[d + 2, d + 3, d + 4]),
+    );
+    assert_eq!(fixture.report().traps, None);
+}
+
+#[test]
+fn moves_climb_from_the_ground_in_another_block() {
+    let fixture = Fixture::new("moves-blocks");
+    let d = d0();
+    punches(
+        &fixture,
+        d,
+        &[("09:00:00", "CB-105-FACE"), ("10:00:00", "AB1-301-FACE")],
+    );
+    for day in d + 1..d + 5 {
+        punches(&fixture, day, &[("09:00:00", "CB-G05-FACE")]);
+    }
+    // 1, then 3 up from AB1's ground floor; the same block would have been 2.
+    assert_eq!(fixture.report().moves.unwrap().floors, 4);
+}
+
+/// A timetable with an earlier semester graded, so FFCS counts.
+fn ffcs_fixture(name: &str, earlier: bool) -> Fixture {
+    let fixture = Fixture::new(name);
+    fixture.page(
+        TIMETABLE,
+        &timetable(&[
+            (
+                "MON", "A1", "CSE1001", "Theory", "08:00", "08:50", "101", "CB ALL", "",
+            ),
+            (
+                "MON", "B1", "CSE1002", "Theory", "09:00", "09:50", "201", "AB1", "",
+            ),
+            (
+                "MON", "C1", "CSE1003", "Theory", "11:00", "11:50", "201", "AB1", "",
+            ),
+            (
+                "MON", "D2", "CSE1004", "Theory", "14:00", "14:50", "201", "AB1", "",
+            ),
+            (
+                "TUE", "L1+L2", "CSE1001", "Lab", "10:00", "11:40", "301", "CB", "",
+            ),
+            (
+                "TUE", "E1", "CSE1002", "Theory", "12:00", "12:50", "101", "CB", "",
+            ),
+        ]),
+    );
+    let month = if earlier { "Nov-2024" } else { "Nov-2025" };
+    fixture.shared(
+        "grade_history.json",
+        &grade_history(&[("MAT1001", "4", "A", month)], "9", "4"),
+    );
+    fixture
+}
+
+#[test]
+fn ffcs_grades_the_week() {
+    let f = ffcs_fixture("ffcs", true).report().ffcs.unwrap();
+    // 25 - 6 for one 8 AM, 25 - 5 for 130 minutes waiting (70 + 40 outside lunch + 20), 12
+    // for lunch kept free on one day of two, 25 for four free days.
+    assert_eq!(
+        (f.early, f.gap_minutes, f.lunch_free_days, f.class_days),
+        (1, 130, 1, 2)
+    );
+    assert_eq!(f.free_days, [2, 3, 4, 5]);
+    assert_eq!((f.score, f.grade), (76, WrappedGrade::A));
+    assert_eq!(
+        (f.best, f.worst),
+        (WrappedFfcsPart::FreeDays, WrappedFfcsPart::Lunch)
+    );
+    assert_eq!(
+        (f.sprints, f.sprint_from.as_deref(), f.sprint_to.as_deref()),
+        (1, Some("CB"), Some("AB1"))
+    );
+    assert_eq!(f.week.len(), 6);
+    assert!(f.week[4].lab && f.week[4].day == 1);
+}
+
+#[test]
+fn ffcs_hidden_in_a_first_semester() {
+    assert_eq!(ffcs_fixture("ffcs-first", false).report().ffcs, None);
+    let fixture = ffcs_fixture("ffcs-no-history", true);
+    fs::remove_file(fixture.dir.join(format!("{PAGES}/grade_history.json"))).unwrap();
+    assert_eq!(fixture.report().ffcs, None);
+}
+
+#[test]
+fn hide_hostel_skips_hostel_titles_and_tracks() {
+    let report = WrappedReport {
+        outings: Some(WrappedOutings {
+            leaves: 6,
+            weekends: 4,
+            ..Default::default()
+        }),
+        attendance: Some(WrappedAttendance {
+            percent: 91,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let earned = traits(&report);
+    assert_eq!(
+        earned.iter().map(|t| t.title).collect::<Vec<_>>(),
+        [
+            WrappedTitle::Explorer,
+            WrappedTitle::Regular,
+            WrappedTitle::SteadyCruiser
+        ]
+    );
+    assert_eq!(title(&earned, true, true), WrappedTitle::Explorer);
+    assert_eq!(title(&earned, true, false), WrappedTitle::Regular);
+    let rich = rich();
+    let tape = mixtape(&rich, "22BCE0001", true, false).unwrap();
+    assert!(!titles(&tape).contains(&"Hostel Nap Interlude"), "{tape:?}");
+    assert_ne!(tape.genre, "Hostel-Nap Dream Pop");
 }

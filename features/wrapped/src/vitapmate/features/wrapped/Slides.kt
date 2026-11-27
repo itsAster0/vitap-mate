@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -19,6 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,10 +51,27 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.Tone
 
 /*
- * The story's slides. Each is drawn in a 360 × 640 design frame (the mockups' phone), scaled to
- * the screen in the app and to 1080 × 1920 for a share image, so both look the same. Positions
- * below are the mockups' (docs/superpowers/specs/wrapped-mockups/).
+ * The story's slides, in design dp. On screen the frame is the screen's width over a scale of
+ * width / 360 kept within 0.94 to 1.2, so a narrow phone gets a narrower frame (340 at 320 dp)
+ * rather than smaller text, and a tall phone a taller one; the Share row sits below it. A share
+ * image is 1080 × 1920: a 360 × 564 frame over the vitapmate footer. Fixed slides are laid out at
+ * the mockups' positions in 360 × 564 and scaled down when the frame is smaller; flexible ones
+ * fill the frame (see [Frame]).
  */
+
+/** The frame a slide is laid out in, in design dp: [width] across, [height] above the Share row or the share image's footer. */
+@Immutable
+internal class Frame(val width: Float, val height: Float) {
+    /** A short frame: headings a step smaller, gaps tighter. */
+    val compact: Boolean get() = height < COMPACT_BELOW
+}
+
+internal val LocalFrame = staticCompositionLocalOf { Frame(DESIGN_WIDTH, CONTENT_HEIGHT) }
+
+/** The share image's frame height, and the footer band under it (640 in all). */
+internal const val CONTENT_HEIGHT = 564f
+internal const val FOOTER_HEIGHT = 76f
+private const val COMPACT_BELOW = 600f
 
 /** The slide's tone, from the theme. */
 internal enum class Ink { Accent, Success, Warning, Danger, Lab }
@@ -61,7 +86,7 @@ internal fun Ink.tone(): Tone = when (this) {
     Ink.Lab -> AppTheme.tones.lab
 }
 
-/** A summary tile: a slide's headline number. [grades] tiles go with Hide grades. */
+/** A summary tile: a slide's headline number. [grades] tiles go with Hide grades, [hostel] ones with Hide hostel and outings. */
 internal class Tile(
     val ink: Ink,
     val value: String,
@@ -70,27 +95,84 @@ internal class Tile(
     val key: Boolean = false,
     val small: Boolean = false,
     val grades: Boolean = false,
+    val hostel: Boolean = false,
 )
 
 /**
- * The Campus slide's fetch: [missing] class days without campus times, the worker's [done] of
- * [total] while it [running], and [start] to queue it.
+ * The outro's campus times: [missing] class days without them, the worker's [done] of [total]
+ * while it [running], and [start] to queue it.
  */
 internal class CampusFetch(val missing: List<Int>, val running: Boolean, val done: Int, val total: Int, val start: () -> Unit)
 
-/** What a slide draws from. [share] is the share image (no fetch row); [hide] is Hide grades, only ever on in it. */
+/** What a share image leaves out; on screen nothing is. */
+@Immutable
+internal data class Privacy(val grades: Boolean = false, val name: Boolean = false, val hostel: Boolean = false)
+
+/**
+ * The story's moments that wait for the student: the attendance guess ([guess], an index into
+ * its ranges, null when skipped; [guessed] once revealed), the sealed title, and the summary as
+ * a grid or a receipt. A share image draws every moment revealed.
+ */
+@Stable
+internal class StoryState {
+    var guess by mutableStateOf<Int?>(null)
+    var guessed by mutableStateOf(false)
+    var unsealed by mutableStateOf(false)
+    var receipt by mutableStateOf(false)
+
+    /** Back to the start of the story: every moment waiting again. */
+    fun reset() {
+        guess = null
+        guessed = false
+        unsealed = false
+        receipt = false
+    }
+}
+
+/** What the outro does: the share sheet, Save to Docs, a replay, and the other semesters to switch to (id to name). */
+internal class Outro(
+    val share: () -> Unit,
+    val save: () -> Unit,
+    val replay: () -> Unit,
+    val semesters: List<Pair<String, String>>,
+    val pick: (String) -> Unit,
+)
+
+/**
+ * What a slide draws from. [share] is the share image, drawn as [privacy] says ([wallpaper]:
+ * without the footer); [state] the story's moments.
+ */
 internal class SlideContext(
     val report: WrappedReport,
     val name: String?,
     val share: Boolean,
-    val hide: Boolean,
+    val privacy: Privacy,
     val campus: CampusFetch,
-)
+    val state: StoryState,
+    val outro: Outro? = null,
+    val wallpaper: Boolean = false,
+) {
+    /** Hide grades. */
+    val hide: Boolean get() = privacy.grades
+
+    /** The first name, unless the share image hides it. */
+    val shownName: String? get() = name.takeUnless { share && privacy.name }
+
+    /** Revealed: in a share image, or once the student guessed or skipped. */
+    val guessed: Boolean get() = share || state.guessed
+    val unsealed: Boolean get() = share || state.unsealed
+}
+
+/** A moment that waits for the student before the slide shows its fact: [skip] reveals it, [label] names that. */
+internal class Pending(val label: String, val waiting: (StoryState) -> Boolean, val skip: (StoryState) -> Unit)
 
 /**
  * One screen of the story: [name] for its test tag and image file, [ink] its tone (null: the
- * summary's plain surface), [grades] shows Hide grades, [shareable] whether its image has a fact
- * left, [tiles] its summary tiles.
+ * summary's plain surface), [grades] shows grades, [hostel] shows hostel times or outings,
+ * [shareable] whether its image has a fact left, [tiles] its summary tiles, [pending] a moment
+ * before its fact (no Share until revealed). [fixed] slides place their parts at the mockups'
+ * positions in 360 × 564; the others fill the [Frame] with a flexible layout. [outro] is the
+ * last screen: never shared, no Share row.
  */
 internal class Slide(
     val name: String,
@@ -98,19 +180,40 @@ internal class Slide(
     val grades: Boolean = false,
     val semesterLine: Boolean = true,
     val tiles: List<Tile> = emptyList(),
-    val shareable: (hide: Boolean) -> Boolean = { true },
+    val shareable: (Privacy) -> Boolean = { true },
+    val fixed: Boolean = true,
+    val hostel: Boolean = false,
+    val pending: Pending? = null,
+    val outro: Boolean = false,
+    /** The tone at the frame's bottom edge when the lower part is another; the Share row takes it. */
+    val foot: Ink? = null,
     val content: @Composable BoxScope.(SlideContext) -> Unit,
-)
+) {
+    fun withInk(ink: Ink) = Slide(name, ink, grades, semesterLine, tiles, shareable, fixed, hostel, pending, outro, foot, content)
 
-/** Every slide with facts, in the spec's order, ending with the summary. */
-internal fun slides(r: WrappedReport, hasMissing: Boolean): List<Slide> {
+    /** Whether a share image with [privacy] has anything left to show. */
+    fun canShare(privacy: Privacy) = !outro && shareable(privacy) && !(hostel && privacy.hostel)
+}
+
+/** Every slide with facts, in story order, then the summary and the outro; no two in a row share a tone. */
+internal fun slides(r: WrappedReport): List<Slide> {
     val story = listOfNotNull(
-        openingSlide(r), attendanceSlide(r), odSlide(r), streakSlide(r), neverMissedSlide(r), comebackSlide(r), habitsSlide(r),
-        dayHalfSlide(r), coursesSlide(r), closeCallSlide(r), timeSlide(r), placesSlide(r), marksSlide(r), fullMarksSlide(r),
-        assessmentsSlide(r), examsSlide(r), crunchSlide(r), gradesSlide(r), cgpaSlide(r), outingsSlide(r), campusSlide(r, hasMissing), hostelSlide(r), movesSlide(r),
-        previousSlide(r), titleSlide(r),
-    )
-    return story + summarySlide(story)
+        openingSlide(r), attendanceSlide(r), streakSlide(r), mosaicSlide(r), arcSlide(r), coursesSlide(r), closeCallSlide(r),
+        rhythmSlide(r), timeSlide(r), trapsSlide(r), ffcsSlide(r), examsSlide(r), marksSlide(r), roiSlide(r), gradesSlide(r),
+        degreeSlide(r), previousSlide(r), outingsSlide(r), campusSlide(r), hostelSlide(r), movesSlide(r), mixtapeSlide(r),
+        titleSlide(r),
+    ).let(::distinctInks)
+    return story + summarySlide(story) + outroSlide(r)
+}
+
+/** Tones a slide takes when its own matches the one before it, in this order. */
+private val SPARE_INKS = listOf(Ink.Accent, Ink.Success, Ink.Warning, Ink.Lab, Ink.Danger)
+
+/** [story] with each slide whose tone repeats the one before it moved to a spare tone, unlike either neighbour. */
+private fun distinctInks(story: List<Slide>): List<Slide> = story.foldIndexed(listOf()) { i, done, slide ->
+    val before = done.lastOrNull()?.ink
+    if (slide.ink == null || slide.ink != before) done + slide
+    else done + slide.withInk(SPARE_INKS.first { it != before && it != story.getOrNull(i + 1)?.ink })
 }
 
 // Colours of the slide being drawn.
@@ -196,12 +299,12 @@ internal fun BigBeside(number: String, size: Float, heading: String, headingSize
     }
 }
 
-/** A pill of quiet text. */
+/** A pill of quiet text; a long one (a course's name) wraps to a second line. */
 @Composable
 internal fun Chip(text: String, modifier: Modifier = Modifier) {
     val ink = LocalInks.current
-    Box(modifier.height(32.dp).background(ink.text.copy(alpha = 0.14f), RoundedCornerShape(16.dp)).padding(horizontal = 14.dp), Alignment.Center) {
-        Text(text, color = ink.text, style = type(13f, 600, -0.01f, 1.2f), maxLines = 1)
+    Box(modifier.heightIn(min = 32.dp).background(ink.text.copy(alpha = 0.14f), RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 6.dp), Alignment.CenterStart) {
+        Text(text, color = ink.text, style = type(13f, 600, -0.01f, 1.2f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -271,20 +374,56 @@ internal fun Panel(y: Int, modifier: Modifier = Modifier, content: @Composable B
     )
 }
 
+/** A flexible slide's column: the frame under the semester line, 24 in from each side. */
+@Composable
+internal fun Flow(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val compact = LocalFrame.current.compact
+    Column(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = if (compact) 52.dp else 58.dp, bottom = 12.dp).then(modifier), content = content)
+}
+
+/** [compact] in a short frame, else [roomy]. */
+@Composable
+@ReadOnlyComposable
+internal fun fits(roomy: Float, compact: Float): Float = if (LocalFrame.current.compact) compact else roomy
+
+/** Panels of a number over a line, [columns] to a row, in a flexible column. */
+@Composable
+internal fun MiniRow(items: List<Pair<String, String>>, modifier: Modifier = Modifier, columns: Int = items.size.coerceIn(1, 3)) {
+    if (items.isEmpty()) return
+    val ink = LocalInks.current
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (value, label) ->
+                    Column(Modifier.weight(1f).fillMaxHeight().background(ink.panel, RoundedCornerShape(22.dp)).padding(horizontal = 14.dp, vertical = 11.dp)) {
+                        Text(value, color = ink.shape, style = type(22f, 800, -0.04f, 1.15f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(label, color = ink.text, style = type(12f, 600, -0.01f, 1.3f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(columns - row.size) { Box(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
 /** One bar split into parts by weight (theory and labs, the grade mix), [h] tall. */
 @Composable
 internal fun SplitBar(y: Int, h: Int, parts: List<Triple<String, Float, Pair<Color, Color>>>) {
+    Txt(y) { Split(h, parts) }
+}
+
+/** [SplitBar]'s bar, across its column. */
+@Composable
+internal fun Split(h: Int, parts: List<Triple<String, Float, Pair<Color, Color>>>) {
     val r = h / 2
-    Txt(y) {
-        Row(Modifier.fillMaxWidth().height(h.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            parts.forEachIndexed { i, (text, weight, colors) ->
-                val shape = RoundedCornerShape(
-                    topStart = if (i == 0) r.dp else 8.dp, bottomStart = if (i == 0) r.dp else 8.dp,
-                    topEnd = if (i == parts.lastIndex) r.dp else 8.dp, bottomEnd = if (i == parts.lastIndex) r.dp else 8.dp,
-                )
-                Box(Modifier.weight(weight).height(h.dp).background(colors.first, shape), Alignment.Center) {
-                    Text(text, color = colors.second, style = type(if (h > 46) 16f else 14f, 800, -0.02f, 1f), maxLines = 1, overflow = TextOverflow.Clip)
-                }
+    Row(Modifier.fillMaxWidth().height(h.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        parts.forEachIndexed { i, (text, weight, colors) ->
+            val shape = RoundedCornerShape(
+                topStart = if (i == 0) r.dp else 8.dp, bottomStart = if (i == 0) r.dp else 8.dp,
+                topEnd = if (i == parts.lastIndex) r.dp else 8.dp, bottomEnd = if (i == parts.lastIndex) r.dp else 8.dp,
+            )
+            Box(Modifier.weight(weight).height(h.dp).background(colors.first, shape), Alignment.Center) {
+                Text(text, color = colors.second, style = type(if (h > 46) 16f else 14f, 800, -0.02f, 1f), maxLines = 1, overflow = TextOverflow.Clip)
             }
         }
     }
@@ -318,12 +457,25 @@ internal fun titled(text: String) =
 internal fun shortName(semester: String) = semester.trim().substringBefore(' ')
 
 internal fun WrappedTitle.label() = when (this) {
+    WrappedTitle.TOPPER -> "The Topper"
+    WrappedTitle.GHOST_GENIUS -> "The Ghost Genius"
+    WrappedTitle.EXAM_CLUTCH -> "The Exam Clutch"
+    WrappedTitle.PERFECTIONIST -> "The Perfectionist"
     WrappedTitle.COMEBACK -> "The Comeback"
+    WrappedTitle.EDGE_WALKER -> "The 75% Tactician"
     WrappedTitle.IRON_STREAK -> "The Iron Streak"
     WrappedTitle.EARLY_REGULAR -> "The 8 AM Regular"
-    WrappedTitle.TOPPER -> "The Topper"
-    WrappedTitle.EXPLORER -> "The Explorer"
-    WrappedTitle.LAB_RAT -> "The Lab Rat"
     WrappedTitle.REGULAR -> "The Regular"
-    WrappedTitle.FREE_SPIRIT -> "The Free Spirit"
+    WrappedTitle.CLUB_CAPTAIN -> "The Club Captain"
+    WrappedTitle.LAB_RAT -> "The Lab Rat"
+    WrappedTitle.EXPLORER -> "The Explorer"
+    WrappedTitle.STAIRMASTER -> "The Stairmaster"
+    WrappedTitle.NIGHT_OWL -> "The Night Owl"
+    WrappedTitle.STEADY_CRUISER -> "The Steady Cruiser"
 }
+
+/** The traits [privacy] leaves, strongest first; the title is the first. */
+internal fun WrappedReport.shownTraits(privacy: Privacy) = traits.filter { !(privacy.grades && it.grades) && !(privacy.hostel && it.hostel) }
+
+/** The title [privacy] leaves. */
+internal fun WrappedReport.shownTitle(privacy: Privacy): WrappedTitle = shownTraits(privacy).firstOrNull()?.title ?: WrappedTitle.STEADY_CRUISER
