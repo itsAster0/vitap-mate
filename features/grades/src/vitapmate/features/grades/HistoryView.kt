@@ -28,6 +28,7 @@ import vitapmate.core.GradeHistory
 import vitapmate.data.PageHandle
 import vitapmate.data.Settings
 import vitapmate.ui.EmptyView
+import vitapmate.ui.InsightsHint
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.SectionHeader
@@ -72,6 +73,7 @@ internal fun HistoryView(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             item("cgpa") { CgpaCard(history, insights) }
+            if (!insights) item("insights.hint") { InsightsHint(Modifier.padding(vertical = Space.sm)) }
             if (history.courseCount > 0) {
                 item("courses") {
                     SectionHeader("Courses", trailing = { Text("${sessions.sumOf { it.second.size }} of ${history.courseCount}") })

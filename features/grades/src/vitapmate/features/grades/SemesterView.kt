@@ -33,6 +33,7 @@ import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.logAction
 import vitapmate.ui.EmptyView
+import vitapmate.ui.InsightsHint
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.Space
@@ -93,6 +94,7 @@ internal fun SemesterView(
                 // Course cards sit 3 dp apart as one segmented run.
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
+                if (!insights) item("insights.hint") { InsightsHint(Modifier.animateItem().padding(bottom = Space.sm)) }
                 if (summary != null) {
                     item("summary") {
                         SemesterSummaryCard(grades.courses, summary, onCourse = { i -> scope.launch { list.animateScrollToItem(i + 1) } }, Modifier.animateItem().padding(bottom = Space.sm))

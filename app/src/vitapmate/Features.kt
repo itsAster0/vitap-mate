@@ -39,6 +39,8 @@ val features: List<Feature> = featureGroups.flatMap { it.second } + wrappedFeatu
 /** Screens the shell itself provides; they can be tabs too. Their content is drawn by [Shell]. */
 const val MORE = "more"
 const val SETTINGS = "settings"
+/** Settings scrolled to the insights toggle (a screen's hint while insights are off). */
+const val INSIGHTS_SETTING = "settings.insights"
 const val INSPECTOR = "inspector"
 
 val builtIns: List<Feature> = listOf(

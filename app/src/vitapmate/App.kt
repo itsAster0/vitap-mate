@@ -38,6 +38,7 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.DownloadFolderPrompt
 import vitapmate.ui.EmptyState
+import vitapmate.ui.LocalOpenInsights
 import vitapmate.ui.LocalSignIn
 import vitapmate.ui.ToastHost
 
@@ -98,6 +99,10 @@ fun App() {
         LocalNav provides nav,
         LocalInspector provides InspectorOpener { nav.push(Route.FlowLog(it)) },
         LocalSignIn provides signIn,
+        LocalOpenInsights provides {
+            Log.info("ui.shell", "open insights setting")
+            nav.push(Route.Screen(INSIGHTS_SETTING))
+        },
         LocalUser provides session.user,
     ) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).semantics { testTagsAsResourceId = true }) {

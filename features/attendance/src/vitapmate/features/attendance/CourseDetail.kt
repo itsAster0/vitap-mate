@@ -59,6 +59,7 @@ import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.ui.InsightsHint
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.AppTheme
@@ -191,6 +192,7 @@ private fun Overview(detail: AttendanceDetail, insights: Boolean) {
         verticalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
         item("hero") { Hero(course, insights) }
+        if (!insights) item("insights.hint") { InsightsHint() }
         if (insights && detail.classes.any { it.status != null }) item("insights") { Insights(detail) }
         if (detail.classes.isNotEmpty()) item("calendar") { ClassCalendar(detail.classes, showTally = insights) }
         classHistory(detail.classes, showCounts = insights)

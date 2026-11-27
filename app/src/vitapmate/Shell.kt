@@ -187,6 +187,7 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder) {
         is Route.Screen -> when (route.id) {
             MORE -> MoreScreen()
             SETTINGS -> SettingsScreen()
+            INSIGHTS_SETTING -> SettingsScreen(jump = "Insights")
             INSPECTOR -> InspectorScreen()
             ACTIVITY -> ActivityScreen()
             ACTIVITY_HISTORY -> ActivityScreen(showOlder = true)

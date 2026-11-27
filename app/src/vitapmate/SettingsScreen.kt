@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -70,10 +71,13 @@ import vitapmate.ui.StatusChip
 import vitapmate.ui.neutralTone
 import vitapmate.ui.rememberHaptics
 
-/** Account (with the semester), appearance (theme, colours, tabs), diagnostics and about. */
+/**
+ * Account (with the semester), appearance (theme, colours, tabs), diagnostics and about. [jump] is
+ * a group title to open scrolled to, as its chip would.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(jump: String? = null) {
     val nav = LocalNav.current
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
@@ -109,6 +113,7 @@ fun SettingsScreen() {
         ("Assistant" to 9).takeIf { android.os.Build.VERSION.SDK_INT >= 36 },
         "Calendar" to 10, "Appearance" to 11, "Files and mess" to 12, "Diagnostics" to 13,
     )
+    LaunchedEffect(jump) { jumps.firstOrNull { it.first == jump }?.let { list.scrollToItem(it.second) } }
     var confirmSignOut by remember { mutableStateOf(false) }
     var messTimings by remember { mutableStateOf(false) }
     var downloadFolder by remember { mutableStateOf(false) }

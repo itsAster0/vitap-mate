@@ -26,12 +26,14 @@ import com.composables.icons.lucide.ClipboardList
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.MarksCourse
+import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
+import vitapmate.ui.InsightsHint
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.ScrollToTopOnReselect
@@ -154,6 +156,7 @@ private fun CourseList(courses: List<MarksCourse>, state: LazyListState, expande
         items(courses, key = { it.key }) { course ->
             MarksCard(course, course.key in expanded, onToggle = { onToggle(course) }, Modifier.animateItem())
         }
+        if (!Settings.calculatedInsights) item("insights.hint") { InsightsHint(Modifier.animateItem()) }
         item("updated") { UpdatedFooter() }
     }
 }

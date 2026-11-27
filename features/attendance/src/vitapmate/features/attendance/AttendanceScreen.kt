@@ -42,6 +42,7 @@ import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
 import vitapmate.observability.logAction
 import vitapmate.ui.EmptyView
+import vitapmate.ui.InsightsHint
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.ScrollToTopOnReselect
@@ -195,6 +196,7 @@ private fun CourseList(courses: List<AttendanceCourse>, state: LazyListState, ou
                 Modifier.animateItem(),
             )
         }
+        if (!insights) item("insights.hint") { InsightsHint(Modifier.animateItem()) }
         item("updated") { UpdatedFooter() }
     }
 }
