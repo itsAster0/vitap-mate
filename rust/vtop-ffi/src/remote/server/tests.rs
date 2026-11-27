@@ -119,11 +119,19 @@ async fn the_account_reads_its_link_and_storage_once() {
             credentials_rejected_at: Some(3),
         }
     );
-    // One read; queries share the socket's subscriptions, so they carry no flow.
-    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
+    // One read, after a token; queries share the socket's subscriptions, so they carry no flow.
+    // Only these calls count: other background calls may reach the fake server on a slow runner.
+    let paths = paths(&edge);
+    let token = paths.iter().position(|p| p == "auth:token");
+    let views: Vec<usize> = (0..paths.len())
+        .filter(|&i| paths[i] == "account:view")
+        .collect();
+    assert_eq!(views.len(), 1, "{paths:?}");
+    assert!(token.is_some_and(|t| t < views[0]), "{paths:?}");
     let edge = edge.lock().unwrap();
-    assert!(edge.requests.iter().all(|r| r.signed));
-    assert!(edge.requests[1].flow.is_empty());
+    let view = &edge.requests[views[0]];
+    assert!(view.signed && edge.requests[token.unwrap()].signed);
+    assert!(view.flow.is_empty());
 }
 
 #[tokio::test]

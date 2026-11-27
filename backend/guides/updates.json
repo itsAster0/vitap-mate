@@ -121,8 +121,8 @@
   "releases": [
     {
       "version": "3.2.3",
-      "code": 3002300,
-      "summary": "3.2.3 rebuilds Semester Wrapped with new slides, a receipt summary and private sharing, fits it to every screen, and shows it whatever your Calculated insights setting.",
+      "code": 3002301,
+      "summary": "3.2.3 rebuilds Semester Wrapped with new slides, a receipt summary and private sharing, fits it to every screen, shows it whatever your Calculated insights setting, and points to that setting from Attendance, Marks and Grades while it's off.",
       "sections": [
         {
           "title": "New",
@@ -134,7 +134,8 @@
         {
           "title": "Improved",
           "items": [
-            "Semester Wrapped is shorter, with thin slides merged, fits small phones, large screens and bigger text, and shows whatever your Calculated insights setting."
+            "Semester Wrapped is shorter, with thin slides merged, fits small phones, large screens and bigger text, and shows whatever your Calculated insights setting.",
+            "With Calculated insights off, Attendance, Marks and Grades show a small link to turn them on in Settings."
           ]
         }
       ]
