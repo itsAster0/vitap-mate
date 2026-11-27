@@ -120,6 +120,26 @@
   ],
   "releases": [
     {
+      "version": "3.2.3",
+      "code": 3002300,
+      "summary": "3.2.3 rebuilds Semester Wrapped with new slides, a receipt summary and private sharing, fits it to every screen, and shows it whatever your Calculated insights setting.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "Semester Wrapped is rebuilt: a day-by-day attendance grid, your attendance through the semester, whether showing up paid off, your GPA across semesters, a semester mixtape, your FFCS verdict, absences VTOP put down to a missing face scan, and a title you unseal.",
+            "Guess your attendance before the reveal, flip the summary into a receipt, and share a story or wallpaper with grades, your name or hostel and outings hidden."
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "Semester Wrapped is shorter, with thin slides merged, fits small phones, large screens and bigger text, and shows whatever your Calculated insights setting."
+          ]
+        }
+      ]
+    },
+    {
       "version": "3.2.2",
       "code": 3002291,
       "summary": "3.2.2 shows verbatim VTOP data by default with opt-in Calculated insights, makes mail forwarding setup more dependable end to end, surfaces forwarding warnings in Settings, refreshes the About screen, and fixes a hang when restoring an account.",
