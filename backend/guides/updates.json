@@ -110,6 +110,10 @@
         {
           "text": "Swipe the week strip on the timetable to see next week, or the weeks after.",
           "since": 3002100
+        },
+        {
+          "text": "Pages show verbatim VTOP data by default. Turn on Calculated insights in Settings → Insights (or during setup) for totals, GPAs, projections, cross-page views and calculators.",
+          "since": 3002291
         }
       ]
     }
@@ -117,12 +121,13 @@
   "releases": [
     {
       "version": "3.2.2",
-      "code": 3002290,
-      "summary": "3.2.2 makes mail forwarding setup more dependable end to end, surfaces forwarding warnings in Settings, refreshes the About screen, and fixes a hang when restoring an account.",
+      "code": 3002291,
+      "summary": "3.2.2 shows verbatim VTOP data by default with opt-in Calculated insights, makes mail forwarding setup more dependable end to end, surfaces forwarding warnings in Settings, refreshes the About screen, and fixes a hang when restoring an account.",
       "sections": [
         {
           "title": "New",
           "items": [
+            "Calculated insights (off by default, in Settings → Insights and during setup): VTOP pages show verbatim VTOP data unless you opt in to derived totals, GPAs, projections, cross-page views and calculators after a timed disclaimer. Classes you can skip now sits under Calculated insights.",
             "Reopen Gmail's confirmation link from step 2 if you left Gmail before tapping Confirm.",
             "New Gmail confirmations that arrive while forwarding is already on now show in the sheet, where you can confirm or dismiss them.",
             "Wrong-Gmail confirmations can be ignored so they no longer hold setup back, and Open college Gmail uses Google's account picker when your college address isn't cached yet.",
