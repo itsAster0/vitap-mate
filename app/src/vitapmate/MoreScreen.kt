@@ -70,7 +70,7 @@ fun MoreScreen() {
     val unseen = rememberUnseenChanges()
     Page("More", MORE) { padding ->
         LazyColumn(contentPadding = padding) {
-            if (Settings.calculatedInsights) item("wrapped") { WrappedCard() }
+            item("wrapped") { WrappedCard() }
             // New changes since the last visit: opens the inbox, as the Changes row does.
             if (unseen > 0) item("changes.new") {
                 val tones = AppTheme.tones
