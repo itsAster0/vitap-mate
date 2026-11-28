@@ -48,8 +48,8 @@ fun <T> rememberGuide(path: String, parse: (JSONObject) -> T): LoadedGuide<T> {
                 .onSuccess { value = it }
                 .onFailure { e ->
                     if (value != null) return@onFailure
-                    problem = if (e is UnsupportedOperationException) Problem(ProblemKind.Unexpected, "Update the App", "This page needs a newer version of the app.", f, retryable = false)
-                    else Problem(ProblemKind.Offline, "Not Loaded", "Couldn't load this page. Check your connection and try again.", f, retryable = true)
+                    problem = if (e is UnsupportedOperationException) Problem(ProblemKind.UNEXPECTED, "Update the App", "This page needs a newer version of the app.", f, retryable = false)
+                    else Problem(ProblemKind.OFFLINE, "Not Loaded", "Couldn't load this page. Check your connection and try again.", f, retryable = true)
                 }
         }
     }

@@ -30,12 +30,24 @@ mod convex;
 mod demo;
 mod dev;
 mod device;
+mod docs;
+mod events;
+mod gmail;
+mod mess_menu;
 mod obs;
 mod otp;
+mod page_watch;
 mod pages;
+mod problem;
 mod remote;
+mod runtime;
+mod schedule;
+mod semester_choice;
 mod session;
+mod settings;
 mod store;
+mod sync;
+mod sync_health;
 #[cfg(test)]
 mod test_edge;
 mod transport;
@@ -56,7 +68,19 @@ use vtop_core::sync::RwLock;
 use vtop_core::types::{PersistedVtopSession, SemesterData};
 use vtop_core::{VtopClient, VtopError};
 
+pub use docs::{
+    Doc, DocKind, DocReconcile, DocSort, FolderFile, doc_kind_of, newest_mess_menu, query_docs,
+};
+pub use events::{AppEvents, SecretBox, SecretError, UrlOpener};
+pub use gmail::{GmailAccount, GmailClient, GmailError, GmailOtp, gmail_parse_client};
+pub use mess_menu::{
+    Meal, MealWindow, MessDay, MessItem, MessMenu, MessMenuError, MessSheet, MessTable,
+    current_or_next_meal, decode_meal_windows, default_meal_windows, detect_mess_menu_month,
+    encode_meal_windows, mess_menu_year, parse_mess_menu, resolve_mess_item,
+};
 pub use obs::log_event;
+pub use page_watch::{PageActivity, PageId, PageListener, PageStatus, PageWatch, page_id_name};
+pub use pages::biometric_job::{BiometricStallNext, BiometricStep, biometric_after_stall};
 pub use pages::calendar::CalendarKind;
 pub use pages::records::{
     Attendance, AttendanceCourse, AttendanceDetail, AttendancePlan, AttendanceProjection,
@@ -64,10 +88,20 @@ pub use pages::records::{
     NextClass, Semester, Semesters, Timetable, TimetableDay, attendance_goal_split,
     project_attendance,
 };
+pub use problem::{Problem, ProblemKind, problem_of, problem_toasts};
+pub use remote::consent::{ConsentAnswer, ConsentAsk, HandoverSheetPhase};
+pub use schedule::{ActivityEntry, ActivityRun, QueueEnd, QueuedWork, TrackEnd};
+pub use semester_choice::SemesterState;
+pub use settings::{
+    OtpSource, PrefValue, SettingChange, Settings, SettingsListener, SettingsStore, ThemeMode,
+    TimetableViewMode, TunableInfo, TunableKey, settings_pref_keys, tunables,
+};
 pub use store::account::{
     AccountListener, AccountStatus, Opening, PasswordCipher, RejectedBy, Sealing, Standing,
 };
 pub use store::cookies::SharedCookies;
+pub use sync::{SyncKind, SyncOtp, SyncOutcome, SyncResult};
+pub use sync_health::{PauseReason, SyncHealth, SyncResume};
 
 uniffi::setup_scaffolding!();
 
@@ -492,12 +526,14 @@ pub struct Platform {
     pub convex: Arc<dyn convex::ConvexNetwork>,
     /// Account proofs' WebSockets.
     pub proof: Arc<dyn remote::account_proof::ProofNetwork>,
-    /// Asked before any VTOP session leaves the phone.
-    pub cookie_gate: Arc<dyn remote::consent::CookieGate>,
     /// Seals the saved password (the Android Keystore).
     pub cipher: Arc<dyn PasswordCipher>,
     /// Shows the OTP prompt ([`otp`]).
     pub otp: Arc<dyn otp::OtpListener>,
+    /// Seals small secret files (the Android Keystore).
+    pub secrets: Arc<dyn SecretBox>,
+    /// Opens the browser.
+    pub urls: Arc<dyn UrlOpener>,
     pub dev: dev::DevConfig,
     /// The name the server shows for this phone ("OnePlus CPH2573").
     pub device_label: String,
@@ -535,6 +571,13 @@ struct Shared {
     cipher: Option<Arc<dyn PasswordCipher>>,
     /// The OTP prompt and the calls waiting on it.
     otp: Arc<otp::Board>,
+    secrets: Option<Arc<dyn SecretBox>>,
+    urls: Option<Arc<dyn UrlOpener>>,
+    /// Gmail BYOK account cache and operation serializer (`gmail.rs`).
+    gmail: Mutex<gmail::State>,
+    gmail_lock: futures::lock::Mutex<()>,
+    /// Skipped biometric days per `(student, semester)` (`pages/biometric_job.rs`).
+    biometric_skipped: Mutex<pages::biometric_job::Skipped>,
     /// This core's file locks and its copy of `device.json`.
     locks: store::Locks,
     /// A hash of the JWT last sent to the UDP gateway (0: none), which it signs in with when the
@@ -546,6 +589,14 @@ struct Shared {
     sealed: store::account::Sealed,
     /// Who hears [`AccountStatus`] changes, and what it heard last.
     account_watch: Mutex<store::account::Watch>,
+    /// The Docs index and download folder bookkeeping (`docs/`).
+    docs: Mutex<docs::State>,
+    /// App-wide event pushes and `app_shown` state (same `Arc` as `Core::events`).
+    events: Arc<events::Events>,
+    /// The core's executor and clock (same `Arc` as `Core::schedule.runtime`).
+    runtime: Arc<runtime::Runtime>,
+    /// Current app settings (same `Arc` as `Core::settings`), for consent timeouts and tunables.
+    settings: Option<Arc<SettingsStore>>,
     /// The server account proofs are held to, and its roots, in place of VTOP's.
     #[cfg(all(test, feature = "tlsn"))]
     proof_target: Mutex<Option<(String, vtop_tlsn::RootCertStore)>>,
@@ -569,9 +620,10 @@ impl From<Platform> for Shared {
             proof: Some(platform.proof),
             label: Some(platform.device_label.trim().chars().take(64).collect()),
             cipher: Some(platform.cipher),
+            secrets: Some(platform.secrets),
+            urls: Some(platform.urls),
             ..Self::default()
         };
-        shared.consent().gate = Some(platform.cookie_gate);
         shared.otp.set_listener(platform.otp);
         shared
     }
@@ -584,6 +636,11 @@ pub struct Core {
     cache: PathBuf,
     slot: Mutex<Signed>,
     shared: Arc<Shared>,
+    schedule: schedule::Schedule,
+    events: Arc<events::Events>,
+    settings: Arc<SettingsStore>,
+    /// The semester choice, sync health and class histories.
+    sync: sync::SyncState,
 }
 
 /// Every call takes the caller's flow id first; its span logs `ms` and
@@ -652,14 +709,22 @@ impl Core {
         flow: String,
         data_dir: String,
         cache_dir: String,
-        shared: Shared,
+        mut shared: Shared,
     ) -> Result<Arc<Self>, CoreError> {
         obs::obs_init(cache_dir.clone());
+        let settings = SettingsStore::open(data_dir.clone());
+        let (events, schedule) = events::wired(settings.clone());
+        shared.events = events.clone();
+        shared.settings = Some(settings.clone());
         let core = Self {
             dir: PathBuf::from(data_dir),
             cache: PathBuf::from(cache_dir),
             slot: Mutex::new(Signed::Out),
             shared: Arc::new(shared),
+            schedule,
+            events,
+            settings,
+            sync: sync::SyncState::default(),
         };
         traced_sync("new", &flow, || {
             fs::create_dir_all(&core.dir)?;
@@ -722,14 +787,53 @@ impl Core {
 
     /// [`Core::for_test`] with the platform pieces set in `shared`.
     #[cfg(test)]
-    fn for_test_on(dir: impl Into<PathBuf>, shared: Shared) -> Self {
+    fn for_test_on(dir: impl Into<PathBuf>, mut shared: Shared) -> Self {
         let dir = dir.into();
+        let settings = SettingsStore::open(dir.to_string_lossy().into_owned());
+        let (events, schedule) = events::wired(settings.clone());
+        shared.events = events.clone();
+        shared.runtime = schedule.runtime.clone();
+        shared.settings = Some(settings.clone());
         Self {
             cache: dir.clone(),
             dir,
             slot: Mutex::new(Signed::Out),
             shared: Arc::new(shared),
+            schedule,
+            events,
+            settings,
+            sync: sync::SyncState::default(),
         }
+    }
+
+    /// [`Core::for_test_on`] with a test [`runtime::Clock`] on `shared.runtime`.
+    #[cfg(test)]
+    fn for_test_with_clock(
+        dir: impl Into<PathBuf>,
+        mut shared: Shared,
+        clock: Arc<dyn runtime::Clock>,
+    ) -> Self {
+        let dir = dir.into();
+        let settings = SettingsStore::open(dir.to_string_lossy().into_owned());
+        let (events, schedule) = events::wired(settings.clone());
+        shared.events = events.clone();
+        shared.runtime = Arc::new(runtime::Runtime::new(clock));
+        shared.settings = Some(settings.clone());
+        Self {
+            cache: dir.clone(),
+            dir,
+            slot: Mutex::new(Signed::Out),
+            shared: Arc::new(shared),
+            schedule,
+            events,
+            settings,
+            sync: sync::SyncState::default(),
+        }
+    }
+
+    /// Current app settings from [`SettingsStore`].
+    pub(crate) fn settings(&self) -> Settings {
+        self.settings.get()
     }
 
     /// Makes `session` the signed-in one, in its own slot.

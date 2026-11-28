@@ -11,20 +11,20 @@ import android.provider.MediaStore
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.edit
 import java.io.File
 import java.io.InputStream
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import vitapmate.core.StoredSavedFile
+import vitapmate.core.Core
 import vitapmate.core.decodeSavedFiles
-import vitapmate.core.encodeSavedFiles
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -32,9 +32,9 @@ import vitapmate.observability.flow
  * The app's one download folder, where saved files (VTOP downloads, course page files, outing
  * passes) land for the student: a folder they chose (Storage Access Framework tree, persistable
  * permission) or, by default, Downloads/vitapmate. The first save asks which ([prompt], drawn by
- * the design module's `DownloadFolderPrompt`). The app remembers what it saved, so changing the
- * folder moves those files (and only those), and [onMoved] tells Docs (a view over this folder)
- * where each went. Log src `downloads`: counts only.
+ * the design module's `DownloadFolderPrompt`). Rust owns the saved-files bookkeeping (`docs/downloads.json`),
+ * so changing the folder moves those files (and only those), and [onMoved] tells Docs (a view over
+ * this folder) where each went. Log src `downloads`: counts only.
  */
 object Downloads {
     const val DEFAULT_LABEL = "Downloads/vitapmate"
@@ -42,9 +42,11 @@ object Downloads {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private var app: Context? = null
+
     /** The app, once [init] ran; every use is after it. */
     private val ctx: Context get() = checkNotNull(app) { "Downloads.init not called" }
     private val prefs get() = ctx.getSharedPreferences("downloads", Context.MODE_PRIVATE)
+    @Volatile private var imported = false
 
     /** The chosen folder (a tree URI), or null for Downloads/vitapmate. Compose state; [folder] and [prompt] change under `this`. */
     var folder by mutableStateOf<Uri?>(null)
@@ -78,7 +80,7 @@ object Downloads {
 
     /**
      * A file DownloadManager wrote to Downloads/vitapmate itself, as [name]: remembered as saved
-     * here, and where it is (its MediaStore entry, else [fallback]).
+     * in Rust, and where it is (its MediaStore entry, else [fallback]).
      */
     suspend fun adopt(name: String, mime: String, fallback: Uri?): Uri = lock.withLock {
         fun find(): Uri? = runCatching {
@@ -94,8 +96,8 @@ object Downloads {
             if (found == null) delay(300)
         }
         val uri = found ?: fallback ?: error("can't find the file")
-        record(uri, name, mime)
-        Log.info("downloads", "adopted", null, mapOf("media_store" to "${found != null}", "count" to "${saved().size}"))
+        val count = record(uri, name, mime, "downloads.adopt")
+        Log.info("downloads", "adopted", null, mapOf("media_store" to "${found != null}", "count" to "$count"))
         uri
     }
 
@@ -110,22 +112,23 @@ object Downloads {
         target()
         return lock.withLock {
             val uri = withContext(Dispatchers.IO) { write(folder, name, mime, open) }
-            record(uri, name, mime)
-            Log.info("downloads", "saved", flow, mapOf("bytes" to "$size", "chosen" to "${folder != null}", "count" to "${saved().size}"))
+            val count = record(uri, name, mime, flow ?: "downloads.save")
+            Log.info("downloads", "saved", flow, mapOf("bytes" to "$size", "chosen" to "${folder != null}", "count" to "$count"))
             uri
         }
     }
 
     /** Saves without asking for a folder (the chosen one, else Downloads/vitapmate): Docs' move out of app storage. */
     suspend fun saveQuietly(name: String, mime: String, bytes: ByteArray): Uri = lock.withLock {
-        withContext(Dispatchers.IO) { write(folder, name, mime) { bytes.inputStream() } }.also { record(it, name, mime) }
+        withContext(Dispatchers.IO) { write(folder, name, mime) { bytes.inputStream() } }.also { record(it, name, mime, "downloads.save") }
     }
 
-    /** Deletes a file this app saved, and forgets it. */
+    /** Deletes a file this app saved, and forgets it in Rust. */
     suspend fun delete(uri: Uri) = lock.withLock {
         val context = app ?: return@withLock
         withContext(Dispatchers.IO) { delete(context, uri) }
-        keep(saved().filter { it.uri != uri.toString() })
+        val core = coreReady("downloads.delete")
+        withContext(Dispatchers.IO) { core.downloadsForget("downloads.delete", uri.toString()) }
     }
 
     /** Whether [uri] still opens (the student may have deleted the file in their file manager). */
@@ -165,8 +168,9 @@ object Downloads {
     }.getOrNull()
 
     /** What the app saved, by file name: its URI (the newest when a name repeats). */
-    fun savedByName(): Map<String, String> {
-        return saved().associate { it.name to it.uri }
+    suspend fun savedByName(): Map<String, String> = lock.withLock {
+        val core = coreReady("downloads.saved_by_name")
+        withContext(Dispatchers.IO) { core.downloadsSavedByName("downloads.saved_by_name") }
     }
 
     /**
@@ -194,33 +198,35 @@ object Downloads {
         }
     }
 
-    private fun move(context: Context, to: Uri?, flow: String): Int {
+    private suspend fun move(context: Context, to: Uri?, flow: String): Int {
+        val core = coreReady(flow)
+        val items = withContext(Dispatchers.IO) { core.downloadsSavedList(flow) }
         val resolver = context.contentResolver
-        val kept = mutableListOf<StoredSavedFile>()
         val moves = mutableMapOf<String, String>()
         var moved = 0
         var gone = 0
         var failed = 0
-        for (item in saved()) {
+        for (item in items) {
             val from = Uri.parse(item.uri)
-            val bytes = runCatching { resolver.openInputStream(from)?.use { it.readBytes() } }.getOrNull()
+            val bytes = withContext(Dispatchers.IO) { runCatching { resolver.openInputStream(from)?.use { it.readBytes() } }.getOrNull() }
             if (bytes == null) {
+                withContext(Dispatchers.IO) { core.downloadsForget(flow, item.uri) }
                 gone++
                 continue
             }
-            runCatching { write(to, item.name, item.mime) { bytes.inputStream() } }
+            withContext(Dispatchers.IO) { runCatching { write(to, item.name, item.mime) { bytes.inputStream() } } }
                 .onSuccess { uri ->
-                    delete(context, from)
+                    withContext(Dispatchers.IO) {
+                        delete(context, from)
+                        core.downloadsMoved(flow, from.toString(), uri.toString())
+                    }
                     moves[from.toString()] = uri.toString()
-                    kept += item.copy(uri = uri.toString())
                     moved++
                 }
                 .onFailure {
-                    kept += item
                     failed++
                 }
         }
-        keep(kept)
         if (moves.isNotEmpty()) onMoved?.invoke(moves)
         Log.info("downloads", "moved", flow, mapOf("moved" to "$moved", "gone" to "$gone", "failed" to "$failed", "chosen" to "${to != null}"))
         return failed
@@ -270,10 +276,32 @@ object Downloads {
         }
     }
 
-    /** What the app saved here, in Rust's [StoredSavedFile] shape; empty when it doesn't read. */
-    private fun saved(): List<StoredSavedFile> = decodeSavedFiles(prefs.getString("saved", null) ?: "[]")
+    /** Returns [Core] after migrating any legacy `"downloads"` SharedPreferences `saved` list once. */
+    private suspend fun coreReady(flow: String): Core {
+        val core = AppCore.await()
+        if (!imported) {
+            withContext(Dispatchers.IO) {
+                if (core.downloadsNeedsImport(flow)) {
+                    val legacy = prefs.getString("saved", null)?.let(::decodeSavedFiles).orEmpty()
+                    runCatching { core.downloadsImport(flow, legacy) }
+                        .onSuccess {
+                            prefs.edit { remove("saved") }
+                            imported = true
+                        }
+                        .onFailure { Log.warn("downloads", "import failed: ${it::class.simpleName}", flow) }
+                } else {
+                    imported = true
+                }
+            }
+        }
+        return core
+    }
 
-    private fun keep(files: List<StoredSavedFile>) = prefs.edit().putString("saved", encodeSavedFiles(files)).apply()
-
-    private fun record(uri: Uri, name: String, mime: String) = keep(saved() + StoredSavedFile(uri.toString(), name, mime))
+    private suspend fun record(uri: Uri, name: String, mime: String, flow: String): Int {
+        val core = coreReady(flow)
+        return withContext(Dispatchers.IO) {
+            core.downloadsSaved(flow, name, uri.toString(), mime)
+            core.downloadsSavedList(flow).size
+        }
+    }
 }

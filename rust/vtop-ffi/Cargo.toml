@@ -34,6 +34,10 @@ convex_sync_types = "=0.10.2"
 # Its JSON conversions name anyhow's error, so values implementing them do too.
 anyhow = "1"
 futures = "0.3"
+# The app's own executor (runtime.rs): work that outlives its caller (the fetch queue, the sweep,
+# sync, consent timeouts) with task handles that cancel on drop, a timer and `unblock`. Not
+# tokio, and its sockets stay unused: the network is the platform's.
+smol = "2"
 # No tokio: async exports run on the futures Kotlin polls (see vtop_core::sync).
 uniffi = { version = "0.32.2", default-features = false }
 # UniFFI's foreign async traits (HttpTransport) need it; already in the tree via vtop-mcp.

@@ -22,26 +22,24 @@ import androidx.work.await
 import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import vitapmate.core.Core
-import vitapmate.core.CoreException
+import vitapmate.core.BiometricStallNext
+import vitapmate.core.BiometricStep
+import vitapmate.core.biometricAfterStall
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
 /**
- * Wrapped's campus times: a WorkManager job, started only by the student's Fetch, that fetches a
- * semester's missing biometric days a few VTOP requests at a time. Unique per semester (KEEP), so a
- * second tap joins the run; days already complete in the cache are skipped. An ordinary (not
- * foreground) job: before Android's 10-minute limit, or when VTOP drops after some days came in,
- * it appends a fresh run of itself to the unique work and ends, so WorkManager's retry count and
- * backoff only ever count attempts that fetched nothing. Flow `wrapped.biometric`, log src `wrapped`.
+ * Wrapped's campus times: a WorkManager job, started only by the student's Fetch, that loops
+ * Rust's [vitapmate.core.Core.biometricStep] for a semester's missing biometric days. Unique per
+ * semester (KEEP), so a second tap joins the run; days already complete in the cache are skipped
+ * in Rust. Before Android's 10-minute limit, or when VTOP drops after some days came in, it
+ * appends a fresh run of itself to the unique work and ends, so WorkManager's retry count and
+ * backoff only ever count attempts that fetched nothing. Flow `wrapped.biometric`, log src
+ * `wrapped`.
  */
 object BiometricFetch {
     internal fun work(semester: String) = "wrapped.biometric.$semester"
@@ -51,16 +49,16 @@ object BiometricFetch {
 
     /** Queues the fetch of [days] (days since 1970-01-01, in India) for [semester]. */
     fun start(context: Context, semester: String, days: List<Int>) {
-        WorkManager.getInstance(context).enqueueUniqueWork(work(semester), ExistingWorkPolicy.KEEP, request(semester, days.toIntArray(), IntArray(0)))
+        WorkManager.getInstance(context).enqueueUniqueWork(work(semester), ExistingWorkPolicy.KEEP, request(semester, days.size))
     }
 
-    /** One run; [skipped] are days that failed in an earlier run of this job, not asked for again. */
-    internal fun request(semester: String, days: IntArray, skipped: IntArray, delaySecs: Long = 0): OneTimeWorkRequest =
+    /** One run; [total] is the initial day count for progress display. */
+    internal fun request(semester: String, total: Int, delaySecs: Long = 0): OneTimeWorkRequest =
         OneTimeWorkRequestBuilder<BiometricFetchWorker>()
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECS, TimeUnit.SECONDS)
             .setInitialDelay(delaySecs, TimeUnit.SECONDS)
-            .setInputData(workDataOf(BiometricFetchWorker.SEMESTER to semester, BiometricFetchWorker.DAYS to days, BiometricFetchWorker.SKIPPED to skipped))
+            .setInputData(workDataOf(BiometricFetchWorker.SEMESTER to semester, BiometricFetchWorker.TOTAL to total))
             .build()
 
     /** The semester's run (progress `done` and `total`), or null when none was queued: the unfinished one of a hand-over chain first. */
@@ -69,29 +67,6 @@ object BiometricFetch {
             infos.firstOrNull { it.state == WorkInfo.State.RUNNING } ?: infos.firstOrNull { !it.state.isFinished } ?: infos.firstOrNull()
         }
 
-    /** Windows of at most 14 days (what `cachedBiometricRange` takes) that cover [days]. */
-    internal fun windows(days: List<Int>): List<IntRange> {
-        val out = mutableListOf<IntRange>()
-        for (day in days.distinct().sorted()) if (out.lastOrNull()?.contains(day) != true) out += day..(day + MAX_RANGE_DAYS - 1)
-        return out
-    }
-
-    /** What an attempt that ended on Offline / VTOP unavailable does next. */
-    internal enum class Next { Rerun, Retry, GiveUp }
-
-    /**
-     * An attempt that [fetched] some days is progress: a fresh run (attempt count 0). One that
-     * fetched nothing retries with backoff; the [MAX_STALLS]th in a row ([attempt] is
-     * `runAttemptCount`, from 0) gives up.
-     */
-    internal fun afterStall(fetched: Int, attempt: Int): Next = when {
-        fetched > 0 -> Next.Rerun
-        attempt + 1 >= MAX_STALLS -> Next.GiveUp
-        else -> Next.Retry
-    }
-
-    internal const val MAX_RANGE_DAYS = 14
-    internal const val MAX_STALLS = 5
     /** First retry 30 s after a stalled attempt, then 60, 120, 240. */
     internal const val BACKOFF_SECS = 30L
 }
@@ -101,123 +76,107 @@ class BiometricFetchWorker(context: Context, params: WorkerParameters) : Corouti
     /** Set when this run ends in a hand-over or retry: the progress notification stays. */
     private var keepNotification = false
 
-    /** How a day's fetch ended. */
-    private enum class Day { Done, SignIn, Unreachable, Skipped }
-
     override suspend fun doWork(): Result {
         val app = applicationContext
         Settings.load(app)
         AppCore.start(app)
-        val days = inputData.getIntArray(DAYS) ?: return Result.success()
-        val semester = inputData.getString(SEMESTER)
-        val skipped = (inputData.getIntArray(SKIPPED) ?: IntArray(0)).toMutableSet()
+        val semester = inputData.getString(SEMESTER) ?: return Result.success()
+        val total = inputData.getInt(TOTAL, 0).takeIf { it > 0 }
+            ?: inputData.getIntArray(DAYS)?.size
+            ?: 0
         app.getSystemService(NotificationManager::class.java)
             .createNotificationChannel(NotificationChannel(CHANNEL, "Campus times", NotificationManager.IMPORTANCE_LOW))
         try {
-            return run(days, semester, skipped)
+            return run(semester, total)
         } finally {
             // Success, failure or Stop: gone. A hand-over or retry keeps the last count up until the next run posts its own.
             if (!keepNotification) notifications.cancel(ID)
         }
     }
 
-    private suspend fun run(days: IntArray, semester: String?, skipped: MutableSet<Int>): Result {
-        val total = days.size
+    private suspend fun run(semester: String, initialTotal: Int): Result {
         val started = System.currentTimeMillis()
         // A sign-in or couldn't-reach notice from an earlier run is out of date now.
         notifications.cancel(END_ID)
         return flow("wrapped.biometric") { f ->
-            var cached = 0
             var fetched = 0
+            var total = initialTotal
             fun ended(result: Result, why: String) = result.also {
-                Log.info("wrapped", "campus times $why", f, mapOf("days" to "$total", "cached" to "$cached", "fetched" to "$fetched", "skipped" to "${skipped.size}", "attempt" to "$runAttemptCount"))
+                Log.info("wrapped", "campus times $why", f, mapOf("days" to "$total", "fetched" to "$fetched", "attempt" to "$runAttemptCount"))
                 if (it !is Result.Success) Log.warn("wrapped", "campus times ended: $why", f, mapOf("result" to "$it"))
             }
-            /** Offline or VTOP unavailable: a fresh run after progress, else a backed-off retry, at most [BiometricFetch.MAX_STALLS] in a row. */
-            fun unreachable(why: String, done: Int = cached): Result = when (BiometricFetch.afterStall(fetched, runAttemptCount)) {
-                BiometricFetch.Next.Rerun -> ended(rerun(semester, days, skipped, BiometricFetch.BACKOFF_SECS, done, total), "resumes after $why")
-                BiometricFetch.Next.Retry -> {
+            fun unreachable(why: String, done: Int): Result = when (biometricAfterStall(fetched.toUInt(), runAttemptCount.toUInt())) {
+                BiometricStallNext.RERUN -> ended(rerun(semester, total, BiometricFetch.BACKOFF_SECS, done), "resumes after $why")
+                BiometricStallNext.RETRY -> {
                     keepNotification = true
                     show(done, total, semester, waiting = true)
                     ended(Result.retry(), "retry after $why")
                 }
-                BiometricFetch.Next.GiveUp -> {
+                BiometricStallNext.GIVE_UP -> {
                     post(END_ID, notification("Couldn't reach VTOP. Open Wrapped to try again.").setAutoCancel(true).build())
                     ended(Result.failure(), "gave up after $why")
                 }
             }
-            try {
-                withContext(Dispatchers.IO) {
-                    val core = AppCore.await()
-                    // The cache, read in 14-day windows (one log line each, not one per day).
-                    val complete = BiometricFetch.windows(days.toList())
-                        .flatMap { core.cachedBiometricRange(f, it.first, it.last) }
-                        .filter { it.complete }.map { it.day }.toSet()
-                    cached = days.count { it in complete }
-                    val missing = days.filter { it !in complete && it !in skipped }
-                    fun done() = cached + fetched + skipped.count { it !in complete }
-                    show(done(), total, semester)
-                    if (missing.isNotEmpty()) {
-                        try {
-                            // Signs in again only when the session is older than 15 minutes.
-                            core.ensureFreshSession(f, 900uL)
-                        } catch (e: CoreException) {
-                            if (e.signIn()) throw e
-                            return@withContext unreachable("sign-in: ${e::class.simpleName}")
+            withContext(Dispatchers.IO) {
+                val core = AppCore.await()
+                val initialMissing = core.wrappedMissingDays(f).size
+                if (total <= 0) total = initialMissing
+                var done = (total - initialMissing).coerceIn(0, total)
+                show(done, total, semester)
+
+                while (true) {
+                    val remaining = RUN_LIMIT_MS - (System.currentTimeMillis() - started)
+                    if (remaining <= 0) {
+                        return@withContext ended(rerun(semester, total, 0, done), "handed to a rerun")
+                    }
+                    val stepBudget = remaining.coerceAtMost(STEP_BUDGET_MS)
+                    val stepStart = System.currentTimeMillis()
+                    when (val step = core.biometricStep(f, semester, stepBudget.toULong())) {
+                        is BiometricStep.Done -> {
+                            fetched += step.fetched.toInt()
+                            done = total
+                            setProgress(workDataOf(DONE to done, TOTAL to total))
+                            show(done, total, semester)
+                            return@withContext ended(Result.success(), "fetched")
+                        }
+                        is BiometricStep.More -> {
+                            fetched += step.fetched.toInt()
+                            val missingNow = core.wrappedMissingDays(f).size
+                            done = (total - missingNow).coerceIn(0, total)
+                            setProgress(workDataOf(DONE to done, TOTAL to total))
+                            show(done, total, semester)
+                            val elapsed = System.currentTimeMillis() - started
+                            val stepElapsed = System.currentTimeMillis() - stepStart
+                            if (elapsed >= RUN_LIMIT_MS) {
+                                return@withContext ended(rerun(semester, total, 0, done), "handed to a rerun")
+                            }
+                            if (stepElapsed < stepBudget) {
+                                return@withContext ended(rerun(semester, total, BiometricFetch.BACKOFF_SECS, done), "resumes after VTOP unreachable")
+                            }
+                        }
+                        is BiometricStep.Failed -> {
+                            fetched += step.fetched.toInt()
+                            val kind = step.problem.kind
+                            if (kind == ProblemKind.SIGN_IN_NEEDED || kind == ProblemKind.OTP_NEEDED) {
+                                post(END_ID, notification("Open vitapmate to sign in and continue").setAutoCancel(true).build())
+                                return@withContext ended(Result.failure(), "need a sign-in: ${kind.name}")
+                            }
+                            return@withContext unreachable(kind.name, done)
                         }
                     }
-                    // A few days at once (VTOP takes the app's page fetches in parallel too), then the gap.
-                    for (batch in missing.chunked(Settings.tunable(Tunable.CampusFetchAtOnce))) {
-                        // Before Android stops an ordinary job (10 minutes): a fresh run skips the done days.
-                        if (System.currentTimeMillis() - started > RUN_LIMIT_MS) return@withContext ended(rerun(semester, days, skipped, 0, done(), total), "handed to a rerun")
-                        val outcomes = coroutineScope { batch.map { day -> async { day to fetchDay(core, f, day) } }.awaitAll() }
-                        fetched += outcomes.count { it.second == Day.Done }
-                        outcomes.filter { it.second == Day.Skipped }.forEach { skipped += it.first }
-                        if (outcomes.any { it.second == Day.SignIn }) {
-                            post(END_ID, notification("Open vitapmate to sign in and continue").setAutoCancel(true).build())
-                            return@withContext ended(Result.failure(), "need a sign-in")
-                        }
-                        if (outcomes.any { it.second == Day.Unreachable }) return@withContext unreachable("VTOP unreachable", done())
-                        setProgress(workDataOf(DONE to done(), TOTAL to total))
-                        show(done(), total, semester)
-                        delay(Settings.tunable(Tunable.CampusFetchGap) * 1000L)
-                    }
-                    ended(Result.success(), "fetched")
                 }
-            } catch (e: CoreException) {
-                // Only the sign-in errors reach here (from ensureFreshSession).
-                post(END_ID, notification("Open vitapmate to sign in and continue").setAutoCancel(true).build())
-                ended(Result.failure(), "need a sign-in: ${e::class.simpleName}")
+                @Suppress("UNREACHABLE_CODE")
+                Result.success()
             }
         }
     }
-
-    /** One day's fetch; only the sign-in and reachability errors end the run, any other skips the day. */
-    private suspend fun fetchDay(core: Core, f: String, day: Int): Day = try {
-        core.fetchBiometricRange(f, day, day)
-        Day.Done
-    } catch (e: CoreException) {
-        when {
-            e.signIn() -> Day.SignIn
-            e is CoreException.Offline || e is CoreException.VtopUnavailable -> Day.Unreachable
-            else -> {
-                Log.warn("wrapped", "campus day skipped: ${e::class.simpleName}", f, mapOf("day" to "$day"))
-                Day.Skipped
-            }
-        }
-    }
-
-    /** Ends the run with the sign-in notice, never a retry: signed out, OTP needed or a wrong password. */
-    private fun CoreException.signIn() = this is CoreException.OtpRequired || this is CoreException.InvalidCredentials || this is CoreException.NotSignedIn
 
     /**
      * Appends a fresh run to this semester's unique work and ends this one with success, so the
      * new run starts at attempt 0. The notification stays (Stop cancels the whole unique work).
-     * A run queued before the semester was in the input falls back to a retry.
      */
-    private fun rerun(semester: String?, days: IntArray, skipped: Set<Int>, delaySecs: Long, done: Int, total: Int): Result {
-        if (semester == null) return Result.retry().also { keepNotification = true }
-        val next = BiometricFetch.request(semester, days, skipped.toIntArray(), delaySecs)
+    private fun rerun(semester: String, total: Int, delaySecs: Long, done: Int): Result {
+        val next = BiometricFetch.request(semester, total, delaySecs)
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(BiometricFetch.work(semester), ExistingWorkPolicy.APPEND_OR_REPLACE, next)
         show(done, total, semester, waiting = true)
         keepNotification = true
@@ -261,13 +220,14 @@ class BiometricFetchWorker(context: Context, params: WorkerParameters) : Corouti
         const val DONE = "done"
         const val TOTAL = "total"
         internal const val SEMESTER = "semester"
-        internal const val SKIPPED = "skipped"
         private const val CHANNEL = "campus_fetch"
         internal const val ID = 0x5168
         /** The end notices: sign in, or couldn't reach VTOP. */
         private const val END_ID = ID + 1
         /** Under the 10 minutes Android gives an ordinary job, with room for the days in flight. */
         private const val RUN_LIMIT_MS = 8 * 60_000L
+        /** Slice length per [vitapmate.core.Core.biometricStep] call so progress updates smoothly. */
+        private const val STEP_BUDGET_MS = 15_000L
     }
 }
 

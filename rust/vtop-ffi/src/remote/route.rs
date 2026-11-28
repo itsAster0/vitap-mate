@@ -17,7 +17,7 @@
 //! The policy itself is [`plan`], with no I/O; this module keeps the core's instance (in
 //! [`Shared`]) and runs it.
 
-mod batch;
+pub(crate) mod batch;
 mod plan;
 
 use std::collections::BTreeMap;
@@ -606,9 +606,7 @@ impl Core {
             }
             answer => answer?,
         };
-        if !self.is_current(slot) {
-            return Err(ServerError::Expired);
-        }
+        self.is_current(slot).ok_or(ServerError::Expired)?;
         let state: SessionState =
             serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
                 .map_err(|_| ServerError::Failed("unexpected sign-in answer".into()))?;
@@ -652,9 +650,7 @@ impl Core {
             return Err(CoreError::ConsentDenied);
         }
         let mut session = slot.write().await;
-        if !self.is_current(slot) {
-            return Err(CoreError::NotSignedIn);
-        }
+        self.is_current(slot).ok_or(CoreError::NotSignedIn)?;
         if session.server_otp_challenge() != Some(challenge_id) {
             if code.is_some() && !session.is_awaiting_otp() && session.client.is_authenticated() {
                 info!("server otp no longer needed: signed in");
@@ -682,9 +678,7 @@ impl Core {
             .signed_call(flow, Kind::Action, path, &body)
             .await
             .map_err(otp_refusal)?;
-        if !self.is_current(slot) {
-            return Err(CoreError::NotSignedIn);
-        }
+        self.is_current(slot).ok_or(CoreError::NotSignedIn)?;
         let state: SessionState =
             serde_json::from_value(answer.get("session").cloned().unwrap_or_default())
                 .map_err(|_| CoreError::from(VtopError::InvalidResponse))?;
@@ -746,7 +740,7 @@ pub(crate) fn unpacked(name: &str, packed: &[u8]) -> Option<Value> {
 pub(crate) fn page_data(name: &str, mut answer: Value) -> Option<Value> {
     match crate::convex::value::bytes(&answer) {
         Some(packed) => unpacked(name, &packed),
-        None => Some(answer.get_mut("data").map(Value::take).unwrap_or_default()),
+        None => Some(answer.get_mut("data").map_or_default(Value::take)),
     }
 }
 

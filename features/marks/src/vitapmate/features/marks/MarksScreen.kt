@@ -26,6 +26,7 @@ import com.composables.icons.lucide.ClipboardList
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.MarksCourse
+import vitapmate.core.PageId
 import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
@@ -57,12 +58,7 @@ private fun List<MarksCourse>.of(kind: Kind) = when (kind) {
  */
 @Composable
 fun MarksScreen() {
-    val page = rememberPage(
-        "marks",
-        { core, flow -> core.cachedMarks(flow) },
-        { core, flow -> core.fetchMarks(flow) },
-        { it.updatedAt },
-    ) { it.courses.size }
+    val page = rememberPage(PageId.MARKS, { core, flow -> core.cachedMarks(flow) })
     val scope = rememberCoroutineScope()
     var filter by rememberSaveable { mutableStateOf(Kind.All) }
     // Open cards by key; several may be open, kept across filters, refreshes and process death.

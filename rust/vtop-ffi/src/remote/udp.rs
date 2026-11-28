@@ -215,7 +215,7 @@ fn page_answer(name: &str, answer: &WirePageResponse) -> Result<Value, UdpFetchE
         return unpacked(name, &answer.body).ok_or_else(unreadable);
     }
     let mut body: Value = serde_json::from_slice(&answer.body).map_err(|_| unreadable())?;
-    Ok(body.get_mut("data").map(Value::take).unwrap_or_default())
+    Ok(body.get_mut("data").map_or_default(Value::take))
 }
 
 impl Core {

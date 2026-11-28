@@ -35,7 +35,7 @@ import androidx.compose.material3.Button as M3Button
 
 /**
  * Full-screen problem (nothing cached): icon, what happened, what to do, one main action
- * ("Sign in again" for [ProblemKind.SignInNeeded], else "Try again" when retryable; [busy] while
+ * ("Sign in again" for [ProblemKind.SIGN_IN_NEEDED], else "Try again" when retryable; [busy] while
  * it runs) and "Details" that opens the Inspector at the problem's flow.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -49,7 +49,7 @@ fun ProblemView(
 ) {
     val (icon, tone) = problem.kind.look()
     val inspector = LocalInspector.current
-    val signIn = problem.kind == ProblemKind.SignInNeeded && onSignIn != null
+    val signIn = problem.kind == ProblemKind.SIGN_IN_NEEDED && onSignIn != null
     Column(
         modifier.padding(horizontal = Space.xl, vertical = Space.xxl).widthIn(max = 420.dp).testTag("problem.view"),
         horizontalAlignment = Alignment.CenterHorizontally,

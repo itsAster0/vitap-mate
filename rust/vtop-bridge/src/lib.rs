@@ -128,8 +128,7 @@ async fn access_log(request: Request, next: Next) -> Response {
     let route = request
         .extensions()
         .get::<MatchedPath>()
-        .map(|path| path.as_str().to_string())
-        .unwrap_or_else(|| "-".into());
+        .map_or_else(|| "-".into(), |path| path.as_str().to_string());
     // How the phone's request came: the UDP gateway marks its calls; the
     // rest come from the edge over HTTPS. The phone's flow id, if sent.
     let [via, request_id] = [("x-via", "https"), ("x-request-id", "-")].map(|(name, none)| {

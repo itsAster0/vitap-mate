@@ -1,5 +1,6 @@
 package vitapmate.features.grades
 
+import vitapmate.core.PageId
 import vitapmate.ui.rememberHaptics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,13 +59,7 @@ internal fun SemesterView(
     shown: (Grades?) -> Unit,
 ) {
     val semester = viewed
-    val page = rememberPage(
-        "grades",
-        { core, flow -> core.cachedGrades(flow, semester) },
-        { core, flow -> core.fetchGrades(flow, semester) },
-        { it.updatedAt },
-        item = semester,
-    ) { it.courses.size }
+    val page = rememberPage(PageId.GRADES, { core, flow -> core.cachedGrades(flow, semester) }, item = semester)
     val scope = rememberCoroutineScope()
     val data = (page.state as? PageState.Ready)?.data
     LaunchedEffect(data) { shown(data) }

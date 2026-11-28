@@ -26,8 +26,7 @@ pub fn parse_profile(html: &str) -> StudentProfile {
         header
             .iter()
             .find(|(label, _)| label == key)
-            .map(|(_, value)| value.clone())
-            .unwrap_or_default()
+            .map_or_default(|(_, value)| value.clone())
     };
     let sections = document
         .pick(&SECTION)
@@ -35,8 +34,7 @@ pub fn parse_profile(html: &str) -> StudentProfile {
             title: item
                 .pick(&SECTION_TITLE)
                 .next()
-                .map(|title| word_text(&title))
-                .unwrap_or_default(),
+                .map_or_default(|title| word_text(&title)),
             groups: groups(&item),
         })
         .filter(|section| !section.groups.is_empty())
@@ -131,8 +129,7 @@ fn field(sections: &[ProfileSection], label: &str) -> String {
         .flat_map(|section| &section.groups)
         .flat_map(|group| &group.fields)
         .find(|field| field.label.eq_ignore_ascii_case(label))
-        .map(|field| field.value.clone())
-        .unwrap_or_default()
+        .map_or_default(|field| field.value.clone())
 }
 
 /// The inline photo's base64, without the `data:...;base64,` prefix.
@@ -141,8 +138,7 @@ fn photo(document: &Html) -> String {
         .pick(&PHOTO)
         .filter_map(|img| img.value().attr("src"))
         .find_map(|src| src.split_once("base64,"))
-        .map(|(_, data)| data.chars().filter(|c| !c.is_whitespace()).collect())
-        .unwrap_or_default()
+        .map_or_default(|(_, data)| data.chars().filter(|c| !c.is_whitespace()).collect())
 }
 
 #[cfg(test)]

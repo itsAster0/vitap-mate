@@ -268,6 +268,7 @@ impl Core {
         )]
         let _ = traced_sync("sign_out_here", flow, || {
             self.uninstall();
+            self.schedule.cancel_all();
             // Left on the edge by `leave_old_forwarding`, which `sign_out` calls next.
             self.queue_leave();
             self.shared.cookies.sign_out();
@@ -358,9 +359,7 @@ impl Core {
     /// meanwhile; VTOP's OTP opens the prompt (`OtpRequired`), and its no marks the password
     /// rejected ([`Core::reject_password`]).
     async fn log_in(&self, slot: &Arc<Slot>, session: &mut Session) -> Result<(), CoreError> {
-        if !self.is_current(slot) {
-            return Err(CoreError::NotSignedIn);
-        }
+        self.is_current(slot).ok_or(CoreError::NotSignedIn)?;
         if session.is_password_rejected() {
             info!("the saved password was rejected, not signing in again");
             return Err(CoreError::InvalidCredentials);
@@ -427,6 +426,7 @@ impl Core {
         }) {
             info!("another account signed in: cached pages and forwarding address dropped");
             self.queue_leave();
+            self.schedule.cancel_all();
             self.forget_held(file, &STUDENT_FILES);
             // The JWT names the last student: set aside to sign out of their account, while the
             // next server call proves this one.

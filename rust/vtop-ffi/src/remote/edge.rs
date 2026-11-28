@@ -42,9 +42,9 @@ impl Core {
     ) -> Result<Option<String>, CoreError> {
         self.current()?;
         let (request_id, asker) = (ask.request_id.clone(), ask.asker.clone());
-        if !consent::allowed_handover(&self.shared, flow, ask).await {
-            return Err(CoreError::ConsentDenied);
-        }
+        consent::allowed_handover(&self.shared, flow, ask)
+            .await
+            .ok_or(CoreError::ConsentDenied)?;
         consent::handover_status(
             &self.shared,
             flow,

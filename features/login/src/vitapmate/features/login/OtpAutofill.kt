@@ -15,7 +15,7 @@ import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.LiveWake
 import vitapmate.data.OtpSource
-import vitapmate.data.PauseReason
+import vitapmate.core.PauseReason
 import vitapmate.data.Settings
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -166,7 +166,6 @@ object OtpAutofill {
             }
             if (why != PauseReason.NoCode) break
         }
-        why?.let { Log.info("sync", "otp not solved: ${it.id}", flow) }
         return why
     }
 }

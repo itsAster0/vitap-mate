@@ -154,6 +154,18 @@ impl Board {
         });
     }
 
+    /// A mark for [`Board::opened_since`]: None while a prompt is open.
+    pub(crate) fn mark(&self) -> Option<u64> {
+        let state = self.state();
+        state.shown.is_none().then_some(state.next_id)
+    }
+
+    /// Whether a prompt was open at `mark` or opened since: a fetch that waited for the
+    /// student's code says nothing about the link.
+    pub(crate) fn opened_since(&self, mark: Option<u64>) -> bool {
+        mark.is_none_or(|mark| self.state().next_id != mark)
+    }
+
     /// Any prompt closes: the session went (sign-out, another account).
     pub(crate) fn close_all(&self) {
         self.update(|state| state.shown = None);

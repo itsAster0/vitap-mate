@@ -26,7 +26,7 @@ pub fn parse_schedule(html: &str, sem: &str) -> ExamScheduleData {
                 records: Vec::new(),
             });
         } else if cells.len() >= RECORD_MIN_CELLS {
-            let text = |index: usize| cells.get(index).map(compact_text).unwrap_or_default();
+            let text = |index: usize| cells.get(index).map_or_default(compact_text);
             let record = ExamScheduleRecord {
                 serial: text(0),
                 slot: text(5),

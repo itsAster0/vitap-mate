@@ -30,6 +30,7 @@ import vitapmate.core.OutingKind
 import vitapmate.core.OutingRequest
 import vitapmate.core.OutingResult
 import vitapmate.core.OutingStanding
+import vitapmate.core.PageId
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.PageHandle
@@ -60,13 +61,13 @@ internal fun OutingList(kind: OutingKind) {
     var applying by rememberSaveable(kind) { mutableStateOf(false) }
     when (kind) {
         OutingKind.GENERAL -> {
-            val page = rememberPage("outing", { c, f -> c.cachedGeneralOuting(f) }, { c, f -> c.fetchGeneralOuting(f) }, { it.updatedAt }, item = kind.key) { it.requests.size }
+            val page = rememberPage(PageId.GENERAL_OUTING, { c, f -> c.cachedGeneralOuting(f) }, item = kind.key)
             Requests(kind, page, { Summary(it.open, it.notice, it.facts, it.requests) }) { applying = true }
             val form = (page.state as? PageState.Ready)?.data
             if (applying && form != null) GeneralSheet(form, onDismiss = { applying = false }, onMaybeSent = { AppScope.launch { refreshAfterWrite(page, "apply") } }) { result -> sent(page, result); applying = false }
         }
         OutingKind.WEEKEND -> {
-            val page = rememberPage("outing", { c, f -> c.cachedWeekendOuting(f) }, { c, f -> c.fetchWeekendOuting(f) }, { it.updatedAt }, item = kind.key) { it.requests.size }
+            val page = rememberPage(PageId.WEEKEND_OUTING, { c, f -> c.cachedWeekendOuting(f) }, item = kind.key)
             Requests(kind, page, { Summary(it.open, it.notice, it.facts, it.requests) }) { applying = true }
             val form = (page.state as? PageState.Ready)?.data
             if (applying && form != null) WeekendSheet(form, onDismiss = { applying = false }, onMaybeSent = { AppScope.launch { refreshAfterWrite(page, "apply") } }) { result -> sent(page, result); applying = false }

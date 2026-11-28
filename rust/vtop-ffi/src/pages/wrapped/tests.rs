@@ -1741,7 +1741,7 @@ fn exam_days(days: &[Option<i32>]) -> Value {
         .enumerate()
         .map(|(i, day)| {
             json!({"serial": "1", "slot": "A1", "course_name": format!("C{i}"), "course_code": format!("C{i}"),
-                "course_type": "ETH", "course_id": "", "exam_date": day.map(dmy).unwrap_or_default(),
+                "course_type": "ETH", "course_id": "", "exam_date": day.map_or_default(dmy),
                 "exam_session": "FN", "reporting_time": "", "exam_time": "09:30 AM - 11:00 AM",
                 "venue": "AB1-101", "seat_location": "", "seat_no": ""})
         })

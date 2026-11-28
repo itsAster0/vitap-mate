@@ -257,9 +257,7 @@ mod jpeg {
     }
 
     pub(super) fn decode(data: &[u8]) -> Result<Image, &'static str> {
-        if !data.starts_with(&[0xFF, 0xD8]) {
-            return Err("not a JPEG");
-        }
+        data.starts_with(&[0xFF, 0xD8]).ok_or("not a JPEG")?;
         let mut quant = [[0_i32; 64]; 4];
         let mut dc_tables = vec![Huffman::default(); 4];
         let mut ac_tables = vec![Huffman::default(); 4];

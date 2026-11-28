@@ -5,14 +5,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import vitapmate.core.CoreException
 import vitapmate.core.WebSession
+import vitapmate.data.Problem
 import vitapmate.data.ProblemKind
-import vitapmate.data.problemOf
 
 class VtopWebStateTest {
     private val session1 = WebSession(baseUrl = "https://vtop.vitap.ac.in", startUrl = "https://vtop.vitap.ac.in/vtop/content")
     private val session2 = WebSession(baseUrl = "https://vtop.vitap.ac.in", startUrl = "https://vtop.vitap.ac.in/vtop/content?2")
+
+    // Rust maps a CoreException (problemOf), and host tests load no Rust library.
+    private val offlineProblem = Problem(ProblemKind.OFFLINE, "No Internet Connection", "Check your connection.", "f1", retryable = true)
 
     private fun openToActive(nowMs: Long = 1_000L): VtopWebState {
         var state = VtopWebState()
@@ -132,7 +134,7 @@ class VtopWebStateTest {
         val crashed = assertIs<VtopWebPhase.Crashed>(secondLoss.state.phase)
         assertEquals(39_999L, crashed.lastLossMs)
         assertEquals("f2", crashed.problem.flow)
-        assertEquals(ProblemKind.Unexpected, crashed.problem.kind)
+        assertEquals(ProblemKind.UNEXPECTED, crashed.problem.kind)
         assertEquals(listOf(VtopWebEffect.DestroyView, VtopWebEffect.CancelPrepare), secondLoss.effects)
 
         // Stale completion for cancelled request 2 is ignored while Crashed.
@@ -175,7 +177,7 @@ class VtopWebStateTest {
         assertEquals(emptyList(), staleSuccess.effects)
 
         val staleFail = superseded.state.reduce(
-            VtopWebEvent.PrepareFailed(1L, problemOf(CoreException.Offline(), "f1")),
+            VtopWebEvent.PrepareFailed(1L, offlineProblem),
             nowMs = 170L,
         )
         assertEquals(superseded.state, staleFail.state)
@@ -245,7 +247,7 @@ class VtopWebStateTest {
         // Retry while Preparing is a no-op.
         assertEquals(emptyList(), attached.state.reduce(VtopWebEvent.Retry, nowMs = 120L).effects)
 
-        val offline = problemOf(CoreException.Offline(), "f1")
+        val offline = offlineProblem
         val failed = attached.state.reduce(VtopWebEvent.PrepareFailed(1L, offline), nowMs = 200L)
         assertEquals(VtopWebPhase.Failed(offline), failed.state.phase)
 

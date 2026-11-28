@@ -16,24 +16,23 @@ pub(crate) mod identity;
 mod live;
 mod rpc;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::Duration;
 
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use serde_json::{Value, json};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::convex::{CallError, ConvexClient, Served, SubscriptionId};
-use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, Shared};
 
 use auth::{AuthMachine, Effect};
-use live::{LiveError, LiveListener, LiveWatch, Renewal, run_renewal_coordinator};
+use live::{LiveListener, LiveWatch, Renewal};
 // Also here for `keys.rs`'s doc link, which the Kotlin bindings copy word for word.
 pub(super) use live::LiveTopic;
-use rpc::edge_error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -104,6 +103,8 @@ pub(crate) struct State {
     identity_waiters: Vec<oneshot::Sender<()>>,
     /// The live watches Kotlin holds, stopped at a server sign-out ([`Core::stop_live_watches`]).
     live: Vec<Weak<LiveWatch>>,
+    /// How many updates each [`LiveTopic`] has received so far.
+    live_changes: HashMap<LiveTopic, u32>,
 }
 
 impl Shared {
@@ -187,9 +188,10 @@ impl Core {
         }
     }
 
-    /// Follows `topic` as the student this install proved to be: `listener` hears each change
-    /// as soon as the server has it. Without an identity (it never proves) or a forwarding
-    /// address for [`LiveTopic::MailInbox`], an error, and the caller reads once instead.
+    /// Follows `topic` as the student this install proved to be while the app is on screen
+    /// (`Core::app_shown`): `listener` hears each change as soon as the server has it. Without an
+    /// identity (it never proves) or a forwarding address for [`LiveTopic::MailInbox`], an error,
+    /// and the caller reads once instead.
     pub async fn live_watch(
         self: Arc<Self>,
         flow: String,
@@ -212,67 +214,63 @@ impl Core {
                 LiveTopic::SignIns => ("account:signIns", json!({})),
             };
             let stamp = self.ensure_identity(&flow, path, false).await?;
-            let backend = self.backend()?;
-            let held = Arc::new(());
-            let (wake, start) = {
-                let mut state = self.shared.backend_state();
-                let start = state.renewal.watch(&held, &flow);
-                (state.renewal.wake.clone(), start)
-            };
-            if start {
-                run_renewal_coordinator(Arc::downgrade(&self), self.shared.clone());
-            }
-            let (core, renew_flow) = (Arc::downgrade(&self), flow.clone());
-            // Tracks the JWT epoch this watch last succeeded under, so a rejected JWT invalidates
-            // that epoch once and concurrent watches share one refresh.
-            let seen_jwt_epoch = Arc::new(AtomicU64::new(stamp.jwt_epoch));
-            let watch_gen = stamp.generation;
-            let on_update = move |update: Result<Value, CallError>| match update {
-                Ok(_) => {
-                    if let Some(core) = core.upgrade() {
-                        let current = core.shared.backend_state().auth.stamp().jwt_epoch;
-                        seen_jwt_epoch.store(current, Ordering::Relaxed);
-                    }
-                    listener.on_change();
-                }
-                Err(error) => {
-                    let error = edge_error(path, error);
-                    if let Some(core) = core.upgrade() {
-                        if error.is(&ServerCode::Unauthenticated) {
-                            let failed_epoch = seen_jwt_epoch.load(Ordering::Relaxed);
-                            core.on_jwt_rejected(Some(failed_epoch));
-                            core.request_watch_renewal(&renew_flow, listener.clone());
-                        }
-                        // Removed on another phone: only act if this watch belongs to the current
-                        // identity generation, so a late error never wipes a newer refresh token.
-                        if error.is(&ServerCode::DeviceRemoved) {
-                            if !core.on_device_removed(watch_gen) {
-                                return;
-                            }
-                            warn!(path, gen = watch_gen, "this install was removed on the server");
-                        }
-                    }
-                    listener.on_error(LiveError::of(error));
-                }
-            };
-            let id = backend.watch(path, args, Box::new(on_update));
-            info!(path, "live watch");
+            let _backend = self.backend()?;
             let watch = Arc::new(LiveWatch {
-                backend,
-                id,
-                held: Mutex::new(Some(held)),
-                wake,
+                core: Arc::downgrade(&self),
+                flow: flow.clone(),
+                topic,
+                path,
+                args,
+                listener,
+                seen_jwt_epoch: Arc::new(AtomicU64::new(stamp.jwt_epoch)),
+                watch_gen: stamp.generation,
+                stopped: AtomicBool::new(false),
+                active: Mutex::new(None),
             });
-            let mut state = self.shared.backend_state();
-            state.live.retain(|live| live.strong_count() > 0);
-            state.live.push(Arc::downgrade(&watch));
+            {
+                let mut state = self.shared.backend_state();
+                state.live.retain(|live| live.strong_count() > 0);
+                state.live.push(Arc::downgrade(&watch));
+            }
+            if self.events.on_screen() {
+                watch.subscribe(&self);
+            }
             Ok(watch)
         })
         .await
     }
+
+    /// How many live changes `topic` has received since the core started.
+    pub fn live_changes(&self, flow: String, topic: LiveTopic) -> u32 {
+        crate::traced_sync("live_changes", &flow, || {
+            Ok(*self
+                .shared
+                .backend_state()
+                .live_changes
+                .get(&topic)
+                .unwrap_or(&0))
+        })
+        .unwrap_or(0)
+    }
 }
 
 impl Core {
+    /// Pauses all live watches when the app leaves the screen and resumes them when it comes back.
+    pub(crate) fn on_live_app_shown(&self, on_screen: bool) {
+        let watches: Vec<Arc<LiveWatch>> = {
+            let mut state = self.shared.backend_state();
+            state.live.retain(|live| live.strong_count() > 0);
+            state.live.iter().filter_map(Weak::upgrade).collect()
+        };
+        for watch in watches {
+            if on_screen {
+                watch.resume();
+            } else {
+                watch.pause();
+            }
+        }
+    }
+
     /// Stops every live watch before the server signs this install out, so the server doesn't
     /// run them again for a phone it just dropped (each would fail `device_removed`, then
     /// `unauthenticated`). Their listeners hear nothing more; the app is signing out.

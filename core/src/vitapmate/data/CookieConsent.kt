@@ -1,81 +1,51 @@
 package vitapmate.data
 
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import vitapmate.core.ConsentAnswer
+import vitapmate.core.ConsentAsk
 import vitapmate.core.CookieAnswer
-import vitapmate.core.CookieGate
 import vitapmate.core.CookieKind
 import vitapmate.core.CookiePayload
-import vitapmate.core.HandoverAsk
-import vitapmate.core.HandoverStatus
-import vitapmate.core.RegnoAnswer
-import vitapmate.observability.Log
-import vitapmate.observability.Unattended
 
 /**
- * Rust's question before the VTOP session goes to our servers (`consent.rs`): a flow is attended
- * while the app is shown and it isn't a background run; [ask] puts a request in [pending] for the
- * shell's dialog and waits for Send or Cancel. Asks of one action at once share one dialog. No
- * answer within [Tunable.CookieAsk], or the app leaving the screen, is Cancel. Log src `ui.consent`.
+ * UI mirror for Rust's cookie consent dialog (`consent.rs`): Rust owns pending prompts, coalescing,
+ * timeouts and app-left cancellation, pushing the active prompt through [AppEventsBridge].
  */
-object CookieConsent : CookieGate {
-    class Request(val flow: String, val kind: CookieKind, val payload: CookiePayload, val action: String, val server: String) {
-        internal val answer = CompletableDeferred<CookieAnswer>()
-        internal var waiters = 0
-    }
+object CookieConsent {
+    class Request(
+        val id: ULong,
+        val flow: String,
+        val kind: CookieKind,
+        val payload: CookiePayload,
+        val action: String,
+        val server: String,
+    )
 
     private val pendingState = MutableStateFlow<List<Request>>(emptyList())
 
-    /** The dialogs to show, oldest first. Thread-safe for updates from Rust / IO threads. */
+    /** The active cookie dialog (at most one), mirrored from Rust. */
     val pending: StateFlow<List<Request>> = pendingState.asStateFlow()
 
-    private val no = CookieAnswer.Deny
-
-    /** How long a dialog waits; tests shorten it. */
-    internal var waitMs = { Settings.tunable(Tunable.CookieAsk) * 1000L }
-
-    override fun attended(flow: String): Boolean = Foreground.shown && flow !in Unattended.ids
-
-    override suspend fun ask(flow: String, kind: CookieKind, payload: CookiePayload, action: String, server: String): CookieAnswer {
-        if (!Foreground.shown) return no // Left between `attended` and here: nobody would see it.
-        // Only the very action the dialog names joins it; anything else waits for its own.
-        val request = synchronized(this) {
-            val current = pendingState.value
-            val same = current.firstOrNull { it.kind == kind && it.payload == payload && it.action == action && it.server == server }
-            (same ?: Request(flow, kind, payload, action, server).also {
-                pendingState.value = current + it
-                Log.info("ui.consent", "shown", flow, mapOf("kind" to kind.name.lowercase()))
-            }).also { it.waiters++ }
-        }
-        try {
-            return withTimeoutOrNull(waitMs()) { request.answer.await() } ?: no.also { answer(request, it) }
-        } finally {
-            // Cancelled (Rust dropped the call): the last one waiting takes the dialog away.
-            if (synchronized(this) { --request.waiters == 0 }) answer(request, no)
+    internal fun onConsent(ask: ConsentAsk) {
+        pendingState.value = when (ask) {
+            is ConsentAsk.Cookie -> listOf(Request(ask.id, ask.flow, ask.kind, ask.payload, ask.action, ask.server))
+            else -> emptyList()
         }
     }
 
-    override suspend fun askRegno(flow: String): RegnoAnswer = RegnoConsent.ask(flow)
-
-    override suspend fun askHandover(flow: String, ask: HandoverAsk): Boolean = HandoverConsent.ask(flow, ask)
-
-    override fun handoverStatus(flow: String, requestId: String, status: HandoverStatus) = HandoverConsent.status(flow, requestId, status)
-
-    /** The student's answer (or Cancel); the dialog goes. */
+    /** Sends the student's answer (or Cancel) to Rust. */
     fun answer(request: Request, answer: CookieAnswer) {
-        synchronized(this) { pendingState.value = pendingState.value - request }
-        if (request.answer.complete(answer)) {
-            Log.info("ui.consent", "answered", request.flow, mapOf("kind" to request.kind.name.lowercase(), "send" to "${answer is CookieAnswer.Allow}", "remember" to "${(answer as? CookieAnswer.Allow)?.remember == true}"))
+        val mapped = when (answer) {
+            is CookieAnswer.Allow -> if (answer.remember) ConsentAnswer.DONT_ASK_AGAIN else ConsentAnswer.SEND
+            CookieAnswer.Deny -> ConsentAnswer.CANCEL
         }
-    }
-
-    /** The app left the screen: every open dialog is Cancel, and the registration number's and a connected app's sheets go. */
-    internal fun left() {
-        synchronized(this) { pendingState.value }.forEach { answer(it, no) }
-        RegnoConsent.left()
-        HandoverConsent.left()
+        AppScope.launch {
+            attempt { withContext(Dispatchers.IO) { AppCore.await().consentAnswer(request.flow, request.id, mapped) } }
+        }
     }
 }

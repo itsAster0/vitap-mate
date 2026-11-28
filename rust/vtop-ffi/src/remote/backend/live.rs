@@ -1,18 +1,22 @@
 //! Live subscriptions ([`Core::live_watch`]) and the single `Condvar`-driven JWT renewal
 //! coordinator that keeps watched queries authenticated.
 
-use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
+use serde_json::Value;
 use tracing::{info, warn};
 
 use super::Backend;
+use super::rpc::edge_error;
+use crate::convex::CallError;
 use crate::device::EdgeError;
 use crate::remote::server_code::ServerCode;
 use crate::{Core, CoreError, Shared};
 
 /// What a screen follows live ([`Core::live_watch`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
 pub enum LiveTopic {
     /// `account:view`: the account, its phones and keys.
     Account,
@@ -67,29 +71,149 @@ impl LiveError {
     }
 }
 
-/// One [`Core::live_watch`]; stopping or dropping it unsubscribes.
+pub(super) struct ActiveWatch {
+    backend: Arc<dyn Backend>,
+    id: u64,
+    /// While any is held, the JWT is renewed before it runs out ([`Renewal`]).
+    held: Arc<()>,
+    wake: Arc<Condvar>,
+}
+
+/// One [`Core::live_watch`]; follows only while the app is on screen (`Core::app_shown`), and
+/// stopping or dropping it unsubscribes.
 #[derive(uniffi::Object)]
 pub struct LiveWatch {
-    pub(super) backend: Arc<dyn Backend>,
-    pub(super) id: u64,
-    /// While any is held, the JWT is renewed before it runs out ([`Renewal`]).
-    pub(super) held: Mutex<Option<Arc<()>>>,
-    pub(super) wake: Arc<Condvar>,
+    pub(super) core: Weak<Core>,
+    pub(super) flow: String,
+    pub(super) topic: LiveTopic,
+    pub(super) path: &'static str,
+    pub(super) args: Value,
+    pub(super) listener: Arc<dyn LiveListener>,
+    pub(super) seen_jwt_epoch: Arc<AtomicU64>,
+    pub(super) watch_gen: u64,
+    pub(super) stopped: AtomicBool,
+    pub(super) active: Mutex<Option<ActiveWatch>>,
+}
+
+impl LiveWatch {
+    pub(super) fn subscribe(&self, core: &Arc<Core>) {
+        if self.stopped.load(Ordering::Acquire) {
+            return;
+        }
+        if self
+            .active
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some()
+        {
+            return;
+        }
+        let Ok(backend) = core.backend() else {
+            return;
+        };
+        let held = Arc::new(());
+        let (wake, start) = {
+            let mut state = core.shared.backend_state();
+            let start = state.renewal.watch(&held, &self.flow);
+            (state.renewal.wake.clone(), start)
+        };
+        if start {
+            run_renewal_coordinator(Arc::downgrade(core), core.shared.clone());
+        }
+        let weak_core = Arc::downgrade(core);
+        let renew_flow = self.flow.clone();
+        let topic = self.topic;
+        let path = self.path;
+        let listener = self.listener.clone();
+        let seen_jwt_epoch = self.seen_jwt_epoch.clone();
+        let watch_gen = self.watch_gen;
+        let on_update = move |update: Result<Value, CallError>| match update {
+            Ok(_) => {
+                if let Some(core) = weak_core.upgrade() {
+                    let mut state = core.shared.backend_state();
+                    let current = state.auth.stamp().jwt_epoch;
+                    seen_jwt_epoch.store(current, Ordering::Relaxed);
+                    state
+                        .live_changes
+                        .entry(topic)
+                        .and_modify(|n| *n = n.saturating_add(1))
+                        .or_insert(1);
+                }
+                listener.on_change();
+            }
+            Err(error) => {
+                let error = edge_error(path, error);
+                if let Some(core) = weak_core.upgrade() {
+                    if error.is(&ServerCode::Unauthenticated) {
+                        let failed_epoch = seen_jwt_epoch.load(Ordering::Relaxed);
+                        core.on_jwt_rejected(Some(failed_epoch));
+                        core.request_watch_renewal(&renew_flow, listener.clone());
+                    }
+                    // Removed on another phone: only act if this watch belongs to the current
+                    // identity generation, so a late error never wipes a newer refresh token.
+                    if error.is(&ServerCode::DeviceRemoved) {
+                        if !core.on_device_removed(watch_gen) {
+                            return;
+                        }
+                        warn!(path, gen = watch_gen, "this install was removed on the server");
+                    }
+                }
+                listener.on_error(LiveError::of(error));
+            }
+        };
+        let id = backend.watch(path, self.args.clone(), Box::new(on_update));
+        info!(path, "live watch");
+        let installed = {
+            let mut active = self.active.lock().unwrap_or_else(PoisonError::into_inner);
+            if self.stopped.load(Ordering::Acquire) || !core.events.on_screen() || active.is_some()
+            {
+                false
+            } else {
+                *active = Some(ActiveWatch {
+                    backend: backend.clone(),
+                    id,
+                    held: held.clone(),
+                    wake: wake.clone(),
+                });
+                true
+            }
+        };
+        if !installed {
+            backend.unwatch(id);
+            drop(held);
+            wake.notify_all();
+        }
+    }
+
+    pub(super) fn pause(&self) {
+        let taken = self
+            .active
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(active) = taken {
+            active.backend.unwatch(active.id);
+            drop(active.held);
+            active.wake.notify_all();
+        }
+    }
+
+    pub(super) fn resume(&self) {
+        if self.stopped.load(Ordering::Acquire) {
+            return;
+        }
+        if let Some(core) = self.core.upgrade() {
+            self.subscribe(&core);
+        }
+    }
 }
 
 #[uniffi::export]
 impl LiveWatch {
     /// No more calls to its listener once the socket's queue drains.
     pub fn stop(&self) {
-        self.backend.unwatch(self.id);
-        let dropped = self
-            .held
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take();
-        if dropped.is_some() {
-            self.wake.notify_all();
-        }
+        self.stopped.store(true, Ordering::Release);
+        self.pause();
     }
 }
 
@@ -142,7 +266,7 @@ enum RenewDecision {
 pub(super) struct Renewal {
     pub(super) wake: Arc<Condvar>,
     phase: RenewPhase,
-    watched: Vec<std::sync::Weak<()>>,
+    watched: Vec<Weak<()>>,
     /// Immediate renewal requested by one or more watches hearing `unauthenticated`.
     renew_now: bool,
     /// Flow id for the next renewal run.
@@ -291,7 +415,7 @@ impl Renewal {
 
 /// Runs the single live-watch JWT renewal coordinator thread until no watches remain, no
 /// identity is available, or the [`Core`] is dropped.
-pub(super) fn run_renewal_coordinator(core: std::sync::Weak<Core>, shared: Arc<Shared>) {
+pub(super) fn run_renewal_coordinator(core: Weak<Core>, shared: Arc<Shared>) {
     let fallback_shared = shared.clone();
     let spawned = std::thread::Builder::new()
         .name("convex-keep-jwt".into())

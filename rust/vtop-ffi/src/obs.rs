@@ -264,11 +264,7 @@ impl<S: Subscriber + for<'a> LookupSpan<'a>> Layer<S> for Pipeline {
         let span_src = line.remove("src");
         let mut fields = Map::new();
         event.record(&mut Fields(&mut fields));
-        let msg = fields
-            .remove("message")
-            .as_ref()
-            .map(plain)
-            .unwrap_or_default();
+        let msg = fields.remove("message").as_ref().map_or_default(plain);
         // Our own events take the call's src; vtop-core's keep their target.
         let src = match (fields.remove("src"), span_src) {
             (Some(src), _) => plain(&src),

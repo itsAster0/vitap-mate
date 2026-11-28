@@ -3,8 +3,14 @@
 vitapmate is an unofficial Android app for VIT-AP's VTOP portal. It shows the
 timetable, attendance, marks, grades, exams, outings, course pages and more, and
 caches them on the phone. The UI is Compose Multiplatform, built with the Kotlin
-Toolchain (no Gradle), over a Rust core through UniFFI. It runs on Android only;
-iOS would need other Kotlin bindings for UniFFI.
+Toolchain (no Gradle), over a Rust core through UniFFI. It runs on Android only.
+
+**Rust is the app; Kotlin is a shell.** All domain logic and its scheduling live in
+`rust/vtop-ffi`: page state, the fetch queue, the open-app sweep, sync, settings, consent,
+Gmail OTP, docs and every calculation. Kotlin draws screens, holds temporary UI state, and
+supplies the platform services Rust asks for through UniFFI foreign traits (HTTP, sockets,
+Keystore, files, URLs, WorkManager, notifications). Another platform reuses the Rust core and
+writes only a shell (UniFFI generates Swift too).
 
 Read `rust/ARCHITECTURE.md` (the crates, the routes from the phone, UDP mode,
 deploys), `backend/README.md` (the Convex functions) and
@@ -36,14 +42,19 @@ app/                  shell: feature registry (Features.kt), nav, More, Settings
                       Account, Connected apps, About, Developer, Inspector, MainActivity;
                       res/, jniLibs/ (built, gitignored)
 core/                 vitapmate.core: generated UniFFI bindings (vtop_ffi.kt, do not edit)
-                      vitapmate.data: AppCore, pages (rememberPage, PageState), Settings,
-                      the HTTP and UDP transports (VtopHttp, VtopHttpEngine, VtopUdp)
+                      vitapmate.data: platform services and mirrors of Rust's state: AppCore,
+                      AppEventsBridge, rememberPage (over Rust's page watch), Settings (a mirror),
+                      the HTTP, WebSocket and UDP transports (VtopHttp, VtopHttpEngine, VtopUdp),
+                      Secrets (Keystore), Downloads and Docs (file I/O only)
                       vitapmate.observability: Log, flow(), activity history, state dump
 design/               vitapmate.ui: theme, shared components, PageScaffold, Feature type
 features/<name>/      one feature per module (module.yaml + src/vitapmate/features/<name>/)
 rust/                 Cargo workspace
   vtop-ffi/           the app's crate: Core, cache, session, records, routes (remote/route.rs),
-                      UDP (remote/udp.rs), server account (remote/server.rs), logs (obs.rs)
+                      UDP (remote/udp.rs), server account (remote/server.rs), logs (obs.rs),
+                      runtime (smol), app events and host traits (events.rs), problems,
+                      page watches (page_watch.rs), queue, activity, sweep and freshness
+                      (schedule/), settings, docs, mess menu, Gmail, consent
   vtop-proto/         parsers, types and HTTP shapes as page machines, with no I/O
   vtop-core/          VTOP client that runs vtop-proto's machines over a Transport
   vtop-shared/        formats the app, engine and backend share (device_sig, mail_seal, page_dictionary)
@@ -66,11 +77,12 @@ keystore/             release keystore (gitignored; never read or print it)
 | Change | Place |
 |---|---|
 | New VTOP page | Parser in `rust/vtop-proto/src/parser/`, its machine in `rust/vtop-proto/src/pages.rs`, and a `PageSpec` (name, args, cache file, machine) in `rust/vtop-proto/src/spec.rs`, listed in `spec::each`. vtop-core runs it with `VtopClient::fetch(&spec, &query)` and the engine serves everything in `spec::each`, so a read page needs nothing in vtop-core or vtop-bridge (writes and downloads keep a method in `rust/vtop-core/src/client/`). FFI in the feature's file `rust/vtop-ffi/src/pages/<feature>.rs` (its own `#[uniffi::export] impl Core` block, `cached_x` and `fetch_x`, flow id first): `fetch_x` calls `Core::fetch(&spec::X, ...)`, which caches it under the picked semester (`Core::page` for one not cached), and `cached_x` reads it back with `read_page`. Both go by the chosen route, so the server routes fetch it too. Never rename a spec's name, args or file: old apps and the deployed engine use them. Then run `mise run rust-android`. |
-| Use a VTOP page in a feature | `rememberPage("<id>", { c, f -> c.cachedX(f) }, { c, f -> c.fetchX(f) }, ...)` in the screen, drawn with `PageScaffold` (see `core/src/vitapmate/data/Page.kt`). |
+| Use a VTOP page in a feature | `rememberPage(PageId.X, { c, f -> c.cachedX(f) })` in the screen, drawn with `PageScaffold` (see `core/src/vitapmate/data/Page.kt`). Rust's page watch decides when to fetch; a new page adds its `PageId` variant and its fetch and cached time in `rust/vtop-ffi/src/page_watch.rs`. |
 | New screen | `features/<name>/` with a `module.yaml` that depends on `//design` only, and `src/vitapmate/features/<name>/` exposing `val <name>Feature: Feature`. Add one line each to `project.yaml`, `app/module.yaml` (`- //features/<name>` under `dependencies`) and `app/src/vitapmate/Features.kt`. A feature never imports another; code two features share moves to `design` (UI) or `core` (data). |
 | Shared widget | `design/src/vitapmate/ui/`, one widget per file. |
 | Shell, nav, Settings, Developer, Inspector UI | `app/src/vitapmate/`. |
-| Data, settings store, downloads, files | `core/src/vitapmate/data/`. |
+| Logic, rules, timers, background work, settings, any calculation | Rust, in `rust/vtop-ffi/src/`. Work that outlives its caller runs on `Runtime` (smol; never tokio), with time from its `Clock` so tests use `ManualClock`. State reaches Kotlin as pushes on `AppEvents` or a listener. |
+| A platform service (HTTP, sockets, Keystore, files, URLs, jobs, notifications) | A `#[uniffi::export(with_foreign)]` trait in Rust, implemented in `core/src/vitapmate/data/`. Keep it I/O only: no decisions in the Kotlin side. |
 | How the app reaches VTOP | `rust/vtop-ffi/src/remote/route.rs` (Direct, Proxy, Server, Udp); the policy (which route to try, the 5-minute skip after a failure, a server fetch's steps) is pure, in `rust/vtop-ffi/src/remote/route/plan.rs`. |
 | Logging | Kotlin: `core/src/vitapmate/observability/` (`Log`, `flow()`). Rust: `tracing`, with the pipeline in `rust/vtop-ffi/src/obs.rs`. |
 | Server-side state | Convex in `backend/convex/`, never the engine or the gateway. A read the app shows is a query it can watch live (`LiveTopic`); queries take no `flow` argument, so the same read shares the watch's subscription. List new functions in `backend/README.md`. |
@@ -123,7 +135,7 @@ A page or route change reaches more than one place. Check each:
   OTPs, CSRF tokens or keys.
 - Background work uses short timeouts (the open-app sweep stops at a page that
   takes over 5 s), never blocks or interrupts the user, and is tunable in
-  Settings → Developer (`Tunable` in `core/src/vitapmate/data/Settings.kt`).
+  Settings → Developer (`TunableKey` in `rust/vtop-ffi/src/settings.rs`).
 - VTOP writes (outing apply and cancel) show a result only after VTOP confirms
   it.
 - A send of the VTOP session to our servers goes through `consent::allowed`
@@ -142,6 +154,15 @@ A page or route change reaches more than one place. Check each:
   being typed, a picked day, an open sheet, scroll) and Android-only state
   (permissions, Keystore, the password manager). A Kotlin screen never copies
   or recomputes domain state.
+- Keep the core logic in Rust and Kotlin a shell. New rules, timers, retries,
+  queues, persistence formats and calculations go in Rust, never in Kotlin,
+  even when a Kotlin version would be shorter. Kotlin's state holders
+  (`Settings`, `Activity`, `SemesterChoice`, `SyncHealth`, `PageHandle`) only
+  mirror what Rust pushes and send changes back; they decide nothing.
+- Rust calls Kotlin listeners (`AppEvents`, `PageListener`, ...) on its own
+  threads: hop to the main thread before touching Compose state
+  (`AppEventsBridge` does). A listener that throws is caught and logged in
+  Rust; it never stops a Rust task.
 - Make invalid states unrepresentable: model mutually exclusive phases as Rust
   enums with data (Kotlin sealed classes through UniFFI) and Kotlin sealed
   interfaces, not parallel booleans, nullable pairs, empty-string sentinels or
@@ -250,7 +271,9 @@ are in `rust/vtop-proto/tests`, client tests in
 `rust/vtop-core/src/client/tests.rs`, the app crate's in
 `rust/vtop-ffi/src/tests.rs` and next to each module, vm1's in
 `rust/vtop-wire/src/tests.rs`, the backend's in `backend/convex/*.test.ts`,
-and Kotlin's in `core/test/` and `features/<name>/test/`.
+and Kotlin's in `core/test/` and `features/<name>/test/`. Logic is tested in
+Rust (the page watch, queue, sweep, settings, consent and sync tests sit next
+to their modules); Kotlin tests cover only the shell.
 
 - Extend an existing test before adding one, and test at the lowest layer that
   shows the bug (a parser test over a client test over an app test).

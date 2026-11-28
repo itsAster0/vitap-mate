@@ -120,10 +120,7 @@ pub(super) fn device_key(dir: &Path) -> Result<[u8; 32], WireError> {
 /// replaces `path`: a crash leaves the old file or the new one, and two writers never share one.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
-    let mut name = path
-        .file_name()
-        .map(OsStr::to_os_string)
-        .unwrap_or_default();
+    let mut name = path.file_name().map_or_default(OsStr::to_os_string);
     name.push(format!(
         ".{}.{}.tmp",
         std::process::id(),

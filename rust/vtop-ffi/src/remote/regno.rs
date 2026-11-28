@@ -8,7 +8,7 @@
 //!
 //! The answers are kept per student in [`FILE`], which a sign-out (or another student) empties
 //! but keeps: no file at all is an install from before the question, whose identity counts as
-//! Shared ([`migrated`]). Asked with [`CookieGate::ask_regno`]. Only a flow with the student
+//! Shared ([`migrated`]). Asked through [`consent::ask_regno`]. Only a flow with the student
 //! on screen that needs the identity asks; background runs and calls nobody started never do.
 //! "Not now" holds for the rest of its flow, so one screen asks once.
 
@@ -18,7 +18,7 @@ use std::sync::PoisonError;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use crate::remote::consent::{self, CookieGate};
+use crate::remote::consent;
 use crate::remote::route::Route;
 use crate::remote::{account_token, forwarding};
 use crate::{Core, CoreError, traced};
@@ -296,8 +296,7 @@ impl Core {
         if !should_ask(sharing, ask) {
             return sharing;
         }
-        let gate = self.shared.consent().gate.clone();
-        let Some(gate) = gate.filter(|_| consent::attended(&self.shared, flow)) else {
+        if !consent::attended(&self.shared, flow) {
             info!(
                 flow,
                 kind = "regno",
@@ -305,7 +304,7 @@ impl Core {
                 "regno sharing"
             );
             return sharing;
-        };
+        }
         let mut said_no_in = self.shared.regno_ask.lock().await;
         // Another call may have asked while this one waited.
         let sharing = self.sharing_of(regno);
@@ -315,7 +314,7 @@ impl Core {
         if said_no_in.as_deref() == Some(flow) {
             return sharing;
         }
-        let answer = ask_gate(gate.as_ref(), flow).await;
+        let answer = consent::ask_regno(&self.shared, flow).await;
         let to = self.apply_regno_answer(flow, regno, sharing, answer);
         if to != RegnoSharing::Shared {
             *said_no_in = Some(flow.to_string());
@@ -397,13 +396,6 @@ impl Core {
         );
         Err(CoreError::RegnoNotShared)
     }
-}
-
-/// The sheet's answer; a failed sheet is no answer.
-async fn ask_gate(gate: &dyn CookieGate, flow: &str) -> RegnoAnswer {
-    gate.ask_regno(flow.to_string())
-        .await
-        .unwrap_or(RegnoAnswer::Dismissed)
 }
 
 #[uniffi::export]

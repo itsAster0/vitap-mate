@@ -1,5 +1,6 @@
 package vitapmate.features.calendar
 
+import vitapmate.core.PageId
 import vitapmate.ui.UpdatedFooter
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -57,7 +58,7 @@ import vitapmate.ui.formatDay
  */
 @Composable
 fun CalendarScreen() {
-    val page = rememberPage("calendar", { c, f -> c.cachedCalendar(f) }, { c, f -> c.fetchCalendar(f) }, { it.updatedAt }) { it.months.size }
+    val page = rememberPage(PageId.CALENDAR, { c, f -> c.cachedCalendar(f) })
     PageScaffold(
         page.state,
         { page.refresh("pull") },

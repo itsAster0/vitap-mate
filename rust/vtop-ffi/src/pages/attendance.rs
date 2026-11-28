@@ -115,8 +115,7 @@ impl Core {
         traced_sync("mismatched_attendance_details", &flow, || {
             let keys: Vec<String> = self
                 .read_page::<AttendanceData>(ATTENDANCE)
-                .map(|data| Attendance::from(data).courses)
-                .unwrap_or_default()
+                .map_or_default(|data| Attendance::from(data).courses)
                 .into_iter()
                 .filter(|course| match self.cached_history(course) {
                     Some(classes) => !records::history_in_sync(course, &classes),
@@ -212,15 +211,13 @@ impl Core {
     /// `course`'s plans from now, by the saved timetable and academic
     /// calendar; none without a calendar (its last class day is unknown).
     pub(crate) fn plans(&self, course: &AttendanceCourse) -> Vec<AttendancePlan> {
-        self.plan_inputs()
-            .map(|(calendar, slots)| {
-                let (today, minute) = records::ist_now();
-                let through = self
-                    .cached_history(course)
-                    .and_then(|classes| records::counted_through(course, &classes));
-                records::attendance_plans(course, &slots, &calendar, today, minute, through)
-            })
-            .unwrap_or_default()
+        self.plan_inputs().map_or_default(|(calendar, slots)| {
+            let (today, minute) = records::ist_now();
+            let through = self
+                .cached_history(course)
+                .and_then(|classes| records::counted_through(course, &classes));
+            records::attendance_plans(course, &slots, &calendar, today, minute, through)
+        })
     }
 
     /// `course`'s saved class history, newest first.

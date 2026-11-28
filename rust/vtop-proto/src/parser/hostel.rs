@@ -184,8 +184,7 @@ impl RequestRow {
         self.cells
             .iter()
             .find(|(name, _)| name == header)
-            .map(|(_, value)| value.clone())
-            .unwrap_or_default()
+            .map_or_default(|(_, value)| value.clone())
     }
 }
 
@@ -298,8 +297,7 @@ fn input_value(document: &Html, id: &str) -> String {
         .pick(&INPUT)
         .find(|input| input.value().attr("id") == Some(id))
         .and_then(|input| input.value().attr("value"))
-        .map(|value| value.split_whitespace().collect::<Vec<_>>().join(" "))
-        .unwrap_or_default()
+        .map_or_default(|value| value.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
 fn max_length(document: &Html, id: &str) -> u32 {
@@ -316,8 +314,7 @@ fn select_options<'a>(document: &'a Html, id: &str) -> Vec<ElementRef<'a>> {
     let select = Selector::parse(&format!("select#{id}")).ok();
     select
         .and_then(|select| document.select(&select).next())
-        .map(|select| select.pick(&OPTION).collect())
-        .unwrap_or_default()
+        .map_or_default(|select| select.pick(&OPTION).collect())
 }
 
 /// The options of `select#id`, without the empty placeholder.

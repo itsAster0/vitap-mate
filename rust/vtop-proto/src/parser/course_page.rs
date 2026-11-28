@@ -105,16 +105,15 @@ pub fn parse_detail(html: &str, semester_id: &str, erp_id: &str) -> CoursePageDe
         .iter()
         .flatten()
         .find(|row| row.has("class id") && row.has("faculty"));
-    let (faculty, faculty_school) =
-        split_faculty(&info.map(|r| r.cell("faculty")).unwrap_or_default());
+    let (faculty, faculty_school) = split_faculty(&info.map_or_default(|r| r.cell("faculty")));
     let class = CoursePageClass {
         class_id: input_value(&document, "classId"),
         erp_id: erp_id.to_string(),
-        class_group: info.map(|r| r.cell("class group")).unwrap_or_default(),
-        course_code: info.map(|r| r.cell("course code")).unwrap_or_default(),
-        course_title: info.map(|r| r.cell("course title")).unwrap_or_default(),
-        course_type: info.map(|r| r.cell("course type")).unwrap_or_default(),
-        slot: info.map(|r| r.cell("slot")).unwrap_or_default(),
+        class_group: info.map_or_default(|r| r.cell("class group")),
+        course_code: info.map_or_default(|r| r.cell("course code")),
+        course_title: info.map_or_default(|r| r.cell("course title")),
+        course_type: info.map_or_default(|r| r.cell("course type")),
+        slot: info.map_or_default(|r| r.cell("slot")),
         faculty,
         faculty_school,
     };
@@ -134,8 +133,7 @@ pub fn parse_detail(html: &str, semester_id: &str, erp_id: &str) -> CoursePageDe
                 topic: row.cell("lecture topic"),
                 materials: row
                     .element("reference material")
-                    .map(|cell| materials(&cell))
-                    .unwrap_or_default(),
+                    .map_or_default(|cell| materials(&cell)),
             })
         })
         .collect();
@@ -188,9 +186,7 @@ impl<'a> HeaderRow<'a> {
     }
 
     fn cell(&self, header: &str) -> String {
-        self.element(header)
-            .map(|c| word_text(&c))
-            .unwrap_or_default()
+        self.element(header).map_or_default(|c| word_text(&c))
     }
 }
 
@@ -249,8 +245,7 @@ fn lecture_date(cell: &ElementRef<'_>) -> String {
     let raw = cell
         .pick(&SPAN)
         .next()
-        .map(|span| word_text(&span))
-        .unwrap_or_else(|| word_text(cell));
+        .map_or_else(|| word_text(cell), |span| word_text(&span));
     let parts: Vec<&str> = raw.split('-').collect();
     match parts.as_slice() {
         [day, month, year] if year.len() == 4 => format!("{year}-{month}-{day}"),
@@ -283,8 +278,7 @@ fn input_value(document: &Html, id: &str) -> String {
         .pick(&INPUT)
         .find(|input| input.value().attr("id") == Some(id))
         .and_then(|input| input.value().attr("value"))
-        .map(|value| value.trim().to_string())
-        .unwrap_or_default()
+        .map_or_default(|value| value.trim().to_string())
 }
 
 #[cfg(test)]

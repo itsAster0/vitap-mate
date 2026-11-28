@@ -1,45 +1,42 @@
 package vitapmate.data
 
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import vitapmate.core.ConsentAnswer
+import vitapmate.core.ConsentAsk
 import vitapmate.core.HandoverAsk
+import vitapmate.core.HandoverSheetPhase
 import vitapmate.core.HandoverStatus
 import vitapmate.core.KeyKind
-import vitapmate.observability.Log
 
 /**
- * Rust's approve sheet for a connected app's request (`consent::allowed_handover`, asked through
- * [CookieConsent]'s gate) and how an approved answer goes (`HandoverStatus`). [ask] shows the
- * sheet and waits for Approve or Deny; after Approve the sheet stays, sending, until Rust says
- * the server took the session or why not. No answer within [Tunable.CookieAsk] or before the
- * request expires is Deny and shows it expired; swiping it away or the app leaving the screen is
- * Deny. [statuses] carries every status, for the notification. Log src `ui.handover`; the
- * address is never logged.
+ * UI mirror for Rust's connected-app handover approve sheet (`consent.rs`) and handover status
+ * stream (for notifications): Rust owns the sheet phase, timeouts and app-left denial.
  */
 object HandoverConsent {
     /** The sheet's phase; [ask] is what it shows. */
     sealed interface Sheet {
+        val id: ULong
+        val flow: String
         val ask: HandoverAsk
 
-        class Asking(override val ask: HandoverAsk, val flow: String) : Sheet {
-            internal val answer = CompletableDeferred<Boolean>()
-        }
-
-        data class Sending(override val ask: HandoverAsk) : Sheet
-        data class Sent(override val ask: HandoverAsk) : Sheet
-        data class Failed(override val ask: HandoverAsk, val reason: String) : Sheet
-        data class Expired(override val ask: HandoverAsk) : Sheet
+        class Asking(override val id: ULong, override val ask: HandoverAsk, override val flow: String) : Sheet
+        data class Sending(override val id: ULong, override val ask: HandoverAsk, override val flow: String) : Sheet
+        data class Sent(override val id: ULong, override val ask: HandoverAsk, override val flow: String) : Sheet
+        data class Failed(override val id: ULong, override val ask: HandoverAsk, override val flow: String, val reason: String) : Sheet
+        data class Expired(override val id: ULong, override val ask: HandoverAsk, override val flow: String) : Sheet
     }
 
     private val sheetState = MutableStateFlow<Sheet?>(null)
 
-    /** The sheet to show. Thread-safe for updates from Rust / IO threads. */
+    /** The sheet to show, mirrored from Rust. */
     val sheet: StateFlow<Sheet?> = sheetState.asStateFlow()
 
     private val statusFlow = MutableSharedFlow<Pair<String, HandoverStatus>>(extraBufferCapacity = 16)
@@ -47,71 +44,40 @@ object HandoverConsent {
     /** Each approved answer's progress (request id, status), for its notification. */
     val statuses: SharedFlow<Pair<String, HandoverStatus>> = statusFlow.asSharedFlow()
 
-    /** How long the sheet waits at most; tests shorten it. */
-    internal var waitMs = { Settings.tunable(Tunable.CookieAsk) * 1000L }
-
-    suspend fun ask(flow: String, ask: HandoverAsk): Boolean {
-        if (!Foreground.shown) return false
-        val asking = Sheet.Asking(ask, flow)
-        val older = synchronized(this) { sheetState.value.also { sheetState.value = asking } }
-        (older as? Sheet.Asking)?.answer?.complete(false)
-        Log.info(
-            "ui.handover",
-            "shown",
-            flow,
-            mapOf("via" to (ask.asker?.via?.name?.lowercase() ?: "-"), "ip_seen" to "${ask.asker?.ip?.seen}"),
-        )
-        val limit = ask.expiresAt?.let { minOf(waitMs(), it - System.currentTimeMillis()) } ?: waitMs()
-        var approved: Boolean? = null
-        try {
-            approved = withTimeoutOrNull(limit.coerceAtLeast(0)) { asking.answer.await() }
-            return approved == true
-        } finally {
-            // Approved: sending until Rust says how it went. Denied or cancelled (Rust dropped the
-            // call): gone. Timed out: says it expired.
-            synchronized(this) {
-                if (sheetState.value === asking) {
-                    sheetState.value = when (approved) {
-                        true -> Sheet.Sending(ask)
-                        false -> null
-                        null -> if (asking.answer.isCompleted) null else Sheet.Expired(ask)
-                    }
-                }
+    internal fun onConsent(ask: ConsentAsk) {
+        sheetState.value = when (ask) {
+            is ConsentAsk.Handover -> when (val phase = ask.phase) {
+                HandoverSheetPhase.Asking -> Sheet.Asking(ask.id, ask.ask, ask.flow)
+                HandoverSheetPhase.Sending -> Sheet.Sending(ask.id, ask.ask, ask.flow)
+                HandoverSheetPhase.Sent -> Sheet.Sent(ask.id, ask.ask, ask.flow)
+                is HandoverSheetPhase.Failed -> Sheet.Failed(ask.id, ask.ask, ask.flow, phase.reason)
+                HandoverSheetPhase.Expired -> Sheet.Expired(ask.id, ask.ask, ask.flow)
             }
-            asking.answer.complete(false)
+            else -> null
         }
+    }
+
+    internal fun onStatus(requestId: String, status: HandoverStatus) {
+        statusFlow.tryEmit(requestId to status)
     }
 
     /** Approve or Deny on the open sheet. */
     fun answer(approve: Boolean) {
         val asking = sheetState.value as? Sheet.Asking ?: return
-        if (asking.answer.complete(approve)) {
-            Log.info("ui.handover", "answered", asking.flow, mapOf("approve" to "$approve"))
+        val mapped = if (approve) ConsentAnswer.APPROVE else ConsentAnswer.DENY
+        AppScope.launch {
+            attempt { withContext(Dispatchers.IO) { AppCore.await().consentAnswer(asking.flow, asking.id, mapped) } }
         }
     }
 
     /** Done, Close or a swipe: an open question is Deny; a finished sheet goes. */
     fun close() {
-        if (sheetState.value is Sheet.Asking) return answer(false)
-        synchronized(this) { if (sheetState.value !is Sheet.Asking) sheetState.value = null }
-    }
-
-    fun status(flow: String, requestId: String, status: HandoverStatus) {
-        statusFlow.tryEmit(requestId to status)
-        Log.info("ui.handover", "status", flow, mapOf("status" to (status::class.simpleName ?: "-").lowercase()))
-        synchronized(this) {
-            val current = sheetState.value ?: return
-            if (current is Sheet.Asking || current.ask.requestId != requestId) return
-            sheetState.value = when (status) {
-                is HandoverStatus.Fetching -> Sheet.Sending(current.ask)
-                is HandoverStatus.Sent -> Sheet.Sent(current.ask)
-                is HandoverStatus.Failed -> Sheet.Failed(current.ask, status.reason)
-            }
+        val current = sheetState.value ?: return
+        val mapped = if (current is Sheet.Asking) ConsentAnswer.DENY else ConsentAnswer.CANCEL
+        AppScope.launch {
+            attempt { withContext(Dispatchers.IO) { AppCore.await().consentAnswer(current.flow, current.id, mapped) } }
         }
     }
-
-    /** The app left the screen: an open question is Deny (a sending sheet stays for its result). */
-    internal fun left() = (sheetState.value as? Sheet.Asking)?.answer?.complete(false)
 }
 
 /** "Chrome on MacBook", or what asked when the server didn't say. */

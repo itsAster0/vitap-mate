@@ -207,8 +207,7 @@ impl Core {
                     .classes
                     .iter()
                     .find(|class| class.class_id == selected)
-                    .map(|class| class.erp_id.clone())
-                    .unwrap_or_default();
+                    .map_or_default(|class| class.erp_id.clone());
                 let detail = self
                     .fetch(
                         &spec::COURSE_PAGE_DETAIL,

@@ -606,6 +606,6 @@ fn request(
         },
         rtt_ms: (link.rtt * 1000.0) as u16,
         last_ctr,
-        body: body.map(<[u8]>::to_vec).unwrap_or_default(),
+        body: body.map_or_default(<[u8]>::to_vec),
     }
 }

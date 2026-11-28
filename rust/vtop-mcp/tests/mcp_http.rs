@@ -498,11 +498,10 @@ async fn outing_tools_say_what_they_change() {
     .await;
     let tools = body["result"]["tools"].as_array().unwrap();
     let annotations = |name: &str| {
-        tools
-            .iter()
-            .find(|tool| tool["name"] == name)
-            .map(|tool| tool["annotations"].clone())
-            .unwrap_or_else(|| panic!("no {name} in {body}"))
+        tools.iter().find(|tool| tool["name"] == name).map_or_else(
+            || panic!("no {name} in {body}"),
+            |tool| tool["annotations"].clone(),
+        )
     };
     assert_eq!(annotations("apply_general_outing")["readOnlyHint"], false);
     assert_eq!(annotations("cancel_outing")["destructiveHint"], true);

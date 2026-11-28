@@ -18,24 +18,24 @@ import vitapmate.data.ProblemKind
 @Composable
 internal fun ProblemKind.look(): Pair<ImageVector, Tone> = AppTheme.tones.let { t ->
     icon to when (this) {
-        ProblemKind.Offline, ProblemKind.ConsentDenied -> neutralTone
-        ProblemKind.VtopDown -> t.warning
-        ProblemKind.SignInNeeded, ProblemKind.OtpNeeded, ProblemKind.SemesterNeeded -> t.accentTone
-        ProblemKind.OtpRejected, ProblemKind.Unexpected -> t.danger
+        ProblemKind.OFFLINE, ProblemKind.CONSENT_DENIED -> neutralTone
+        ProblemKind.VTOP_DOWN -> t.warning
+        ProblemKind.SIGN_IN_NEEDED, ProblemKind.OTP_NEEDED, ProblemKind.SEMESTER_NEEDED -> t.accentTone
+        ProblemKind.OTP_REJECTED, ProblemKind.UNEXPECTED -> t.danger
     }
 }
 
 /** The icon a [ProblemKind] is drawn with (also on its toast). */
 internal val ProblemKind.icon: ImageVector get() = when (this) {
-    ProblemKind.Offline -> Lucide.CloudOff
-    ProblemKind.VtopDown -> Lucide.ServerCrash
-    ProblemKind.SignInNeeded -> Lucide.KeyRound
-    ProblemKind.OtpNeeded -> Lucide.MailCheck
-    ProblemKind.OtpRejected -> Lucide.ShieldX
-    ProblemKind.SemesterNeeded -> Lucide.CalendarRange
-    ProblemKind.ConsentDenied -> Lucide.Cookie
-    ProblemKind.Unexpected -> Lucide.TriangleAlert
+    ProblemKind.OFFLINE -> Lucide.CloudOff
+    ProblemKind.VTOP_DOWN -> Lucide.ServerCrash
+    ProblemKind.SIGN_IN_NEEDED -> Lucide.KeyRound
+    ProblemKind.OTP_NEEDED -> Lucide.MailCheck
+    ProblemKind.OTP_REJECTED -> Lucide.ShieldX
+    ProblemKind.SEMESTER_NEEDED -> Lucide.CalendarRange
+    ProblemKind.CONSENT_DENIED -> Lucide.Cookie
+    ProblemKind.UNEXPECTED -> Lucide.TriangleAlert
 }
 
-/** Composition local for the app's "go to sign-in" action, used by problem views for [ProblemKind.SignInNeeded]. */
+/** Composition local for the app's "go to sign-in" action, used by problem views for [ProblemKind.SIGN_IN_NEEDED]. */
 val LocalSignIn = staticCompositionLocalOf<(() -> Unit)?> { null }

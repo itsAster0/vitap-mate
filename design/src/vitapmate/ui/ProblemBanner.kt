@@ -42,7 +42,7 @@ fun ProblemBanner(
 ) {
     val (icon, tone) = problem.kind.look()
     val inspector = LocalInspector.current
-    val signIn = onSignIn.takeIf { problem.kind == ProblemKind.SignInNeeded }
+    val signIn = onSignIn.takeIf { problem.kind == ProblemKind.SIGN_IN_NEEDED }
     val action = signIn ?: onRetry?.takeIf { problem.retryable }
     Surface(modifier.fillMaxWidth().testTag("problem.banner"), MaterialTheme.shapes.large, tone.subtle, tone.onSubtle) {
         Row(Modifier.padding(start = Space.lg, top = Space.md), verticalAlignment = Alignment.Top) {

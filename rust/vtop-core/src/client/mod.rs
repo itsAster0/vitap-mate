@@ -217,16 +217,13 @@ impl VtopClient {
 
     /// Logs which cookies are present, never their values.
     fn log_cookie_names(&self, context: &str) {
-        let names = self
-            .cookie_header()
-            .map(|header| {
-                parse_cookie_pairs(&header)
-                    .into_iter()
-                    .map(|(name, _)| name)
-                    .collect::<Vec<_>>()
-                    .join(",")
-            })
-            .unwrap_or_default();
+        let names = self.cookie_header().map_or_default(|header| {
+            parse_cookie_pairs(&header)
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>()
+                .join(",")
+        });
         let external = self.state().session.external_cookie_header().is_some();
         info!(
             target: AUTH,
@@ -260,9 +257,9 @@ impl VtopClient {
     /// Makes sure the session is signed in and returns what an
     /// authenticated form post needs.
     async fn authorize(&self, context: &str) -> VtopResult<AuthorizedRequest> {
-        if !self.ensure_authenticated_session().await? {
-            return Err(VtopError::SessionExpired);
-        }
+        self.ensure_authenticated_session()
+            .await?
+            .ok_or(VtopError::SessionExpired)?;
         let state = self.state();
         let csrf = state
             .session
@@ -605,8 +602,7 @@ impl VtopClient {
             username: self
                 .credentials
                 .as_ref()
-                .map(|credentials| credentials.username.as_str().to_string())
-                .unwrap_or_default(),
+                .map_or_default(|credentials| credentials.username.as_str().to_string()),
             saved_at_epoch_ms,
             cookies: (!state.cookies.is_empty()).then_some(state.cookies),
             csrf_token: state.csrf_token,
@@ -715,10 +711,7 @@ impl VtopClient {
         if check && !self.is_authenticated() {
             return Err(VtopError::SessionExpired);
         }
-        Ok(self
-            .cookie_header()
-            .map(String::into_bytes)
-            .unwrap_or_default())
+        Ok(self.cookie_header().map_or_default(String::into_bytes))
     }
 
     #[cfg(all(test, feature = "reqwest"))]

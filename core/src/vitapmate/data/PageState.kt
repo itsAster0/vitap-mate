@@ -5,12 +5,14 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import vitapmate.core.CoreException
+import vitapmate.core.problemToasts
+import vitapmate.core.problemOf as rustProblemOf
 
 /** Every screen's data (from [rememberPage]), as design's `PageScaffold` draws it. */
 sealed interface PageState<out T> {
     /**
      * Nothing to show yet (no cache; the first fetch runs). [waiting]: the fetch is queued behind
-     * other pages ("Waiting for Attendance to finish"), set after a moment ([PageFetches]).
+     * other pages ("Waiting for Attendance to finish"), set after a moment (Rust's page watch).
      */
     data class Loading(val waiting: String? = null) : PageState<Nothing>
 
@@ -33,23 +35,24 @@ sealed interface PageActivity {
 
     /** After a fetch that ended without an answer (cancelled, or dropped from the queue). */
     fun settled(): PageActivity = if (this is Refreshing) Idle else this
-
-    /** [text] as [Refreshing.waiting]; only a running fetch waits. */
-    fun waiting(text: String?): PageActivity = if (this is Refreshing) Refreshing(text) else this
 }
 
 /**
- * What went wrong, in words for the student: [title], [message] (says what to do), and the [flow]
- * it happened in. [userInitiated]: the student asked for the work (a pull, a button, a retry, a
- * submit); false for automatic work (auto refresh, the sweep), which toasts only with
+ * What went wrong, in words for the student (Rust's `Problem`): title, message (says what to do),
+ * and the flow it happened in. `userInitiated`: the student asked for the work (a pull, a button,
+ * a retry, a submit); false for automatic work (auto refresh, the sweep), which toasts only with
  * [Settings.showBackgroundErrors] ([toasts]).
  */
-data class Problem(val kind: ProblemKind, val title: String, val message: String, val flow: String, val retryable: Boolean, val userInitiated: Boolean = true)
+typealias Problem = vitapmate.core.Problem
+
+/**
+ * SEMESTER_NEEDED: no semester picked yet; the app shows the picker instead of a toast.
+ * CONSENT_DENIED: the student cancelled sending their VTOP cookie; no toast, only the problem view.
+ */
+typealias ProblemKind = vitapmate.core.ProblemKind
 
 /** Whether [this] shows as a toast: never for an OTP or semester prompt (they have their own UI). */
-val Problem.toasts: Boolean get() = kind !in NoToast && (userInitiated || Settings.showBackgroundErrors)
-
-private val NoToast = setOf(ProblemKind.SemesterNeeded, ProblemKind.OtpNeeded, ProblemKind.OtpRejected, ProblemKind.ConsentDenied)
+val Problem.toasts: Boolean get() = problemToasts(this, Settings.showBackgroundErrors)
 
 /**
  * Failures of automatic work that has no screen of its own (calendar and exam-day refreshes, the
@@ -62,12 +65,6 @@ object BackgroundProblems {
         problemOf(e, flow).copy(userInitiated = false).takeIf { it.toasts }?.let { shown.tryEmit(it) }
     }
 }
-
-/**
- * [SemesterNeeded]: no semester picked yet; the app shows the picker instead of a toast.
- * [ConsentDenied]: the student cancelled sending their VTOP cookie; no toast, only the problem view.
- */
-enum class ProblemKind { Offline, VtopDown, SignInNeeded, OtpNeeded, OtpRejected, SemesterNeeded, ConsentDenied, Unexpected }
 
 /** Opens the Inspector at a flow; the app provides it, any "Details" button calls it. */
 fun interface InspectorOpener {
@@ -107,45 +104,12 @@ class ServerFailure(val flow: String, override val cause: Throwable) : Exception
 }
 
 /**
- * The one mapping from a failure to a [Problem] (texts from the Flutter app's `app_errors.dart`
- * and `common_toast.dart`). Anything that is not a [CoreException] is [ProblemKind.Unexpected].
+ * A failure as a [Problem]: Rust maps a [CoreException] (its texts are the Flutter app's
+ * `app_errors.dart` and `common_toast.dart`); anything else is [ProblemKind.UNEXPECTED].
  * [server]: the call went to our server, not VTOP, so its failures don't blame VTOP.
  */
-fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem {
-    fun p(kind: ProblemKind, title: String, message: String, retryable: Boolean = true) = Problem(kind, title, message, flow, retryable)
-    return when (e) {
-        is CoreException.Offline -> p(ProblemKind.Offline, "No Internet Connection", "We couldn't reach ${if (server) "the server" else "VTOP"}. Check your internet connection and try again.")
-        is CoreException.VtopUnavailable -> p(
-            ProblemKind.VtopDown,
-            "VTOP Is Down",
-            "${e.reason.trim().trimEnd('.').ifEmpty { "VTOP is not answering" }}. This is on VTOP's side, not your connection; try again in a few minutes.",
-        )
-        is CoreException.InvalidCredentials -> p(
-            ProblemKind.SignInNeeded,
-            "VTOP Sign-In Failed",
-            "VTOP rejected the saved password. Update it in Settings, under Your account.",
-            retryable = false,
-        )
-        is CoreException.NotSignedIn -> p(ProblemKind.SignInNeeded, "Sign-In Needed", "Your saved session expired. Please sign in again.", retryable = false)
-        is CoreException.PasswordLocked -> p(ProblemKind.Unexpected, "Couldn't Open Your Password", "The phone's keystore didn't open the saved password just now. Try again in a moment.")
-        is CoreException.OtpRequired -> p(ProblemKind.OtpNeeded, "Verify Your Sign-In", "We need to verify this sign-in with the OTP sent to your registered email.")
-        is CoreException.OtpRejected -> p(
-            ProblemKind.OtpRejected,
-            "OTP Not Accepted",
-            e.reason.trim().ifEmpty { "That OTP didn't work. Check the code, or ask for a new one, and try again." },
-        )
-        is CoreException.SemesterNeeded -> p(
-            ProblemKind.SemesterNeeded,
-            "Choose Your Semester",
-            "Pick the semester to show in Settings → Account → Semester.",
-            retryable = false,
-        )
-        is CoreException.ConsentDenied -> p(ProblemKind.ConsentDenied, "Not Sent", "Not sent: your VTOP cookie stays on the phone.")
-        // A "Not now" on the registration number's sheet: as quiet as the cookie's no.
-        is CoreException.RegnoNotShared -> p(ProblemKind.ConsentDenied, "Not Shared", "This needs your registration number on the vitapmate server. Share it from Settings → Connections.")
-        is CoreException.Other -> if (server) p(ProblemKind.Unexpected, "Server Problem", e.reason.trim().ifEmpty { UNEXPECTED }) else p(ProblemKind.Unexpected, "VTOP Problem", UNEXPECTED)
-        else -> p(ProblemKind.Unexpected, "Something Went Wrong", UNEXPECTED)
-    }
-}
+fun problemOf(e: Throwable, flow: String, server: Boolean = false): Problem =
+    (e as? CoreException)?.let { rustProblemOf(it, flow, server) }
+        ?: Problem(ProblemKind.UNEXPECTED, "Something Went Wrong", UNEXPECTED, flow, retryable = true)
 
 private const val UNEXPECTED = "Something went wrong. Try again; if it keeps happening, open Details and share the log."

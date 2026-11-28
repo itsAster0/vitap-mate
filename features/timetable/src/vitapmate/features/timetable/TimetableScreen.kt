@@ -32,12 +32,11 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.ClassDay
 import vitapmate.core.DayClass
+import vitapmate.core.PageId
 import vitapmate.core.Timetable
 import vitapmate.core.TimetableDay
 import vitapmate.data.Histories
 import vitapmate.data.AppCore
-import vitapmate.data.CalendarRefresh
-import vitapmate.data.ExamDayRefresh
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
 import vitapmate.data.TimetableViewMode
@@ -57,6 +56,7 @@ import vitapmate.ui.isoWeekday
 import vitapmate.ui.mondayOf
 import vitapmate.ui.rememberNow
 import vitapmate.data.attempt
+import vitapmate.data.orNull
 
 /** Days read with the timetable: this week, next week (Sunday's grid) and four more to look ahead. */
 private const val WINDOW = 42
@@ -71,7 +71,7 @@ private class Extra(val days: List<TimetableDay>, val attendance: List<Attendanc
  */
 @Composable
 fun TimetableScreen() {
-    val page = rememberPage("timetable", { c, f -> c.cachedTimetable(f) }, { c, f -> c.fetchTimetable(f) }, { it.updatedAt }) { it.slots.size }
+    val page = rememberPage(PageId.TIMETABLE, { c, f -> c.cachedTimetable(f) })
     PageScaffold(
         page.state,
         onRefresh = { page.refresh("user") },
@@ -98,9 +98,9 @@ private fun TimetableContent(tt: Timetable) {
     val insights = Settings.calculatedInsights
     // Bumped when the academic calendar arrives, so the days are read again with it.
     var calendars by remember { mutableIntStateOf(0) }
-    LaunchedEffect(tt.updatedAt, semester, insights) { if (insights && CalendarRefresh.ifOld(tt.semesterId, "timetable")) calendars++ }
+    LaunchedEffect(tt.updatedAt, semester, insights) { if (insights && orNull { AppCore.await().timetableCalendarIfOld(tt.semesterId) } == true) calendars++ }
     // On a day with one of your papers, the schedule again (a moved venue, seat or time).
-    LaunchedEffect(tt.semesterId, today, insights) { if (insights && ExamDayRefresh.ifExamToday(tt.semesterId, "timetable")) calendars++ }
+    LaunchedEffect(tt.semesterId, today, insights) { if (insights && orNull { AppCore.await().timetableExamsIfExamToday(tt.semesterId) } == true) calendars++ }
     // Bumped when class histories arrive, so held classes show what VTOP posted.
     var histories by remember { mutableIntStateOf(0) }
     LaunchedEffect(tt.updatedAt, semester, today, calendars, insights) {

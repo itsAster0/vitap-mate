@@ -204,7 +204,7 @@ mod tests {
                 status: 200,
                 headers: Vec::new(),
                 url: request.url,
-                body: id.map(|h| h.value.clone().into_bytes()).unwrap_or_default(),
+                body: id.map_or_default(|h| h.value.clone().into_bytes()),
                 saved_size: None,
             })
         }

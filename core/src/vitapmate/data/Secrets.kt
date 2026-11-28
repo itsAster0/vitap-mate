@@ -17,6 +17,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import vitapmate.core.Opening
 import vitapmate.core.PasswordCipher
+import vitapmate.core.SecretBox
+import vitapmate.core.SecretException
 import vitapmate.core.Sealing
 import vitapmate.observability.Log
 
@@ -93,6 +95,23 @@ object Secrets {
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .build()
         KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, STORE).apply { init(spec) }.generateKey()
+    }
+}
+
+/**
+ * [Secrets] for Rust, in the files dir of [context]. A Keystore failure reaches Rust as
+ * [SecretException.Unavailable], named by class only, never with the secret.
+ */
+class SecretFiles(private val context: Context) : SecretBox {
+    override fun seal(name: String, bytes: ByteArray) = guard("sealed") { Secrets.write(context, name, bytes) }
+
+    override fun open(name: String): ByteArray? = guard("opened") { Secrets.read(context, name) }
+
+    private inline fun <T> guard(what: String, block: () -> T): T = try {
+        block()
+    } catch (e: Exception) {
+        Log.warn("secrets", "secret not $what: ${e::class.simpleName}")
+        throw SecretException.Unavailable(e::class.simpleName ?: "Exception")
     }
 }
 

@@ -12,8 +12,7 @@ pub fn u64() -> u64 {
     let mut h = RandomState::new().build_hasher();
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
+        .map_or_default(|d| d.as_nanos());
     h.write_u128(nanos);
     h.finish()
 }

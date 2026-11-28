@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
+import vitapmate.core.PageId
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -37,12 +38,7 @@ private enum class Tab { Profile, Mentor }
  */
 @Composable
 fun ProfileScreen() {
-    val page = rememberPage(
-        "profile",
-        { core, flow -> core.cachedProfile(flow) },
-        { core, flow -> core.fetchProfile(flow) },
-        { it.updatedAt },
-    ) { it.details.size }
+    val page = rememberPage(PageId.PROFILE, { core, flow -> core.cachedProfile(flow) })
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(Tab.Profile) }
     PageScaffold(

@@ -34,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -147,9 +146,9 @@ internal fun GmailContent() {
     }
 }
 
-/** A Google sign-in in progress: [start] runs [Gmail.connect]; tapping again cancels. */
+/** A Google sign-in in progress: [toggle] runs [Gmail.connect]; tapping again cancels. */
 @Stable
-private class Connecting(private val scope: CoroutineScope, private val open: (String) -> Unit) {
+private class Connecting(private val scope: CoroutineScope) {
     var job by mutableStateOf<Job?>(null)
         private set
     var problem by mutableStateOf<String?>(null)
@@ -162,7 +161,7 @@ private class Connecting(private val scope: CoroutineScope, private val open: (S
                 flow("gmail.connect") { id ->
                     // The college address ends with the registration number (not the VTOP username).
                     val regno = withContext(Dispatchers.IO) { AppCore.await().savedAccount(id)?.registrationNumber }.orEmpty()
-                    Gmail.connect(client, regno, id, open)
+                    Gmail.connect(client, regno, id)
                 }
                 showToast("Gmail connected", "VTOP's OTP now fills in from your Gmail.")
             } catch (e: CancellationException) {
@@ -183,8 +182,7 @@ private class Connecting(private val scope: CoroutineScope, private val open: (S
 @Composable
 private fun rememberConnecting(): Connecting {
     val scope = rememberCoroutineScope()
-    val uri = LocalUriHandler.current
-    return remember { Connecting(scope) { uri.openUri(it) } }
+    return remember { Connecting(scope) }
 }
 
 /** Connect (or Reconnect) Google; Cancel while the browser sign-in runs. */

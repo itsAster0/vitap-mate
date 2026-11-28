@@ -6,8 +6,10 @@ use serde_json::{Value, json};
 
 use super::board::{GRACE_MS, Request, TTL_MS, notification_id};
 use super::*;
-use crate::remote::consent::{self, CookieAnswer, CookieGate, CookieKind, CookiePayload};
-use crate::remote::regno::RegnoAnswer;
+use crate::events::AppEvents;
+use crate::problem::Problem;
+use crate::remote::consent::{self, ConsentAsk, CookieKind};
+use crate::schedule::ActivityEntry;
 use crate::test_edge::{Edge, keep_token, serve};
 
 fn cancel(id: &str) -> HandoverEffect {
@@ -449,30 +451,20 @@ async fn an_expired_request_is_not_answered() {
 /// Shows the consent dialog and never answers it.
 struct Unanswered(AtomicU32);
 
-#[async_trait::async_trait]
-impl CookieGate for Unanswered {
-    fn attended(&self, _flow: String) -> bool {
-        true
+impl AppEvents for Unanswered {
+    fn on_background_problem(&self, _problem: Problem) {}
+    fn on_activity(&self, _entries: Vec<ActivityEntry>) {}
+    fn on_consent(&self, ask: ConsentAsk) {
+        if !matches!(ask, ConsentAsk::None) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
     }
-    async fn ask(
-        &self,
-        _flow: String,
-        _kind: CookieKind,
-        _payload: CookiePayload,
-        _action: String,
-        _server: String,
-    ) -> Result<CookieAnswer, CoreError> {
-        self.0.fetch_add(1, Ordering::SeqCst);
-        std::future::pending().await
+    fn on_handover_status(&self, _flow: String, _request_id: String, _status: HandoverStatus) {}
+    fn is_flow_unattended(&self, _flow: String) -> bool {
+        false
     }
-    async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
-        Ok(RegnoAnswer::Dismissed)
-    }
-    async fn ask_handover(&self, _flow: String, _ask: HandoverAsk) -> Result<bool, CoreError> {
-        self.0.fetch_add(1, Ordering::SeqCst);
-        std::future::pending().await
-    }
-    fn handover_status(&self, _flow: String, _request_id: String, _status: HandoverStatus) {}
+    fn on_semesters(&self, _state: crate::SemesterState) {}
+    fn on_sync_health(&self, _health: crate::SyncHealth, _paused: Option<String>) {}
 }
 
 #[tokio::test]
@@ -480,7 +472,8 @@ async fn past_its_limit_the_answer_is_dropped_and_only_the_timeout_sent() {
     let (core, edge) = answering("timeout").await;
     consent::tests::signed_in(&core);
     let gate = Arc::new(Unanswered(AtomicU32::new(0)));
-    core.shared.consent().gate = Some(gate.clone());
+    core.events.set_shown_for_test(true);
+    core.set_events(gate.clone());
     let attempt = on_screen(&core, "r1");
 
     let answered = core
@@ -517,7 +510,8 @@ async fn past_its_limit_the_answer_is_dropped_and_only_the_timeout_sent() {
 async fn an_answer_the_app_cancels_frees_the_request() {
     let (core, edge) = answering("cancelled").await;
     consent::tests::signed_in(&core);
-    core.shared.consent().gate = Some(Arc::new(Unanswered(AtomicU32::new(0))));
+    core.events.set_shown_for_test(true);
+    core.set_events(Arc::new(Unanswered(AtomicU32::new(0))));
     let attempt = on_screen(&core, "r1");
     {
         let answer = core.answer_handover("f".into(), "r1".into(), attempt, 60);

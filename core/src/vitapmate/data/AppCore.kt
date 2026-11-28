@@ -1,9 +1,11 @@
 package vitapmate.data
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.util.Base64
 import java.io.File
@@ -12,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -20,6 +23,7 @@ import vitapmate.core.Core
 import vitapmate.core.DevConfig
 import vitapmate.core.Platform
 import vitapmate.core.RegnoAsk
+import vitapmate.core.UrlOpener
 import vitapmate.core.obsInit
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
@@ -65,7 +69,6 @@ object AppCore {
                     if (old.exists() && !File(app.cacheDir, name).exists()) old.renameTo(File(app.cacheDir, name)) else old.delete()
                 }
                 obsInit(app.cacheDir.path)
-                runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
                 // Debuggable: Developer → Chat's servers may apply (never in a release build).
                 val debuggable = app.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
@@ -76,13 +79,23 @@ object AppCore {
                     udp = VtopUdp(app),
                     convex = SocketConvexNetwork(),
                     proof = SocketProofNetwork(),
-                    cookieGate = CookieConsent,
                     cipher = AccountPassword,
                     otp = OtpPrompt,
+                    secrets = SecretFiles(app),
+                    urls = Browser(app),
                     dev = DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt(), debuggable),
                     deviceLabel = if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}",
                 )
-                runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path, platform).also { core -> core.watchAccount(it, AccountWatch) } } }
+                runBlocking {
+                    flow("core_init") { id ->
+                        Core(id, dir, app.cacheDir.path, platform).also { created ->
+                            created.watchAccount(id, AccountWatch)
+                            created.setEvents(AppEventsBridge)
+                            runCatching { Gmail.load(created, id) }
+                                .onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
+                        }
+                    }
+                }
             }.fold(core::complete) { e ->
                 Log.error("core", "init failed: $e")
                 core.completeExceptionally(e)
@@ -177,6 +190,18 @@ object AppCore {
         return VtopHttp(proxy, cas)
     }
 
+    /** Opens Rust's links (Gmail's sign-in page) in the browser; a phone without one logs it. */
+    private class Browser(private val context: Context) : UrlOpener {
+        override fun open(url: String) {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                .onFailure { Log.warn("core", "link not opened: ${it::class.simpleName}") }
+        }
+    }
+
     /** The core, once created; throws what creating it threw. */
     suspend fun await(): Core = core.await()
+
+    /** The core if it is up now, for reads that can't wait; null before (or if creating it failed). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun ready(): Core? = if (core.isCompleted && !core.isCancelled) runCatching { core.getCompleted() }.getOrNull() else null
 }

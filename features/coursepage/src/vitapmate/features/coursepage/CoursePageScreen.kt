@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BookX
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
+import vitapmate.core.PageId
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
@@ -35,12 +36,7 @@ import vitapmate.ui.UpdatedFooter
  */
 @Composable
 fun CoursePageScreen() {
-    val page = rememberPage(
-        "coursepage",
-        { core, flow -> core.cachedCoursePage(flow) },
-        { core, flow -> core.fetchCoursePage(flow) },
-        { it.updatedAt },
-    ) { data -> data.groups.size }
+    val page = rememberPage(PageId.COURSE_PAGE, { core, flow -> core.cachedCoursePage(flow) })
     val opener = LocalOpenDetail.current
     val scope = rememberCoroutineScope()
     val list = rememberLazyListState()

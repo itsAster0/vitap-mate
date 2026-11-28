@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.CalendarX
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
+import vitapmate.core.PageId
 import vitapmate.data.Settings
 import vitapmate.data.epochDayOf
 import vitapmate.data.minuteOf
@@ -46,12 +47,7 @@ import vitapmate.ui.rememberSyncedPager
  */
 @Composable
 fun ExamsScreen() {
-    val page = rememberPage(
-        "exams",
-        { core, flow -> core.cachedExams(flow) },
-        { core, flow -> core.fetchExams(flow) },
-        { it.updatedAt },
-    ) { exams -> exams.groups.sumOf { it.papers.size } }
+    val page = rememberPage(PageId.EXAMS, { core, flow -> core.cachedExams(flow) })
     val scope = rememberCoroutineScope()
     // The exam picked by name, so a refresh that adds one keeps the pick; null = Rust's `opens`.
     var picked by rememberSaveable { mutableStateOf<String?>(null) }

@@ -166,9 +166,7 @@ mod tests {
     fn answer(status: u16, url: &str, location: Option<&str>) -> Response {
         Response {
             status,
-            headers: location
-                .map(|to| vec![("Location".into(), to.into())])
-                .unwrap_or_default(),
+            headers: location.map_or_default(|to| vec![("Location".into(), to.into())]),
             url: url.into(),
             body: b"<html>page</html>".to_vec(),
         }

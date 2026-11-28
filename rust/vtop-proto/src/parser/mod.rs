@@ -67,7 +67,7 @@ pub(crate) fn compact_text(element: &ElementRef<'_>) -> String {
 
 /// [`compact_text`] for an optional cell; a missing cell is empty.
 pub(crate) fn compact_cell(cell: Option<&ElementRef<'_>>) -> String {
-    cell.map(compact_text).unwrap_or_default()
+    cell.map_or_default(compact_text)
 }
 
 /// The element's text with all whitespace runs collapsed to one space.
@@ -81,7 +81,7 @@ pub(crate) fn word_text(element: &ElementRef<'_>) -> String {
 
 /// [`word_text`] for an optional cell; a missing cell is empty.
 pub(crate) fn word_cell(cell: Option<&ElementRef<'_>>) -> String {
-    cell.map(word_text).unwrap_or_default()
+    cell.map_or_default(word_text)
 }
 
 #[cfg(test)]

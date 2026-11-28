@@ -364,7 +364,7 @@ impl Mentor {
             "department",
         ];
         Self {
-            initials: name.as_deref().map(initials).unwrap_or_default(),
+            initials: name.as_deref().map_or_default(initials),
             lines: [detail("designation"), detail("department")]
                 .into_iter()
                 .flatten()

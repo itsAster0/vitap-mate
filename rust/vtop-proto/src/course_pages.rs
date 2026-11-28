@@ -174,13 +174,12 @@ pub fn file_name_from_disposition(header: &str) -> String {
         .map(str::trim)
         .find_map(|part| part.strip_prefix("filename="))
         .map(|name| name.trim_matches('"').trim().to_string())
-        .map(|name| {
+        .map_or_default(|name| {
             name.rsplit(['/', '\\'])
                 .next()
                 .unwrap_or_default()
                 .to_string()
         })
-        .unwrap_or_default()
 }
 
 /// [`file_head`], then the whole body: read a download held in memory with

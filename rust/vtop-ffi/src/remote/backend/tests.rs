@@ -235,6 +235,7 @@ impl LiveListener for Heard {
 async fn live_watches_follow_as_the_student() {
     let (core, edge, server) = setup("watch").await;
     let core = Arc::new(core);
+    core.app_shown("f".into(), true);
     let heard = Arc::new(Heard::default());
     // No identity, never proving: an error, and nothing sent.
     let none = core
@@ -250,6 +251,7 @@ async fn live_watches_follow_as_the_student() {
         .await
         .unwrap();
     assert_eq!(*heard.0.lock().unwrap(), ["change"]);
+    assert_eq!(core.live_changes("f".into(), LiveTopic::Account), 1);
     assert_eq!(paths(&edge), ["auth:token", "account:view"]);
     assert_eq!(edge.lock().unwrap().requests[1].flow, "");
     watch.stop();
@@ -265,6 +267,45 @@ async fn live_watches_follow_as_the_student() {
             ..
         })
     ));
+}
+
+#[tokio::test]
+async fn live_followed_only_while_shown() {
+    let (core, edge, server) = setup("watch-shown").await;
+    let core = Arc::new(core);
+    keep_token(&core, &server);
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    can(&edge, "account:view", 200, json!({ "thisPhone": true }));
+    let heard = Arc::new(Heard::default());
+
+    // App is not shown yet: live_watch checks identity, but doesn't subscribe until shown.
+    let watch = core
+        .clone()
+        .live_watch("f-w".into(), LiveTopic::Account, heard.clone())
+        .await
+        .unwrap();
+    assert!(heard.0.lock().unwrap().is_empty());
+    assert_eq!(core.live_changes("f".into(), LiveTopic::Account), 0);
+    assert_eq!(paths(&edge), ["auth:token"]);
+
+    // Coming on screen subscribes and increments the change count.
+    core.app_shown("f".into(), true);
+    assert_eq!(*heard.0.lock().unwrap(), ["change"]);
+    assert_eq!(core.live_changes("f".into(), LiveTopic::Account), 1);
+    assert_eq!(paths(&edge), ["auth:token", "account:view"]);
+
+    // Leaving the screen unsubscribes.
+    core.app_shown("f".into(), false);
+    assert_eq!(edge.lock().unwrap().unwatched.len(), 1);
+
+    // Coming back re-subscribes and bumps the count again.
+    core.app_shown("f".into(), true);
+    assert_eq!(*heard.0.lock().unwrap(), ["change", "change"]);
+    assert_eq!(core.live_changes("f".into(), LiveTopic::Account), 2);
+    assert_eq!(paths(&edge), ["auth:token", "account:view", "account:view"]);
+
+    watch.stop();
+    assert_eq!(edge.lock().unwrap().unwatched.len(), 2);
 }
 
 #[tokio::test]
@@ -304,6 +345,7 @@ async fn sign_out_everywhere_sent_offline_stays_everywhere() {
 async fn sign_out_stops_live_watches_first() {
     let (core, edge, server) = setup("signout-watches").await;
     let core = Arc::new(core);
+    core.app_shown("f".into(), true);
     keep_token(&core, &server);
     can(&edge, "account:view", 200, json!({ "thisPhone": true }));
     let heard = Arc::new(Heard::default());

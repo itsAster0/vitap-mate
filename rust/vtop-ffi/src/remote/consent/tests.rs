@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::fmt::Write as _;
 use std::future::Future;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex, Weak};
 
 use tracing::field::{Field, Visit};
 use tracing::span::Attributes;
@@ -10,6 +10,10 @@ use tracing::{Event, Id, Subscriber};
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 
 use super::*;
+use crate::events::AppEvents;
+use crate::problem::Problem;
+use crate::runtime::ManualClock;
+use crate::schedule::ActivityEntry;
 use crate::{ACCOUNT, Account, Session};
 
 /// Runs `future` on this thread.
@@ -42,7 +46,8 @@ impl<S: Subscriber> Layer<S> for Captured {
 /// Scripted answers (yes once the script runs out, or no with `deny`), whether flows are
 /// attended, and how often it asked.
 pub(crate) struct TestGate {
-    pub(crate) attended: bool,
+    shared: Weak<Shared>,
+    pub(crate) attended: AtomicBool,
     pub(crate) deny: bool,
     pub(crate) answers: Mutex<VecDeque<CookieAnswer>>,
     pub(crate) payloads: Mutex<Vec<CookiePayload>>,
@@ -61,50 +66,89 @@ impl TestGate {
     }
 }
 
-#[async_trait::async_trait]
-impl CookieGate for TestGate {
-    fn attended(&self, _flow: String) -> bool {
-        self.attended
+impl AppEvents for TestGate {
+    fn on_background_problem(&self, _problem: Problem) {}
+    fn on_activity(&self, _entries: Vec<ActivityEntry>) {}
+
+    fn on_consent(&self, ask: ConsentAsk) {
+        let Some(shared) = self.shared.upgrade() else {
+            return;
+        };
+        match ask {
+            ConsentAsk::None => {}
+            ConsentAsk::Cookie { id, payload, .. } => {
+                self.asks.fetch_add(1, Ordering::SeqCst);
+                self.payloads.lock().unwrap().push(payload);
+                let next = self.answers.lock().unwrap().pop_front();
+                let answer = next.unwrap_or(if self.deny {
+                    CookieAnswer::Deny
+                } else {
+                    CookieAnswer::Allow { remember: false }
+                });
+                let mapped = match answer {
+                    CookieAnswer::Deny => ConsentAnswer::Cancel,
+                    CookieAnswer::Allow { remember: false } => ConsentAnswer::Send,
+                    CookieAnswer::Allow { remember: true } => ConsentAnswer::DontAskAgain,
+                };
+                answer_shared(&shared, id, mapped);
+            }
+            ConsentAsk::Regno { id, .. } => {
+                self.regno_asks.fetch_add(1, Ordering::SeqCst);
+                let next = self
+                    .regno_answers
+                    .lock()
+                    .unwrap()
+                    .pop_front()
+                    .unwrap_or(RegnoAnswer::Dismissed);
+                let mapped = match next {
+                    RegnoAnswer::Share => ConsentAnswer::Share,
+                    RegnoAnswer::NotNow => ConsentAnswer::NotNow,
+                    RegnoAnswer::Dismissed => ConsentAnswer::Cancel,
+                };
+                answer_shared(&shared, id, mapped);
+            }
+            ConsentAsk::Handover {
+                id,
+                ask,
+                phase: HandoverSheetPhase::Asking,
+                ..
+            } => {
+                self.asks.fetch_add(1, Ordering::SeqCst);
+                self.handover_asks.lock().unwrap().push(ask);
+                let next = self.answers.lock().unwrap().pop_front();
+                let approve = next.map_or(!self.deny, |answer| {
+                    matches!(answer, CookieAnswer::Allow { .. })
+                });
+                answer_shared(
+                    &shared,
+                    id,
+                    if approve {
+                        ConsentAnswer::Approve
+                    } else {
+                        ConsentAnswer::Deny
+                    },
+                );
+            }
+            ConsentAsk::Handover { .. } => {}
+        }
     }
-    async fn ask(
-        &self,
-        _flow: String,
-        _kind: CookieKind,
-        payload: CookiePayload,
-        _action: String,
-        _server: String,
-    ) -> Result<CookieAnswer, CoreError> {
-        self.asks.fetch_add(1, Ordering::SeqCst);
-        self.payloads.lock().unwrap().push(payload);
-        let next = self.answers.lock().unwrap().pop_front();
-        Ok(next.unwrap_or(if self.deny {
-            CookieAnswer::Deny
-        } else {
-            CookieAnswer::Allow { remember: false }
-        }))
-    }
-    async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
-        self.regno_asks.fetch_add(1, Ordering::SeqCst);
-        let next = self.regno_answers.lock().unwrap().pop_front();
-        Ok(next.unwrap_or(RegnoAnswer::Dismissed))
-    }
-    async fn ask_handover(&self, _flow: String, ask: HandoverAsk) -> Result<bool, CoreError> {
-        self.asks.fetch_add(1, Ordering::SeqCst);
-        self.handover_asks.lock().unwrap().push(ask);
-        let next = self.answers.lock().unwrap().pop_front();
-        Ok(next.map_or(!self.deny, |answer| {
-            matches!(answer, CookieAnswer::Allow { .. })
-        }))
-    }
-    fn handover_status(&self, _flow: String, _request_id: String, status: HandoverStatus) {
+
+    fn on_handover_status(&self, _flow: String, _request_id: String, status: HandoverStatus) {
         self.statuses.lock().unwrap().push(status);
     }
+
+    fn is_flow_unattended(&self, _flow: String) -> bool {
+        !self.attended.load(Ordering::SeqCst)
+    }
+    fn on_semesters(&self, _state: crate::SemesterState) {}
+    fn on_sync_health(&self, _health: crate::SyncHealth, _paused: Option<String>) {}
 }
 
 /// Gives `core` a fresh gate (and no remembered kinds).
 pub(crate) fn install(core: &Core, attended: bool, deny: bool) -> Arc<TestGate> {
     let gate = Arc::new(TestGate {
-        attended,
+        shared: Arc::downgrade(&core.shared),
+        attended: AtomicBool::new(attended),
         deny,
         answers: Mutex::default(),
         payloads: Mutex::default(),
@@ -114,10 +158,9 @@ pub(crate) fn install(core: &Core, attended: bool, deny: bool) -> Arc<TestGate> 
         handover_asks: Mutex::default(),
         statuses: Mutex::default(),
     });
-    *core.shared.consent() = State {
-        gate: Some(gate.clone()),
-        ..State::default()
-    };
+    *core.shared.consent() = State::default();
+    core.events.set_shown_for_test(attended);
+    core.set_events(gate.clone());
     gate
 }
 
@@ -408,48 +451,58 @@ fn ticks_replace_the_file_instead_of_rewriting_it_in_place() {
     let _ = fs::remove_dir_all(&core.dir);
 }
 
+/// Captures pushed [`ConsentAsk`]s without answering them, for interactive prompt tests.
+#[derive(Default)]
+struct ManualEvents {
+    pushed: Mutex<Vec<ConsentAsk>>,
+    unattended: Mutex<BTreeSet<String>>,
+}
+
+impl ManualEvents {
+    fn current(&self) -> ConsentAsk {
+        self.pushed
+            .lock()
+            .unwrap()
+            .last()
+            .cloned()
+            .unwrap_or(ConsentAsk::None)
+    }
+
+    fn count(&self) -> usize {
+        self.pushed.lock().unwrap().len()
+    }
+}
+
+impl AppEvents for ManualEvents {
+    fn on_background_problem(&self, _problem: Problem) {}
+    fn on_activity(&self, _entries: Vec<ActivityEntry>) {}
+    fn on_consent(&self, ask: ConsentAsk) {
+        self.pushed.lock().unwrap().push(ask);
+    }
+    fn on_handover_status(&self, _flow: String, _request_id: String, _status: HandoverStatus) {}
+    fn is_flow_unattended(&self, flow: String) -> bool {
+        self.unattended.lock().unwrap().contains(&flow)
+    }
+    fn on_semesters(&self, _state: crate::SemesterState) {}
+    fn on_sync_health(&self, _health: crate::SyncHealth, _paused: Option<String>) {}
+}
+
+fn manual_core() -> (Core, ManualClock, Arc<ManualEvents>) {
+    let clock = ManualClock::default();
+    let core = Core::for_test_with_clock(
+        std::env::temp_dir(),
+        Shared::default(),
+        Arc::new(clock.clone()),
+    );
+    let events = Arc::new(ManualEvents::default());
+    core.set_events(events.clone());
+    (core, clock, events)
+}
+
 #[tokio::test]
 async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
-    struct GatedGate {
-        asks: AtomicU32,
-        entered: tokio::sync::Notify,
-        release: tokio::sync::Notify,
-    }
-
-    #[async_trait::async_trait]
-    impl CookieGate for GatedGate {
-        fn attended(&self, _flow: String) -> bool {
-            true
-        }
-        async fn ask(
-            &self,
-            _flow: String,
-            _kind: CookieKind,
-            _payload: CookiePayload,
-            _action: String,
-            _server: String,
-        ) -> Result<CookieAnswer, CoreError> {
-            self.asks.fetch_add(1, Ordering::SeqCst);
-            self.entered.notify_one();
-            self.release.notified().await;
-            Ok(CookieAnswer::Allow { remember: false })
-        }
-        async fn ask_regno(&self, _flow: String) -> Result<RegnoAnswer, CoreError> {
-            Ok(RegnoAnswer::Dismissed)
-        }
-        async fn ask_handover(&self, _flow: String, _ask: HandoverAsk) -> Result<bool, CoreError> {
-            Ok(false)
-        }
-        fn handover_status(&self, _flow: String, _request_id: String, _status: HandoverStatus) {}
-    }
-
-    let core = fresh();
-    let gate = Arc::new(GatedGate {
-        asks: AtomicU32::new(0),
-        entered: tokio::sync::Notify::new(),
-        release: tokio::sync::Notify::new(),
-    });
-    core.shared.consent().gate = Some(gate.clone());
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
 
     let shared_a = core.shared.clone();
     let shared_b = core.shared.clone();
@@ -465,7 +518,9 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
         )
         .await
     });
-    gate.entered.notified().await;
+    while !matches!(events.current(), ConsentAsk::Cookie { .. }) {
+        tokio::task::yield_now().await;
+    }
     let second = tokio::spawn(async move {
         allowed(
             &shared_b,
@@ -479,10 +534,21 @@ async fn concurrent_asks_for_same_flow_and_kind_coalesce_into_one_prompt() {
         .await
     });
     tokio::task::yield_now().await;
-    gate.release.notify_one();
+    let ConsentAsk::Cookie { id, .. } = events.current() else {
+        panic!("expected cookie prompt");
+    };
+    core.consent_answer("f-same".into(), id, ConsentAnswer::Send);
     assert!(first.await.unwrap());
     assert!(second.await.unwrap());
-    assert_eq!(gate.asks.load(Ordering::SeqCst), 1);
+    assert_eq!(events.current(), ConsentAsk::None);
+    let cookie_pushes = events
+        .pushed
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|a| matches!(a, ConsentAsk::Cookie { .. }))
+        .count();
+    assert_eq!(cookie_pushes, 1);
 }
 
 #[test]
@@ -553,4 +619,425 @@ fn gate_receives_typed_payload() {
         *gate.payloads.lock().unwrap(),
         [CookiePayload::CookieAndPassword]
     );
+}
+
+#[test]
+fn unattended_flow_is_not_attended() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    assert!(attended(&core.shared, "f"));
+    events.unattended.lock().unwrap().insert("f".into());
+    assert!(!attended(&core.shared, "f"));
+    events.unattended.lock().unwrap().remove("f");
+    assert!(attended(&core.shared, "f"));
+}
+
+#[test]
+fn not_shown_is_not_attended() {
+    let (core, _clock, _events) = manual_core();
+    core.app_shown("f".into(), true);
+    assert!(attended(&core.shared, "f"));
+    core.app_shown("f".into(), false);
+    assert!(!attended(&core.shared, "f"));
+}
+
+#[test]
+fn asks_of_one_action_share_one_dialog() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut first = Box::pin(ask_cookie(
+        &core.shared,
+        "f1",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch attendance",
+        "vmate.aster0.dev",
+    ));
+    let mut second = Box::pin(ask_cookie(
+        &core.shared,
+        "f2",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch attendance",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut first)).is_none());
+    assert!(smol::future::block_on(smol::future::poll_once(&mut second)).is_none());
+    assert_eq!(core.shared.consent().cookie_prompts.len(), 1);
+    let ConsentAsk::Cookie { id, .. } = events.current() else {
+        panic!("expected cookie prompt");
+    };
+    core.consent_answer("f1".into(), id, ConsentAnswer::Send);
+    assert_eq!(
+        smol::future::block_on(first),
+        CookieAnswer::Allow { remember: false }
+    );
+    assert_eq!(
+        smol::future::block_on(second),
+        CookieAnswer::Allow { remember: false }
+    );
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn payload_stays_separate_when_coalescing() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut cookie_only = Box::pin(ask_cookie(
+        &core.shared,
+        "f1",
+        CookieKind::Account,
+        CookiePayload::Cookie,
+        "Save",
+        "vmate.aster0.dev",
+    ));
+    let mut with_pw = Box::pin(ask_cookie(
+        &core.shared,
+        "f2",
+        CookieKind::Account,
+        CookiePayload::CookieAndPassword,
+        "Save",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut cookie_only)).is_none());
+    assert!(smol::future::block_on(smol::future::poll_once(&mut with_pw)).is_none());
+    assert_eq!(core.shared.consent().cookie_prompts.len(), 2);
+    let ConsentAsk::Cookie { id, payload, .. } = events.current() else {
+        panic!("expected first cookie prompt");
+    };
+    assert_eq!(payload, CookiePayload::Cookie);
+    core.consent_answer("f1".into(), id, ConsentAnswer::Cancel);
+    assert_eq!(smol::future::block_on(cookie_only), CookieAnswer::Deny);
+    let ConsentAsk::Cookie { id, payload, .. } = events.current() else {
+        panic!("expected second cookie prompt");
+    };
+    assert_eq!(payload, CookiePayload::CookieAndPassword);
+    core.consent_answer("f2".into(), id, ConsentAnswer::Cancel);
+    assert_eq!(smol::future::block_on(with_pw), CookieAnswer::Deny);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn timeout_is_cancel() {
+    let (core, clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    core.shared.consent().wait_ms_override = Some(500);
+    let mut asked = Box::pin(ask_cookie(
+        &core.shared,
+        "f",
+        CookieKind::Account,
+        CookiePayload::Cookie,
+        "Load connected apps",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    assert!(matches!(events.current(), ConsentAsk::Cookie { .. }));
+    clock.advance(499);
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    clock.advance(1);
+    assert_eq!(smol::future::block_on(asked), CookieAnswer::Deny);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn app_left_is_cancel() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut asked = Box::pin(ask_cookie(
+        &core.shared,
+        "f",
+        CookieKind::Handover,
+        CookiePayload::Cookie,
+        "Give a connected app your VTOP session",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    assert!(matches!(events.current(), ConsentAsk::Cookie { .. }));
+    core.app_shown("f".into(), false);
+    assert_eq!(smol::future::block_on(asked), CookieAnswer::Deny);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn another_action_never_rides_on_a_shown_dialog() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut load = Box::pin(ask_cookie(
+        &core.shared,
+        "f1",
+        CookieKind::Account,
+        CookiePayload::Cookie,
+        "Load your connected apps",
+        "vmate.aster0.dev",
+    ));
+    let mut delete = Box::pin(ask_cookie(
+        &core.shared,
+        "f2",
+        CookieKind::Account,
+        CookiePayload::Cookie,
+        "Delete your account on the server",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut load)).is_none());
+    assert!(smol::future::block_on(smol::future::poll_once(&mut delete)).is_none());
+    let ConsentAsk::Cookie { id, action, .. } = events.current() else {
+        panic!("expected first cookie prompt");
+    };
+    assert_eq!(action, "Load your connected apps");
+    core.consent_answer("f1".into(), id, ConsentAnswer::Send);
+    assert_eq!(
+        smol::future::block_on(load),
+        CookieAnswer::Allow { remember: false }
+    );
+    let ConsentAsk::Cookie { id, action, .. } = events.current() else {
+        panic!("expected second cookie prompt");
+    };
+    assert_eq!(action, "Delete your account on the server");
+    core.consent_answer("f2".into(), id, ConsentAnswer::Cancel);
+    assert_eq!(smol::future::block_on(delete), CookieAnswer::Deny);
+}
+
+#[test]
+fn cancelled_ask_takes_its_dialog_away() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    {
+        let mut asked = Box::pin(ask_cookie(
+            &core.shared,
+            "f",
+            CookieKind::Account,
+            CookiePayload::Cookie,
+            "Load your connected apps",
+            "vmate.aster0.dev",
+        ));
+        assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+        assert!(matches!(events.current(), ConsentAsk::Cookie { .. }));
+    }
+    assert_eq!(events.current(), ConsentAsk::None);
+    assert!(core.shared.consent().cookie_prompts.is_empty());
+}
+
+#[test]
+fn cancelled_ask_keeps_a_dialog_others_wait_on() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut first = Box::pin(ask_cookie(
+        &core.shared,
+        "f1",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch attendance",
+        "vmate.aster0.dev",
+    ));
+    let mut second = Box::pin(ask_cookie(
+        &core.shared,
+        "f2",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch attendance",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut first)).is_none());
+    assert!(smol::future::block_on(smol::future::poll_once(&mut second)).is_none());
+    drop(first);
+    let ConsentAsk::Cookie { id, .. } = events.current() else {
+        panic!("dialog should remain for second waiter");
+    };
+    core.consent_answer("f2".into(), id, ConsentAnswer::Send);
+    assert_eq!(
+        smol::future::block_on(second),
+        CookieAnswer::Allow { remember: false }
+    );
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn ask_while_not_shown_answers_cancel_at_once() {
+    let (core, _clock, events) = manual_core();
+    let answer = smol::future::block_on(ask_cookie(
+        &core.shared,
+        "f",
+        CookieKind::Account,
+        CookiePayload::Cookie,
+        "Load your connected apps",
+        "vmate.aster0.dev",
+    ));
+    assert_eq!(answer, CookieAnswer::Deny);
+    assert_eq!(events.count(), 0);
+}
+
+#[test]
+fn unattended_without_dont_ask_again_goes_direct() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    events.unattended.lock().unwrap().insert("bg".into());
+    // Unattended without "Don't ask again" denies without ever prompting (so Server falls back to Direct).
+    assert!(!smol::future::block_on(allowed(
+        &core.shared,
+        "bg",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch attendance",
+        "vmate.aster0.dev",
+        true,
+    )));
+    assert_eq!(events.count(), 0);
+    // With "Don't ask again" ticked for Route, unattended is allowed without prompting.
+    core.remember_cookie_consent("f".into(), CookieKind::Route)
+        .unwrap();
+    assert!(smol::future::block_on(allowed(
+        &core.shared,
+        "bg",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch attendance",
+        "vmate.aster0.dev",
+        true,
+    )));
+    assert_eq!(events.count(), 0);
+}
+
+#[test]
+fn wrong_consent_answer_variant_is_treated_as_deny() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut cookie = Box::pin(ask_cookie(
+        &core.shared,
+        "f",
+        CookieKind::Route,
+        CookiePayload::Cookie,
+        "Fetch",
+        "vmate.aster0.dev",
+    ));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut cookie)).is_none());
+    let ConsentAsk::Cookie { id, .. } = events.current() else {
+        panic!("expected cookie prompt");
+    };
+    core.consent_answer("f".into(), id, ConsentAnswer::Approve);
+    assert_eq!(smol::future::block_on(cookie), CookieAnswer::Deny);
+
+    let mut regno = Box::pin(ask_regno(&core.shared, "f2"));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut regno)).is_none());
+    let ConsentAsk::Regno { id, .. } = events.current() else {
+        panic!("expected regno prompt");
+    };
+    core.consent_answer("f2".into(), id, ConsentAnswer::Send);
+    assert_eq!(smol::future::block_on(regno), RegnoAnswer::Dismissed);
+}
+
+#[test]
+fn handover_expired_shows_expired() {
+    let (core, clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    core.shared.consent().wait_ms_override = Some(60_000);
+    let ask = HandoverAsk {
+        request_id: "req-1".into(),
+        asker: None,
+        asked_at: Some(0),
+        expires_at: Some(500),
+        server: "vmate.aster0.dev".into(),
+    };
+    let mut asked = Box::pin(ask_handover(&core.shared, "f", ask.clone()));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    assert!(matches!(
+        events.current(),
+        ConsentAsk::Handover {
+            phase: HandoverSheetPhase::Asking,
+            ..
+        }
+    ));
+    clock.advance(500);
+    assert!(!smol::future::block_on(asked));
+    let ConsentAsk::Handover {
+        id,
+        phase,
+        ask: shown_ask,
+        ..
+    } = events.current()
+    else {
+        panic!("expected expired handover sheet");
+    };
+    assert_eq!(phase, HandoverSheetPhase::Expired);
+    assert_eq!(shown_ask, ask);
+    // Closing the expired sheet clears it.
+    core.consent_answer("f".into(), id, ConsentAnswer::Cancel);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn regno_answer_goes_back_and_sheet_goes() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut asked = Box::pin(ask_regno(&core.shared, "f"));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    let ConsentAsk::Regno { id, flow } = events.current() else {
+        panic!("expected regno prompt");
+    };
+    assert_eq!(flow, "f");
+    core.consent_answer("f".into(), id, ConsentAnswer::Share);
+    assert_eq!(smol::future::block_on(asked), RegnoAnswer::Share);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn regno_not_shown_is_dismissed_at_once() {
+    let (core, _clock, events) = manual_core();
+    assert_eq!(
+        smol::future::block_on(ask_regno(&core.shared, "f")),
+        RegnoAnswer::Dismissed
+    );
+    assert_eq!(events.count(), 0);
+}
+
+#[test]
+fn regno_timeout_is_dismissed() {
+    let (core, clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    core.shared.consent().wait_ms_override = Some(250);
+    let mut asked = Box::pin(ask_regno(&core.shared, "f"));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    clock.advance(250);
+    assert_eq!(smol::future::block_on(asked), RegnoAnswer::Dismissed);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn regno_leaving_the_app_is_dismissed() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut asked = Box::pin(ask_regno(&core.shared, "f"));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+    core.app_shown("f".into(), false);
+    assert_eq!(smol::future::block_on(asked), RegnoAnswer::Dismissed);
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn regno_cancelled_ask_takes_its_sheet_away() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    {
+        let mut asked = Box::pin(ask_regno(&core.shared, "f"));
+        assert!(smol::future::block_on(smol::future::poll_once(&mut asked)).is_none());
+        assert!(matches!(events.current(), ConsentAsk::Regno { .. }));
+    }
+    assert_eq!(events.current(), ConsentAsk::None);
+}
+
+#[test]
+fn newer_regno_ask_closes_older() {
+    let (core, _clock, events) = manual_core();
+    core.app_shown("f".into(), true);
+    let mut first = Box::pin(ask_regno(&core.shared, "f1"));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut first)).is_none());
+    let mut second = Box::pin(ask_regno(&core.shared, "f2"));
+    assert!(smol::future::block_on(smol::future::poll_once(&mut second)).is_none());
+    assert_eq!(smol::future::block_on(first), RegnoAnswer::Dismissed);
+    let ConsentAsk::Regno { id, flow } = events.current() else {
+        panic!("expected second regno prompt");
+    };
+    assert_eq!(flow, "f2");
+    core.consent_answer("f2".into(), id, ConsentAnswer::NotNow);
+    assert_eq!(smol::future::block_on(second), RegnoAnswer::NotNow);
+    assert_eq!(events.current(), ConsentAsk::None);
 }

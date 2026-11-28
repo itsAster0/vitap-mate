@@ -130,7 +130,7 @@ impl Core {
         self.read_kept(&format!("{PAGES}/{DIR}/{day}.json"))
     }
 
-    async fn fetch_day(&self, day: i32) -> Result<BiometricData, CoreError> {
+    pub(crate) async fn fetch_day(&self, day: i32) -> Result<BiometricData, CoreError> {
         let text = vtop_date(day);
         let data = self
             .page(&vtop_core::spec::BIOMETRIC, None, &[("date", &text)])
@@ -181,7 +181,7 @@ fn vtop_date(day: i32) -> String {
 }
 
 /// Fetched once `day` was over in India.
-fn is_complete(day: i32, data: &BiometricData) -> bool {
+pub(crate) fn is_complete(day: i32, data: &BiometricData) -> bool {
     ((data.update_time as i64 + 19_800).div_euclid(86_400)) > i64::from(day)
 }
 

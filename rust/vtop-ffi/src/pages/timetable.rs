@@ -63,8 +63,7 @@ impl Core {
             let mut days = records::timetable_days(&slots, from_day, count, calendar.as_ref());
             let histories: HashMap<(String, ClassKind), Vec<AttendedClass>> = self
                 .read_page::<AttendanceData>(ATTENDANCE)
-                .map(|data| Attendance::from(data).courses)
-                .unwrap_or_default()
+                .map_or_default(|data| Attendance::from(data).courses)
                 .into_iter()
                 .filter_map(|course| {
                     let classes = self.cached_history(&course)?;

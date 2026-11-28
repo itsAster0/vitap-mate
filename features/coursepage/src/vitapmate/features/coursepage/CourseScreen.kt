@@ -62,6 +62,7 @@ import vitapmate.core.CoursePlan
 import vitapmate.core.CourseView
 import vitapmate.core.Lecture
 import vitapmate.core.FileLink
+import vitapmate.core.PageId
 import vitapmate.data.Settings
 import vitapmate.data.epochDayOf
 import vitapmate.data.rememberPage
@@ -96,12 +97,10 @@ internal fun CourseScreen(courseId: String) {
     var picked by rememberSaveable(courseId) { mutableStateOf<String?>(null) }
     val insights = Settings.calculatedInsights
     val page = rememberPage(
-        "coursepage_course",
+        PageId.COURSE_PAGE_COURSE,
         { core, flow -> core.cachedCourseView(flow, courseId, picked, insights) },
-        { core, flow -> core.fetchCourseView(flow, courseId, picked, insights) },
-        { it.updatedAt },
         item = "$courseId/${picked.orEmpty()}/${if (insights) 1 else 0}",
-    ) { view -> view.plan?.lectures?.size ?: view.sections.size }
+    )
     var sheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val pick: (String, String) -> Unit = { classId, by ->

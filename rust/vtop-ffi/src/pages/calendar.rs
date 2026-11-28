@@ -514,7 +514,7 @@ impl SemesterCalendar {
             date: civil_date(i64::from(day)),
             kind: top.map(|entry| entry.kind.clone()),
             mark: top.map(|entry| entry.mark),
-            title: top.map(|entry| entry.title.clone()).unwrap_or_default(),
+            title: top.map_or_default(|entry| entry.title.clone()),
             label: entries.map_or_else(String::new, |entries| {
                 entries
                     .iter()

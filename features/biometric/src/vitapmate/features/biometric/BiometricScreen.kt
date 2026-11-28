@@ -1,5 +1,6 @@
 package vitapmate.features.biometric
 
+import vitapmate.core.PageId
 import vitapmate.data.istDay
 import vitapmate.ui.rememberHaptics
 import androidx.compose.foundation.layout.Arrangement
@@ -66,13 +67,7 @@ fun BiometricScreen() {
     val now by rememberNow()
     val today = istDay(now)
     var day by rememberSaveable { mutableIntStateOf(today) }
-    val page = rememberPage(
-        "biometric",
-        { core, flow -> core.cachedBiometric(flow, day) },
-        { core, flow -> core.fetchBiometric(flow, day) },
-        { it.updatedAt },
-        item = "$day",
-    ) { it.punches.size }
+    val page = rememberPage(PageId.BIOMETRIC, { core, flow -> core.cachedBiometric(flow, day) }, item = "$day")
     val scope = rememberCoroutineScope()
     var picking by remember { mutableStateOf(false) }
     // The first day shown follows rememberPage's open rules; later picks refresh here.

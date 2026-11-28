@@ -140,9 +140,9 @@ impl VtopClient {
 
     pub async fn verify_session(&self) -> VtopResult<String> {
         let _validation = self.validation.write().await;
-        if !self.check_authenticated_session(true).await? {
-            return Err(VtopError::SessionExpired);
-        }
+        self.check_authenticated_session(true)
+            .await?
+            .ok_or(VtopError::SessionExpired)?;
         self.registration_number()
     }
 

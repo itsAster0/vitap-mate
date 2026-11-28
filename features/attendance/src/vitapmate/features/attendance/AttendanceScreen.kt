@@ -31,7 +31,7 @@ import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
-import vitapmate.data.CalendarRefresh
+import vitapmate.core.PageId
 import vitapmate.data.Histories
 import vitapmate.data.PageActivity
 import vitapmate.data.PageState
@@ -58,20 +58,14 @@ import vitapmate.ui.rememberSyncedPager
  */
 @Composable
 fun AttendanceScreen() {
-    val page = rememberPage(
-        "attendance",
-        { core, flow -> core.cachedAttendance(flow) },
-        { core, flow -> core.fetchAttendance(flow) },
-        { it.updatedAt },
-    ) { it.courses.size }
+    val page = rememberPage(PageId.ATTENDANCE, { core, flow -> core.cachedAttendance(flow) })
     val scope = rememberCoroutineScope()
     var filter by rememberSaveable { mutableStateOf(Kind.All) }
     var open by rememberSaveable { mutableStateOf<String?>(null) }
     var skipDay by rememberSaveable { mutableStateOf(false) }
     val insights = Settings.calculatedInsights
     // After each fetch of the summary, histories that fell behind it are fetched again in the
-    // background, and the calendar when a day old; the refresh spinner doesn't wait. A newer
-    // refresh cancels the last run.
+    // background; the refresh spinner doesn't wait. A newer refresh cancels the last run.
     val fresh = (page.state as? PageState.Ready)?.takeIf { it.activity !is PageActivity.Refreshing }?.updatedAt
     var seen by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(fresh, insights) {
@@ -79,7 +73,6 @@ fun AttendanceScreen() {
         val before = seen
         seen = fresh
         if (before == null || before == fresh) return@LaunchedEffect
-        (page.state as? PageState.Ready)?.data?.semesterId?.let { launch { CalendarRefresh.ifOld(it, "attendance", anyway = true) } }
         Histories.sync("attendance") { c, id -> c.mismatchedAttendanceDetails(id) }
     }
     PageScaffold(

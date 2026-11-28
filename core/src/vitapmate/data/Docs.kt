@@ -6,8 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
-import android.os.Environment
 import android.os.Build
+import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
@@ -27,23 +27,26 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.FileLink
-import vitapmate.core.StoredDoc
-import vitapmate.core.StoredDocIndex
-import vitapmate.core.decodeDocIndex
-import vitapmate.core.encodeDocIndex
+import vitapmate.core.FolderFile
+import vitapmate.core.docKindOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.core.Doc as RustDoc
+import vitapmate.core.DocKind as RustDocKind
+import vitapmate.core.DocSort as RustDocSort
+import vitapmate.core.newestMessMenu as rustNewestMessMenu
+import vitapmate.core.queryDocs as rustQueryDocs
 
 /** What Docs can show a file as, from its extension; anything else is a plain [File]. */
-enum class DocKind(val extensions: List<String>) {
-    Pdf(listOf("pdf")),
-    Image(listOf("png", "jpg", "jpeg", "webp", "gif", "bmp")),
-    Spreadsheet(listOf("xlsx", "xlsm", "xls", "ods")),
-    Text(listOf("xml", "html", "htm", "txt", "json", "md", "csv")),
-    File(emptyList());
+enum class DocKind {
+    Pdf,
+    Image,
+    Spreadsheet,
+    Text,
+    File;
 
     companion object {
-        fun of(fileName: String): DocKind = fileName.substringAfterLast('.', "").lowercase().let { ext -> entries.firstOrNull { ext in it.extensions } ?: File }
+        fun of(fileName: String): DocKind = docKindOf(fileName).toKotlin()
     }
 }
 
@@ -81,59 +84,22 @@ enum class DocSort(val label: String) {
 }
 
 /** [docs] whose name contains [query] (of [kind] when given), in [sort] order; ties by name, then id (Flutter's `queryDocs`). */
-fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = "", kind: DocKind? = null): List<Doc> {
-    val needle = query.trim().lowercase()
-    val byName = compareBy<Doc> { it.name.lowercase() }
-    val primary: Comparator<Doc> = when (sort) {
-        // Never-opened documents go last.
-        DocSort.RecentlyOpened -> compareBy(nullsLast(reverseOrder())) { it.lastOpenedAt }
-        DocSort.RecentlyAdded -> compareByDescending { it.addedAt }
-        DocSort.NameAscending -> byName
-        DocSort.NameDescending -> byName.reversed()
-        DocSort.Largest -> compareByDescending { it.size }
-        DocSort.Type -> compareBy { it.kind }
-    }
-    return docs.filter { needle in it.name.lowercase() && (kind == null || it.kind == kind) }.sortedWith(primary.then(byName).thenBy { it.id })
-}
+fun queryDocs(docs: List<Doc>, sort: DocSort, query: String = "", kind: DocKind? = null): List<Doc> =
+    rustQueryDocs(docs.map(Doc::toRust), sort.toRust(), query, kind?.toRust()).map(RustDoc::toKotlin)
 
 /** The newest of these documents read as the mess menu. */
-fun List<Doc>.newestMessMenu(): Doc? = filter { it.asMessMenu }.maxByOrNull { it.addedAt }
-
-/** The index file, in Rust's [StoredDocIndex] shape: the sort and every document, newest last. */
-internal object DocIndex {
-    fun stored(sort: DocSort, docs: List<Doc>) = StoredDocIndex(
-        sort.name,
-        docs.map { d -> StoredDoc(d.id, d.name, d.file, d.uri, d.kind.name, d.size, d.source, d.addedAt, d.lastOpenedAt, d.asMessMenu, d.page, d.zoom.toDouble()) },
-    )
-
-    /** An unknown sort is the default; an unknown kind comes from the file name. */
-    fun of(index: StoredDocIndex): Pair<DocSort, List<Doc>> =
-        (DocSort.entries.firstOrNull { it.name == index.sort } ?: DocSort.RecentlyOpened) to index.docs.map { o ->
-            Doc(
-                o.id, o.name, o.file, o.uri, DocKind.entries.firstOrNull { it.name == o.kind } ?: DocKind.of(o.file),
-                o.size, o.source, o.addedAt, o.lastOpenedAt, o.asMessMenu, o.page, o.zoom.toFloat(),
-            )
-        }
-
-    fun encode(sort: DocSort, docs: List<Doc>): String = encodeDocIndex(stored(sort, docs))
-
-    /** Null when the file doesn't read (logged by Rust). */
-    fun decode(raw: String): Pair<DocSort, List<Doc>>? = decodeDocIndex(raw)?.let(::of)
-}
+fun List<Doc>.newestMessMenu(): Doc? = rustNewestMessMenu(map(Doc::toRust))?.toKotlin()
 
 /**
  * The app's view of the files it saved for the student (VTOP downloads, outing passes, imported
- * files): each lives only in the download folder ([Downloads]); `files/docs/index.json` keeps the
- * names, sources and viewer state; the Flutter app's Docs repository and `download_to_docs.dart`.
- * Any feature saves with [save] or [keep]. Log src `docs`: counts, sizes and kinds only, never
- * file names.
+ * files): each lives only in the download folder ([Downloads]); Rust owns `files/docs/index.json`
+ * and every mutation on it, while Kotlin owns SAF and file I/O and calls Rust after each SAF write
+ * or delete. Log src `docs`: counts, sizes and kinds only, never file names.
  */
 object Docs {
     /** Safety re-check interval in case an OEM removes a cancelled download without broadcasting. */
     private const val DOWNLOAD_RECHECK_MS = 30_000L
 
-    // Compose state, written only under [lock] (after [ready]), so no change is lost; [sort] is
-    // shown at once and written under it.
     private val state = mutableStateOf<List<Doc>>(emptyList())
     private val sortState = mutableStateOf(DocSort.RecentlyOpened)
     private val lock = Mutex()
@@ -167,7 +133,7 @@ object Docs {
     private val pickedSort = AtomicReference<DocSort?>(null)
 
     /**
-     * The library's sort, kept in the index. A pick shows at once; the write that follows saves
+     * The library's sort, kept in Rust's index. A pick shows at once; the write that follows saves
      * the latest pick, so quick picks land in the order they were made.
      */
     var sort: DocSort
@@ -181,15 +147,15 @@ object Docs {
                     // Null: a later pick's write already saved it.
                     val latest = pickedSort.getAndSet(null) ?: return@withLock
                     sortState.value = latest
-                    write()
+                    flow("docs.sort") { f -> AppCore.await().docsSortSet(f, latest.toRust()) }
                 }
             }
         }
 
     /**
-     * Starts loading the index off the main thread, loads mess timings, moves documents still in
-     * app storage (from before) to the download folder, and resumes VTOP downloads still to copy;
-     * later calls do nothing.
+     * Starts loading the index from Rust off the main thread, loads mess timings, moves documents
+     * still in app storage (from before) to the download folder, and resumes VTOP downloads still
+     * to copy; later calls do nothing.
      */
     @Synchronized
     fun init(context: Context) {
@@ -205,14 +171,17 @@ object Docs {
         scope.launch {
             try {
                 lock.withLock {
-                    d.mkdirs()
-                    val index = File(d, "index.json")
-                    if (index.exists()) attempt { DocIndex.decode(index.readText()) ?: error("unreadable") }
-                        .onSuccess { (s, list) ->
-                            sortState.value = pickedSort.get() ?: s
-                            state.value = list
+                    attempt {
+                        flow("docs.init") { f ->
+                            val core = AppCore.await()
+                            val savedSort = core.docsSort(f).toKotlin()
+                            val picked = pickedSort.getAndSet(null)
+                            val activeSort = picked ?: savedSort
+                            if (picked != null) core.docsSortSet(f, picked.toRust())
+                            sortState.value = activeSort
+                            state.value = core.docs(f).map(RustDoc::toKotlin)
                         }
-                        .onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }
+                    }.onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }
                 }
             } finally {
                 ready.complete(Unit)
@@ -397,22 +366,27 @@ object Docs {
         }
     }
 
-    suspend fun rename(id: String, name: String) = update(id) { it.copy(name = name.trim().ifEmpty { it.name }) }
+    suspend fun rename(id: String, name: String) = mutate("docs.rename") { core, f -> core.docRename(f, id, name) }
 
-    suspend fun setMessMenu(id: String, on: Boolean) = update(id) { it.copy(asMessMenu = on) }
+    suspend fun setMessMenu(id: String, on: Boolean) = mutate("docs.mess_menu") { core, f -> core.docSetMessMenu(f, id, on) }
 
-    suspend fun opened(id: String) = update(id) { it.copy(lastOpenedAt = System.currentTimeMillis()) }
+    suspend fun opened(id: String) = mutate("docs.opened") { core, f -> core.docOpened(f, id, System.currentTimeMillis()) }
 
-    suspend fun saveView(id: String, page: Int, zoom: Float) = update(id) { it.copy(page = page, zoom = zoom) }
+    suspend fun saveView(id: String, page: Int, zoom: Float) = mutate("docs.view") { core, f -> core.docSaveView(f, id, page, zoom.toDouble()) }
 
-    /** Removes [id] from Docs and its file from the download folder. */
+    /** Removes [id]'s file from the download folder first, then drops [id] from Rust's index. */
     suspend fun remove(id: String) {
         ready.await()
         lock.withLock {
             val doc = docs.firstOrNull { it.id == id } ?: return@withLock
             uriOf(doc)?.let { Downloads.delete(it) }
-            state.value = docs - doc
-            write()
+            flow("docs.remove") { f ->
+                val core = AppCore.await()
+                withContext(Dispatchers.IO) {
+                    core.docRemove(f, id)
+                    state.value = core.docs(f).map(RustDoc::toKotlin)
+                }
+            }
         }
     }
 
@@ -475,9 +449,9 @@ object Docs {
                 source,
                 System.currentTimeMillis(),
             )
-            // A [refresh] meanwhile may have picked the new file up from the folder already.
-            state.value = docs.filterNot { it.id == doc.id || it.uri == doc.uri } + doc
-            write()
+            val core = AppCore.await()
+            val updated = withContext(Dispatchers.IO) { core.docAdd(flow ?: "docs.save", doc.toRust()) }
+            state.value = updated.map(RustDoc::toKotlin)
             Log.info("docs", "saved", flow, mapOf("kind" to doc.kind.name, "bytes" to "${doc.size}", "source" to source, "count" to "${docs.size}"))
             doc
         }
@@ -485,38 +459,21 @@ object Docs {
 
     /**
      * Catches up with what the student did in the download folder outside the app (Docs opened):
-     * a file deleted there leaves Docs, a file added there joins it (source `folder`), and a file
-     * renamed there keeps its document (matched by size and kind), with the new name. Lazy: only
-     * when Docs is opened, never in the background. Log src `docs`: counts only.
+     * lists SAF entries and lets Rust reconcile removed, renamed and newly added files.
      */
     suspend fun refresh() {
         ready.await()
         val files = withContext(Dispatchers.IO) { Downloads.list() } ?: return
         lock.withLock {
-            val byUri = files.associateBy { it.uri }
-            val known = docs.mapNotNull { it.uri }.toSet()
-            val added = files.filter { it.uri !in known }.toMutableList()
-            var renamed = 0
-            var removed = 0
-            val kept = docs.mapNotNull { d ->
-                val file = byUri[d.uri ?: return@mapNotNull d]
-                when {
-                    file != null -> if (file.name == d.file) d else d.copy(file = file.name, name = file.name.substringBeforeLast('.'), kind = DocKind.of(file.name))
-                    else -> added.firstOrNull { it.size == d.size && DocKind.of(it.name) == d.kind }?.let { moved ->
-                        added -= moved
-                        renamed++
-                        d.copy(uri = moved.uri, file = moved.name, name = moved.name.substringBeforeLast('.').ifEmpty { moved.name })
-                    } ?: run { removed++; null }
+            flow("docs.refresh") { f ->
+                val core = AppCore.await()
+                val res = withContext(Dispatchers.IO) {
+                    core.docsReconcile(f, files.map { FolderFile(it.uri, it.name, it.size) }, System.currentTimeMillis())
                 }
+                if (!res.changed) return@flow
+                state.value = res.docs.map(RustDoc::toKotlin)
+                Log.info("docs", "folder caught up", f, mapOf("removed" to "${res.removed}", "renamed" to "${res.renamed}", "added" to "${res.added}", "count" to "${docs.size}"))
             }
-            val now = System.currentTimeMillis()
-            val joined = added.mapIndexed { i, f ->
-                Doc("doc-$now-${counter++}-$i", f.name.substringBeforeLast('.').ifEmpty { f.name }, f.name, f.uri, DocKind.of(f.name), f.size, "folder", now)
-            }
-            if (removed == 0 && renamed == 0 && joined.isEmpty() && kept == docs) return
-            state.value = kept + joined
-            write()
-            Log.info("docs", "folder caught up", fields = mapOf("removed" to "$removed", "renamed" to "$renamed", "added" to "${joined.size}", "count" to "${docs.size}"))
         }
     }
 
@@ -524,8 +481,10 @@ object Docs {
     private suspend fun remap(moves: Map<String, String>) {
         ready.await()
         lock.withLock {
-            state.value = docs.map { d -> d.uri?.let(moves::get)?.let { d.copy(uri = it) } ?: d }
-            write()
+            flow("docs.remap") { f ->
+                val core = AppCore.await()
+                state.value = withContext(Dispatchers.IO) { core.docsRemap(f, moves) }.map(RustDoc::toKotlin)
+            }
         }
     }
 
@@ -561,8 +520,9 @@ object Docs {
             lock.withLock {
                 val byId = moved.associateBy { it.id }
                 // Gone everywhere: dropped. Still in app storage after a failed write: kept for next time.
-                state.value = docs.mapNotNull { doc -> if (doc.uri != null) doc else byId[doc.id] ?: doc.takeIf { File(d, it.file).exists() } }
-                write()
+                val next = docs.mapNotNull { doc -> if (doc.uri != null) doc else byId[doc.id] ?: doc.takeIf { File(d, it.file).exists() } }
+                val core = AppCore.await()
+                state.value = withContext(Dispatchers.IO) { core.docsReplaceAll(f, next.map(Doc::toRust)) }.map(RustDoc::toKotlin)
             }
             // Only the index stays in app storage.
             val keep = docs.filter { it.uri == null }.map { it.file.substringBefore('/') }.toSet()
@@ -571,17 +531,77 @@ object Docs {
         }
     }
 
-    private suspend fun update(id: String, change: (Doc) -> Doc) {
+    private suspend fun mutate(flowName: String, op: (vitapmate.core.Core, String) -> List<RustDoc>) {
         ready.await()
         lock.withLock {
-            if (docs.none { it.id == id }) return@withLock
-            state.value = docs.map { if (it.id == id) change(it) else it }
-            write()
+            flow(flowName) { f ->
+                val core = AppCore.await()
+                state.value = withContext(Dispatchers.IO) { op(core, f) }.map(RustDoc::toKotlin)
+            }
         }
     }
-
-    private suspend fun write() = withContext(Dispatchers.IO) {
-        val d = dir ?: return@withContext
-        File(d, "index.json").writeAtomically(DocIndex.encode(sort, docs).toByteArray())
-    }
 }
+
+private fun RustDocKind.toKotlin(): DocKind = when (this) {
+    RustDocKind.PDF -> DocKind.Pdf
+    RustDocKind.IMAGE -> DocKind.Image
+    RustDocKind.SPREADSHEET -> DocKind.Spreadsheet
+    RustDocKind.TEXT -> DocKind.Text
+    RustDocKind.FILE -> DocKind.File
+}
+
+private fun DocKind.toRust(): RustDocKind = when (this) {
+    DocKind.Pdf -> RustDocKind.PDF
+    DocKind.Image -> RustDocKind.IMAGE
+    DocKind.Spreadsheet -> RustDocKind.SPREADSHEET
+    DocKind.Text -> RustDocKind.TEXT
+    DocKind.File -> RustDocKind.FILE
+}
+
+private fun RustDocSort.toKotlin(): DocSort = when (this) {
+    RustDocSort.RECENTLY_OPENED -> DocSort.RecentlyOpened
+    RustDocSort.RECENTLY_ADDED -> DocSort.RecentlyAdded
+    RustDocSort.NAME_ASCENDING -> DocSort.NameAscending
+    RustDocSort.NAME_DESCENDING -> DocSort.NameDescending
+    RustDocSort.LARGEST -> DocSort.Largest
+    RustDocSort.TYPE -> DocSort.Type
+}
+
+private fun DocSort.toRust(): RustDocSort = when (this) {
+    DocSort.RecentlyOpened -> RustDocSort.RECENTLY_OPENED
+    DocSort.RecentlyAdded -> RustDocSort.RECENTLY_ADDED
+    DocSort.NameAscending -> RustDocSort.NAME_ASCENDING
+    DocSort.NameDescending -> RustDocSort.NAME_DESCENDING
+    DocSort.Largest -> RustDocSort.LARGEST
+    DocSort.Type -> RustDocSort.TYPE
+}
+
+private fun RustDoc.toKotlin(): Doc = Doc(
+    id = id,
+    name = name,
+    file = file,
+    uri = uri,
+    kind = kind.toKotlin(),
+    size = size,
+    source = source,
+    addedAt = addedAt,
+    lastOpenedAt = lastOpenedAt,
+    asMessMenu = asMessMenu,
+    page = page,
+    zoom = zoom.toFloat(),
+)
+
+private fun Doc.toRust(): RustDoc = RustDoc(
+    id = id,
+    name = name,
+    file = file,
+    uri = uri,
+    kind = kind.toRust(),
+    size = size,
+    source = source,
+    addedAt = addedAt,
+    lastOpenedAt = lastOpenedAt,
+    asMessMenu = asMessMenu,
+    page = page,
+    zoom = zoom.toDouble(),
+)

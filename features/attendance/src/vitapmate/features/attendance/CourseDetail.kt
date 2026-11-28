@@ -10,6 +10,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Calculator
 import com.composables.icons.lucide.List
 import com.composables.icons.lucide.RefreshCw
+import vitapmate.core.PageId
 import vitapmate.data.Histories
 import vitapmate.data.PageActivity
 import vitapmate.data.PageState
@@ -83,13 +84,7 @@ private enum class DetailTab(val label: String) { Overview("Overview"), Calculat
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun CourseDetail(key: String, title: String? = null) {
-    val page = rememberPage(
-        "attendance_detail",
-        { core, flow -> core.cachedAttendanceDetail(flow, key) },
-        { core, flow -> core.fetchAttendanceDetail(flow, key) },
-        { it.updatedAt },
-        item = key,
-    ) { it.classes.size }
+    val page = rememberPage(PageId.ATTENDANCE_DETAIL, { core, flow -> core.cachedAttendanceDetail(flow, key) }, item = key)
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable(key) { mutableStateOf(DetailTab.Overview) }
     DisposableEffect(key) { onDispose { StateRegistry.remove("ui.attendance.detail") } }

@@ -29,14 +29,15 @@ import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
 import vitapmate.core.Core
+import vitapmate.core.PauseReason
+import vitapmate.core.SyncHealth
+import vitapmate.core.SyncKind
+import vitapmate.core.SyncOtp
 import vitapmate.data.AppCore
 import vitapmate.data.AppScope
 import vitapmate.data.OtpSource
-import vitapmate.data.PauseReason
 import vitapmate.data.Settings
 import vitapmate.data.StoreCap
-import vitapmate.data.SyncHealth
-import vitapmate.data.VtopSync
 import vitapmate.data.coreFlow
 import vitapmate.features.login.MailForwarding
 import vitapmate.features.login.OtpAutofill
@@ -46,9 +47,9 @@ import vitapmate.observability.flow
 
 /**
  * Settings → Background sync: a WorkManager job every [Settings.syncHours] (on a network) that
- * fetches VTOP's pages ([VtopSync]), so Rust records what changed, then notifies about the
+ * fetches VTOP's pages (`Core.sync`), so Rust records what changed, then notifies about the
  * changes of the kinds switched on. Offered only while OTP auto-fill works; a run whose OTP can't
- * be filled stops quietly and marks sync paused ([Settings.syncHealth]) until a run goes through.
+ * be filled stops quietly and marks sync paused (Rust's sync health) until a run goes through.
  * Flow `sync.background`, log src `sync`.
  */
 object BackgroundSync {
@@ -204,18 +205,21 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             MailForwarding.load("sync")
             if (!BackgroundSync.available()) {
                 val reason = if (OtpAutofill.selected() == OtpSource.Gmail) PauseReason.GmailReconnect else PauseReason.NotSetUp
-                Settings.syncHealth = SyncHealth.Paused(reason)
-                Log.info("sync", "skipped: ${reason.text}", f)
+                withContext(Dispatchers.IO) { AppCore.await().setSyncHealth(f, SyncHealth.Paused(reason)) }
+                Log.info("sync", "skipped: ${reason::class.simpleName}", f)
                 return@flow
             }
-            val result = VtopSync.run("sync.background.pages", "Background sync", everything = false, pageTimeoutMs = PAGE_TIMEOUT_MS, unattended = true) { e, id ->
-                val why = OtpAutofill.solve(id, e.issuedAt?.toLong())
-                Settings.syncHealth = Settings.syncHealth.afterOtp(why)
-                why == null
+            // Rust keeps the health: a rejected password pauses it, a run that fetched something clears it.
+            val otp = object : SyncOtp {
+                override suspend fun get(issuedAt: ULong?, flow: String): Boolean {
+                    val why = OtpAutofill.solve(flow, issuedAt?.toLong())
+                    withContext(Dispatchers.IO) { AppCore.await().syncHealthAfterOtp(flow, why) }
+                    return why == null
+                }
             }
-            if (result.outcome == VtopSync.Outcome.Rejected) Settings.syncHealth = SyncHealth.Paused(PauseReason.PasswordRejected)
-            // A run that fetched nothing (offline, VTOP down) says nothing about auto-fill working.
-            if (result.outcome == VtopSync.Outcome.Done && result.fetched > 0) Settings.syncHealth = SyncHealth.OK
+            val result = flow("sync.background.pages", unattended = true) { p ->
+                AppCore.await().sync(p, SyncKind.BACKGROUND, PAGE_TIMEOUT_MS.toULong(), otp)
+            }
             Widgets.refresh(app)
             CalendarSync.sync(app, unattended = true)
             // New changes since the last notification, of the kinds switched on.

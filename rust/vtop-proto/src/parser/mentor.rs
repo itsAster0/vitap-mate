@@ -34,7 +34,7 @@ pub fn parse_messages(html: &str) -> Vec<MentorMessage> {
         .pick(&TABLE)
         .flat_map(|table| {
             let mut rows = table.pick(&TR);
-            let headings = rows.next().map(|row| cells(&row)).unwrap_or_default();
+            let headings = rows.next().map_or_default(|row| cells(&row));
             rows.filter_map(move |row| {
                 let values = cells(&row);
                 if values.iter().all(String::is_empty) {

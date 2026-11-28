@@ -41,7 +41,7 @@ fn json(value: impl Serialize) -> VtopResult<Value> {
 }
 
 fn arg<'a>(args: &'a Args, name: &str) -> &'a str {
-    args.get(name).map(String::as_str).unwrap_or_default()
+    args.get(name).map_or_default(String::as_str)
 }
 
 /// Forces `call`'s signature, which a closure boxed straight away can't infer.

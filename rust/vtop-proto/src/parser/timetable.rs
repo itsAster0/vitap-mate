@@ -219,11 +219,10 @@ fn parse_grid(grid: ElementRef<'_>, registration: &Registration) -> Vec<Timetabl
 pub fn parse_timetable(html: &str, sem: &str) -> TimetableData {
     let document = Html::parse_document(html);
     let mut tables = document.pick(&TBODY);
-    let registration = tables.next().map(Registration::parse).unwrap_or_default();
+    let registration = tables.next().map_or_default(Registration::parse);
     let slots = tables
         .next()
-        .map(|grid| parse_grid(grid, &registration))
-        .unwrap_or_default();
+        .map_or_default(|grid| parse_grid(grid, &registration));
 
     TimetableData {
         slots,

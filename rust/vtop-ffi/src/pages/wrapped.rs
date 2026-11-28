@@ -853,8 +853,7 @@ impl Core {
         let class_days = calendar.class_days();
         let courses: Vec<AttendanceCourse> = self
             .read_page::<AttendanceData>(ATTENDANCE)
-            .map(|data| Attendance::from(data).courses)
-            .unwrap_or_default();
+            .map_or_default(|data| Attendance::from(data).courses);
         let classes: Vec<Taken> = courses
             .iter()
             .flat_map(|course| {
@@ -876,17 +875,14 @@ impl Core {
         let own_grades = self.cached_grades(flow.to_string(), semester_id.clone());
         // This semester's exam session in the grade history, and the one before it. Without its
         // own grades page (an old semester), its courses come from attendance or the timetable.
-        let (this, before) = history
-            .as_ref()
-            .map(|history| {
-                let own = own_grades
-                    .as_ref()
-                    .map(grade_codes)
-                    .filter(|own| !own.is_empty())
-                    .unwrap_or_else(|| codes.iter().map(|c| c.trim().to_uppercase()).collect());
-                sessions(history, &own, first_day, last_day)
-            })
-            .unwrap_or_default();
+        let (this, before) = history.as_ref().map_or_default(|history| {
+            let own = own_grades
+                .as_ref()
+                .map(grade_codes)
+                .filter(|own| !own.is_empty())
+                .unwrap_or_else(|| codes.iter().map(|c| c.trim().to_uppercase()).collect());
+            sessions(history, &own, first_day, last_day)
+        });
         let grades = grades(own_grades.as_ref(), history.as_ref(), this);
         let cgpa = history
             .as_ref()
@@ -935,8 +931,7 @@ impl Core {
                 .semesters
                 .iter()
                 .find(|semester| semester.id == semester_id)
-                .map(|semester| semester.name.clone())
-                .unwrap_or_default(),
+                .map_or_default(|semester| semester.name.clone()),
             semester_id,
             first_day,
             last_day,
@@ -1126,8 +1121,7 @@ impl Core {
     /// The selected semester's class days from its cached calendar.
     fn class_days(&self) -> Vec<i32> {
         self.read_page::<AcademicCalendarData>(CALENDAR)
-            .map(|data| SemesterCalendar::of(&data).class_days())
-            .unwrap_or_default()
+            .map_or_default(|data| SemesterCalendar::of(&data).class_days())
     }
 
     /// The semester after the pick in VTOP's list (newest first): its id and name.

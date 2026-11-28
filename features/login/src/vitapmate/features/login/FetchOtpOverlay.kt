@@ -46,7 +46,7 @@ fun FetchOtpOverlay() {
                     Log.warn("ui.otp", "otp failed: ${e::class.simpleName}", challenge.lastFlow)
                     OtpPrompt.cancel()
                     // Cancel on the cookie dialog was the student's choice: nothing to say.
-                    problemOf(e, challenge.lastFlow).takeIf { it.kind != ProblemKind.ConsentDenied }
+                    problemOf(e, challenge.lastFlow).takeIf { it.kind != ProblemKind.CONSENT_DENIED }
                         ?.let { showToast(it.title, it.message, tone = ToastTone.Error) }
                 }
             }

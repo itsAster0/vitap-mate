@@ -21,7 +21,6 @@ async-trait = "0.1"
 base64 = "0.23.1"
 brotli = "9"
 aes-gcm = "0.11"
-sha2 = "0.11"
 futures = "0.3"
 tower-http = { version = "0.7", default-features = false, features = ["compression-br", "compression-gzip"] }
 

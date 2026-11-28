@@ -286,7 +286,7 @@ private suspend fun fetchMissing(f: String, semester: String, report: WrappedRep
         Log.warn("ui.wrapped", "fetch failed, left out", f, mapOf("page" to page, "error" to (e::class.simpleName ?: "Throwable"), "kind" to p.kind.name))
         if (first == null) first = p
         askedOtp(e)
-        p.kind == ProblemKind.Unexpected
+        p.kind == ProblemKind.UNEXPECTED
     }
     suspend fun <T> cached(read: (Core) -> T): T = withContext(Dispatchers.IO) { read(core) }
     val maxAge = Settings.tunable(Tunable.WrappedRefetch) * 3600L

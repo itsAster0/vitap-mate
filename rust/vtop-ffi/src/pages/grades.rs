@@ -374,8 +374,7 @@ impl Core {
         traced_sync("planner_courses", &flow, || {
             let courses = self
                 .read_page::<TimetableData>(TIMETABLE)
-                .map(|data| plan_courses(&data))
-                .unwrap_or_default();
+                .map_or_default(|data| plan_courses(&data));
             info!(courses = courses.len(), "planner courses");
             Ok(courses)
         })

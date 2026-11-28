@@ -57,7 +57,7 @@ pub fn parse_calendar_month(html: &str, cal_date: &str) -> Vec<CalendarEntry> {
                 continue;
             }
             let (kind, group) = event.rsplit_once(" - ").unwrap_or((event, ""));
-            let note = pair.get(1).map(String::as_str).unwrap_or_default();
+            let note = pair.get(1).map_or_default(String::as_str);
             let note = note
                 .strip_prefix('(')
                 .and_then(|note| note.strip_suffix(')'))

@@ -1,52 +1,53 @@
 package vitapmate.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.compose.runtime.mutableStateMapOf
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
-import kotlin.reflect.KProperty
 import vitapmate.core.ChangeKind
+import vitapmate.core.PrefValue
+import vitapmate.core.SettingChange
+import vitapmate.core.SettingsListener
+import vitapmate.core.SettingsStore
+import vitapmate.core.TunableInfo
+import vitapmate.core.TunableKey
+import vitapmate.core.settingsPrefKeys
+import vitapmate.core.tunables
+import vitapmate.observability.Log
+import vitapmate.core.OtpSource as RustOtpSource
+import vitapmate.core.Settings as RustSettings
+import vitapmate.core.ThemeMode as RustThemeMode
+import vitapmate.core.TimetableViewMode as RustTimetableViewMode
 
 /** The display sizes offered, in percent of the app's own fit (100); 0 follows the phone's display size. */
 val DISPLAY_SIZES = listOf(0, 90, 100, 110)
 
-/** App settings (SharedPreferences "settings", the Flutter app's keys) as Compose-observable state. */
+/**
+ * App settings as Compose-observable state, mirroring Rust's [SettingsStore] (`files/settings.json`).
+ * Rust is the single owner; this object holds a view of the last snapshot and forwards every write.
+ */
 object Settings {
-    @Volatile private var prefs: SharedPreferences? = null
-    private val all = mutableListOf<Pref<*>>()
-    private val tuned = mutableStateMapOf<Tunable, Int>()
-    private val notifyOff = mutableStateMapOf<ChangeKind, Boolean>()
+    @Volatile private var store: SettingsStore? = null
+    @Volatile private var tunableMap: Map<TunableKey, TunableInfo>? = null
+    private val state = mutableStateOf(defaultRustSettings())
 
-    /** One saved value: Compose state, read by [load] and written through on every set. */
-    private class Pref<T>(val key: String, val default: T, val read: SharedPreferences.(String, T) -> T, val write: SharedPreferences.Editor.(String, T) -> Unit) {
-        val state = mutableStateOf(default)
-        operator fun getValue(owner: Any?, property: KProperty<*>): T = state.value
-        operator fun setValue(owner: Any?, property: KProperty<*>, value: T) {
-            state.value = value
-            prefs?.edit { write(key, value) }
-        }
-        fun load(p: SharedPreferences) { state.value = p.read(key, default) }
+    const val WALLPAPER = "wallpaper"
+
+    private fun applyChange(change: SettingChange, fallback: (RustSettings) -> RustSettings) {
+        val s = store
+        state.value = if (s != null) s.set(change) else fallback(state.value)
     }
 
-    private fun <T> pref(key: String, default: T, read: SharedPreferences.(String, T) -> T, write: SharedPreferences.Editor.(String, T) -> Unit) =
-        Pref(key, default, read, write).also { all += it }
-
-    private fun flag(key: String, default: Boolean) = pref(key, default, { k, d -> getBoolean(k, d) }, { k, v -> putBoolean(k, v) })
-
-    private fun text(key: String) = pref<String?>(key, null, { k, d -> getString(k, d) }, { k, v -> putString(k, v) })
-
-    private fun ids(key: String) = pref<Set<String>>(key, emptySet(), { k, d -> getStringSet(k, d)?.toSet() ?: d }, { k, v -> putStringSet(k, v) })
-
-    /** An enum saved as its lowercase name. */
-    private fun <T : Enum<*>?> choice(key: String, default: T, entries: List<T & Any>) =
-        pref(key, default, { k, d -> entries.firstOrNull { it.name.lowercase() == getString(k, null) } ?: d }, { k, v -> putString(k, v?.name?.lowercase()) })
-
     /** Whether attendance shows how many classes can be skipped. */
-    var showSkipAdvice by flag("settings_show_skip_advice", false)
+    var showSkipAdvice: Boolean
+        get() = state.value.showSkipAdvice
+        set(value) = applyChange(SettingChange.ShowSkipAdvice(value)) { it.copy(showSkipAdvice = value) }
 
     /** Whether app-computed totals, GPAs, projections, cross-page joins and calculators are shown. */
-    var calculatedInsights by flag("settings_calculated_insights", false)
+    var calculatedInsights: Boolean
+        get() = state.value.calculatedInsights
+        set(value) = applyChange(SettingChange.CalculatedInsights(value)) { it.copy(calculatedInsights = value) }
 
     /** Whether skip advice is active: requires [calculatedInsights] to be on too. */
     val effectiveSkipAdvice: Boolean get() = calculatedInsights && showSkipAdvice
@@ -55,246 +56,386 @@ object Settings {
      * Whether Connected apps' note "storage stayed on because you saved your password" was read
      * (or the student chose storage there): it shows once.
      */
-    var storageNoteSeen by flag("settings_storage_note_seen", false)
+    var storageNoteSeen: Boolean
+        get() = state.value.storageNoteSeen
+        set(value) = applyChange(SettingChange.StorageNoteSeen(value)) { it.copy(storageNoteSeen = value) }
 
     /**
      * Which one fills in VTOP's OTP: one at a time. Set when one is set up or connected, or chosen
      * with "Use this for OTPs"; null before either is. The other stays set up, on standby.
      */
-    var otpSource by choice<OtpSource?>("settings_otp_source", null, OtpSource.entries)
+    var otpSource: OtpSource?
+        get() = state.value.otpSource?.toKotlin()
+        set(value) = applyChange(SettingChange.OtpSource(value?.toRust())) { it.copy(otpSource = value?.toRust()) }
 
     /** Haptic feedback on taps, toggles, refreshes and results (the system's touch feedback setting still applies). */
-    var haptics by flag("settings_haptics", true)
+    var haptics: Boolean
+        get() = state.value.haptics
+        set(value) = applyChange(SettingChange.Haptics(value)) { it.copy(haptics = value) }
 
     /**
      * The Flutter app's "Auto Refresh": pages fetch on their own (on open, when old, on return to
      * the app, the open-app sweep). Off, only a page with nothing saved fetches by itself.
      */
-    var autoRefresh by flag("settings_auto_refresh", true)
+    var autoRefresh: Boolean
+        get() = state.value.autoRefresh
+        set(value) = applyChange(SettingChange.AutoRefresh(value)) { it.copy(autoRefresh = value) }
 
     /** Failures of work the student didn't ask for (auto refresh, the sweep) show as toasts too; off, they only log. */
-    var showBackgroundErrors by flag("settings_show_background_errors", false)
+    var showBackgroundErrors: Boolean
+        get() = state.value.showBackgroundErrors
+        set(value) = applyChange(SettingChange.ShowBackgroundErrors(value)) { it.copy(showBackgroundErrors = value) }
 
     /** The timetable's view; the Flutter app's key and values (anything else, like the removed "daily" view, opens the agenda). */
-    var timetableView by choice("settings_timetable_view_mode", TimetableViewMode.Agenda, TimetableViewMode.entries)
+    var timetableView: TimetableViewMode
+        get() = state.value.timetableView.toKotlin()
+        set(value) = applyChange(SettingChange.TimetableView(value.toRust())) { it.copy(timetableView = value.toRust()) }
 
     /** Light, dark, or as the phone is set. */
-    var themeMode by choice("settings_theme_mode", ThemeMode.System, ThemeMode.entries)
+    var themeMode: ThemeMode
+        get() = state.value.themeMode.toKotlin()
+        set(value) = applyChange(SettingChange.ThemeMode(value.toRust())) { it.copy(themeMode = value.toRust()) }
 
     /** The colours: [WALLPAPER], a palette's name (the design module's `Palette`), or null for the default. */
-    var colorChoice by pref<String?>(
-        "settings_colors",
-        null,
-        // The old wallpaper switch carries over.
-        { k, d -> getString(k, d) ?: WALLPAPER.takeIf { getBoolean("settings_dynamic_color", false) } },
-        { k, v -> putString(k, v) },
-    )
-
-    const val WALLPAPER = "wallpaper"
+    var colorChoice: String?
+        get() = state.value.colorChoice
+        set(value) = applyChange(SettingChange.ColorChoice(value)) { it.copy(colorChoice = value) }
 
     /** Black backgrounds in dark mode (OLED screens). */
-    var pureBlack by flag("settings_pure_black", false)
+    var pureBlack: Boolean
+        get() = state.value.pureBlack
+        set(value) = applyChange(SettingChange.PureBlack(value)) { it.copy(pureBlack = value) }
 
     /** Settings → Appearance → Display size: one of [DISPLAY_SIZES]. */
-    var displaySize by pref("settings_display_size", 100, { k, d -> getInt(k, d).takeIf { it in DISPLAY_SIZES } ?: d }, { k, v -> putInt(k, v) })
+    var displaySize: Int
+        get() = state.value.displaySize
+        set(value) {
+            val valid = value.takeIf { it in DISPLAY_SIZES } ?: 100
+            applyChange(SettingChange.DisplaySize(valid)) { it.copy(displaySize = valid) }
+        }
 
     /** The student's chosen avatar photo (a file in the app's private files), or null for the initial. */
-    var avatarPath by text("settings_avatar_path")
-
-    private var tabs by pref("settings_nav_tabs", NavTabs.DEFAULT, { k, _ -> NavTabs.decode(getString(k, null)) }, { k, v -> putString(k, NavTabs.encode(v)) })
+    var avatarPath: String?
+        get() = state.value.avatarPath
+        set(value) = applyChange(SettingChange.AvatarPath(value)) { it.copy(avatarPath = value) }
 
     /**
-     * The nav bar's tabs, feature ids in order (rules in [NavTabs]: at most 4, always "more").
+     * The nav bar's tabs, feature ids in order (rules in [NavTabs]: at most 5, always "more").
      * Ids of features that no longer exist may be in it; the app skips them.
      */
-    val navTabs: List<String> get() = tabs
+    val navTabs: List<String> get() = state.value.navTabs
 
-    fun setNavTabs(ids: List<String>) { tabs = NavTabs.normalize(ids) }
+    fun setNavTabs(ids: List<String>) {
+        val next = NavTabs.normalize(ids)
+        applyChange(SettingChange.NavTabs(next)) { it.copy(navTabs = next) }
+    }
 
-    /** Pins [id]; false when the bar is full (4) and nothing changed. */
-    fun addNavTab(id: String): Boolean = (id in navTabs || navTabs.size < NavTabs.MAX).also { tabs = NavTabs.add(navTabs, id) }
+    /** Pins [id]; false when the bar is full and nothing changed. */
+    fun addNavTab(id: String): Boolean {
+        val current = navTabs
+        val ok = id in current || current.size < NavTabs.MAX
+        setNavTabs(NavTabs.add(current, id))
+        return ok
+    }
 
-    fun removeNavTab(id: String) { tabs = NavTabs.remove(navTabs, id) }
+    fun removeNavTab(id: String) = setNavTabs(NavTabs.remove(navTabs, id))
 
-    fun moveNavTab(id: String, to: Int) { tabs = NavTabs.move(navTabs, id, to) }
+    fun moveNavTab(id: String, to: Int) = setNavTabs(NavTabs.move(navTabs, id, to))
 
     /**
      * Developer listed in Settings, as on Android: turned on by tapping the version 7 times,
      * off from the switch at the top of Developer. Kept across launches.
      */
-    var developerEnabled by flag("dev_always_show", false)
+    var developerEnabled: Boolean
+        get() = state.value.developerEnabled
+        set(value) = applyChange(SettingChange.DeveloperEnabled(value)) { it.copy(developerEnabled = value) }
 
     /** Developer → Inspect Traffic: from the next launch, VTOP requests use the Wi-Fi proxy and trust user CAs. */
-    var inspectTraffic by flag("dev_inspect_traffic", false)
+    var inspectTraffic: Boolean
+        get() = state.value.inspectTraffic
+        set(value) = applyChange(SettingChange.InspectTraffic(value)) { it.copy(inspectTraffic = value) }
 
     /**
      * Developer → HttpEngine, on by default: from the next launch, on Android 14+ (where the
      * phone has HttpEngine) and with Inspect Traffic off, requests go through [VtopHttpEngine]
      * (HTTP/3 where the server offers it); otherwise the platform's HttpURLConnection.
      */
-    var httpEngine by flag("dev_http_engine", true)
+    var httpEngine: Boolean
+        get() = state.value.httpEngine
+        set(value) = applyChange(SettingChange.HttpEngine(value)) { it.copy(httpEngine = value) }
 
     /**
      * Background sync (WorkManager, every [syncHours]): off by default, and offered only while OTP
      * auto-fill works, since nobody can type a code in the background.
      */
-    var backgroundSync by flag("settings_background_sync", false)
+    var backgroundSync: Boolean
+        get() = state.value.backgroundSync
+        set(value) = applyChange(SettingChange.BackgroundSync(value)) { it.copy(backgroundSync = value) }
 
     /** Live updates (Android 16+): the class on now and outing requests as promoted notifications; off by default. */
-    var liveUpdates by flag("settings_live_updates", false)
+    var liveUpdates: Boolean
+        get() = state.value.liveUpdates
+        set(value) = applyChange(SettingChange.LiveUpdates(value)) { it.copy(liveUpdates = value) }
 
     /** In class: Do Not Disturb while a class or exam is on (ClassMode); off by default. */
-    var classMode by flag("settings_class_mode", false)
+    var classMode: Boolean
+        get() = state.value.classMode
+        set(value) = applyChange(SettingChange.ClassMode(value)) { it.copy(classMode = value) }
 
     /** Assistant (Android 16+): the saved timetable and attendance for Android's app functions; off by default. */
-    var assistant by flag("settings_assistant", false)
+    var assistant: Boolean
+        get() = state.value.assistant
+        set(value) = applyChange(SettingChange.Assistant(value)) { it.copy(assistant = value) }
 
     /** Calendar: classes, exams and the academic calendar in a calendar on the phone (app's CalendarSync); off by default. */
-    var calendarSync by flag("settings_calendar_sync", false)
+    var calendarSync: Boolean
+        get() = state.value.calendarSync
+        set(value) = applyChange(SettingChange.CalendarSync(value)) { it.copy(calendarSync = value) }
 
     /** The setup page after the first semester pick (app's Onboarding) was seen; shown once per install. */
-    var onboarded by flag("settings_onboarded", false)
+    var onboarded: Boolean
+        get() = state.value.onboarded
+        set(value) = applyChange(SettingChange.Onboarded(value)) { it.copy(onboarded = value) }
 
     /** A semester was picked the first time, and the setup page that follows isn't done yet. */
-    var onboardingPending by flag("settings_onboarding_pending", false)
+    var onboardingPending: Boolean
+        get() = state.value.onboardingPending
+        set(value) = applyChange(SettingChange.OnboardingPending(value)) { it.copy(onboardingPending = value) }
 
     /**
      * The student (their username, as [AccountWatch] names them) whose things Kotlin keeps:
      * the rest of these settings, their photo and Gmail grant. Another one signing in lets go
      * of them; null signed out, or from before this was kept.
      */
-    var student by text("settings_student")
+    var student: String?
+        get() = state.value.student
+        set(value) = applyChange(SettingChange.Student(value)) { it.copy(student = value) }
 
     /** Semester ids whose Wrapped was opened. */
-    var wrappedSeen by ids("settings_wrapped_seen")
+    var wrappedSeen: Set<String>
+        get() = state.value.wrappedSeen.toSet()
+        set(value) {
+            val sorted = value.sorted()
+            applyChange(SettingChange.WrappedSeen(sorted)) { it.copy(wrappedSeen = sorted) }
+        }
 
     /** Semester ids whose Wrapped share images hide grades and marks. */
-    var wrappedHideGrades by ids("settings_wrapped_hide_grades")
+    var wrappedHideGrades: Set<String>
+        get() = state.value.wrappedHideGrades.toSet()
+        set(value) {
+            val sorted = value.sorted()
+            applyChange(SettingChange.WrappedHideGrades(sorted)) { it.copy(wrappedHideGrades = sorted) }
+        }
 
     /** Wrapped share images leave out the first name. */
-    var wrappedHideName by flag("settings_wrapped_hide_name", false)
+    var wrappedHideName: Boolean
+        get() = state.value.wrappedHideName
+        set(value) = applyChange(SettingChange.WrappedHideName(value)) { it.copy(wrappedHideName = value) }
 
     /** Wrapped share images leave out hostel times and outings. */
-    var wrappedHideHostel by flag("settings_wrapped_hide_hostel", false)
+    var wrappedHideHostel: Boolean
+        get() = state.value.wrappedHideHostel
+        set(value) = applyChange(SettingChange.WrappedHideHostel(value)) { it.copy(wrappedHideHostel = value) }
 
     /** Hours between background syncs, one of [SYNC_HOURS]. */
-    var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
-
-    /**
-     * How background sync stands: paused when a background run couldn't finish the OTP (no code
-     * coming only after two runs in a row), until the next good run. The reason's id is saved
-     * where older apps kept its text; the miss count beside it.
-     */
-    var syncHealth by pref(
-        "settings_sync_paused",
-        SyncHealth.OK,
-        { k, _ -> SyncHealth.parse(getString(k, null), getInt(SYNC_MISSES, 0)) },
-        { k, v ->
-            when (v) {
-                is SyncHealth.Active -> remove(k).putInt(SYNC_MISSES, v.otpMisses)
-                is SyncHealth.Paused -> putString(k, v.reason.id).remove(SYNC_MISSES)
-            }
-        },
-    )
-
-    private const val SYNC_MISSES = "settings_sync_otp_misses"
-
-    /** The course part background sync last checked for new files ([VtopSync]). */
-    var syncCourse by text("settings_sync_course")
+    var syncHours: Int
+        get() = state.value.syncHours
+        set(value) {
+            val valid = value.takeIf { it in SYNC_HOURS } ?: SYNC_HOURS_DEFAULT
+            applyChange(SettingChange.SyncHours(valid)) { it.copy(syncHours = valid) }
+        }
 
     /**
      * Forgets what was set up for the student who signed out or was replaced: the OTP source
      * (their Gmail or address), background sync built on it, and where sync left off. The caller
      * disconnects Gmail and re-applies the sync job.
      */
-    fun forgetStudent() {
-        otpSource = null
-        backgroundSync = false
-        syncHealth = SyncHealth.OK
-        syncCourse = null
-        wrappedSeen = emptySet()
-        wrappedHideGrades = emptySet()
-        wrappedHideName = false
-        wrappedHideHostel = false
-        storageNoteSeen = false
-        student = null
+    fun forgetStudent() = applyChange(SettingChange.ForgetStudent) {
+        it.copy(
+            otpSource = null,
+            backgroundSync = false,
+            syncPaused = null,
+            syncOtpMisses = 0,
+            syncCourse = null,
+            wrappedSeen = emptyList(),
+            wrappedHideGrades = emptyList(),
+            wrappedHideName = false,
+            wrappedHideHostel = false,
+            storageNoteSeen = false,
+            student = null,
+        )
     }
 
     /** Whether background sync notifies about changes of [kind]. */
-    fun notifies(kind: ChangeKind): Boolean = notifyOff[kind] != true
+    fun notifies(kind: ChangeKind): Boolean = kind !in state.value.notifyOff
 
-    fun setNotifies(kind: ChangeKind, on: Boolean) {
-        if (on) notifyOff.remove(kind) else notifyOff[kind] = true
-        prefs?.edit { putBoolean(notifyKey(kind), on) }
+    fun setNotifies(kind: ChangeKind, on: Boolean) = applyChange(SettingChange.Notifies(kind, on)) { current ->
+        val next = if (on) current.notifyOff - kind else (current.notifyOff + kind).distinct()
+        current.copy(notifyOff = next)
     }
 
-    /** `settings_notify_attendance`, ...: the key older apps saved under too. */
-    private fun notifyKey(kind: ChangeKind) = "settings_notify_${kind.name.lowercase()}"
-
     /** [t]'s value, in its unit. */
-    fun tunable(t: Tunable): Int = tuned[t] ?: t.default
+    fun tunable(t: Tunable): Int = state.value.tuned[t.key] ?: t.default
 
     /** Saves [value] (kept in [Tunable.range]) for [t]; null goes back to its default. */
-    fun setTunable(t: Tunable, value: Int?) {
-        val v = value?.coerceIn(t.range)
-        if (v == null || v == t.default) tuned.remove(t) else tuned[t] = v
-        prefs?.edit { if (v == null || v == t.default) remove(t.key) else putInt(t.key, v) }
+    fun setTunable(t: Tunable, value: Int?) = applyChange(SettingChange.Tunable(t.rustKey, value)) { current ->
+        val clamped = value?.coerceIn(t.range)
+        val next = current.tuned.toMutableMap()
+        if (clamped == null || clamped == t.default) next.remove(t.key) else next[t.key] = clamped
+        current.copy(tuned = next)
+    }
+
+    internal fun tunableInfo(key: TunableKey): TunableInfo? {
+        tunableMap?.let { return it[key] }
+        val loaded = runCatching { tunables().associateBy { it.key } }.getOrNull() ?: return null
+        tunableMap = loaded
+        return loaded[key]
     }
 
     /**
-     * Reads the saved values, once: every entry point (the activity, FCM, WorkManager, widgets,
-     * the tile) calls it first, on whatever thread it runs, and returns with them read.
+     * Opens Rust's [SettingsStore] synchronously and imports legacy SharedPreferences once if
+     * `settings.json` does not exist yet. Safe from any thread; later calls do nothing.
      */
     @Synchronized
     fun load(context: Context) {
-        if (prefs != null) return
-        val p = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        // Older apps counted missed codes in their own file.
-        val old = context.getSharedPreferences("sync", Context.MODE_PRIVATE)
-        if (old.contains("otp_misses")) {
-            p.edit { putInt(SYNC_MISSES, old.getInt("otp_misses", 0)) }
-            old.edit { remove("otp_misses") }
+        if (store != null) return
+        val app = context.applicationContext
+        val s = SettingsStore.open(app.filesDir.path)
+        tunableMap = tunables().associateBy { it.key }
+        if (s.needsImport()) {
+            val p = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val old = app.getSharedPreferences("sync", Context.MODE_PRIVATE)
+            val map = buildMap<String, PrefValue> {
+                p.all.forEach { (key, raw) -> toPrefValue(raw)?.let { put(key, it) } }
+                if (old.contains("otp_misses")) {
+                    put("settings_sync_otp_misses", PrefValue.Int(old.getInt("otp_misses", 0)))
+                }
+            }
+            runCatching { s.import(map) }
+                .onSuccess { imported ->
+                    state.value = imported
+                    // Clear only keys owned by Settings so other screens sharing "settings" prefs keep theirs.
+                    val ownedKeys = settingsPrefKeys()
+                    p.edit { ownedKeys.forEach(::remove) }
+                    if (old.contains("otp_misses")) old.edit { remove("otp_misses") }
+                }
+                .onFailure { e ->
+                    Log.warn("settings", "import failed: ${e::class.simpleName}")
+                    state.value = s.get()
+                }
+        } else {
+            state.value = s.get()
         }
-        all.forEach { it.load(p) }
-        Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
-        ChangeKind.entries.forEach { k -> if (!p.getBoolean(notifyKey(k), true)) notifyOff[k] = true }
-        // Set last: once [prefs] is there, every value has been read.
-        prefs = p
+        val main = Handler(Looper.getMainLooper())
+        s.setListener(object : SettingsListener {
+            override fun onSettings(settings: RustSettings) {
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    state.value = settings
+                } else {
+                    main.post { state.value = settings }
+                }
+            }
+        })
+        // Set last: once [store] is visible, every value has been read.
+        store = s
     }
 
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("calculatedInsights" to calculatedInsights, "showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "timetableView" to timetableView.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (syncHealth is SyncHealth.Paused), "notifyOff" to notifyOff.keys.map { it.name.lowercase() }.sorted()) +
+            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "calendarSync" to calendarSync, "syncHours" to syncHours, "syncPaused" to (SyncHealthState.pausedText != null), "notifyOff" to state.value.notifyOff.map { it.name.lowercase() }.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 
+private fun toPrefValue(raw: Any?): PrefValue? = when (raw) {
+    is Boolean -> PrefValue.Bool(raw)
+    is Int -> PrefValue.Int(raw)
+    is Long -> PrefValue.Long(raw)
+    is Float -> PrefValue.Float(raw)
+    is String -> PrefValue.Str(raw)
+    is Set<*> -> PrefValue.StrSet(raw.filterIsInstance<String>())
+    else -> null
+}
+
+private fun defaultRustSettings() = RustSettings(
+    showSkipAdvice = false,
+    calculatedInsights = false,
+    storageNoteSeen = false,
+    otpSource = null,
+    haptics = true,
+    autoRefresh = true,
+    showBackgroundErrors = false,
+    timetableView = RustTimetableViewMode.AGENDA,
+    themeMode = RustThemeMode.SYSTEM,
+    colorChoice = null,
+    pureBlack = false,
+    displaySize = 100,
+    avatarPath = null,
+    navTabs = NavTabs.DEFAULT,
+    developerEnabled = false,
+    inspectTraffic = false,
+    httpEngine = true,
+    backgroundSync = false,
+    liveUpdates = false,
+    classMode = false,
+    assistant = false,
+    calendarSync = false,
+    onboarded = false,
+    onboardingPending = false,
+    student = null,
+    wrappedSeen = emptyList(),
+    wrappedHideGrades = emptyList(),
+    wrappedHideName = false,
+    wrappedHideHostel = false,
+    syncHours = SYNC_HOURS_DEFAULT,
+    syncPaused = null,
+    syncOtpMisses = 0,
+    syncCourse = null,
+    notifyOff = emptyList(),
+    tuned = emptyMap(),
+)
+
 /**
- * A number tuned in Settings → Developer (the Flutter app's `Tunable`), in [unit]s ("h", "min",
- * "s"), kept in [range]; [default] is the built-in value. [note] says what it changes.
+ * A number tuned in Settings → Developer (the Flutter app's `Tunable`). Metadata (key, title,
+ * unit, default, range, note) is owned by Rust (`tunables()`); the fallback numbers exist only so
+ * host JVM unit tests without `libvtop_ffi.so` can still read defaults.
  */
-enum class Tunable(val key: String, val title: String, val unit: String, val default: Int, val range: IntRange, val note: String) {
-    PageMaxAge("dev_page_max_age_h", "Page max age", "h", 6, 1..168, "Older pages fetch again on open and on return"),
-    JustFetched("dev_just_fetched_min", "Just fetched", "min", 10, 0..120, "A page that finished this recently while away isn't fetched again"),
-    CalendarMaxAge("dev_calendar_max_age_h", "Calendar max age", "h", 24, 1..720, "The academic calendar fetches again when this old"),
-    SweepMaxAge("dev_sweep_max_age_h", "Background refresh age", "h", 12, 1..168, "Pages not on screen this old refresh in the open-app sweep"),
-    SweepCooldown("dev_sweep_cooldown_min", "Background refresh gap", "min", 15, 0..1440, "At most one sweep in this long"),
-    SweepQuick("dev_sweep_quick_s", "Quick fetch", "s", 2, 1..60, "A sweep starts only after a page fetch this fast"),
-    SlowPage("dev_slow_page_s", "Background page timeout", "s", 5, 1..120, "A slower page stops the sweep"),
-    FetchLanes("dev_fetch_lanes", "Pages at once", "pages", 2, 1..4, "Page fetches that run at the same time; the rest wait, the page on screen first"),
-    SlowFetch("dev_slow_fetch_s", "Slow link", "s", 4, 1..60, "When recent page fetches take this long, one runs at a time and the sweep waits"),
-    QueueDrop("dev_queue_drop_s", "Waiting fetch limit", "s", 60, 5..600, "An automatic fetch for a page left behind is dropped after waiting this long"),
-    VtopTimeout("dev_vtop_timeout_s", "VTOP request timeout", "s", 30, 5..180, "One VTOP request, from the next launch"),
-    SessionReuse("dev_session_reuse_min", "VTOP session reuse", "min", 0, 0..10_080, "A saved session older than this signs in again at launch; 0: any age"),
-    OtpPoll("dev_otp_poll_s", "OTP check without the live socket", "s", 2, 1..30, "How often the OTP prompt checks Gmail, or forwarded mail when the server can't push it"),
-    SessionAnswer("dev_session_answer_s", "Session request timeout", "s", 15, 3..60, "How long the phone tries to answer a browser's or AI app's session request"),
-    CookieAsk("dev_cookie_ask_s", "Cookie consent wait", "s", 60, 10..300, "How long the 'send your VTOP cookie?' dialog waits before it counts as Cancel"),
-    SyncBiometricDays("dev_sync_bio_days", "Biometric days per sync", "days", 3, 0..7, "Recent days not final in the cache, newest first; 0 turns it off"),
-    CampusFetchGap("dev_campus_gap_s", "Campus fetch gap", "s", 3, 0..30, "Pause between biometric days in the Wrapped fetch"),
-    CampusFetchAtOnce("dev_campus_at_once", "Campus fetch at once", "days", 2, 1..3, "Biometric days the Wrapped fetch asks VTOP for at the same time"),
-    WrappedRefetch("dev_wrapped_refetch_h", "Wrapped refetch age", "h", 12, 1..168, "Pages with nothing posted yet fetch again for Wrapped when this old"),
-    ProofTimeout("dev_proof_bg_timeout_s", "Background proof timeout", "s", 90, 20..300, "The account proof after sign-in gives up after this long and tries again at the next open"),
-    ProofOnCellular("dev_proof_cellular", "Background proof on mobile data", "on", 0, 0..1, "1: the account proof after sign-in (about 1.5 MB) may run on mobile data too"),
+enum class Tunable(
+    internal val rustKey: TunableKey,
+    private val fallbackKey: String,
+    private val fallbackDefault: Int,
+    private val fallbackRange: IntRange,
+) {
+    PageMaxAge(TunableKey.PAGE_MAX_AGE, "dev_page_max_age_h", 6, 1..168),
+    JustFetched(TunableKey.JUST_FETCHED, "dev_just_fetched_min", 10, 0..120),
+    CalendarMaxAge(TunableKey.CALENDAR_MAX_AGE, "dev_calendar_max_age_h", 24, 1..720),
+    SweepMaxAge(TunableKey.SWEEP_MAX_AGE, "dev_sweep_max_age_h", 12, 1..168),
+    SweepCooldown(TunableKey.SWEEP_COOLDOWN, "dev_sweep_cooldown_min", 15, 0..1440),
+    SweepQuick(TunableKey.SWEEP_QUICK, "dev_sweep_quick_s", 2, 1..60),
+    SlowPage(TunableKey.SLOW_PAGE, "dev_slow_page_s", 5, 1..120),
+    FetchLanes(TunableKey.FETCH_LANES, "dev_fetch_lanes", 2, 1..4),
+    SlowFetch(TunableKey.SLOW_FETCH, "dev_slow_fetch_s", 4, 1..60),
+    QueueDrop(TunableKey.QUEUE_DROP, "dev_queue_drop_s", 60, 5..600),
+    VtopTimeout(TunableKey.VTOP_TIMEOUT, "dev_vtop_timeout_s", 30, 5..180),
+    SessionReuse(TunableKey.SESSION_REUSE, "dev_session_reuse_min", 0, 0..10_080),
+    OtpPoll(TunableKey.OTP_POLL, "dev_otp_poll_s", 2, 1..30),
+    SessionAnswer(TunableKey.SESSION_ANSWER, "dev_session_answer_s", 15, 3..60),
+    CookieAsk(TunableKey.COOKIE_ASK, "dev_cookie_ask_s", 60, 10..300),
+    SyncBiometricDays(TunableKey.SYNC_BIOMETRIC_DAYS, "dev_sync_bio_days", 3, 0..7),
+    CampusFetchGap(TunableKey.CAMPUS_FETCH_GAP, "dev_campus_gap_s", 3, 0..30),
+    CampusFetchAtOnce(TunableKey.CAMPUS_FETCH_AT_ONCE, "dev_campus_at_once", 2, 1..3),
+    WrappedRefetch(TunableKey.WRAPPED_REFETCH, "dev_wrapped_refetch_h", 12, 1..168),
+    ProofTimeout(TunableKey.PROOF_TIMEOUT, "dev_proof_bg_timeout_s", 90, 20..300),
+    ProofOnCellular(TunableKey.PROOF_ON_CELLULAR, "dev_proof_cellular", 0, 0..1);
+
+    private val info: TunableInfo? get() = Settings.tunableInfo(rustKey)
+
+    val key: String get() = info?.prefKey ?: fallbackKey
+    val title: String get() = info?.title ?: name
+    val unit: String get() = info?.unit ?: ""
+    val default: Int get() = info?.default ?: fallbackDefault
+    val range: IntRange get() = info?.let { it.min..it.max } ?: fallbackRange
+    val note: String get() = info?.note ?: ""
 }
 
 /** The background sync intervals on offer, in hours. */
@@ -307,3 +448,35 @@ enum class TimetableViewMode { Agenda, Weekly }
 
 /** Where the OTP prompt reads VTOP's code from. */
 enum class OtpSource { Forwarding, Gmail }
+
+private fun RustOtpSource.toKotlin(): OtpSource = when (this) {
+    RustOtpSource.FORWARDING -> OtpSource.Forwarding
+    RustOtpSource.GMAIL -> OtpSource.Gmail
+}
+
+private fun OtpSource.toRust(): RustOtpSource = when (this) {
+    OtpSource.Forwarding -> RustOtpSource.FORWARDING
+    OtpSource.Gmail -> RustOtpSource.GMAIL
+}
+
+private fun RustThemeMode.toKotlin(): ThemeMode = when (this) {
+    RustThemeMode.SYSTEM -> ThemeMode.System
+    RustThemeMode.LIGHT -> ThemeMode.Light
+    RustThemeMode.DARK -> ThemeMode.Dark
+}
+
+private fun ThemeMode.toRust(): RustThemeMode = when (this) {
+    ThemeMode.System -> RustThemeMode.SYSTEM
+    ThemeMode.Light -> RustThemeMode.LIGHT
+    ThemeMode.Dark -> RustThemeMode.DARK
+}
+
+private fun RustTimetableViewMode.toKotlin(): TimetableViewMode = when (this) {
+    RustTimetableViewMode.AGENDA -> TimetableViewMode.Agenda
+    RustTimetableViewMode.WEEKLY -> TimetableViewMode.Weekly
+}
+
+private fun TimetableViewMode.toRust(): RustTimetableViewMode = when (this) {
+    TimetableViewMode.Agenda -> RustTimetableViewMode.AGENDA
+    TimetableViewMode.Weekly -> RustTimetableViewMode.WEEKLY
+}

@@ -21,6 +21,7 @@ import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
 import vitapmate.core.Grades
+import vitapmate.core.PageId
 import vitapmate.data.PageState
 import vitapmate.data.SemesterChoice
 import vitapmate.data.Settings
@@ -44,12 +45,7 @@ private enum class View { Semester, History, Planner }
  */
 @Composable
 fun GradesScreen() {
-    val history = rememberPage(
-        "grade_history",
-        { core, flow -> core.cachedGradeHistory(flow) },
-        { core, flow -> core.fetchGradeHistory(flow) },
-        { it.updatedAt },
-    ) { it.courseCount }
+    val history = rememberPage(PageId.GRADE_HISTORY, { core, flow -> core.cachedGradeHistory(flow) })
     val scope = rememberCoroutineScope()
     var view by rememberSaveable { mutableStateOf(View.Semester) }
     // The semester shown; empty: the picked one (or the one before while it has no grades).

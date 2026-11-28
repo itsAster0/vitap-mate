@@ -3,6 +3,7 @@
 
 pub(crate) mod attendance;
 pub(crate) mod biometric;
+pub(crate) mod biometric_job;
 pub(crate) mod calendar;
 pub(crate) mod changes;
 pub(crate) mod course_page;

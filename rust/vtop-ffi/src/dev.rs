@@ -16,15 +16,15 @@ use crate::pages::marks::MARKS;
 use vtop_core::VtopConfig;
 use vtop_core::types::{
     AttendanceData, ExamScheduleData, FullAttendanceData, MarksData, PersistedVtopSession,
-    SemesterData, TimetableData,
+    TimetableData,
 };
 
 use crate::pages::records;
 use crate::remote::edge;
 use crate::store;
 use crate::{
-    ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS, SESSION,
-    Session, Shared, TIMETABLE, traced, traced_sync,
+    ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SESSION, Session,
+    Shared, TIMETABLE, traced, traced_sync,
 };
 
 /// The Flutter app's Cookie-Editor domain.
@@ -355,11 +355,6 @@ impl Core {
 }
 
 impl Core {
-    /// The picked semester, if the cached list still has it.
-    fn selected_semester(&self) -> Option<String> {
-        self.pick(&self.read_kept::<SemesterData>(SEMESTERS)?)
-    }
-
     /// `file`'s path under the selected semester's pages.
     fn page_path(&self, file: &str) -> Option<String> {
         Some(format!("{PAGES}/{}/{file}", self.selected_semester()?))
@@ -410,7 +405,7 @@ fn remove_dir(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ACCOUNT;
+    use crate::{ACCOUNT, SEMESTERS};
 
     fn core(name: &str) -> (Core, std::path::PathBuf) {
         let dir = std::env::temp_dir().join(format!("vtop-ffi-dev-{name}-{}", std::process::id()));

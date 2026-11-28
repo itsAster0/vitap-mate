@@ -67,7 +67,7 @@ import vitapmate.core.SignIn
 import vitapmate.data.AccountWatch
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
-import vitapmate.data.PauseReason
+import vitapmate.core.SyncResume
 import vitapmate.data.SavedPasswords
 import vitapmate.data.Settings
 import vitapmate.data.coreFlow
@@ -147,7 +147,7 @@ fun AccountScreen() {
                 Log.info("ui.account", "save result", flowId, mapOf("done" to "$done"))
                 if (done) {
                     // Paused over the old password: the next run can try again.
-                    Settings.syncHealth = Settings.syncHealth.resumedIf { it == PauseReason.PasswordRejected }
+                    withContext(Dispatchers.IO) { AppCore.await().syncHealthResumeIf(flowId, SyncResume.PASSWORD_REJECTED) }
                     savedPassword = password
                     // Another student: the app lets go of the last one's things as Rust reports
                     // the switch ([AccountTeardown.follow]), wherever this page is by then.

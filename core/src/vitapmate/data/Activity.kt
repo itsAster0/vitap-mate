@@ -5,11 +5,14 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import vitapmate.core.ActivityEntry
+import vitapmate.core.ActivityRun
+import vitapmate.core.TrackEnd
 
 /**
  * Work that talks to VTOP, for the app bar ("Refreshing attendance…") and its recent-activity
- * sheet, like the Flutter app's queue. Each entry is one flow, so "Details" opens it in the
+ * sheet, like the Flutter app's queue. Rust keeps the list (page fetches and the runs [track]
+ * hands it); this mirrors it ([mirror]). Each entry is one flow, so "Details" opens it in the
  * Inspector.
  */
 object Activity {
@@ -23,41 +26,41 @@ object Activity {
         val cancelled: Boolean = false,
     )
 
-    /** What runs now, oldest first, and what finished, newest first (at most [KEEP]). */
+    /** What runs now, oldest first, and what finished, newest first. */
     @Immutable
     data class State(val running: List<Entry> = emptyList(), val recent: List<Entry> = emptyList()) {
         /** The latest finished run failed because the phone is offline. */
-        val offline: Boolean get() = recent.firstOrNull()?.problem?.kind == ProblemKind.Offline
-
-        fun started(entry: Entry) = copy(running = running + entry)
-
-        /** [entry] left [running] as [finished], at the top of [recent]. */
-        fun finished(entry: Entry, finished: Entry) = State(running - entry, (listOf(finished) + recent).take(KEEP))
+        val offline: Boolean get() = recent.firstOrNull()?.problem?.kind == ProblemKind.OFFLINE
     }
-
-    const val KEEP = 30
 
     private val now = MutableStateFlow(State())
 
-    /** Runs start and finish on any thread: one immutable [State], swapped whole. */
     val state: StateFlow<State> = now.asStateFlow()
 
-    /** Runs [block] as [label] (e.g. "Refreshing attendance") in [flow]; a failure is recorded and rethrown. */
+    /** Rust's list: running entries first, then finished ones. */
+    internal fun mirror(entries: List<ActivityEntry>) {
+        val (running, recent) = entries.partition { it.run is ActivityRun.Running }
+        now.value = State(running.map(::entry), recent.map(::entry))
+    }
+
+    private fun entry(e: ActivityEntry) = when (val run = e.run) {
+        is ActivityRun.Running -> Entry(e.flow, e.label, e.startedAt)
+        is ActivityRun.Done -> Entry(e.flow, e.label, e.startedAt, run.ms)
+        is ActivityRun.Failed -> Entry(e.flow, e.label, e.startedAt, run.ms, run.problem)
+        is ActivityRun.Cancelled -> Entry(e.flow, e.label, e.startedAt, run.ms, cancelled = true)
+    }
+
+    /** Runs [block] as [label] (e.g. "Refreshing calendar") in [flow]; a failure is recorded and rethrown. */
     suspend fun <T> track(label: String, flow: String, block: suspend () -> T): T {
-        val entry = Entry(flow, label, System.currentTimeMillis())
-        now.update { it.started(entry) }
-        val start = System.nanoTime()
-        fun done(problem: Problem? = null, cancelled: Boolean = false) {
-            val finished = entry.copy(ms = (System.nanoTime() - start) / 1_000_000, problem = problem, cancelled = cancelled)
-            now.update { it.finished(entry, finished) }
-        }
+        val core = AppCore.await()
+        val id = core.trackStart(flow, label)
         return try {
-            block().also { done() }
+            block().also { core.trackEnd(flow, id, TrackEnd.Done) }
         } catch (e: CancellationException) {
-            done(cancelled = true)
+            core.trackEnd(flow, id, TrackEnd.Cancelled)
             throw e
         } catch (e: Throwable) {
-            done(problemOf(e, flow))
+            core.trackEnd(flow, id, TrackEnd.Failed(problemOf(e, flow)))
             throw e
         }
     }
