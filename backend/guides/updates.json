@@ -121,7 +121,7 @@
   "releases": [
     {
       "version": "3.2.3",
-      "code": 3002302,
+      "code": 3002300,
       "summary": "3.2.3 rebuilds Semester Wrapped with new slides, a receipt summary and private sharing, fits it to every screen, shows it whatever your Calculated insights setting, and points to that setting from Attendance, Marks and Grades while it's off.",
       "sections": [
         {
