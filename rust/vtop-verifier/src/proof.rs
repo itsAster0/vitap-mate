@@ -69,7 +69,7 @@ impl ProofTarget {
             host: VTOP_HOST.into(),
             addr: format!("{VTOP_HOST}:443"),
             // The bundled roots are a constant: a bad one fails every test.
-            roots: session::vtop_roots().unwrap_or_else(|_| RootCertStore::mozilla()),
+            roots: session::vtop_mozilla_roots().unwrap_or_else(|_| RootCertStore::mozilla()),
         }
     }
 }

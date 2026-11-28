@@ -9,7 +9,7 @@ description = "The TLSNotary verifier of a phone's account proof: stateless, it 
 [dependencies]
 vtop-core = { path = "../vtop-core", features = ["reqwest"] }
 vtop-shared = { path = "../vtop-shared" }
-vtop-tlsn = { path = "../vtop-tlsn" }
+vtop-tlsn = { path = "../vtop-tlsn", features = ["mozilla-certs"] }
 axum = { version = "0.8", features = ["ws"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 tokio-util = { version = "0.7", features = ["compat", "rt"] }

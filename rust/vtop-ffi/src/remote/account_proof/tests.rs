@@ -66,6 +66,10 @@ impl ProofSocket for FakeSocket {
 
 #[async_trait::async_trait]
 impl ProofNetwork for FakeNetwork {
+    fn trust_roots(&self) -> Vec<Vec<u8>> {
+        Vec::new()
+    }
+
     async fn open(
         &self,
         url: String,

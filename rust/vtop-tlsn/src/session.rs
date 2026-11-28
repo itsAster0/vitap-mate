@@ -78,14 +78,26 @@ pub enum Phase {
     Close,
 }
 
-/// Mozilla's roots plus the intermediate VTOP leaves out of its chain.
-pub fn vtop_roots() -> Result<RootCertStore> {
-    let mut store = RootCertStore::mozilla();
+/// `roots` (DER, the phone's trusted CAs) plus the intermediate VTOP leaves out of its chain.
+pub fn vtop_roots(roots: Vec<Vec<u8>>) -> Result<RootCertStore> {
+    let mut store = RootCertStore {
+        roots: roots.into_iter().map(CertificateDer).collect(),
+    };
     store.roots.push(
         CertificateDer::from_pem_slice(crate::content::SECTIGO_DV_R36.as_bytes())
             .map_err(|_| anyhow!("bad bundled Sectigo PEM"))?,
     );
     Ok(store)
+}
+
+/// [`vtop_roots`] over Mozilla's roots, for the verifier.
+#[cfg(feature = "mozilla-certs")]
+pub fn vtop_mozilla_roots() -> Result<RootCertStore> {
+    let mozilla = RootCertStore::mozilla()
+        .roots
+        .into_iter()
+        .map(|cert| cert.0);
+    vtop_roots(mozilla.collect())
 }
 
 /// How far a prover's run got.
@@ -600,5 +612,19 @@ mod status_tests {
         );
         assert_eq!(status_line(&[b'A'; 500]).len(), 64);
         assert_eq!(status_line(b"a\x00b"), "a?b");
+    }
+}
+
+#[cfg(test)]
+mod roots_tests {
+    use super::vtop_roots;
+
+    #[test]
+    fn the_phones_roots_come_first_then_the_bundled_intermediate() {
+        let store = vtop_roots(vec![b"phone-ca".to_vec()]).unwrap();
+        assert_eq!(store.roots.len(), 2);
+        assert_eq!(store.roots[0].0, b"phone-ca");
+        // No readable phone roots still leaves VTOP's intermediate to check against.
+        assert_eq!(vtop_roots(Vec::new()).unwrap().roots.len(), 1);
     }
 }

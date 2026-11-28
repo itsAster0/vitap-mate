@@ -66,6 +66,10 @@ pub trait ProofNetwork: Send + Sync {
         headers: Vec<Header>,
         timeout_ms: u32,
     ) -> Result<ProofOpened, TransportError>;
+
+    /// The phone's trusted CA certificates (DER), which the OS keeps current: the proof checks
+    /// VTOP's certificate against them, so the app ships no root list of its own.
+    fn trust_roots(&self) -> Vec<Vec<u8>>;
 }
 
 /// One WebSocket. `send` and `receive` are called at the same time; `receive` keeps the
@@ -443,8 +447,9 @@ impl Core {
         {
             return Ok(target);
         }
+        let phone = (self.shared.proof.as_ref()).map_or_default(|network| network.trust_roots());
         let roots =
-            vtop_tlsn::session::vtop_roots().map_err(|error| failed(format!("{error:#}")))?;
+            vtop_tlsn::session::vtop_roots(phone).map_err(|error| failed(format!("{error:#}")))?;
         Ok((vtop_tlsn::content::VTOP_HOST.into(), roots))
     }
 }

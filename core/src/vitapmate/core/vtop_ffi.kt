@@ -716,6 +716,9 @@ internal interface UniffiCallbackInterfacePageListenerMethod0 : com.sun.jna.Call
 internal interface UniffiCallbackInterfaceProofNetworkMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`headers`: RustBuffer.ByValue,`timeoutMs`: Int,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
+internal interface UniffiCallbackInterfaceProofNetworkMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
+}
 internal interface UniffiCallbackInterfaceProofSocketMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`data`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteVoid,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
@@ -961,22 +964,25 @@ internal open class UniffiVTableCallbackInterfacePageListener(
     }
 
 }
-@Structure.FieldOrder("uniffiFree", "uniffiClone", "open")
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "open", "trustRoots")
 internal open class UniffiVTableCallbackInterfaceProofNetwork(
     @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
     @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
     @JvmField internal var `open`: UniffiCallbackInterfaceProofNetworkMethod0? = null,
+    @JvmField internal var `trustRoots`: UniffiCallbackInterfaceProofNetworkMethod1? = null,
 ) : Structure() {
     class UniffiByValue(
         `uniffiFree`: UniffiCallbackInterfaceFree? = null,
         `uniffiClone`: UniffiCallbackInterfaceClone? = null,
         `open`: UniffiCallbackInterfaceProofNetworkMethod0? = null,
-    ): UniffiVTableCallbackInterfaceProofNetwork(`uniffiFree`,`uniffiClone`,`open`,), Structure.ByValue
+        `trustRoots`: UniffiCallbackInterfaceProofNetworkMethod1? = null,
+    ): UniffiVTableCallbackInterfaceProofNetwork(`uniffiFree`,`uniffiClone`,`open`,`trustRoots`,), Structure.ByValue
 
    internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceProofNetwork) {
         `uniffiFree` = other.`uniffiFree`
         `uniffiClone` = other.`uniffiClone`
         `open` = other.`open`
+        `trustRoots` = other.`trustRoots`
     }
 
 }
@@ -1742,6 +1748,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_proofnetwork_open(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_proofnetwork_trust_roots(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_proofsocket_send(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_proofsocket_receive(
@@ -2325,6 +2333,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_proofnetwork_open(`ptr`: Long,`url`: RustBuffer.ByValue,`headers`: RustBuffer.ByValue,`timeoutMs`: Int,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_proofnetwork_trust_roots(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_clone_proofsocket(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_vtop_ffi_fn_free_proofsocket(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -3393,6 +3403,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_proofnetwork_open() and 0xFFFF) != 58287) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_proofnetwork_trust_roots() and 0xFFFF) != 11212) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_proofsocket_send() and 0xFFFF) != 47696) {
@@ -13895,6 +13908,12 @@ public interface ProofNetwork {
      */
     suspend fun `open`(`url`: kotlin.String, `headers`: List<Header>, `timeoutMs`: kotlin.UInt): ProofOpened
     
+    /**
+     * The phone's trusted CA certificates (DER), which the OS keeps current: the proof checks
+     * VTOP's certificate against them, so the app ships no root list of its own.
+     */
+    fun `trustRoots`(): List<kotlin.ByteArray>
+    
     companion object
 }
 
@@ -14032,6 +14051,23 @@ open class ProofNetworkImpl: Disposable, AutoCloseable, ProofNetwork
     }
 
     
+    /**
+     * The phone's trusted CA certificates (DER), which the OS keeps current: the proof checks
+     * VTOP's certificate against them, so the app ships no root list of its own.
+     */override fun `trustRoots`(): List<kotlin.ByteArray> {
+            return FfiConverterSequenceByteArray.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_proofnetwork_trust_roots(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
 
     
 
@@ -14085,6 +14121,17 @@ internal object uniffiCallbackInterfaceProofNetwork {
             )
         }
     }
+    internal object `trustRoots`: UniffiCallbackInterfaceProofNetworkMethod1 {
+        override fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeProofNetwork.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`trustRoots`(
+                )
+            }
+            val writeReturn = { value: List<kotlin.ByteArray> -> uniffiOutReturn.setValue(FfiConverterSequenceByteArray.lower(value)) }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
 
     internal object uniffiFree: UniffiCallbackInterfaceFree {
         override fun callback(handle: Long) {
@@ -14102,6 +14149,7 @@ internal object uniffiCallbackInterfaceProofNetwork {
         uniffiFree,
         uniffiClone,
         `open`,
+        `trustRoots`,
     )
 
     // Registers the foreign callback with the Rust side.
@@ -40134,6 +40182,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceByteArray: FfiConverterRustBuffer<List<kotlin.ByteArray>> {
+    override fun read(buf: ByteBuffer): List<kotlin.ByteArray> {
+        val len = buf.getInt()
+        return List<kotlin.ByteArray>(len) {
+            FfiConverterByteArray.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.ByteArray>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterByteArray.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.ByteArray>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterByteArray.write(it, buf)
         }
     }
 }

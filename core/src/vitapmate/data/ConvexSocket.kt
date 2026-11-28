@@ -7,6 +7,7 @@ import java.net.NoRouteToHostException
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.security.KeyStore
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLSocketFactory
@@ -23,6 +24,7 @@ import vitapmate.core.Header
 import vitapmate.core.ProofFrame
 import vitapmate.core.ProofNetwork
 import vitapmate.core.ProofOpened
+import vitapmate.observability.Log
 import vitapmate.core.ProofSocket
 import vitapmate.core.TransportException
 
@@ -66,6 +68,16 @@ class SocketProofNetwork internal constructor(
     private val cleartext: (String) -> Boolean,
 ) : ProofNetwork {
     constructor() : this(sockets, platformTls, platformCleartext)
+
+    // System CAs only: a user-added CA (a debugging proxy) must not vouch for VTOP in a proof.
+    override fun trustRoots(): List<ByteArray> = runCatching {
+        val store = KeyStore.getInstance("AndroidCAStore").apply { load(null) }
+        store.aliases().toList().filter { it.startsWith("system:") }.mapNotNull { store.getCertificate(it)?.encoded }
+    }.getOrElse { e ->
+        // The bundled Sectigo intermediate still lets the proof check VTOP's certificate.
+        Log.warn("proof", "system roots unreadable: ${e::class.simpleName}")
+        emptyList()
+    }
 
     override suspend fun open(url: String, headers: List<Header>, timeoutMs: UInt): ProofOpened {
         val inbox = Channel<ProofFrame>(Channel.UNLIMITED)
