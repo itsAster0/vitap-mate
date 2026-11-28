@@ -20,6 +20,9 @@ ignore = [
   # its k256/p256 serve attestations and MPC-TLS's key exchange, neither of which a proxy-mode
   # proof runs (the prover's own TLS is rustls with ring). Drop when tlsn moves on.
   { id = "RUSTSEC-2026-0387", reason = "tlsn's curves; proxy mode runs none of their secret arithmetic" },
+  # bincode 1.3.3 is final, not broken: the vendored mpz-circuits-data decodes upstream's circuit
+  # blobs with it, so it must stay the format mpz2 wrote them in.
+  { id = "RUSTSEC-2025-0141", reason = "mpz2's circuit format; 1.3.3 is complete" },
 ]
 
 [licenses]

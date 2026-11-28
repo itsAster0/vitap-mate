@@ -1,0 +1,27 @@
+# mpz-circuits-data from tlsnotary/mpz2 at the rev tlsn pins (MIT OR Apache-2.0), with the
+# circuits brotli-compressed (5.8 MB of raw bincode, mostly zeros, down to 0.9 MB in the .so)
+# and only the aes and sha2 circuits that tlsn uses. The workspace's [patch] swaps it in. When
+# tlsn moves to a new mpz2 rev, regenerate data/ from that rev's crates/circuits-data/data:
+#   brotli -q 11 -w 24 -o data/<name>.bin.br <name>.bin
+[package]
+name = "mpz-circuits-data"
+version = "0.1.0-beta.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "mpz_circuits_data"
+
+[features]
+default = ["aes", "sha2"]
+aes = []
+sha2 = []
+
+[dependencies]
+bincode = "1.3.3"
+brotli-decompressor = "6"
+mpz-circuits-core = { git = "https://github.com/tlsnotary/mpz2", rev = "23e2cc08ed11ae86d71f72fb968f1273d70c9e88" }
+
+[lints]
+workspace = true

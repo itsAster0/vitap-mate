@@ -2,7 +2,7 @@
 # 2: dev-dependency features (vtop-ffi's tests turn on vtop-core/reqwest)
 # stay out of the app build.
 resolver = "2"
-members = ["vtop-shared", "vtop-proto", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway", "vtop-tlsn", "vtop-verifier", "vtop-ffi"]
+members = ["vtop-shared", "vtop-proto", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway", "vtop-tlsn", "vtop-verifier", "vtop-ffi", "vendor/mpz-circuits-data"]
 # The parser fuzzer builds on nightly with its own workspace (`mise run fuzz`).
 exclude = ["vtop-proto/fuzz"]
 
@@ -153,3 +153,7 @@ strip = true
 # Line tables only: backtraces keep file:line, and dev builds and target/ stay smaller.
 [profile.dev]
 debug = "line-tables-only"
+
+# tlsn's MPC circuits, brotli-compressed: 4.9 MB off the app's .so (see the crate's Cargo.toml).
+[patch."https://github.com/tlsnotary/mpz2"]
+mpz-circuits-data = { path = "vendor/mpz-circuits-data" }
