@@ -24,6 +24,9 @@ dependencies:
   - com.google.android.play:app-update:2.1.0
   # The home-screen widgets (Widgets: timetable, attendance, exams), drawn with Compose.
   - androidx.glance:glance-appwidget:1.2.0
+  # Pins credentials → biometric's appcompat 1.2.0 up: its keep rule for SearchView held all of
+  # AppCompat and its PNGs in the APK; 1.7.1 lets R8 drop them (~170 KB).
+  - androidx.appcompat:appcompat:1.7.1
   # Settings → Assistant: the timetable and attendance as Android app functions (AssistantFunctions, Android 16+).
   - androidx.appfunctions:appfunctions:1.0.0
 settings:

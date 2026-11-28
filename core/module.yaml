@@ -16,9 +16,9 @@ dependencies:
   # flow() sections in Perfect, next to the Rust spans.
   - androidx.tracing:tracing:2.0.5
   - androidx.core:core-ktx:1.19.1
-  # The VTOP password in the phone's password manager (SavedPasswords); Play services below Android 14.
+  # The VTOP password in the phone's password manager (SavedPasswords), through Android 14+'s own
+  # Credential Manager. No Play services provider (~150 KB): below 14 saving and picking do nothing.
   - androidx.credentials:credentials:1.6.0
-  - androidx.credentials:credentials-play-services-auth:1.6.0
   # Background sync (app's SyncWorker) and Wrapped's campus-times fetch (BiometricFetch).
   - androidx.work:work-runtime:2.12.0: exported
 

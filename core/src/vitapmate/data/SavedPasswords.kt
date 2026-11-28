@@ -14,8 +14,9 @@ import vitapmate.observability.flow
 
 /**
  * The VTOP username and password in the phone's password manager (Credential Manager): the
- * system draws its own sheets; cancelled or no password manager, nothing happens. [context] must
- * be the activity. Flows `password.save`, `password.pick`; log src `password`, never the password.
+ * system draws its own sheets (Android 14+); cancelled, no password manager or older Android,
+ * nothing happens. [context] must be the activity. Flows `password.save`, `password.pick`; log src
+ * `password`, never the password.
  */
 object SavedPasswords {
     /** Offers to save (or update) [username] and [password]; outlives the screen that asks. */
