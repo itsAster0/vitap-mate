@@ -1,7 +1,10 @@
 # The TLSNotary verifier (vtop-verifier), with this folder as context. Stateless: it needs
 # CONVEX_URL and VERIFIER_TOKEN, and serves the phone's `GET /proof?ticket=` WebSocket.
-FROM rust:1.98-slim-bookworm AS build
+FROM rust:1.100-slim-bookworm AS build
 WORKDIR /src
+# The pinned nightly from rust-toolchain.toml, in its own layer so a code change reuses it.
+COPY rust-toolchain.toml .
+RUN rustup toolchain install
 COPY . .
 RUN cargo build --locked --profile server --package vtop-verifier --bin vtop-verifier \
     && cp target/server/vtop-verifier /vtop-verifier

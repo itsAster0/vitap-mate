@@ -1,4 +1,4 @@
-# The parser fuzzer: `mise run fuzz` (cargo +nightly fuzz run parsers). Its own workspace,
+# The parser fuzzer: `mise run fuzz` (cargo fuzz run parsers). Its own workspace,
 # so the main one (stable, `cargo test --workspace`) never builds it.
 [package]
 name = "vtop-proto-fuzz"

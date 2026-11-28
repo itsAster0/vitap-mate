@@ -442,7 +442,7 @@ pub(super) fn cumulative(
             points += credit * value;
         }
     }
-    ((credits > 0.0).then(|| points / credits), earned)
+    ((credits > 0.0).then_some(points / credits), earned)
 }
 
 /// `value` in hundredths, as the story draws a GPA.
@@ -490,7 +490,7 @@ pub(super) fn roi(
         let parts = marks?.courses.iter().filter(|c| key(&c.code) == code);
         let (weighted, max) =
             parts.fold((0.0, 0.0), |(w, m), c| (w + c.weighted, m + c.max_weighted));
-        (max >= ROI_MARKS_MIN).then(|| weighted * 100.0 / max)
+        (max >= ROI_MARKS_MIN).then_some(weighted * 100.0 / max)
     };
     let paired = |score: &dyn Fn(&str) -> Option<f64>| -> Vec<WrappedRoiPoint> {
         pooled

@@ -37,7 +37,7 @@ pub(super) const RULES: &[Rule] = &[
             let gpa = r.grades.as_ref()?.gpa;
             let att = f64::from(r.attendance.as_ref()?.percent);
             (att < 82.0 && gpa >= 8.5)
-                .then(|| 0.6 + (82.0 - att) / 12.0 * 0.2 + (gpa - 8.5) / 1.5 * 0.2)
+                .then_some(0.6 + (82.0 - att) / 12.0 * 0.2 + (gpa - 8.5) / 1.5 * 0.2)
         },
     },
     Rule {

@@ -51,7 +51,7 @@ The UI is Kotlin with Compose Multiplatform, built with the Kotlin Toolchain (`.
 You need:
 
 - [mise](https://mise.jdx.dev), which installs Java, the Kotlin Toolchain and bun at the versions in `mise.toml`
-- Rust stable with the `aarch64-linux-android` target, and `cargo-ndk`
+- Rust (rustup installs the pinned nightly in `rust/rust-toolchain.toml`) with the `aarch64-linux-android` target, and `cargo-ndk`
 - The Android SDK and NDK
 
 Build the Rust library and its Kotlin bindings, then build the app and run the tests:

@@ -410,7 +410,7 @@ pub fn semester_summary(
         }
     }
     SemesterSummary {
-        gpa: (credits > 0.0).then(|| points / credits),
+        gpa: (credits > 0.0).then_some(points / credits),
         credits,
         course_credits,
         counts: counts(courses.iter().map(|course| course.grade.as_str())),

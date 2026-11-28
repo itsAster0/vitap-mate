@@ -2,8 +2,11 @@
 # with this folder as context. The engine runs elsewhere (Railway); the
 # gateway reaches it at ENGINE_URL. alchemy.run.ts builds it on nest, an
 # x86_64 machine, so rustc runs natively.
-FROM rust:1.98-slim-bookworm AS build
+FROM rust:1.100-slim-bookworm AS build
 WORKDIR /src
+# The pinned nightly from rust-toolchain.toml, in its own layer so a code change reuses it.
+COPY rust-toolchain.toml .
+RUN rustup toolchain install
 COPY . .
 # The cargo registry and target/ live in BuildKit cache mounts on the builder,
 # so a rebuild recompiles only what changed.

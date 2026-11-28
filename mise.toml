@@ -18,13 +18,13 @@ run = [
   # logs, since obs.rs formats every tracing field, the message too, with {:?}). Panics unwind,
   # so a panic fails one call, not the app, and obs.rs logs its message and file:line. Android
   # crates also deny unwrap/expect/indexing/panic in non-test code.
-  # The flags are per Android target and live only in this step: host builds and the
-  # server stay on stable.
-  "rustup run nightly-2026-11-01 rustc --version >/dev/null 2>&1 || rustup toolchain install nightly-2026-11-01 --profile minimal --component rust-src --target aarch64-linux-android,armv7-linux-androideabi",
+  # The flags are per Android target and live only in this step. The toolchain is the pinned
+  # nightly in rust/rust-toolchain.toml, as for every other build.
+  "rustup target add aarch64-linux-android armv7-linux-androideabi",
   '''
   f="-Zfmt-debug=shallow -C link-arg=-Wl,--icf=all"
   CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="$f" CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_RUSTFLAGS="$f" \
-    cargo +nightly-2026-11-01 ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs \
+    cargo ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs \
     build --release -p vtop-ffi -Zbuild-std=std,panic_unwind -Zbuild-std-features=panic-unwind,backtrace,optimize_for_size
   ''',
   # Bindgen reads the metadata from a host build: the stripped Android .so
@@ -46,11 +46,11 @@ run = [
   # the pinned nightly for -Zfmt-debug=shallow, so derived Debug fields stay out of the logs as
   # in release. A leftover armeabi-v7a .so in app/jniLibs is stale against the new bindings:
   # run `mise run rust-android` before testing on 32-bit Android or building a release.
-  "rustup run nightly-2026-11-01 rustc --version >/dev/null 2>&1 || rustup toolchain install nightly-2026-11-01 --profile minimal --component rust-src --target aarch64-linux-android,armv7-linux-androideabi",
+  "rustup target add aarch64-linux-android",
   '''
   CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
   CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="-Zfmt-debug=shallow" \
-    cargo +nightly-2026-11-01 ndk -t arm64-v8a -P 28 -o ../app/jniLibs build --release -p vtop-ffi
+    cargo ndk -t arm64-v8a -P 28 -o ../app/jniLibs build --release -p vtop-ffi
   ''',
   "cargo build -q -p vtop-ffi --lib",
   'cargo run -q -p vtop-ffi --features cli --bin uniffi-bindgen -- generate "target/debug/libvtop_ffi.$([ "$(uname)" = Darwin ] && echo dylib || echo so)" --language kotlin --out-dir ../core/src --no-format',
@@ -81,9 +81,8 @@ description = "Fuzz the VTOP parsers for a minute (nightly, cargo-fuzz): no inpu
 dir = "rust/vtop-proto/fuzz"
 run = [
   "cargo fuzz --version >/dev/null 2>&1 || cargo install cargo-fuzz --locked",
-  "rustup run nightly rustc --version >/dev/null 2>&1 || rustup toolchain install nightly --profile minimal",
   "./seed.sh",
-  "cargo +nightly fuzz run parsers -- -max_total_time=60",
+  "cargo fuzz run parsers -- -max_total_time=60",
 ]
 
 [tasks.check-kotlin]

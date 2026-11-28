@@ -39,7 +39,7 @@ pub(super) fn session_gpa<'a>(
         credits += credit;
         points += credit * value;
     }
-    (credits > 0.0).then(|| points / credits)
+    (credits > 0.0).then_some(points / credits)
 }
 
 /// The first number in `raw` ("4", "1.5 credits", "2,5"), when above 0.

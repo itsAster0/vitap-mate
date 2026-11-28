@@ -1,0 +1,8 @@
+# One toolchain for the whole workspace: the app's .so, the servers, CI, the fuzzer and local
+# builds. A nightly because the Android build needs -Zbuild-std (std built for size) and
+# -Zfmt-debug=shallow (derived Debug fields stay out of the logs); pinned so it never moves on
+# its own. Bump it on purpose, then run `mise run check` (new clippy lints land with nightlies).
+[toolchain]
+channel = "nightly-2026-11-01"
+components = ["rustfmt", "clippy", "rust-src"]
+profile = "minimal"

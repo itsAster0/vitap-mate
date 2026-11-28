@@ -346,7 +346,7 @@ fn mutation_resolves_after_transition_reaches_its_ts() {
     let harness = Harness::new();
     harness.connect();
     harness.push(transition(version(0, 0, 0), version(1, 1, 5), vec![]));
-    let mut sending = Box::pin(
+    let mut sending = std::pin::pin!(
         harness
             .client
             .mutation("messages:send", json!({ "body": "x" })),
@@ -364,7 +364,7 @@ fn resend_after_reconnect_does_not_duplicate() {
     let harness = Harness::new();
     harness.connect();
     harness.push(transition(version(0, 0, 0), version(1, 1, 5), vec![]));
-    let mut sending = Box::pin(
+    let mut sending = std::pin::pin!(
         harness
             .client
             .mutation("messages:send", json!({ "body": "x" })),
@@ -463,7 +463,7 @@ fn unsubscribe_sends_query_removal() {
 fn action_resolves_on_its_response() {
     let harness = Harness::new();
     harness.connect();
-    let mut acting = Box::pin(harness.client.action("mail:send", json!({ "to": "a" })));
+    let mut acting = std::pin::pin!(harness.client.action("mail:send", json!({ "to": "a" })));
     assert!(acting.as_mut().now_or_never().is_none());
     assert!(matches!(
         harness.last_sent(),
@@ -486,7 +486,7 @@ fn auth_error_drops_the_token_reconnects_and_tells_the_owner() {
     let harness = Harness::new();
     harness.client.set_auth(Some("jwt-1".into()));
     harness.connect();
-    let mut sending = Box::pin(harness.client.mutation("account:view", json!({})));
+    let mut sending = std::pin::pin!(harness.client.mutation("account:view", json!({})));
     assert!(sending.as_mut().now_or_never().is_none());
     harness.push(auth_error());
     assert!(harness.socket(0).closed.load(Ordering::SeqCst));
@@ -513,7 +513,7 @@ fn auth_error_drops_the_token_reconnects_and_tells_the_owner() {
 fn server_error_code_reaches_the_caller() {
     let harness = Harness::new();
     harness.connect();
-    let mut sending = Box::pin(harness.client.mutation("users:setNickname", json!({})));
+    let mut sending = std::pin::pin!(harness.client.mutation("users:setNickname", json!({})));
     assert!(sending.as_mut().now_or_never().is_none());
     harness.push(ServerMessage::MutationResponse {
         request_id: 0,
@@ -553,7 +553,7 @@ fn value_refuses_tagged_forms_but_bytes() {
 fn query_answers_its_first_result_then_unsubscribes() {
     let harness = Harness::new();
     harness.connect();
-    let mut asking = Box::pin(harness.client.query("udp:keys", json!({})));
+    let mut asking = std::pin::pin!(harness.client.query("udp:keys", json!({})));
     assert!(asking.as_mut().now_or_never().is_none());
     harness.push(transition(
         version(0, 0, 0),
@@ -586,7 +586,7 @@ fn a_query_of_a_watched_query_is_answered_here() {
         vec![updated(0, json!({ "sealed": "s" }))],
     ));
     let frames = harness.sent(harness.opens() - 1).len();
-    let mut asking = Box::pin(harness.client.query("mail:inbox", args));
+    let mut asking = std::pin::pin!(harness.client.query("mail:inbox", args));
     assert_eq!(
         asking.as_mut().now_or_never(),
         Some((Ok(json!({ "sealed": "s" })), Served::Local))
@@ -599,7 +599,7 @@ fn a_query_of_a_watched_query_is_answered_here() {
 fn close_fails_pending_calls() {
     let harness = Harness::new();
     harness.connect();
-    let mut sending = Box::pin(harness.client.mutation("auth:token", json!({})));
+    let mut sending = std::pin::pin!(harness.client.mutation("auth:token", json!({})));
     assert!(sending.as_mut().now_or_never().is_none());
     harness.client.close();
     assert_eq!(
@@ -644,7 +644,7 @@ fn logs_never_contain_token() {
         let harness = Harness::new();
         harness.client.set_auth(Some("secret-jwt-one".into()));
         harness.connect();
-        let mut sending = Box::pin(
+        let mut sending = std::pin::pin!(
             harness
                 .client
                 .mutation("auth:token", json!({ "payload": "private body" })),
@@ -732,7 +732,7 @@ fn an_idle_socket_closes_and_the_next_call_opens_one() {
     );
     harness.advance(120_000);
     assert_eq!(harness.opens(), 1, "no socket while idle");
-    let mut sending = Box::pin(harness.client.mutation("auth:token", json!({})));
+    let mut sending = std::pin::pin!(harness.client.mutation("auth:token", json!({})));
     assert!(sending.as_mut().now_or_never().is_none());
     harness.client.tick();
     assert_eq!(harness.opens(), 2, "a call opens one");

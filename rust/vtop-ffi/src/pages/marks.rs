@@ -211,7 +211,7 @@ impl MarksCourse {
             })
             .collect();
         let (weighted, max_weighted) = totals(&assessments);
-        let percent = (max_weighted > 0.0).then(|| weighted / max_weighted * 100.0);
+        let percent = (max_weighted > 0.0).then_some(weighted / max_weighted * 100.0);
         // Ties (one fetch saw them all) go to the last in order.
         let latest = assessments
             .iter()

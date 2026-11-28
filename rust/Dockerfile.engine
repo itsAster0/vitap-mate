@@ -1,7 +1,10 @@
 # The engine (vtop-bridge), built on nest, pushed to GHCR and run on hawk
 # (deploy/hawk/compose.yaml) by deploy/alchemy.run.ts (`bun run deploy`).
-FROM rust:1.98-slim-bookworm AS build
+FROM rust:1.100-slim-bookworm AS build
 WORKDIR /src
+# The pinned nightly from rust-toolchain.toml, in its own layer so a code change reuses it.
+COPY rust-toolchain.toml .
+RUN rustup toolchain install
 COPY . .
 RUN cargo build --locked --profile server --package vtop-bridge --bin vtop-bridge \
     && cp target/server/vtop-bridge /vtop-bridge

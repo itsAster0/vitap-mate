@@ -90,18 +90,13 @@ jobs:
         with:
           install_args: java kotlin-toolchain
           cache: true
-      # Pinned nightly for Android .so (-Zbuild-std needs rust-src); stable
-      # stays the default for the host uniffi-bindgen build.
-      - name: Set up Rust nightly (Android)
+      # The pinned nightly from rust/rust-toolchain.toml (-Zbuild-std needs rust-src).
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: nightly-2026-11-01
           components: rust-src
           targets: aarch64-linux-android,armv7-linux-androideabi
-      - name: Set up Rust stable
-        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
-        with:
-          toolchain: stable
       - name: Install cargo-ndk
         uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
         with:

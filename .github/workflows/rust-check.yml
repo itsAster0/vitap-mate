@@ -38,7 +38,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
-          toolchain: stable
+          toolchain: nightly-2026-11-01 # rust/rust-toolchain.toml
           components: rustfmt, clippy
 
       - name: Cache Rust build
@@ -64,13 +64,8 @@ jobs:
       - name: Dependencies (cargo deny)
         run: cargo deny check
 
-      # Builds the parser fuzzer (rust/vtop-proto/fuzz, nightly) so it keeps compiling; it
+      # Builds the parser fuzzer (rust/vtop-proto/fuzz) so it keeps compiling; it
       # runs locally with `mise run fuzz`.
-      - name: Set up nightly Rust for the fuzzer
-        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
-        with:
-          toolchain: nightly
-
       - name: Install cargo-fuzz
         uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
         with:
@@ -80,4 +75,4 @@ jobs:
       # x86_64-unknown-linux-musl (not installed, and incompatible with ASan's dynamic libc).
       - name: Build the parser fuzzer
         working-directory: rust/vtop-proto/fuzz
-        run: cargo +nightly fuzz build --target x86_64-unknown-linux-gnu parsers
+        run: cargo fuzz build --target x86_64-unknown-linux-gnu parsers
