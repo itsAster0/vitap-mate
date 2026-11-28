@@ -14,7 +14,8 @@ fake-vtop = ["dep:tokio", "dep:tokio-util", "dep:futures-rustls"]
 [dependencies]
 # Prover and verifier are one crate in tlsn; both sessions here run on any executor, so the
 # app (no tokio) proves and the engine verifies with the same code.
-tlsn = { git = "https://github.com/tlsnotary/tlsn", tag = "v0.1.0-beta.1", features = ["mozilla-certs"] }
+# Not its default `hash-blake3`: the proof commits no transcript hashes, and that circuit is 1.9 MB.
+tlsn = { git = "https://github.com/tlsnotary/tlsn", tag = "v0.1.0-beta.1", default-features = false, features = ["rayon", "mozilla-certs"] }
 anyhow = "1"
 # The verifier's per-step spans and timings (`session::verify`).
 tracing = "0.1"
